@@ -1,0 +1,28 @@
+{
+  "name": "rogatio",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "format": "biome format --write .",
+    "format:check": "biome check --formatter-enabled=true --linter-enabled=false .",
+    "lint": "biome check --formatter-enabled=false --linter-enabled=true .",
+    "typecheck": "tsc --noEmit",
+    "build": "node scripts/build.ts",
+    "test": "pnpm build && vitest run",
+    "test:browser": "pnpm build && playwright test",
+    "validate": "node scripts/validate.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.9",
+    "@playwright/test": "1.62.1",
+    "@types/node": "26.2.0",
+    "esbuild": "0.28.2",
+    "playwright": "1.62.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  }
+}

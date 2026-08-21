@@ -141,3 +141,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# F1 generated output and browser test state
+build-manifest.json
+packages/*/dist/
+playwright-report/
+test-results/
