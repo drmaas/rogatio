@@ -14,13 +14,18 @@ Do not silently skip stages. If a stage is not applicable, record why in the wor
 
 - Match the repository's conventions, tooling, architecture, and naming before introducing anything new.
 - Keep the work isolated in a feature worktree. Do not develop a feature in the main checkout.
+- Before editing with multiple worktrees, verify `git rev-parse --show-toplevel`, the current branch, `git worktree list`, and repository status; use the confirmed root for absolute paths.
 - Separate discovery from commitment: brainstorming may contain alternatives; the approved specification must contain a clear decision.
 - Treat the human review gate as a real stop. Do not write the implementation plan, tests, or production code until the user approves the specification.
 - Write tests from approved acceptance criteria before implementation. A test may be intentionally red at first, but it must become meaningful and pass after implementation.
 - Keep the specification, architecture, plan, tests, implementation, and documentation consistent. When one changes, inspect the downstream artifacts.
 - Use the project's package manager and existing scripts. Do not install a new dependency merely to satisfy this workflow without approval.
-- Before release operations, check for secrets, unrelated changes, generated artifacts, and accidental edits outside the worktree.
-- Commit, push, and PR creation are separate release actions. Obtain explicit user approval immediately before performing them; never force-push.
+- Treat untrusted values and unusual object behavior defensively, including inherited properties, accessors, proxies, cycles, sparse collections, malformed encodings, and mutable shared state when relevant.
+- Keep public diagnostics and serialized output deterministic and independent of third-party wording or incidental iteration order.
+- After implementation or review fixes, rerun the repository's canonical validation command; CI should run that same authoritative command rather than a weaker duplicate.
+- Before release operations, audit staged, unstaged, tracked, and untracked files for secrets, local settings, generated artifacts, unrelated changes, and accidental edits outside the worktree.
+- Keep state-inspection commands clearly scoped so branch, path, and status output cannot be confused; a failed or malformed tool call is a no-op, not a reason to guess.
+- Commit, push, PR creation, merge, and cleanup are separate release actions for audit purposes, but one explicit authorization for a clearly defined set remains valid for that set. Ask again only when authorization is absent, ambiguous, or the scope changes; never force-push or push directly to a protected default branch. Prompt immediately before deleting files/directories or removing worktrees.
 
 ## Model Roles
 
@@ -62,7 +67,7 @@ Prefer durable documents for the architecture, specification, and plan when the 
 
 ## Stage 0 — Enter an isolated worktree
 
-1. Inspect repository state: current branch, worktrees, status, and the available package/test scripts. If the checkout has uncommitted work, do not mix it in — ask how to proceed or branch from a clean known base.
+1. Verify the repository root with `git rev-parse --show-toplevel`, then inspect the current branch, worktrees, status, and available package/test scripts. If the checkout has uncommitted work, do not mix it in — ask how to proceed or branch from a clean known base.
 2. Create or enter the dedicated feature worktree and branch using the repository's naming convention. Confirm the shell is operating in that worktree before editing.
 3. Record base commit, branch, worktree path, intended change, and which models will serve each role. If the user supplied a worktree, verify it is the intended feature worktree before editing.
 
@@ -184,7 +189,7 @@ Use a maximum of **three review rounds**:
    - Implementation defect within approved behavior → Implementation, then verification.
    - Verification or release-process gap → Verification, then review.
    - Documentation-only issue → Documentation after the fix.
-4. Re-run affected tests and verification after fixes, then start the next fresh review round.
+4. Re-run the canonical validation command and any affected tests after fixes, then start the next fresh review round.
 5. Record the round number, reviewer context, findings, fixes, and evidence.
 
 Never exceed three rounds. If actionable disagreement or findings remain after round three, stop and ask the user to decide rather than continuing an unbounded loop.
@@ -199,22 +204,24 @@ Once behavior and review findings are stable, have the documentation model updat
 
 Then update the rest of the documentation set as needed: user guides, CLI/API references, examples, configuration, migration, release, and troubleshooting docs; changelog or release notes when the repository uses them.
 
-Document supported platforms, limitations, security behavior, and the upgrade path. Keep examples executable or consistent with the implementation. Run documentation checks, links, generated-doc builds, or package checks that the repository provides.
+Document supported platforms, limitations, security behavior, and the upgrade path. Keep examples executable or consistent with the implementation. Run documentation checks, links, generated-doc builds, or package checks that the repository provides. Record final release/status changes in the established workflow documentation.
 
-## Stage 11 — Commit, push, and PR
+## Stage 11 — Commit, push, PR, merge, and cleanup
 
 Before release actions, show the user the final summary, changed-file list, verification evidence, review-round result, and any known limitations. Confirm that the worktree contains only intended changes.
 
-With explicit user approval:
+With explicit user approval for the defined release-action set (an existing authorization remains valid unless it is absent, ambiguous, or the scope changes):
 
-1. Review staged and unstaged diffs and recent commit-message conventions.
-2. Stage only files belonging to this change; never include secrets, local settings, or unrelated user work.
+1. Verify the active repository root, branch, worktree list, status, and recent commit-message conventions.
+2. Review staged, unstaged, tracked, and untracked files and diffs; never include secrets, local settings, generated noise, or unrelated user work.
 3. Create a concise conventional commit when the repository uses conventional commits, describing why the change was made.
 4. Push the feature branch to the expected remote. Never force-push or push directly to a protected default branch.
 5. Open or update a pull request using the repository's supported tooling. Include the problem, solution, scope, tests/verification, review-round summary, documentation changes, migrations, and known risks.
-6. Report the commit, branch, PR, and any remaining action required from the user.
+6. When merge is in scope and authorized, wait for required checks and merge without bypassing branch protections.
+7. After merge, reconcile release/status documentation and verify the default branch, worktrees, local branches, and remote refs. Remove worktrees, local branches, or merged remote branches only when cleanup is in scope; prompt immediately before deleting files/directories or removing worktrees.
+8. Report the commit, branch, PR, merge result, cleanup result, verification evidence, and any remaining action required from the user.
 
-If approval for any release action is absent, stop after preparing the exact proposed command or PR content. Do not infer permission to commit, push, merge, or deploy.
+If approval for any release action is absent or ambiguous, stop after preparing the exact proposed command or PR content. Do not infer permission to commit, push, merge, deploy, or delete.
 
 ## Completion checklist
 
@@ -227,7 +234,9 @@ A change is complete only when:
 - [ ] Each role's model was checked; fallbacks were recorded, not silently substituted.
 - [ ] Tests were written first or the exception was documented.
 - [ ] Relevant formatting, linting, type, unit, integration, E2E, and build checks pass.
+- [ ] The canonical validation command was rerun after implementation and after later fixes; CI runs the same authoritative validation.
 - [ ] Fresh-context review passed within three rounds, or unresolved findings were escalated.
 - [ ] Documentation this change touches is updated (architecture, README, AGENTS as applicable).
 - [ ] The user approved commit/push/PR actions before they were performed.
-- [ ] The commit and PR contain only intended changes and include verification evidence.
+- [ ] The final release audit covered staged, unstaged, tracked, and untracked files; the commit and PR contain only intended changes and include verification evidence.
+- [ ] After merge, release/status documentation, the default branch, worktrees, local branches, and remote refs were reconciled and verified.
