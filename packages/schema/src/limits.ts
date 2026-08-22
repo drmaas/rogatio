@@ -1,0 +1,13 @@
+export const LIMITS = Object.freeze({
+  maxGroups: 64,
+  maxRulesPerGroup: 256,
+  maxRulesPerProject: 4096,
+  maxOriginsPerScope: 32,
+  maxIdLength: 64,
+  maxLabelLength: 100,
+  maxDescriptionLength: 1000,
+  maxUrlRegexLength: 2048,
+  maxResourceTypesPerRule: 16,
+  minPriority: 1,
+  maxPriority: 1000,
+});
