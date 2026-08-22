@@ -7,7 +7,7 @@
 - **Branch:** `feature/f1-monorepo-tooling`
 - **Worktree:** `/home/drmaas/Projects/github/drmaas/rogatio-f1`
 - **Implementation authorization:** The latest user request explicitly authorizes continuing from the F1 specification and plan to complete F1. The implementation remains bounded by those artifacts.
-- **Release authorization:** No commit, push, pull request, merge, or deployment authorization has been given.
+- **Release authorization:** The user explicitly authorized commit, push, pull request, merge, and worktree cleanup for F1, F2, and F3.
 
 ## Stage Status
 
@@ -22,7 +22,7 @@
 - [x] Stage 8 - verification and evidence
 - [x] Stage 9 - independent review; rounds completed: 2 of 3 (round 2 complete, stage complete)
 - [x] Stage 10 - documentation updates after behavior stabilizes
-- [ ] Stage 11 - release actions; not authorized
+- [ ] Stage 11 - release actions; authorized and pending completion of PR #1 merge and worktree cleanup
 
 ## Model Roles
 
@@ -89,6 +89,6 @@ Stage 9 conclusion: 2 of 3 available independent-review rounds used. The third r
 
 ## Release State
 
-- Stage 11 release actions remain unauthorized.
-- No commit, push, pull request, merge, or deployment has been performed or authorized.
+- Stage 11 release actions are authorized and pending completion of the F1 merge and worktree cleanup.
+- The F1 implementation commit exists at `7677555`; the merge commit, push, pull request update, merge, and worktree cleanup remain pending.
 - All generated artifacts, build output, browser binaries, coverage, and local environment files remain ignored and out of version control.

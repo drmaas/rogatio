@@ -51,15 +51,14 @@ F1 uses explicit target-specific build settings rather than a custom internal bu
 
 ## Workflow Model Roles
 
-The repository workflow uses model roles rather than retaining raw brainstorming as project documentation:
+The `sdd` and `doit` skills in `.agents/skills/` define per-role model preferences and the fallback chain. Preferred models are drawn from the `opencode-go` and `openrouter` providers, with the session's active model as the final fallback when a preferred variant is unavailable.
 
-- `opencode-go/gpt-5.6-luna` performs the primary brainstorm, architecture synthesis, and SDD specification synthesis.
-- `opencode-go/minimax-m3` performs the adversarial brainstorm.
-- `opencode-go/glm-5.3` writes implementation plans and performs independent review.
-- `opencode-go/gpt-5.6-luna` performs tests-first coding tasks.
-- `opencode-go/hy3` performs verification and documentation updates.
+- Primary brainstorm, architecture, SDD specification, tests, and coding: `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → session model.
+- Adversarial brainstorm: `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `openrouter/anthropic/claude-opus-5` → session model.
+- Implementation plans and independent review: `opencode-go/glm-5.3` → `opencode-go/glm-5.2` → `openrouter/anthropic/claude-sonnet-5` → session model.
+- Verification and documentation: `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model.
 
-Raw brainstorm output is ephemeral. Only synthesized architecture decisions, specifications, plans, verification evidence, and final documentation are durable. Required model identifiers are checked before delegation; unavailable roles block work rather than being silently substituted.
+Raw brainstorm output is ephemeral. Only synthesized architecture decisions, specifications, plans, verification evidence, and final documentation are durable. Model availability is checked once at workflow start; a preferred model being unavailable triggers a recorded fallback rather than blocking the whole workflow. Under a single-model session (for example Freebuff), one model performs every role and the fresh-context review becomes a deliberate self-review pass that re-reads the final diff without the implementer's working notes.
 
 ## Compatibility Baseline
 

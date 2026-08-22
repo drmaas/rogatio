@@ -16,9 +16,7 @@ Feature 1, monorepo and tooling bootstrap, is implemented in this worktree. Prod
 
 ## Development Workflow
 
-The planning workflow uses `opencode-go/gpt-5.6-luna` for primary brainstorming, architecture synthesis, specification synthesis, and coding; `opencode-go/minimax-m3` for adversarial brainstorming; `opencode-go/glm-5.3` for plans and review; and `opencode-go/hy3` for verification and documentation. Raw brainstorm output is ephemeral and is not part of the durable project documentation.
-
-Required model identifiers are checked before delegated work, and unavailable roles block work rather than being silently substituted.
+The planning workflow uses role-specific models with a recorded fallback chain. Preferred models are drawn from the `opencode-go` and `openrouter` providers, with the session's active model as the final fallback: primary brainstorm, architecture, specification, tests, and coding prefer `opencode-go/gpt-5.6-luna`; adversarial brainstorm prefers `opencode-go/minimax-m3`; plans and review prefer `opencode-go/glm-5.3`; verification and documentation prefer `opencode-go/hy3`. Under a single-model session (for example Freebuff), one model performs every role and the fresh-context review becomes a self-review pass. Raw brainstorm output is ephemeral and is not part of the durable project documentation.
 
 ## Foundation
 
