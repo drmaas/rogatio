@@ -2,7 +2,7 @@
 
 **Synthesis model:** `opencode-go/gpt-5.6-luna`
 **Inputs:** primary and adversarial F2 design passes, repository overview, sequence, and F1 architecture
-**Status:** Approved specification; implementation complete pending release
+**Status:** Released in PR #2 as commit `87f96a2c48e1b7a967c24e5604df4308365a50b1`
 **Feature:** F2
 **Depends on:** F1
 **Enables:** F3 and later rule slices

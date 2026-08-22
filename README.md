@@ -4,7 +4,7 @@ Rogatio is a planned local-first tool for creating, reviewing, and running brows
 
 ## Current Status
 
-Feature 1, monorepo and tooling bootstrap, is implemented. Feature 2's `@rogatio/schema` package is implemented in the feature worktree and pending release. Other product packages remain intentionally unimplemented.
+Feature 1, monorepo and tooling bootstrap, and Feature 2, the released `@rogatio/schema` package, are complete. Feature 3's `@rogatio/compiler` package is implemented in the feature worktree and pending release. Other product packages remain intentionally unimplemented.
 
 ## Project Documents
 
@@ -14,6 +14,9 @@ Feature 1, monorepo and tooling bootstrap, is implemented. Feature 2's `@rogatio
 - [`docs/specs/f1-monorepo-tooling.md`](docs/specs/f1-monorepo-tooling.md): Feature 1 specification.
 - [`docs/plans/f1-monorepo-tooling.md`](docs/plans/f1-monorepo-tooling.md): Feature 1 implementation plan.
 - [`docs/specs/f2-schema.md`](docs/specs/f2-schema.md): Feature 2 schema specification.
+- [`docs/plans/f2-schema.md`](docs/plans/f2-schema.md): Feature 2 implementation plan.
+- [`docs/specs/f3-compiler.md`](docs/specs/f3-compiler.md): Feature 3 compiler specification.
+- [`docs/plans/f3-compiler.md`](docs/plans/f3-compiler.md): Feature 3 implementation plan.
 
 ## Development Workflow
 
@@ -51,21 +54,25 @@ F1 retains pnpm's default lifecycle-script blocking. No broad install-script all
 - `pnpm format:check` checks formatting; `pnpm format` writes it.
 - `pnpm lint` runs Biome linting.
 - `pnpm typecheck` runs the pinned strict TypeScript compiler.
-- `pnpm build` creates and verifies Node and browser ESM smoke artifacts plus the Node ESM schema artifact.
+- `pnpm build` creates and verifies Node and browser ESM smoke artifacts plus the Node ESM schema and compiler artifacts.
 - `pnpm test` builds and runs the non-empty Vitest smoke suite.
 - `pnpm test:browser` builds and runs the Chromium Playwright smoke journey.
 - `pnpm validate` runs the complete fail-fast validation sequence, including negative fixtures.
 
 ## F1 Verification Baseline
 
-F1 validation is pinned to a known-good toolchain: Node `24.19.0`, pnpm `10.32.1`, and `typescript@7.0.2`. In the current session `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test`, `pnpm test:browser`, and `pnpm validate` all passed, along with the `smoke`/`sanity` package tests and builds. `pnpm validate` executed two Vitest tests, three intentional TypeScript failures, three emitted artifacts, direct emitted `smoke`/`sanity` Node imports, and one Chromium test. See `docs/f1-workflow.md` for the recorded evidence.
+F1 validation is pinned to a known-good toolchain: Node `24.19.0`, pnpm `10.32.1`, and `typescript@7.0.2`. The original F1 validation evidence is recorded in `docs/f1-workflow.md`.
 
 ## F1 Package Boundaries
 
-F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary. The future `compiler -> browser-core/editor/runtime -> extension/cli` layers are documented boundaries only. No F3-F20 product API or behavior is present.
+F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary; F3 adds the `@rogatio/compiler` matcher transformation boundary. The future `browser-core/editor/runtime -> extension/cli` layers are documented boundaries only. No F4-F20 product API or behavior is present.
 
 There is no installable CLI, browser extension, or runtime yet. Do not infer product behavior from the F1 bootstrap smoke packages.
 
 ## Schema Boundary
 
 F2 adds `@rogatio/schema` as the local validation boundary for the common version-1 `.rogatio.json` envelope. It owns project/group/rule matcher data, explicit HTTP(S) site origins, bounded inputs, and frozen forbidden-header policy lists. Its verified distribution artifact is Node ESM; MV3-safe browser packaging is deferred to the extension boundary. Rule actions, compiler operations, browser integration, persistence, and runtime behavior remain out of scope until their sequence items land.
+
+## Compiler Boundary
+
+F3 adds `@rogatio/compiler` as a pure Node ESM boundary from the fully validated F2 envelope to one fresh, data-only matcher operation per source rule. It normalizes and sorts effective origins, orders resource types canonically, preserves regex source, method, priority, and source order, and maps validation failures to stable diagnostics. It does not execute matching, define priority precedence, add actions, or access browser, runtime, filesystem, network, persistence, permission, or telemetry APIs. MV3-safe packaging remains deferred with the F2 browser boundary.

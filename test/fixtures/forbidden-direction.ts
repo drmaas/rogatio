@@ -1,3 +1,3 @@
-import { compilerValue } from "@rogatio/compiler";
+import { browserCoreValue } from "@rogatio/browser-core";
 
-export { compilerValue };
+export { browserCoreValue };

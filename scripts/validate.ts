@@ -57,6 +57,7 @@ async function checkArtifacts(): Promise<void> {
     "packages/smoke/dist/browser/index.js",
     "packages/sanity/dist/node/index.js",
     "packages/schema/dist/node/index.js",
+    "packages/compiler/dist/node/index.js",
   ];
   if (
     expected.length !== Object.keys(manifest).length ||
@@ -112,6 +113,24 @@ async function checkEmittedModules(): Promise<void> {
     throw new Error("Schema emitted Node module did not validate a project");
   if (schema.validateProject?.({ ...project, unexpected: true }) !== false)
     throw new Error("Schema emitted Node module accepted an unknown property");
+
+  const compiler = (await import(
+    pathToFileURL(resolve(root, "packages/compiler/dist/node/index.js")).href
+  )) as {
+    compileProject?: (
+      value: unknown,
+    ) =>
+      | { ok: true; operations: unknown[]; diagnostics: unknown[] }
+      | { ok: false; operations: []; diagnostics: unknown[] };
+  };
+  const compiled = compiler.compileProject?.(project);
+  if (!compiled?.ok || compiled.operations.length !== 1)
+    throw new Error("Compiler emitted Node module did not compile a project");
+  const rejected = compiler.compileProject?.({ ...project, unexpected: true });
+  if (rejected?.ok !== false || rejected.operations.length !== 0)
+    throw new Error(
+      "Compiler emitted Node module accepted an unknown property",
+    );
 }
 async function checkBoundaries(): Promise<void> {
   const manifest = JSON.parse(
@@ -124,11 +143,24 @@ async function checkBoundaries(): Promise<void> {
   ) as { dependencies?: Record<string, string> };
   if (schemaManifest.dependencies?.ajv !== "8.17.1")
     throw new Error("Schema must declare its exact Ajv runtime dependency");
+  if ("@rogatio/compiler" in (schemaManifest.dependencies ?? {}))
+    throw new Error("Schema must not depend on the compiler");
+  const compilerManifest = JSON.parse(
+    await readFile(resolve(root, "packages/compiler/package.json"), "utf8"),
+  ) as { dependencies?: Record<string, string> };
+  const compilerDependencies = compilerManifest.dependencies ?? {};
+  if (
+    Object.keys(compilerDependencies).length !== 1 ||
+    compilerDependencies["@rogatio/schema"] !== "workspace:*"
+  )
+    throw new Error(
+      "Compiler must depend only on the schema workspace package",
+    );
   const forbidden = await readFile(
     resolve(root, "test/fixtures/forbidden-direction.ts"),
     "utf8",
   );
-  if (!forbidden.includes("@rogatio/compiler"))
+  if (!forbidden.includes("@rogatio/browser-core"))
     throw new Error("Forbidden-direction fixture was altered");
 }
 run("format", pnpm, ["format:check"]);

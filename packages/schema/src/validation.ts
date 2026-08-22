@@ -46,35 +46,94 @@ function ajvIssues(
   }));
 }
 
-function hasOwnArrayEntries(
+type SnapshotResult = { valid: true; value: unknown } | { valid: false };
+
+function snapshotOwnData(
   value: unknown,
   ancestors = new WeakSet<object>(),
-): boolean {
-  if (value === null || typeof value !== "object") return true;
-  if (ancestors.has(value)) return false;
+): SnapshotResult {
+  if (value === null || typeof value !== "object") {
+    return { valid: true, value };
+  }
+  if (ancestors.has(value)) return { valid: false };
 
   ancestors.add(value);
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
-      if (
-        !Object.hasOwn(value, index) ||
-        !hasOwnArrayEntries(value[index], ancestors)
-      ) {
-        return false;
-      }
+  try {
+    if (Object.getOwnPropertySymbols(value).length > 0) {
+      return { valid: false };
     }
-  } else {
-    for (const key of Object.keys(value)) {
-      if (
-        !hasOwnArrayEntries((value as Record<string, unknown>)[key], ancestors)
-      ) {
-        return false;
-      }
-    }
-  }
 
-  ancestors.delete(value);
-  return true;
+    if (Array.isArray(value)) {
+      const lengthDescriptor = Object.getOwnPropertyDescriptor(value, "length");
+      if (
+        lengthDescriptor === undefined ||
+        !("value" in lengthDescriptor) ||
+        !Number.isSafeInteger(lengthDescriptor.value) ||
+        lengthDescriptor.value < 0 ||
+        lengthDescriptor.value > LIMITS.maxRulesPerProject
+      ) {
+        return { valid: false };
+      }
+
+      const length = lengthDescriptor.value;
+      for (const propertyName of Object.getOwnPropertyNames(value)) {
+        if (propertyName === "length") continue;
+        const index = Number(propertyName);
+        if (
+          !Number.isInteger(index) ||
+          index < 0 ||
+          index >= length ||
+          String(index) !== propertyName
+        ) {
+          return { valid: false };
+        }
+      }
+
+      const snapshot: unknown[] = new Array(length);
+      for (let index = 0; index < length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(
+          value,
+          String(index),
+        );
+        if (
+          descriptor === undefined ||
+          !("value" in descriptor) ||
+          !descriptor.enumerable
+        ) {
+          return { valid: false };
+        }
+        const child = snapshotOwnData(descriptor.value, ancestors);
+        if (!child.valid) return child;
+        snapshot[index] = child.value;
+      }
+      return { valid: true, value: snapshot };
+    }
+
+    const snapshot = Object.create(null) as Record<string, unknown>;
+    for (const key of Object.getOwnPropertyNames(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (
+        descriptor === undefined ||
+        !("value" in descriptor) ||
+        !descriptor.enumerable
+      ) {
+        return { valid: false };
+      }
+      const child = snapshotOwnData(descriptor.value, ancestors);
+      if (!child.valid) return child;
+      Object.defineProperty(snapshot, key, {
+        configurable: true,
+        enumerable: true,
+        value: child.value,
+        writable: true,
+      });
+    }
+    return { valid: true, value: snapshot };
+  } catch {
+    return { valid: false };
+  } finally {
+    ancestors.delete(value);
+  }
 }
 
 const compiledProjectValidator: ValidateFunction<RogatioProject> =
@@ -88,12 +147,13 @@ const ownArrayEntriesError: ErrorObject = {
 };
 const guardedProjectValidator = Object.assign(
   (value: unknown): value is RogatioProject => {
-    if (!hasOwnArrayEntries(value)) {
+    const snapshot = snapshotOwnData(value);
+    if (!snapshot.valid) {
       guardedProjectValidator.errors = [ownArrayEntriesError];
       return false;
     }
 
-    const valid = compiledProjectValidator(value);
+    const valid = compiledProjectValidator(snapshot.value);
     guardedProjectValidator.errors = compiledProjectValidator.errors ?? null;
     return valid;
   },
@@ -191,7 +251,8 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
 export function validateProjectDetailed(
   value: unknown,
 ): ProjectValidationResult {
-  if (!hasOwnArrayEntries(value)) {
+  const snapshot = snapshotOwnData(value);
+  if (!snapshot.valid) {
     return {
       valid: false,
       errors: [
@@ -205,14 +266,14 @@ export function validateProjectDetailed(
     };
   }
 
-  if (!projectValidator(value)) {
+  if (!projectValidator(snapshot.value)) {
     return { valid: false, errors: ajvIssues(projectValidator.errors) };
   }
 
-  const errors = semanticIssues(value);
+  const errors = semanticIssues(snapshot.value as RogatioProject);
   return errors.length > 0
     ? { valid: false, errors }
-    : { valid: true, data: value };
+    : { valid: true, data: value as RogatioProject };
 }
 
 export function validateProject(value: unknown): value is RogatioProject {
