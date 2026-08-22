@@ -4,7 +4,7 @@ Rogatio is a planned local-first tool for creating, reviewing, and running brows
 
 ## Current Status
 
-Feature 1, monorepo and tooling bootstrap, is implemented in this worktree. Product packages remain intentionally unimplemented.
+Feature 1, monorepo and tooling bootstrap, is implemented. Feature 2's `@rogatio/schema` package is implemented in the feature worktree and pending release. Other product packages remain intentionally unimplemented.
 
 ## Project Documents
 
@@ -13,6 +13,7 @@ Feature 1, monorepo and tooling bootstrap, is implemented in this worktree. Prod
 - [`docs/architecture.md`](docs/architecture.md): current planned boundaries and decisions.
 - [`docs/specs/f1-monorepo-tooling.md`](docs/specs/f1-monorepo-tooling.md): Feature 1 specification.
 - [`docs/plans/f1-monorepo-tooling.md`](docs/plans/f1-monorepo-tooling.md): Feature 1 implementation plan.
+- [`docs/specs/f2-schema.md`](docs/specs/f2-schema.md): Feature 2 schema specification.
 
 ## Development Workflow
 
@@ -50,7 +51,7 @@ F1 retains pnpm's default lifecycle-script blocking. No broad install-script all
 - `pnpm format:check` checks formatting; `pnpm format` writes it.
 - `pnpm lint` runs Biome linting.
 - `pnpm typecheck` runs the pinned strict TypeScript compiler.
-- `pnpm build` creates and verifies Node and browser ESM smoke artifacts.
+- `pnpm build` creates and verifies Node and browser ESM smoke artifacts plus the Node ESM schema artifact.
 - `pnpm test` builds and runs the non-empty Vitest smoke suite.
 - `pnpm test:browser` builds and runs the Chromium Playwright smoke journey.
 - `pnpm validate` runs the complete fail-fast validation sequence, including negative fixtures.
@@ -61,6 +62,10 @@ F1 validation is pinned to a known-good toolchain: Node `24.19.0`, pnpm `10.32.1
 
 ## F1 Package Boundaries
 
-Only `@rogatio/smoke` and `@rogatio/sanity` exist for F1 tooling verification. The future `schema -> compiler -> browser-core/editor/runtime -> extension/cli` layers are documented boundaries only. No F2-F20 product API or behavior is present.
+F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary. The future `compiler -> browser-core/editor/runtime -> extension/cli` layers are documented boundaries only. No F3-F20 product API or behavior is present.
 
 There is no installable CLI, browser extension, or runtime yet. Do not infer product behavior from the F1 bootstrap smoke packages.
+
+## Schema Boundary
+
+F2 adds `@rogatio/schema` as the local validation boundary for the common version-1 `.rogatio.json` envelope. It owns project/group/rule matcher data, explicit HTTP(S) site origins, bounded inputs, and frozen forbidden-header policy lists. Its verified distribution artifact is Node ESM; MV3-safe browser packaging is deferred to the extension boundary. Rule actions, compiler operations, browser integration, persistence, and runtime behavior remain out of scope until their sequence items land.

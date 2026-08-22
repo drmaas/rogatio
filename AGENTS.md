@@ -2,7 +2,7 @@
 
 ## Repository State
 
-Rogatio has completed Feature 1, the monorepo and tooling bootstrap. Read `rogatio-overview.md` and `sequence.md` before changing scope. F1 must not implement schema, compiler, editor, extension, CLI, runtime, release, telemetry, or traffic-capture behavior.
+Rogatio has completed Feature 1, the monorepo and tooling bootstrap. F2 schema work is isolated to the `feature/f2-schema` worktree, implemented there, and specified in `docs/specs/f2-schema.md`. Read `rogatio-overview.md` and `sequence.md` before changing scope. F1 must not implement schema, compiler, editor, extension, CLI, runtime, release, telemetry, or traffic-capture behavior.
 
 ## Durable Documentation
 

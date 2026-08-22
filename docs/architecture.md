@@ -1,6 +1,6 @@
 # Rogatio Architecture
 
-**Status:** F1 bootstrap implemented; product packages remain intentionally unimplemented.
+**Status:** F1 bootstrap and F2 schema implementation are complete in their feature worktrees; F2 is pending release.
 
 ## Product Boundary
 
@@ -28,7 +28,7 @@ extension / cli
 - `extension` provides the Chrome MV3 boundary and browser-specific translation.
 - `cli` hosts the public `edit`, `verify`, and `runtime` commands.
 
-These packages are planned boundaries only. F1 must not implement their domain behavior.
+These packages are planned boundaries only. F1 must not implement their domain behavior. F2 is the first product package and is limited to the common version-1 file contract and shared validation policy.
 
 ## F1 Bootstrap Architecture
 
@@ -92,9 +92,19 @@ F1 decisions are:
 - **G3:** Run Chromium in a separate mandatory browser job; local and CI runs fail clearly when Chromium is not installed.
 - **G4:** Run Ubuntu checks on every push and pull request; run Windows and macOS smoke checks on the weekly schedule or manual dispatch.
 
-The repository now contains the F1 bootstrap plus planning documents. The durable F1 specification and plan are stored at:
+The repository contains the F1 bootstrap and its durable specification and plan:
 
 - `docs/specs/f1-monorepo-tooling.md`
 - `docs/plans/f1-monorepo-tooling.md`
 
-No raw brainstorm documents are retained. No product implementation, release automation, credentials, telemetry, hosted endpoint, native runtime, or traffic capture has been introduced.
+No raw brainstorm documents are retained. F1 introduced no product behavior, release automation, credentials, telemetry, hosted endpoint, native runtime, or traffic capture. The F2 schema package below is the only product implementation currently present.
+
+## F2 Schema Architecture
+
+F2 introduces `@rogatio/schema` as the authoritative validation boundary for the common version-1 `.rogatio.json` envelope. The package owns the root project metadata, named groups, explicit HTTP(S) origins, and common rule matcher fields: stable IDs, labels, case-sensitive URL regular expressions, resource types, priority, and optional method. It does not implement action payloads or any consumer behavior; later rule slices extend the version-1 schema with their own action fields.
+
+The schema is draft 2020-12 with strict additional-property rejection. Ajv compiles it with all-errors reporting and with coercion, defaults, and property removal disabled. A small semantic validation layer supplements JSON Schema for globally unique IDs, non-empty effective origins, and the total rule bound. All errors use stable JSON-pointer paths and no rejected document is persisted or sent over the network.
+
+Origin validation accepts only explicit `http` and `https` origins with a hostname and optional valid port. Credentials, paths, query strings, fragments, wildcard hosts, and other schemes are rejected. Bounds and browser-neutral resource/method enumerations are exported from the package. Request and response forbidden-header lists are frozen and matched case-insensitively for later header-rule slices.
+
+The verified F2 distribution target is a Node ESM artifact because Ajv compiles its validator at module initialization. Browser and MV3 consumers must receive a later approved standalone/browser packaging strategy rather than loading this runtime-compiled entry under an extension CSP.
