@@ -4,7 +4,7 @@ Rogatio is a planned local-first tool for creating, reviewing, and running brows
 
 ## Current Status
 
-Feature 1, monorepo and tooling bootstrap, and Feature 2, the released `@rogatio/schema` package, are complete. Feature 3's `@rogatio/compiler` package is implemented in the feature worktree and pending release. Other product packages remain intentionally unimplemented.
+Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, and Feature 3, the released `@rogatio/compiler` package, are complete. Other product packages remain intentionally unimplemented.
 
 ## Project Documents
 

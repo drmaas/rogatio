@@ -1,6 +1,6 @@
 # Rogatio Architecture
 
-**Status:** F1 bootstrap and F2 schema are released; F3 compiler implementation is complete in the `feature/f3-compiler` worktree and pending release.
+**Status:** F1 bootstrap, F2 schema, and F3 compiler are released.
 
 ## Product Boundary
 

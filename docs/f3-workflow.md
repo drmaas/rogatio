@@ -7,7 +7,7 @@
 - **Branch:** `feature/f3-compiler`
 - **Worktree:** `/home/drmaas/Projects/github/drmaas/rogatio-f3`
 - **Implementation authorization:** The user's sequential F1/F2/F3 request authorizes implementation, subject to the SDD specification approval gate.
-- **Release authorization:** The user explicitly authorized commit, push, pull request, merge, and worktree cleanup for F1, F2, and F3. Confirmation is still required immediately before deleting this worktree.
+- **Release authorization:** The user explicitly authorized commit, push, pull request, merge, and worktree cleanup for F1, F2, and F3. Worktree deletion was confirmed immediately before removing the F3 worktree.
 
 ## Stage Status
 
@@ -22,7 +22,7 @@
 - [x] Stage 8 - verification and evidence
 - [x] Stage 9 - independent fresh-context review; rounds completed: 3 of 3
 - [x] Stage 10 - documentation updates after behavior stabilized
-- [ ] Stage 11 - release actions
+- [x] Stage 11 - release actions
 
 ## Model Roles
 
@@ -72,3 +72,9 @@ Tests were added before compiler source in `packages/compiler/test/compiler.test
 - Review round 2 found one invalid CI indentation and accessor/proxy instability. The workflow indentation was corrected, F2 and compiler inputs were changed to stable own-data snapshots, custom array extensions/cycles are rejected, and the F2 release metadata was completed.
 - Review round 3 passed with no blocking or actionable implementation findings. A priority-order regression was added so unequal priorities prove source order is preserved. Remaining gaps are non-blocking: the invariant-path catch branch is defensive and has no direct fault-injection test, and the broader validation script does not duplicate every package metadata assertion already covered by source and manifest checks.
 - The final review confirmed the private ESM boundary, dependency direction, F2 validation use, atomic failures, normalization, diagnostics, CI, generated-file hygiene, and exclusion of browser/runtime/action behavior. MV3-safe packaging remains intentionally deferred.
+
+## Release Evidence
+
+- Commit `a8a05af` (`feat(f3): add compiler matcher boundary`) was pushed in `feature/f3-compiler` through PR #3.
+- PR #3 (`https://github.com/drmaas/rogatio/pull/3`) passed its required checks and merged into `main` as `63bde12eeb497ee52cc7094f451c83cfd0785d4`.
+- The F3 worktree was removed after confirmation and its local feature branch was deleted.

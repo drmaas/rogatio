@@ -2,7 +2,7 @@
 
 ## Repository State
 
-Rogatio has released Feature 1, the monorepo and tooling bootstrap, and Feature 2, the schema package. Feature 3 compiler work is isolated to the `feature/f3-compiler` worktree and specified in `docs/specs/f3-compiler.md` until its release is complete. Read `rogatio-overview.md` and `sequence.md` before changing scope. F1 must not implement schema, compiler, editor, extension, CLI, runtime, release, telemetry, or traffic-capture behavior.
+Rogatio has released Feature 1, the monorepo and tooling bootstrap, Feature 2, the schema package, and Feature 3, the compiler package. Read `rogatio-overview.md` and `sequence.md` before changing scope. F1 must not implement schema, compiler, editor, extension, CLI, runtime, release, telemetry, or traffic-capture behavior.
 
 ## Durable Documentation
 

@@ -2,7 +2,7 @@
 
 **Synthesis model:** `opencode-go/gpt-5.6-luna`
 **Adversarial model:** `opencode-go/minimax-m3`
-**Status:** Approved specification; implementation complete pending release
+**Status:** Released in PR #3 as commit `63bde12eeb497ee52cc7094f451c83cfd0785d4`
 **Feature:** F3
 **Depends on:** F2
 **Enables:** F4, F5, and later rule-type compiler slices
