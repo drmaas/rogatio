@@ -1,6 +1,6 @@
 # Rogatio Architecture
 
-**Status:** F1 bootstrap and F2 schema implementation are complete in their feature worktrees; F2 is pending release.
+**Status:** F1 bootstrap and F2 schema are released; F3 compiler implementation is complete in the `feature/f3-compiler` worktree and pending release.
 
 ## Product Boundary
 
@@ -28,7 +28,7 @@ extension / cli
 - `extension` provides the Chrome MV3 boundary and browser-specific translation.
 - `cli` hosts the public `edit`, `verify`, and `runtime` commands.
 
-These packages are planned boundaries only. F1 must not implement their domain behavior. F2 is the first product package and is limited to the common version-1 file contract and shared validation policy.
+These packages are planned boundaries only. F1 must not implement their domain behavior. F2 is limited to the common version-1 file contract and shared validation policy; F3 is limited to compiling that common envelope into matcher operations.
 
 ## F1 Bootstrap Architecture
 
@@ -97,7 +97,7 @@ The repository contains the F1 bootstrap and its durable specification and plan:
 - `docs/specs/f1-monorepo-tooling.md`
 - `docs/plans/f1-monorepo-tooling.md`
 
-No raw brainstorm documents are retained. F1 introduced no product behavior, release automation, credentials, telemetry, hosted endpoint, native runtime, or traffic capture. The F2 schema package below is the only product implementation currently present.
+No raw brainstorm documents are retained. F1 introduced no product behavior, release automation, credentials, telemetry, hosted endpoint, native runtime, or traffic capture. The F2 schema and F3 compiler packages below are the only product implementations currently present.
 
 ## F2 Schema Architecture
 
@@ -108,3 +108,11 @@ The schema is draft 2020-12 with strict additional-property rejection. Ajv compi
 Origin validation accepts only explicit `http` and `https` origins with a hostname and optional valid port. Credentials, paths, query strings, fragments, wildcard hosts, and other schemes are rejected. Bounds and browser-neutral resource/method enumerations are exported from the package. Request and response forbidden-header lists are frozen and matched case-insensitively for later header-rule slices.
 
 The verified F2 distribution target is a Node ESM artifact because Ajv compiles its validator at module initialization. Browser and MV3 consumers must receive a later approved standalone/browser packaging strategy rather than loading this runtime-compiled entry under an extension CSP.
+
+## F3 Compiler Architecture
+
+F3 adds `@rogatio/compiler` as a pure, Node ESM transformation boundary from validated F2 projects to browser-neutral matcher operations. Because the F2 envelope intentionally contains no action fields, F3 emits one data-only matcher operation per source rule. Later rule slices add action-specific compiler operations; F3 does not invent a no-op action or a browser-specific representation.
+
+The public `compileProject(value: unknown)` entry point invokes the complete F2 structural and semantic validation boundary before compiling. Invalid input returns a discriminated failure with stable compiler diagnostics and an empty operation list. A valid project produces fresh, serializable output: group and rule traversal order is preserved, group and rule origins are normalized, unioned, deduplicated, and sorted deterministically, resource types use the shared canonical order, the exact regex source is retained with empty flags, and method and priority values pass through unchanged. The compiler does not sort by priority or expand a rule into an origin/resource-type Cartesian product.
+
+Compiler diagnostics use stable codes, severity, JSON-pointer paths, and structured parameters rather than exposing Ajv message text as an API contract. The package depends only on `@rogatio/schema`, has no browser or downstream-package dependency, and inherits the verified Node ESM distribution target. It performs no matching, action transformation, browser permission/DNR translation, filesystem, network, persistence, runtime, telemetry, or traffic-capture work.

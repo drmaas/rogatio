@@ -203,6 +203,21 @@ describe("@rogatio/schema", () => {
     expect(validateProject(inherited)).toBe(false);
   });
 
+  it("rejects accessor-backed values without invoking the accessor", () => {
+    const project = makeProject();
+    let getterRead = false;
+    Object.defineProperty(project.groups[0].rules[0], "priority", {
+      enumerable: true,
+      get: () => {
+        getterRead = true;
+        return 1n;
+      },
+    });
+
+    expect(validateProject(project)).toBe(false);
+    expect(getterRead).toBe(false);
+  });
+
   it("does not validate inherited entries in sparse arrays", () => {
     const inheritedGroups = [] as RogatioProject["groups"];
     Object.setPrototypeOf(inheritedGroups, { 0: makeProject().groups[0] });

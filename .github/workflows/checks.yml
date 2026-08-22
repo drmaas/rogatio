@@ -1,4 +1,4 @@
-name: F1 checks
+name: Repository checks
 
 on:
   pull_request:
@@ -63,8 +63,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Browser smoke
-        run: pnpm test:browser
+      - name: Full validation
+        run: pnpm validate
 
   cross-platform:
     name: Cross-platform smoke (${{ matrix.os }})

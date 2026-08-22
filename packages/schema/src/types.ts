@@ -1,6 +1,6 @@
 export const PROJECT_VERSION = 1 as const;
 
-export const RESOURCE_TYPES = [
+export const RESOURCE_TYPES = Object.freeze([
   "main_frame",
   "sub_frame",
   "stylesheet",
@@ -16,11 +16,11 @@ export const RESOURCE_TYPES = [
   "webtransport",
   "webbundle",
   "other",
-] as const;
+] as const);
 
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
-export const HTTP_METHODS = [
+export const HTTP_METHODS = Object.freeze([
   "GET",
   "POST",
   "PUT",
@@ -30,7 +30,7 @@ export const HTTP_METHODS = [
   "OPTIONS",
   "CONNECT",
   "TRACE",
-] as const;
+] as const);
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 

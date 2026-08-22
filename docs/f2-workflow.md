@@ -7,7 +7,7 @@
 - **Branch:** `feature/f2-schema`
 - **Worktree:** `/home/drmaas/Projects/github/drmaas/rogatio-f2`
 - **Implementation authorization:** The user's sequential F1/F2/F3 request authorizes implementation, subject to the SDD specification approval gate.
-- **Release authorization:** The user explicitly authorized commit, push, pull request, merge, and worktree cleanup for F1, F2, and F3. Confirmation is still required immediately before deleting this worktree.
+- **Release authorization:** The user explicitly authorized commit, push, pull request, merge, and worktree cleanup for F1, F2, and F3. Worktree deletion was confirmed immediately before removing the F2 worktree.
 
 ## Stage Status
 
@@ -22,7 +22,7 @@
 - [x] Stage 8 - verification and evidence
 - [x] Stage 9 - independent fresh-context review; rounds completed: 3 of 3
 - [x] Stage 10 - documentation updates after behavior stabilizes
-- [ ] Stage 11 - release actions
+- [x] Stage 11 - release actions
 
 ## Model Roles
 
@@ -84,3 +84,9 @@ Final `pnpm validate` passed in this worktree:
 - **Round 1:** Found runtime-compiled Ajv/MV3 boundary risk, permissive origin spellings, inherited root properties, and stale documentation. Fixed the origin lexical checks and credential rejection, enabled Ajv own-property validation, added regression tests and schema artifact checks, and documented the approved Node-only F2 target with MV3 standalone packaging deferred.
 - **Round 2:** Found sparse arrays with inherited indices could bypass Ajv own-property validation. Added a cycle-safe dense-array/own-entry precheck and regression coverage.
 - **Round 3:** Initially found overrideable array iterators in semantic validation and an exported-validator bypass. Replaced iterator-based traversal with indexed access, guarded the exported validator, added iterator/direct-validator coverage, reran verification, and received a PASS. No actionable scope, dependency, generated-file, secret, or F3-leakage findings remain.
+
+## Release Evidence
+
+- Commit `f81f2ad` (`feat(f2): add schema validation package`) was pushed in `feature/f2-schema` through PR #2.
+- PR #2 (`https://github.com/drmaas/rogatio/pull/2`) passed its required checks and merged into `main` as `87f96a2c48e1b7a967c24e5604df4308365a50b1`.
+- The F2 worktree was removed after confirmation and its local feature branch was deleted.
