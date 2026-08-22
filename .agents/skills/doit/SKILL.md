@@ -1,6 +1,6 @@
 ---
 name: doit
-description: Run a fast, execution-focused development workflow for well-understood software changes. Use this skill when the user wants to just get a clearly scoped change done, asks to skip formal specs or planning, or requests the lightweight counterpart to an SDD/TDD process. It keeps an isolated worktree, brainstorming, architecture checks, tests-first development, verification, up to three independent fresh-context review rounds, documentation, and release preparation, but deliberately skips the formal specification, human review gate, and implementation-plan stages.
+description: Run a fast, execution-focused development workflow for well-understood software changes. Use this skill when the user wants to just get a clearly scoped change done, asks to skip formal specs or planning overhead, or requests the lightweight counterpart to an SDD/TDD process. It keeps an isolated worktree, ephemeral model-assisted brainstorming, a lightweight plan with a focused architecture note, tests-first model-assisted coding, model-assisted verification, fresh-context review, documentation, and release preparation, but deliberately skips the formal specification and human review gate.
 compatibility: Requires Git with worktree support, the repository's existing development tools, and an independent review context or reviewer.
 ---
 
@@ -12,7 +12,8 @@ This workflow deliberately omits:
 
 - A formal specification document.
 - A formal human approval gate before implementation.
-- A separate implementation plan.
+
+It keeps planning lightweight: a short, ordered plan with a focused architecture note (see Stage 2) is written up front rather than a heavyweight specification-and-plan package.
 
 Do not use those omissions to hide ambiguity. Ask blocking questions during brainstorming. If requirements, architecture, compatibility, security, or scope remain materially ambiguous, recommend switching to `sdd` rather than guessing.
 
@@ -20,27 +21,47 @@ Do not use those omissions to hide ambiguity. Ask blocking questions during brai
 
 - Work in a dedicated feature worktree, not the main checkout.
 - Match repository conventions, package manager, architecture, naming, and test tooling.
-- Derive a concise set of behavioral notes and acceptance checks from the user's request and brainstorming. Keep them in the task, issue, PR description, or a lightweight workflow note rather than writing a formal specification.
+- Derive a concise set of behavioral notes and acceptance checks from the user's request and ephemeral brainstorming. Keep them in the task, issue, PR description, or a lightweight workflow note rather than writing a formal specification or retaining raw brainstorm files.
+- Write a lightweight, ordered plan before tests or code.
 - Write tests before production code whenever practical.
 - Keep the change focused. Do not add speculative abstractions or unrelated refactors.
-- Keep behavioral notes, architecture, tests, implementation, documentation, and verification consistent.
+- Keep behavioral notes, architecture, plan, tests, implementation, documentation, and verification consistent.
 - Use existing scripts and dependencies. Do not install new tooling without approval.
 - Record stage status, verification commands, review rounds, findings, and fixes.
 - Commit, push, and PR creation are separate release actions. Obtain explicit user approval immediately before performing them; never force-push.
 
+## Model Roles
+
+This workflow uses role-specific models for rigor, but role separation must not become ceremony. The rule: try the preferred model for each role; if it is unavailable, fall back to an alternate variant in the same family; if no alternate is available, use the session's active model for that role and record the fallback. Never block the whole workflow on a single missing model identifier.
+
+### Two execution modes
+
+- **opencode / opencode-go session (multi-model):** Delegate each role to its preferred model below. Alternate between `opencode-go/*` and `openrouter/*` variants of the same family so a provider outage does not stall work.
+- **Freebuff or other single-model session:** The session-start model performs every role. Still keep the role passes distinct (brainstorm → architecture → plan → tests → code → verify → review) so the rigor survives; the fresh-context review becomes a deliberate self-review pass that re-reads the final diff against the behavioral notes without the implementer's working notes.
+
+### Preferred models per role
+
+Primary and adversarial brainstorm are different models even in single-model mode — the adversarial pass re-reads the primary output with a critical prompt rather than restating it.
+
+- **Primary brainstorm:** `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → session model.
+- **Adversarial brainstorm:** `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `openrouter/anthropic/claude-opus-5` → session model.
+- **Architecture + plan:** `opencode-go/glm-5.3` → `opencode-go/glm-5.2` → `openrouter/openai/gpt-5.5` → session model.
+- **Tests and coding:** `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → `opencode-go/kimi-k2.7-code` → session model.
+- **Verification:** `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model. The workflow still executes real commands and captures their output; a model report alone is not evidence.
+- **Independent review:** `opencode-go/glm-5.3` → `openrouter/anthropic/claude-sonnet-5` → `opencode-go/glm-5.2` → a different model than the one that implemented (session model if that is the only option, with a fresh-context re-read).
+- **Documentation:** `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model.
+
+Verify model availability once at workflow start with `opencode models opencode-go` (or the session's provider list). Record which model served each role in the workflow log; record any fallback as a note, not a blocker.
+
 ## Stage 0 — Enter an isolated worktree
 
-1. Inspect the repository root, current branch, worktrees, status, recent conventions, and available package/test scripts.
-2. Do not mix existing uncommitted user work into this change. Ask how to proceed if the base checkout is dirty or the intended base is unclear.
-3. Create or enter a dedicated feature worktree and branch using the repository's naming convention.
-4. Confirm the shell is operating in that worktree before editing files.
-5. Record the base commit, branch, worktree path, requested outcome, and workflow checklist.
-
-If the user supplied a worktree, verify that it is the intended feature worktree.
+1. Inspect repository state: current branch, worktrees, status, and the available package/test scripts. If the checkout has uncommitted work, do not mix it in — ask how to proceed or branch from a clean known base.
+2. Create or enter the dedicated feature worktree and branch using the repository's naming convention. Confirm the shell is operating in that worktree before editing.
+3. Record base commit, branch, worktree path, requested outcome, and which models will serve each role. If the user supplied a worktree, verify it is the intended feature worktree before editing.
 
 ## Stage 1 — Brainstorm and scope
 
-Quickly establish enough context to implement safely:
+Quickly establish enough context to implement safely. Run the primary pass with the primary-brainstorm model, then give its result and repository evidence to the adversarial model for a challenge. Keep both raw outputs ephemeral and do not create `docs/specs/<feature>-brainstorm.md` files.
 
 - Restate the requested outcome and affected users/callers.
 - Inspect current behavior and the relevant code/documentation.
@@ -49,25 +70,37 @@ Quickly establish enough context to implement safely:
 - Write concise behavioral notes and acceptance checks, using stable IDs such as `AC-001` when useful. Keep them in the task/PR description, or persist them to `docs/specs/<feature>.md` if a durable note is warranted.
 - Ask only questions that block a safe implementation. Do not wait for a formal approval packet.
 
+Skip the adversarial pass only when the change is a pure documentation or config edit with no behavior, security, persistence, migration, public-API, or compatibility surface; record the skip reason.
+
 If discovery reveals a substantial new product decision, cross-cutting architecture change, migration risk, or unclear user-visible behavior, stop and suggest using `sdd` for the change.
 
-## Stage 2 — Architecture check
+## Stage 2 — Architecture note and lightweight plan
 
-Perform a focused architecture pass before coding. Record only what is needed for implementation and review:
+Capture a short, ordered plan that another engineer could follow, preceded by a focused architecture note. Keep both proportional to the change — a few bulleted tasks and 2–4 architecture bullets are enough; do not produce a heavyweight specification-and-plan package.
+
+Have the architecture+plan model write them. Record:
+
+**Architecture note (only the non-obvious parts):**
 
 - Components/modules and responsibilities affected.
-- Public APIs, data models, schemas, state transitions, and error paths.
-- Data/control flow and important integration boundaries.
-- Persistence, migration, concurrency, rollback, and compatibility behavior when relevant.
-- Security boundaries, permissions, secrets, input validation, and observability.
-- Extension points and testing seams.
-- Alternatives rejected and why, when the choice is non-obvious.
+- Public APIs, data models, schemas, state transitions, and error paths that change.
+- Persistence, migration, concurrency, rollback, or compatibility behavior when relevant.
+- Security boundaries, permissions, secrets, input validation, and observability when relevant.
+- Alternatives rejected and why, only when the choice is non-obvious.
 
-Keep this proportional. Do not produce a formal architecture/specification package; a short note in the workflow log or task is sufficient. If a durable note is warranted, record the architecture in `docs/architecture.md` (human readable) and any ordering or plan notes in `docs/plans/<feature>.md`.
+**Plan, one bullet per task:**
+
+- The file, module, package, or configuration area it touches.
+- The behavior or invariant being added or changed.
+- Ordering constraints and dependencies on earlier tasks.
+- The acceptance-check IDs it covers, when useful.
+- The test or verification that proves it is done.
+
+Persist the plan to `docs/plans/<feature>.md` when the change is large enough to outlive the session; otherwise keep it in the task or PR description. Record durable architecture decisions in `docs/architecture.md` only when the change shifts boundaries or decisions. If planning reveals scope or architecture ambiguity, return to Stage 1 rather than guessing.
 
 ## Stage 3 — Write tests first
 
-Translate the behavioral notes and acceptance checks into executable tests before implementation whenever the repository permits it.
+Have the tests-and-coding model translate the behavioral notes and acceptance checks into executable tests before implementation whenever the repository permits it.
 
 - Cover normal behavior, boundaries, invalid input, failures, security constraints, and compatibility behavior relevant to the request.
 - Use the narrowest appropriate level: unit tests for deterministic logic, integration tests for component boundaries, and end-to-end tests for real user journeys.
@@ -80,7 +113,7 @@ If a test cannot be written first because of an integration or UI constraint, do
 
 ## Stage 4 — Write the implementation
 
-Implement the smallest coherent change that satisfies the behavioral notes and tests.
+Have the tests-and-coding model implement the smallest coherent change that satisfies the behavioral notes and tests.
 
 - Preserve behavior outside the requested scope.
 - Validate untrusted input at the correct boundary and return stable, actionable errors.
@@ -91,7 +124,7 @@ Implement the smallest coherent change that satisfies the behavioral notes and t
 
 ## Stage 5 — Verification and tests
 
-Run the complete relevant project verification suite, not only the new tests. Use the repository's equivalents of:
+Have the verification model drive the complete relevant project verification suite, not only the new tests. The workflow must still execute real commands and capture their output; a model report alone is not evidence. Use the repository's equivalents of:
 
 - Formatting and linting.
 - Type checking or static analysis.
@@ -104,15 +137,15 @@ Review the diff and test output together. Confirm that each acceptance check has
 
 ## Stage 6 — Independent fresh-context review loop
 
-Review the completed change from an independent fresh context. Give the reviewer only the user request, behavioral notes, focused architecture note, final diff, and verification results—not the implementer's unstated reasoning.
+Have the independent-review model review the completed change from a fresh context — a different model than the one that implemented whenever possible. Give it only the user request, behavioral notes, focused architecture note, plan, final diff, and verification results — not the implementer's unstated reasoning.
 
 Use a maximum of **three review rounds**:
 
-1. Request findings ordered by severity, including missing behavior, incorrect assumptions, security/privacy issues, regressions, test gaps, maintainability concerns, and documentation gaps.
-2. If there are no actionable findings, mark the review passed and continue.
-3. If findings exist, route each to the earliest appropriate stage:
+1. Round 1 is mandatory. Request findings ordered by severity: missing behavior, incorrect assumptions, security/privacy issues, regressions, test gaps, maintainability concerns, and documentation gaps.
+2. If round 1 has no actionable findings, mark the review passed and continue.
+3. Rounds 2 and 3 run only when round 1 produced findings. Route each finding to the earliest appropriate stage:
    - Unclear or changed behavior → Brainstorm and scope; ask the user if a decision is required.
-   - Architecture, boundary, migration, or API issue → Architecture check, then implementation.
+   - Architecture, boundary, migration, or API issue → Architecture note and plan, then implementation and verification.
    - Missing or weak coverage → Tests first, then implementation and verification.
    - Implementation defect within the understood scope → Implementation, then verification.
    - Verification or release-process gap → Verification, then review.
@@ -124,17 +157,13 @@ Never exceed three rounds. If actionable disagreement or findings remain after r
 
 ## Stage 7 — Documentation updates
 
-After behavior and review findings are stable, update documentation that users and maintainers rely on. The following three files are **always** updated to reflect the latest changes, regardless of change size:
+After behavior and review findings are stable, have the documentation model update the files this change actually touches. Update at minimum:
 
-- `docs/architecture.md` — human-readable architecture: components, boundaries, data/control flow, and decisions affected by this change.
-- `README.md` — human-readable project overview, setup, usage, and examples affected by this change.
-- `AGENTS.md` — a concise record of the latest changes so agents working in the repository stay oriented.
+- `docs/architecture.md` when the change alters components, boundaries, data/control flow, or decisions.
+- `README.md` when the change alters setup, usage, or examples visible to users.
+- `AGENTS.md` orientation line when the change shifts what an agent working in the repo needs to know first.
 
-Then update the rest of the documentation set as needed:
-
-- User guides, CLI/API references, and examples.
-- Configuration, migration, release, and troubleshooting documentation.
-- Changelog or release notes when the repository uses them.
+Then update the rest of the documentation set as needed: user guides, CLI/API references, examples, configuration, migration, release, and troubleshooting docs; changelog or release notes when the repository uses them.
 
 Document supported platforms, limitations, security behavior, and upgrade steps when relevant. Keep examples consistent with the implementation and run available documentation checks or generated-doc builds.
 
@@ -156,12 +185,13 @@ If approval for any release action is absent, stop after preparing the exact pro
 ## Completion checklist
 
 - [ ] Work happened in the intended feature worktree.
-- [ ] Brainstorm/scope notes and the focused architecture decision are recorded (architecture in `docs/architecture.md`).
+- [ ] Primary and adversarial brainstorm passes were completed ephemerally (or the skip was recorded with reason); only the focused architecture decision is retained (architecture in `docs/architecture.md` when applicable).
+- [ ] Each role's model was checked; fallbacks were recorded, not silently substituted.
+- [ ] A lightweight, ordered plan with a focused architecture note is recorded (in `docs/plans/<feature>.md` or the task/PR description).
 - [ ] No unresolved requirement or architecture ambiguity was guessed through.
 - [ ] Tests were written first or the exception was documented.
 - [ ] Relevant formatting, linting, type, unit, integration, E2E, and build checks pass.
 - [ ] Fresh-context review passed within three rounds, or unresolved findings were escalated.
-- [ ] `docs/architecture.md`, `README.md`, and `AGENTS.md` are updated with the latest changes.
-- [ ] Other documentation and release notes are updated as needed.
+- [ ] Documentation this change touches is updated (architecture, README, AGENTS as applicable).
 - [ ] The user approved commit/push/PR actions before they were performed.
 - [ ] The commit and PR contain only intended changes and include verification evidence.
