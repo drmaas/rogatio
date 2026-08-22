@@ -1,0 +1,23 @@
+{
+  "name": "@rogatio/sanity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/node/index.js"
+    }
+  },
+  "scripts": {
+    "format": "biome format --write src test",
+    "format:check": "biome check --formatter-enabled=true --linter-enabled=false src test",
+    "lint": "biome check --formatter-enabled=false --linter-enabled=true src test",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "build": "node ../../scripts/build.ts"
+  },
+  "dependencies": {
+    "@rogatio/smoke": "workspace:*"
+  }
+}

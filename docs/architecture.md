@@ -1,6 +1,6 @@
 # Rogatio Architecture
 
-**Status:** Planning baseline. F1 has a synthesized specification and implementation plan; product packages have not been implemented yet.
+**Status:** F1 bootstrap implemented; product packages remain intentionally unimplemented.
 
 ## Product Boundary
 
@@ -64,7 +64,7 @@ Raw brainstorm output is ephemeral. Only synthesized architecture decisions, spe
 
 - Node.js `24+` is the declared minimum; Node 24 is the F1 CI baseline.
 - pnpm is exactly `10.32.1`.
-- TypeScript major version 7 is required; the exact patch version is a blocking F1 decision and must be recorded after validation.
+- TypeScript major version 7 is required; the exact patch version was a blocking F1 decision, now resolved as `typescript@7.0.2` and recorded in `docs/f1-workflow.md`.
 - The current browser target is Chrome; the exact browser version policy remains open.
 - Linux, Windows, and macOS are supported development platforms; the CI matrix policy is an F1 decision gate.
 
@@ -74,7 +74,7 @@ F1 introduces only development and validation tooling. It must not add credentia
 
 ## Decision Gates
 
-The F1 plan carries four gates that must be resolved before the affected implementation tasks:
+The F1 plan carried four gates that were resolved before the affected implementation tasks:
 
 - **G1:** exact validated TypeScript 7 patch version.
 - **G2:** GitHub Actions immutable SHA pinning versus pinned release-version policy.
@@ -83,11 +83,18 @@ The F1 plan carries four gates that must be resolved before the affected impleme
 
 The decisions belong in this document and in the F1 implementation record. Open questions must not be silently converted into product requirements.
 
-## Current State
+## F1 Decisions and Current State
 
-The repository currently contains planning documents and workflow skills. The durable F1 specification and plan are stored at:
+F1 decisions are:
+
+- **G1:** Pin `typescript@7.0.2`, validated against the strict NodeNext repository typecheck, the `smoke`/`sanity` package builds, and the emitted-module execution checks in `pnpm validate`.
+- **G2:** Pin GitHub Actions to release versions (`checkout@v4`, `setup-node@v4`, `pnpm/action-setup@v4`) until immutable SHA pinning becomes repository policy.
+- **G3:** Run Chromium in a separate mandatory browser job; local and CI runs fail clearly when Chromium is not installed.
+- **G4:** Run Ubuntu checks on every push and pull request; run Windows and macOS smoke checks on the weekly schedule or manual dispatch.
+
+The repository now contains the F1 bootstrap plus planning documents. The durable F1 specification and plan are stored at:
 
 - `docs/specs/f1-monorepo-tooling.md`
 - `docs/plans/f1-monorepo-tooling.md`
 
-No raw brainstorm documents are retained. No F1 workspace, package source, CI workflow, or product implementation exists yet.
+No raw brainstorm documents are retained. No product implementation, release automation, credentials, telemetry, hosted endpoint, native runtime, or traffic capture has been introduced.

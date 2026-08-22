@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rogatio smoke fixture</title>
+  </head>
+  <body>
+    <p id="result">loading</p>
+    <script type="module">
+      import { composeSmokeMessage } from "/browser/index.js";
+
+      document.querySelector("#result").textContent = composeSmokeMessage("sanity");
+    </script>
+  </body>
+</html>

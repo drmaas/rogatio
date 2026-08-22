@@ -2,7 +2,7 @@
 
 ## Repository State
 
-Rogatio is currently a planning-only repository. Read `rogatio-overview.md` and `sequence.md` before changing scope. Feature 1 is the monorepo and tooling bootstrap; it must not implement schema, compiler, editor, extension, CLI, runtime, release, telemetry, or traffic-capture behavior.
+Rogatio has completed Feature 1, the monorepo and tooling bootstrap. Read `rogatio-overview.md` and `sequence.md` before changing scope. F1 must not implement schema, compiler, editor, extension, CLI, runtime, release, telemetry, or traffic-capture behavior.
 
 ## Durable Documentation
 
@@ -31,6 +31,9 @@ Verify model availability once at workflow start with `opencode models opencode-
 - Review new dependencies and install-script permissions before adding them.
 - Use cross-platform Node-based scripts instead of Bash-only orchestration.
 - Verify real test execution, emitted builds, and browser prerequisites; do not accept false-green checks.
+- Run `pnpm validate` before declaring F1 bootstrap work complete.
+- Keep negative fixtures outside normal typecheck and Biome inputs, and preserve their intended failures.
+- Treat `build-manifest.json`, package `dist/`, coverage, Playwright output, browser binaries, and dependencies as generated or local-only.
 
 ## Workflow
 
