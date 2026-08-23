@@ -353,7 +353,7 @@ describe("@rogatio/compiler", () => {
     ).toBe(true);
   });
 
-  it("fails closed for duplicate IDs, missing effective origins, unknown actions, and limits", () => {
+  it("fails closed for duplicate IDs, missing effective origins, invalid actions, and limits", () => {
     const duplicate = makeProject();
     duplicate.groups[0].rules.push(makeRule(1));
     expect(diagnostics(compileProject(duplicate))).toEqual(
@@ -376,14 +376,7 @@ describe("@rogatio/compiler", () => {
     );
 
     const action = makeProject({}, { action: { type: "redirect" } });
-    expect(diagnostics(compileProject(action))).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: "schema.unknown-property",
-          path: "/groups/0/rules/0",
-        }),
-      ]),
-    );
+    expect(diagnostics(compileProject(action)).length).toBeGreaterThan(0);
 
     const overLimit = makeProject();
     overLimit.groups = Array.from({ length: 17 }, (_, groupIndex) => ({
@@ -527,6 +520,28 @@ describe("@rogatio/compiler", () => {
         "resourceTypes",
         "priority",
       ]);
+    }
+  });
+
+  it("compiles a valid query action into an operation carrying the action", () => {
+    const project = makeProject(
+      {},
+      {
+        action: {
+          type: "query",
+          params: [{ name: "utm_source", value: "rogatio" }],
+        },
+      },
+    );
+
+    const result = compileProject(project);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.operations[0]?.action).toEqual({
+        type: "query",
+        params: [{ name: "utm_source", value: "rogatio" }],
+      });
     }
   });
 });

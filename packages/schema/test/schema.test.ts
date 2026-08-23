@@ -267,4 +267,153 @@ describe("@rogatio/schema", () => {
 
     expect(validateProject(project)).toBe(false);
   });
+
+  it("accepts a valid query action", () => {
+    const project = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              action: {
+                type: "query",
+                params: [{ name: "utm_source", value: "rogatio" }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(validateProject(project)).toBe(true);
+  });
+
+  it("rejects an unknown action type", () => {
+    const project = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [{ ...makeRule(1), action: { type: "redirect" } }],
+        },
+      ],
+    };
+
+    const result = validateProjectDetailed(project);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((error) => error.keyword === "const")).toBe(
+        true,
+      );
+    }
+  });
+
+  it("rejects empty params, duplicate param names, and empty values", () => {
+    const empty = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [{ ...makeRule(1), action: { type: "query", params: [] } }],
+        },
+      ],
+    };
+    expect(validateProject(empty)).toBe(false);
+
+    const duplicate = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              action: {
+                type: "query",
+                params: [
+                  { name: "a", value: "1" },
+                  { name: "a", value: "2" },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const dupResult = validateProjectDetailed(duplicate);
+    expect(dupResult.valid).toBe(false);
+    if (!dupResult.valid) {
+      expect(
+        dupResult.errors.some(
+          (error) => error.keyword === "uniqueQueryParamName",
+        ),
+      ).toBe(true);
+    }
+
+    const blank = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              action: { type: "query", params: [{ name: "", value: "1" }] },
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateProject(blank)).toBe(false);
+  });
+
+  it("enforces query param bounds", () => {
+    const tooMany = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              action: {
+                type: "query",
+                params: Array.from(
+                  { length: LIMITS.maxQueryParamsPerRule + 1 },
+                  (_, index) => ({ name: `n${index}`, value: "v" }),
+                ),
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateProject(tooMany)).toBe(false);
+
+    const longName = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              action: {
+                type: "query",
+                params: [
+                  {
+                    name: "x".repeat(LIMITS.maxQueryNameLength + 1),
+                    value: "v",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateProject(longName)).toBe(false);
+  });
 });

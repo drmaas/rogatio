@@ -1,6 +1,6 @@
 import { LIMITS } from "@rogatio/schema";
 import { describe, expect, it } from "vitest";
-import { urlToExactRegex } from "../src/index.js";
+import { builtInRuleTypes, queryRuleType, urlToExactRegex } from "../src/index.js";
 
 describe("@rogatio/editor URL conversion", () => {
   it("serializes and escapes an absolute URL as an exact source", () => {
@@ -53,5 +53,55 @@ describe("@rogatio/editor URL conversion", () => {
       ok: true,
       source: "^https://example\\.com/\\(a\\)\\+\\[b\\]\\|c$",
     });
+  });
+});
+
+describe("@rogatio/editor query rule type (F10)", () => {
+  const rulePath = "/groups/0/rules/0";
+
+  it("registers the query rule type as a built-in extension", () => {
+    expect(builtInRuleTypes.map((e) => e.id)).toContain("query");
+  });
+
+  it("matches only a rule carrying a query action", () => {
+    expect(queryRuleType.matches({ action: { type: "query", params: [] } })).toBe(
+      true,
+    );
+    expect(
+      queryRuleType.matches({ action: { type: "redirect", params: [] } }),
+    ).toBe(false);
+    expect(queryRuleType.matches({})).toBe(false);
+  });
+
+  it("validates query params and rejects empty or duplicate names", () => {
+    const ok = queryRuleType.validate(
+      { action: { type: "query", params: [{ name: "a", value: "1" }] } },
+      rulePath,
+    );
+    expect(ok).toHaveLength(0);
+
+    const empty = queryRuleType.validate(
+      { action: { type: "query", params: [{ name: "", value: "1" }] } },
+      rulePath,
+    );
+    expect(
+      empty.some((d) => d.code === "editor.query-param-name-required"),
+    ).toBe(true);
+
+    const dup = queryRuleType.validate(
+      {
+        action: {
+          type: "query",
+          params: [
+            { name: "a", value: "1" },
+            { name: "a", value: "2" },
+          ],
+        },
+      },
+      rulePath,
+    );
+    expect(
+      dup.some((d) => d.code === "editor.query-duplicate-param"),
+    ).toBe(true);
   });
 });

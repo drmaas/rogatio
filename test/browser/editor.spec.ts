@@ -418,3 +418,40 @@ test("ships a browser artifact without Node runtime leakage", async ({
   expect(source).not.toMatch(/node:|process\.|Buffer|fs\/|path\//);
   await expect(page.locator("[data-rogatio-editor]")).toBeVisible();
 });
+
+test("selects the Query parameters rule type and round-trips the action through save", async ({
+  page,
+}) => {
+  await page
+    .locator("[data-desktop-route-rail]")
+    .getByRole("button", { name: "One", exact: true })
+    .click();
+  const card = page
+    .locator('[data-rule-card]')
+    .filter({ hasText: "First rule" })
+    .first();
+
+  const select = card.locator('[data-rule-type-select="true"]');
+  await expect(select).toBeVisible();
+  await select.selectOption({ label: "Query parameters" });
+
+  const nameInput = page
+    .locator('[data-path$="/action/params/0/name"]')
+    .first();
+  await expect(nameInput).toBeVisible();
+  await nameInput.fill("utm_source");
+  const valueInput = page
+    .locator('[data-path$="/action/params/0/value"]')
+    .first();
+  await valueInput.fill("rogatio");
+
+  await page.getByRole("button", { name: "Validate" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  const saved = await page.evaluate(() => window.editorTest.saveCalls.at(-1));
+  expect(saved?.groups?.[0]?.rules?.[0]?.action).toEqual({
+    type: "query",
+    params: [{ name: "utm_source", value: "rogatio" }],
+  });
+});

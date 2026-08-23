@@ -43,6 +43,9 @@ export const LIMITS = Object.freeze({
   maxPriority: 1000,
   maxRedirectDestinationLength: 2048,
   maxCaptureGroups: 9,
+  maxQueryParamsPerRule: 64,
+  maxQueryNameLength: 256,
+  maxQueryValueLength: 2048,
 });
 
 type JsonRecord = Record<string, unknown>;
@@ -328,7 +331,69 @@ const RULE_KEYS = [
   "method",
   "type",
   "redirect",
+  "action",
 ] as const;
+
+const QUERY_ACTION_KEYS = ["type", "params"] as const;
+const QUERY_PARAM_KEYS = ["name", "value"] as const;
+
+function validateQueryParam(
+  errors: ValidationIssue[],
+  value: unknown,
+  path: string,
+): void {
+  if (!isRecord(value) || !hasOnlyKeys(value, QUERY_PARAM_KEYS)) {
+    errors.push(issue(path, "invalid-structure"));
+    return;
+  }
+  if (
+    typeof value.name !== "string" ||
+    value.name.length === 0 ||
+    value.name.length > LIMITS.maxQueryNameLength
+  )
+    errors.push(issue(`${path}/name`, "invalid-value"));
+  if (
+    typeof value.value !== "string" ||
+    value.value.length === 0 ||
+    value.value.length > LIMITS.maxQueryValueLength
+  )
+    errors.push(issue(`${path}/value`, "invalid-value"));
+}
+
+function validateQueryAction(
+  errors: ValidationIssue[],
+  value: unknown,
+  path: string,
+): void {
+  if (!isRecord(value) || !hasOnlyKeys(value, QUERY_ACTION_KEYS)) {
+    errors.push(issue(path, "invalid-structure"));
+    return;
+  }
+  if (value.type !== "query") {
+    errors.push(issue(`${path}/type`, "invalid-value"));
+    return;
+  }
+  if (
+    !Array.isArray(value.params) ||
+    value.params.length < 1 ||
+    value.params.length > LIMITS.maxQueryParamsPerRule
+  ) {
+    errors.push(issue(`${path}/params`, "invalid-value"));
+    return;
+  }
+  const seenNames = new Set<string>();
+  for (let index = 0; index < value.params.length; index += 1) {
+    const param = value.params[index];
+    if (isRecord(param) && typeof param.name === "string") {
+      if (seenNames.has(param.name))
+        errors.push(
+          issue(`${path}/params/${index}/name`, "uniqueQueryParamName"),
+        );
+      else seenNames.add(param.name);
+    }
+    validateQueryParam(errors, param, `${path}/params/${index}`);
+  }
+}
 
 export function validateProjectDetailed(
   value: unknown,
@@ -464,7 +529,7 @@ export function validateProjectDetailed(
         !HTTP_METHODS.includes(rule.method as HttpMethod)
       )
         errors.push(issue(`${rulePath}/method`, "invalid-value"));
-      if (rule.type !== undefined && rule.type !== "redirect")
+      if (rule.type !== undefined && rule.type !== "redirect" && rule.type !== "query")
         errors.push(issue(`${rulePath}/type`, "invalid-value"));
       if (rule.type === "redirect") {
         const redirect = (rule as Record<string, unknown>).redirect;
@@ -490,6 +555,8 @@ export function validateProjectDetailed(
           }
         }
       }
+      if (rule.action !== undefined)
+        validateQueryAction(errors, rule.action, `${rulePath}/action`);
       const effective = [
         ...(Array.isArray(group.origins) ? group.origins : []),
         ...(Array.isArray(rule.origins) ? rule.origins : []),

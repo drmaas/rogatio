@@ -12,4 +12,7 @@ export const LIMITS = Object.freeze({
   maxPriority: 1000,
   maxRedirectDestinationLength: 2048,
   maxCaptureGroups: 9,
+  maxQueryParamsPerRule: 64,
+  maxQueryNameLength: 256,
+  maxQueryValueLength: 2048,
 });

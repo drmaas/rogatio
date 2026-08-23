@@ -72,7 +72,19 @@ function freezeMatcher(operation: MatcherOperation): MatcherOperation {
 function normalizeMatcher(value: unknown): MatcherOperation | null {
   if (value === null || typeof value !== "object" || Array.isArray(value))
     return null;
-  if (!exactKeys(value, ["kind", "groupId", "ruleId", "matcher"])) return null;
+  const requiredKeys = ["kind", "groupId", "ruleId", "matcher"];
+  if (
+    !requiredKeys.every((key) => hasOwn(value, key)) ||
+    Object.keys(value).some(
+      (key) =>
+        key !== "kind" &&
+        key !== "groupId" &&
+        key !== "ruleId" &&
+        key !== "matcher" &&
+        key !== "action",
+    )
+  )
+    return null;
   const record = value as Record<string, unknown>;
   if (
     record.kind !== "matcher" ||

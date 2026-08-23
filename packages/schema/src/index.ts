@@ -14,7 +14,10 @@ export type {
   ResourceType,
   RogatioGroup,
   RogatioProject,
+  RogatioQueryAction,
+  RogatioQueryParam,
   RogatioRule,
+  RogatioRuleAction,
   RuleType,
 } from "./types.js";
 export { HTTP_METHODS, PROJECT_VERSION, RESOURCE_TYPES } from "./types.js";
