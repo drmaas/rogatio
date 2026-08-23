@@ -80,4 +80,6 @@ No actionable findings remain after the fixes; verification was rerun and passed
 
 ## Release Evidence
 
-Pending: awaiting explicit user authorization for commit, push, pull request, merge, and worktree cleanup.
+- Commit `a7a6caa` (`feat(f4): add browser-core platform layer`) was created and pushed on `feature/f4-browser-core`.
+- PR #4 (`https://github.com/drmaas/rogatio/pull/4`) was opened against `main`.
+- Merge and worktree cleanup remain pending explicit authorization.
