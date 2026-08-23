@@ -126,3 +126,96 @@ Storage is a single versioned envelope (`version`, a project record keyed by sta
 The repository maintains the documented product invariants: at most 64 uniquely named projects, exactly one active project whenever any exist (the first created/imported project activates; removing the active project activates the most recently updated remaining project, tie-broken by id), creation/import/update and browser save reset group enablement to all-disabled, and grants are restricted to declared effective origins and pruned when data changes. Switching restores the destination project's saved enablement without touching permission or runtime state.
 
 Rule statuses derive from compiled operations, saved enablement, granted origins, and the installed rule ids reported by the installer adapter: disabled groups are `disabled`, enabled rules with un-granted origins are `needs permission`, enabled and granted rules missing from the installed set are `error` with `core.rule-not-installed`, and installed rules are `active`. The `needs proxy` and `unsupported` statuses are part of the defined model and populate only when runtime-dependent rule kinds land in later slices. The badge is a pure function of statuses: the active rule count plus an attention flag. `InstallService` atomically replaces the installed set through the `RuleInstallerAdapter`, treats identical sets as a no-op, rolls back to the previous set on failure with `core.install-failed` / `core.recovery-failed`, and serializes concurrent applies. Mock (`disconnected/checking/connected/failed` with last-check) and native (`stopped/starting/started/failed`) runtime phases are modeled in memory with a guarded transition table; runtime state is not persisted until the runtime slices define their semantics.
+
+## F5 Editor Architecture
+
+**Status:** Implemented and verified in `feature/f5-editor` worktree.
+
+F5 introduces a private `@rogatio/editor` package as the shared browser-facing editor boundary. It is a framework-free ESM package that owns a project editor's DOM view, draft state, common matcher editing, navigation, and accessible interaction model. It does not own persistence, browser-core lifecycle, permissions, extension APIs, CLI process behavior, runtime behavior, or rule actions.
+
+F5 introduces a private `@rogatio/editor` package as the shared browser-facing editor boundary. It is a framework-free ESM package that owns a project editor's DOM view, draft state, common matcher editing, navigation, and accessible interaction model. It does not own persistence, browser-core lifecycle, permissions, extension APIs, CLI process behavior, runtime behavior, or rule actions.
+
+### Package and Host Boundary
+
+The dependency direction remains:
+
+```text
+schema -> compiler -> editor
+```
+
+F5 uses F2 types and the F3 diagnostic/validation contract. The editor's public browser entry point does not import the current runtime-compiled Node ESM artifacts from F2 or F3. Instead, the host supplies a synchronous validation adapter and an asynchronous save adapter. A Node host can implement the validation adapter with `compileProject`; a later browser host must supply an explicitly approved browser-safe F2/F3 adapter. This prevents Ajv or Node-only modules from leaking into the editor browser bundle while keeping F2/F3 authoritative.
+
+The initial value must be a valid, parsed JSON project accepted by the supplied validator. The editor takes a defensive JSON snapshot and refuses to mount an invalid or hostile initial value rather than coercing, dropping, or silently repairing data. Repairing an invalid file remains a host or later workflow concern.
+
+The conceptual public boundary is:
+
+```ts
+interface EditorOptions {
+  root: HTMLElement;
+  initialProject: unknown;
+  validate: (value: unknown) => readonly EditorDiagnostic[];
+  save: (project: EditorProjectSnapshot) =>
+    | EditorSaveResult
+    | Promise<EditorSaveResult>;
+  onCancel?: () => void;
+  ruleTypes?: readonly RuleTypeFieldExtension[];
+}
+
+interface EditorController {
+  getDraft(): EditorProjectSnapshot;
+  isDirty(): boolean;
+  validate(): readonly EditorDiagnostic[];
+  destroy(): void;
+}
+```
+
+`createEditor(options)` returns a mounted controller. `getDraft()` always returns a fresh detached snapshot. Save callbacks receive a fresh snapshot and cannot mutate the controller's state through that argument. Save results are either `{ ok: true }` or a safe host error containing a stable code, optional JSON-pointer path, and safe message.
+
+### Controller, View, and State
+
+One controller owns the committed snapshot, draft snapshot, monotonic draft revision, route, search query, focused entity, validation state, and save state. The view is a semantic DOM projection and emits intents; it does not call F2/F3, serialize projects, or mutate shared state. DOM event delegation and keyed group/rule identities keep repeated controls from capturing stale array indexes.
+
+The common F2 fields remain the editor's complete F5 data surface: project name and description; group ID, name, origins, and rules; and rule ID, name, URL regular expression, origins, resource types, priority, and optional method. Existing source spellings and array order are preserved unless the user edits them; F3 normalization is not written back by F5. New IDs are deterministic collision-free values selected from the current project. Array order is source order and is never inferred from priority.
+
+Draft transitions are explicit:
+
+- An edit increments the draft revision, leaves the committed snapshot unchanged, marks the editor dirty, and clears stale validation errors.
+- Validate checks the current detached draft and renders sorted stable diagnostics without saving.
+- Save validates first, captures the current revision and snapshot, and disables conflicting mutations while the host operation is pending. A success commits only when the captured revision is still current. A failure retains the exact draft and dirty state for retry. A late result after destroy is ignored.
+- Cancel requires an accessible confirmation when dirty, restores the committed snapshot, clears errors, and then calls the optional host callback. Cancel is disabled while a save is pending rather than racing a host write.
+- Destroy removes only editor-owned DOM and listeners and performs no save or cancel callback.
+
+### View and Navigation
+
+The view uses a semantic `main`, `nav`, `form`, headings, `fieldset`/`legend`, native inputs/selects/checkboxes, and a live status region. The desktop route rail contains Project and one route per group. A synchronized native select is the compact mobile navigation. Routes are internal editor state, not browser history or host persistence. Removing the current group falls back to Project and announces the change.
+
+The contextual command bar keeps Validate, Save, and Cancel available and exposes only commands valid for the current route or focused entity, such as Add group, Add rule, move, and remove. Remove actions use a cancellable accessible alert dialog and name the affected group or rule. Reorder commands operate on the item's absolute source position even when search is active; announcements include the resulting position so hidden neighboring items cannot make the operation ambiguous.
+
+Search is project-wide, literal, case-insensitive, and NFKC-normalized for matching only. It searches common project, group, and rule fields, reports deterministic source-order results, and navigates to the selected group or field without changing project data. It never treats user text as a regular expression. Search updates are region-level updates rather than full document replacement on every keystroke.
+
+### Validation and Extension Boundary
+
+The host validation adapter returns F3-compatible stable diagnostics with an error code, JSON-pointer path, and safe message. F5 sorts them deterministically, maps current paths to stable entity identities and controls, renders a summary with links, sets `aria-invalid`, and associates each error with its field. F5 never exposes raw Ajv wording or rejected input values. Extension diagnostics use the same path contract. A validator throw becomes a generic editor validation error and never permits saving.
+
+The rule-type extension point is an empty registry in F5. Each future extension has a stable ID and label, a pure matcher, synchronous mount/cleanup, controlled field access, control registration, and synchronous validation. It receives defensive snapshots and can set only extension-owned fields through a controlled store; it never receives the live project or common-field mutators. Duplicate registrations, multiple matches, callback throws, cyclic values, malformed values, and unregistered controls fail closed with stable editor diagnostics. Unknown action data is not silently discarded or passed through: it is saveable only when a future extension and its host validator explicitly own it. F5 defines no action discriminant or action payload.
+
+### URL Conversion
+
+The common editor exposes `urlToExactRegex` as a pure utility. It accepts an absolute HTTP(S) URL with no surrounding whitespace, controls, credentials, or fragment. WHATWG URL serialization supplies deterministic normalization for scheme, hostname, default ports, empty paths, and percent encoding while preserving query order and duplicates. The serialized URL is escaped as a literal and wrapped in `^` and `$`; no flags, wildcard, capture, or matching execution is added. Conversion fails without changing the rule when the URL is malformed or the generated source exceeds the F2 regex limit. Fragments are rejected because browser request targets do not include them.
+
+### Accessibility, Security, and Build Constraints
+
+All user-controlled values are inserted as text or DOM properties, never as HTML. The editor does not evaluate user regular expressions or JavaScript, contact a network, access a filesystem, request permissions, use storage, emit telemetry, or invoke runtime/browser-core APIs. F2/F3 remain responsible for authoritative bounds and validation. Defensive snapshots reject accessors, proxies, inherited/sparse properties, symbols, cycles, and unsupported non-JSON objects without invoking hostile getters.
+
+The view must remain keyboard complete without drag-and-drop or pointer-only commands. Error controls use stable generated IDs, labels, descriptions, focus restoration, and live announcements. Focus indicators and state must remain visible in forced colors; the layout must reflow at narrow widths and 200% zoom without clipping or requiring horizontal scrolling for core controls. CSS uses native/system colors in forced-colors mode and respects reduced-motion preferences.
+
+The editor browser artifact must contain no `node:` imports, Node globals, filesystem code, or runtime-compiled F2/F3 imports. Build and browser checks must import the shipped browser artifact, not only source or a test double. Pure state/conversion tests belong in Vitest; controller/DOM interaction, keyboard, error association, responsive, forced-colors, zoom, and browser-package checks belong in Playwright. No DOM emulation dependency is introduced solely for F5.
+
+### Rejected Alternatives
+
+- A framework UI was rejected because it violates the shared framework-free boundary and adds CLI/extension packaging cost.
+- Direct browser imports of current F2/F3 runtime artifacts were rejected because their Node ESM/Ajv initialization is not an approved MV3-safe boundary.
+- Browser storage or browser-core callbacks inside F5 were rejected because persistence, lifecycle, permissions, and conflicts belong to later hosts.
+- Full string-template rendering was rejected because it increases XSS and focus-loss risk; the view uses safe DOM construction.
+- Drag-and-drop and visible-index reorder were rejected because they exclude keyboard users and become unsafe under filtering.
+- An arbitrary `action: unknown` passthrough was rejected because it bypasses strict F2 validation and can lose or persist unsupported data.

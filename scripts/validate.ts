@@ -55,6 +55,7 @@ async function checkArtifacts(): Promise<void> {
   const expected = [
     "packages/smoke/dist/node/index.js",
     "packages/smoke/dist/browser/index.js",
+    "packages/editor/dist/browser/index.js",
     "packages/sanity/dist/node/index.js",
     "packages/schema/dist/node/index.js",
     "packages/compiler/dist/node/index.js",
@@ -212,6 +213,17 @@ async function checkEmittedModules(): Promise<void> {
     throw new Error(
       "Browser-core emitted Node module computed an unexpected badge",
     );
+
+  const editor = (await import(
+    pathToFileURL(resolve(root, "packages/editor/dist/browser/index.js")).href
+  )) as {
+    urlToExactRegex?: (value: string) => { ok: boolean; source?: string };
+  };
+  const converted = editor.urlToExactRegex?.("https://example.com/path");
+  if (!converted?.ok || converted.source !== "^https://example\\.com/path$")
+    throw new Error(
+      "Editor emitted browser module did not execute as expected",
+    );
 }
 async function checkBoundaries(): Promise<void> {
   const manifest = JSON.parse(
@@ -259,6 +271,47 @@ async function checkBoundaries(): Promise<void> {
   );
   if (!forbidden.includes("@rogatio/extension"))
     throw new Error("Forbidden-direction fixture was altered");
+
+  const editorManifest = JSON.parse(
+    await readFile(resolve(root, "packages/editor/package.json"), "utf8"),
+  ) as { dependencies?: Record<string, string> };
+  const editorDependencies = editorManifest.dependencies ?? {};
+  if (
+    Object.keys(editorDependencies).length !== 2 ||
+    editorDependencies["@rogatio/compiler"] !== "workspace:*" ||
+    editorDependencies["@rogatio/schema"] !== "workspace:*"
+  )
+    throw new Error(
+      "Editor must depend only on the schema and compiler packages",
+    );
+
+  const editorSources = await Promise.all(
+    ["index.ts", "types.ts", "url.ts", "editor.ts"].map((file) =>
+      readFile(resolve(root, "packages/editor/src", file), "utf8"),
+    ),
+  );
+  const editorSource = editorSources.join("\n");
+  if (
+    /node:|process\.|Buffer|from ["'](?:fs|path|url)["']/.test(editorSource) ||
+    /@rogatio\/(browser-core|extension|cli|runtime)/.test(editorSource)
+  )
+    throw new Error(
+      "Editor source contains a forbidden runtime or downstream import",
+    );
+
+  const editorArtifact = await readFile(
+    resolve(root, "packages/editor/dist/browser/index.js"),
+    "utf8",
+  );
+  if (
+    /node:|process\.|Buffer|from ["'](?:fs|path|url)["']/.test(
+      editorArtifact,
+    ) ||
+    /@rogatio\/(browser-core|extension|cli|runtime)/.test(editorArtifact)
+  )
+    throw new Error(
+      "Editor browser artifact contains a forbidden import or global",
+    );
 }
 run("format", pnpm, ["format:check"]);
 run("lint", pnpm, ["lint"]);

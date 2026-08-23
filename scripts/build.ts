@@ -27,6 +27,12 @@ const targets: BuildTarget[] = [
     target: "es2022",
   },
   {
+    entry: "packages/editor/src/index.ts",
+    output: "packages/editor/dist/browser/index.js",
+    platform: "browser",
+    target: "es2022",
+  },
+  {
     entry: "packages/sanity/src/index.ts",
     output: "packages/sanity/dist/node/index.js",
     platform: "node",

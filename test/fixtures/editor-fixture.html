@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rogatio editor fixture</title>
+  </head>
+  <body>
+    <div id="editor-root"></div>
+    <script type="module">
+      import { createEditor } from "/editor/index.js";
+
+      const project = {
+        version: 1,
+        name: "Editor project",
+        description: "A project for the editor journey",
+        groups: [
+          {
+            id: "group-one",
+            name: "One",
+            origins: ["https://one.example"],
+            rules: [
+              {
+                id: "rule-one",
+                name: "First rule",
+                urlRegex: "^https://one\\.example/first$",
+                origins: [],
+                resourceTypes: ["main_frame"],
+                priority: 100,
+              },
+              {
+                id: "rule-two",
+                name: "Second rule",
+                urlRegex: "^https://one\\.example/second$",
+                origins: [],
+                resourceTypes: ["script"],
+                priority: 200,
+              },
+            ],
+          },
+          {
+            id: "group-two",
+            name: "Two",
+            origins: ["https://two.example"],
+            rules: [
+              {
+                id: "rule-three",
+                name: "Third rule",
+                urlRegex: "^https://two\\.example/third$",
+                origins: [],
+                resourceTypes: ["image"],
+                priority: 300,
+              },
+            ],
+          },
+        ],
+      };
+
+      function diagnostic(code, path, message) {
+        return { code, severity: "error", path, message };
+      }
+
+      function validate(value) {
+        const errors = [];
+        if (!value || typeof value !== "object") {
+          return [diagnostic("fixture.invalid", "", "The project is invalid.")];
+        }
+        if (typeof value.name !== "string" || value.name.trim() === "") {
+          errors.push(
+            diagnostic("schema.invalid-value", "/name", "Enter a project name."),
+          );
+        }
+        if (!Array.isArray(value.groups)) return errors;
+        value.groups.forEach((group, groupIndex) => {
+          if (typeof group.name !== "string" || group.name.trim() === "") {
+            errors.push(
+              diagnostic(
+                "schema.invalid-value",
+                `/groups/${groupIndex}/name`,
+                "Enter a group name.",
+              ),
+            );
+          }
+          if (!Array.isArray(group.rules)) return;
+          group.rules.forEach((rule, ruleIndex) => {
+            const rulePath = `/groups/${groupIndex}/rules/${ruleIndex}`;
+            if (typeof rule.name !== "string" || rule.name.trim() === "") {
+              errors.push(
+                diagnostic(
+                  "schema.invalid-value",
+                  `${rulePath}/name`,
+                  "Enter a rule name.",
+                ),
+              );
+            }
+            if (typeof rule.urlRegex !== "string" || rule.urlRegex === "[") {
+              errors.push(
+                diagnostic(
+                  "schema.invalid-format",
+                  `${rulePath}/urlRegex`,
+                  "Enter a valid URL regular expression.",
+                ),
+              );
+            }
+            if (
+              (!Array.isArray(group.origins) || group.origins.length === 0) &&
+              (!Array.isArray(rule.origins) || rule.origins.length === 0)
+            ) {
+              errors.push(
+                diagnostic(
+                  "schema.no-effective-origin",
+                  `${rulePath}/origins`,
+                  "Add a group or rule origin.",
+                ),
+              );
+            }
+          });
+        });
+        return errors;
+      }
+
+      const editorTest = {
+        saveCalls: [],
+        pending: [],
+        saveMode: "auto",
+        setSaveMode(mode) {
+          this.saveMode = mode;
+        },
+        resolveSave(index, result) {
+          this.pending[index]?.resolve(result);
+        },
+      };
+
+      function save(value) {
+        editorTest.saveCalls.push(structuredClone(value));
+        if (editorTest.saveMode === "fail") {
+          return Promise.resolve({
+            ok: false,
+            code: "host.write-failed",
+            message: "The host could not save the project.",
+          });
+        }
+        if (editorTest.saveMode === "pending") {
+          return new Promise((resolve) => {
+            editorTest.pending.push({ resolve });
+          });
+        }
+        return Promise.resolve({ ok: true });
+      }
+
+      window.editorModule = { createEditor };
+      window.editorTest = editorTest;
+      window.editorController = createEditor({
+        root: document.querySelector("#editor-root"),
+        initialProject: project,
+        validate,
+        save,
+      });
+    </script>
+  </body>
+</html>
