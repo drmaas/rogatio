@@ -59,6 +59,7 @@ The `sdd` and `doit` skills repeat the operational tier-selection rules and role
 - For code that consumes untrusted structured data, include adversarial tests for those behaviors and other relevant malformed inputs.
 - Keep public diagnostics and serialized output stable and independent of third-party wording or incidental iteration order.
 - CI should run the same authoritative validation used locally rather than a weaker manually duplicated subset.
+- Keep the proposed F5 editor as a framework-free, browser-safe DOM boundary: use host-supplied F2/F3 validation and save ports, preserve detached draft state, and do not import Node-only validation artifacts into browser output.
 
 ## Workflow
 

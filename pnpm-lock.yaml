@@ -45,6 +45,15 @@ importers:
         specifier: workspace:*
         version: link:../schema
 
+  packages/editor:
+    dependencies:
+      '@rogatio/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@rogatio/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/sanity:
     dependencies:
       '@rogatio/smoke':

@@ -4,7 +4,7 @@ Rogatio is a planned local-first tool for creating, reviewing, and running brows
 
 ## Current Status
 
-Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, and Feature 4, the released `@rogatio/browser-core` package, are complete. The editor, runtime, extension, and CLI packages remain intentionally unimplemented.
+Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, and Feature 4, the released `@rogatio/browser-core` package, are complete. F5, the `@rogatio/editor` package, is implemented and verified in the isolated `feature/f5-editor` worktree. Other product packages remain intentionally unimplemented.
 
 ## Project Documents
 
@@ -19,6 +19,8 @@ Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/sch
 - [`docs/plans/f3-compiler.md`](docs/plans/f3-compiler.md): Feature 3 implementation plan.
 - [`docs/plans/f4-browser-core.md`](docs/plans/f4-browser-core.md): Feature 4 implementation plan.
 - [`docs/f4-workflow.md`](docs/f4-workflow.md): Feature 4 workflow log.
+- [`docs/specs/f5-editor.md`](docs/specs/f5-editor.md): Feature 5 editor specification.
+- [`docs/f5-workflow.md`](docs/f5-workflow.md): Feature 5 workflow record.
 
 ## Development Workflow
 
@@ -72,6 +74,10 @@ F1 validation is pinned to a known-good toolchain: Node `24.19.0`, pnpm `10.32.1
 F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary; F3 adds the `@rogatio/compiler` matcher transformation boundary; F4 adds the `@rogatio/browser-core` core platform layer. The future `editor/runtime -> extension/cli` layers are documented boundaries only. No F5-F20 product API or behavior is present.
 
 There is no installable CLI, browser extension, or runtime yet. Do not infer product behavior from the F1 bootstrap smoke packages.
+
+## Editor Boundary
+
+F5 adds the private `@rogatio/editor` package with a framework-free DOM controller and accessible view. It owns common project editing, local draft state, navigation, search, validation presentation, and host callbacks. Persistence and browser lifecycle remain host responsibilities. The browser entry uses a host-supplied F2/F3-compatible validation adapter rather than importing the current Node-only runtime artifacts directly. See [`docs/specs/f5-editor.md`](docs/specs/f5-editor.md) for the contract.
 
 ## Schema Boundary
 

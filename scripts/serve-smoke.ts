@@ -8,6 +8,10 @@ const browserRoot = resolve(
   import.meta.dirname,
   "../packages/smoke/dist/browser",
 );
+const editorRoot = resolve(
+  import.meta.dirname,
+  "../packages/editor/dist/browser",
+);
 function resolveWithin(root: string, requestPath: string): string | undefined {
   const candidate = resolve(root, requestPath);
   const relativePath = relative(root, candidate);
@@ -31,13 +35,12 @@ const server = createServer(async (request, response) => {
     response.end("Invalid request");
     return;
   }
-  const requestPath =
-    pathname === "/browser-fixture.html"
-      ? "browser-fixture.html"
-      : pathname.slice(1);
+  const requestPath = pathname.slice(1);
   const filePath = requestPath.startsWith("browser/")
     ? resolveWithin(browserRoot, requestPath.slice("browser/".length))
-    : resolveWithin(fixtureRoot, requestPath);
+    : requestPath.startsWith("editor/")
+      ? resolveWithin(editorRoot, requestPath.slice("editor/".length))
+      : resolveWithin(fixtureRoot, requestPath);
   if (!filePath) {
     response.writeHead(404);
     response.end("Not found");
