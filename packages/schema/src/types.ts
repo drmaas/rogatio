@@ -34,7 +34,10 @@ export const HTTP_METHODS = Object.freeze([
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
-export type RuleType = "redirect" | "query";
+export type RuleType = "redirect" | "query" | "header";
+
+export type HeaderDirection = "request" | "response";
+export type HeaderOperationKind = "set" | "append" | "remove";
 
 export interface RedirectAction {
   /** Absolute http(s) URL. May contain \1..\9 backreferences to urlRegex capture groups. */
@@ -53,6 +56,13 @@ export interface RogatioQueryAction {
 
 export type RogatioRuleAction = RedirectAction | RogatioQueryAction;
 
+export interface HeaderAction {
+  headerDirection: HeaderDirection;
+  headerOperation: HeaderOperationKind;
+  headerName: string;
+  headerValue?: string;
+}
+
 export interface RogatioRule {
   id: string;
   name: string;
@@ -70,6 +80,11 @@ export interface RogatioRule {
 
   /** Required iff type === "query". */
   action?: RogatioRuleAction;
+  /** Required iff type === "header". */
+  headerDirection?: HeaderDirection;
+  headerOperation?: HeaderOperationKind;
+  headerName?: string;
+  headerValue?: string;
 }
 
 export interface RogatioGroup {

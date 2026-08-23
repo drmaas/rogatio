@@ -1,4 +1,6 @@
 import type {
+  HeaderDirection,
+  HeaderOperationKind,
   HttpMethod,
   ResourceType,
   RogatioQueryAction,
@@ -38,10 +40,24 @@ export interface QueryOperation {
   readonly action: RogatioQueryAction;
 }
 
+export interface HeaderOperation {
+  readonly kind: "header";
+  readonly groupId: string;
+  readonly ruleId: string;
+  readonly matcher: NormalizedMatcher;
+  readonly header: {
+    readonly direction: HeaderDirection;
+    readonly operation: HeaderOperationKind;
+    readonly name: string;
+    readonly value?: string;
+  };
+}
+
 export type RogatioOperation =
   | MatcherOperation
   | RedirectOperation
-  | QueryOperation;
+  | QueryOperation
+  | HeaderOperation;
 
 export type CompilerDiagnosticCode =
   | "schema.required"
@@ -54,7 +70,12 @@ export type CompilerDiagnosticCode =
   | "schema.duplicate-id"
   | "schema.no-effective-origin"
   | "schema.rule-limit"
-  | "compiler.invariant";
+  | "compiler.invariant"
+  | "compiler.forbidden-header"
+  | "compiler.header-value-required"
+  | "compiler.header-value-unexpected"
+  | "compiler.invalid-header-direction"
+  | "compiler.invalid-header-operation";
 
 export interface CompilerDiagnostic {
   readonly code: CompilerDiagnosticCode;

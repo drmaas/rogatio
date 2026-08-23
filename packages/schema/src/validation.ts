@@ -1,5 +1,6 @@
 import type { ErrorObject, ValidateFunction } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
+import { isForbiddenHeader, type HeaderDirection } from "./headers.js";
 import { LIMITS } from "./limits.js";
 import { isSiteOrigin, normalizeSiteOrigin } from "./origins.js";
 import { compileUrlRegex } from "./regex.js";
@@ -212,13 +213,14 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
       if (
         rule.type !== undefined &&
         rule.type !== "redirect" &&
-        rule.type !== "query"
+        rule.type !== "query" &&
+        rule.type !== "header"
       ) {
         issues.push({
           instancePath: `${rulePath}/type`,
           keyword: "enum",
-          message: 'must be "redirect" or "query"',
-          params: { allowedValues: ["redirect", "query"] },
+          message: 'must be "redirect", "query", or "header"',
+          params: { allowedValues: ["redirect", "query", "header"] },
         });
       }
 
@@ -295,6 +297,20 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
           } else {
             seenNames.add(paramName);
           }
+        }
+      }
+      if (rule.type === "header" && rule.headerName !== undefined) {
+        const direction: HeaderDirection = rule.headerDirection ?? "request";
+        if (isForbiddenHeader(rule.headerName, direction)) {
+          issues.push({
+            instancePath: `${rulePath}/headerName`,
+            keyword: "forbiddenHeader",
+            message: `Header "${rule.headerName}" is forbidden for ${direction} headers.`,
+            params: {
+              headerName: rule.headerName,
+              headerDirection: direction,
+            },
+          });
         }
       }
     }

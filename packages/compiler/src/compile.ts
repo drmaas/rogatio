@@ -12,6 +12,7 @@ import {
 import { invariantDiagnostic, mapValidationIssues } from "./diagnostics.js";
 import type {
   CompileResult,
+  HeaderOperation,
   MatcherOperation,
   NormalizedMatcher,
   QueryOperation,
@@ -231,6 +232,22 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
           ruleId: rule.id,
           matcher,
           action,
+        };
+        operations.push(operation);
+      } else if (rule.type === "header") {
+        const operation: HeaderOperation = {
+          kind: "header",
+          groupId: group.id,
+          ruleId: rule.id,
+          matcher,
+          header: {
+            direction: rule.headerDirection ?? "request",
+            operation: rule.headerOperation ?? "set",
+            name: rule.headerName ?? "",
+            ...(rule.headerValue !== undefined
+              ? { value: rule.headerValue }
+              : {}),
+          },
         };
         operations.push(operation);
       } else {

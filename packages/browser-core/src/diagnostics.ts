@@ -41,6 +41,14 @@ const MESSAGES: Record<CoreDiagnosticCode, string> = {
   "schema.rule-limit": "The project contains too many rules.",
   "compiler.invariant":
     "The compiler could not normalize validated project data.",
+  "compiler.forbidden-header":
+    "The header name is forbidden for this direction.",
+  "compiler.header-value-required":
+    "Header value is required for set and append operations.",
+  "compiler.header-value-unexpected":
+    "Header value must not be provided for remove operation.",
+  "compiler.invalid-header-direction": "Invalid header direction.",
+  "compiler.invalid-header-operation": "Invalid header operation.",
   "core.storage-corrupt":
     "The stored project state is unreadable and must be repaired or reset.",
   "core.storage-conflict":

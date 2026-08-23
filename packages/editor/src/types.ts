@@ -1,4 +1,12 @@
-import type { HttpMethod, ResourceType, RogatioProject } from "@rogatio/schema";
+import type {
+  HeaderDirection,
+  HeaderOperationKind,
+  HttpMethod,
+  ResourceType,
+  RogatioProject,
+} from "@rogatio/schema";
+
+export type { HeaderDirection, HeaderOperationKind };
 
 export interface EditorDiagnostic {
   readonly code: string;

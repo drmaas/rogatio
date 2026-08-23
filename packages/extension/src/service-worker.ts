@@ -5,13 +5,20 @@ import {
   type RuleInstallerAdapter,
   type StorageAdapter,
 } from "@rogatio/browser-core";
-import { compileProject, type RogatioOperation } from "@rogatio/compiler";
+import {
+  compileProject,
+  type HeaderOperation,
+  type MatcherOperation,
+  type RogatioOperation,
+} from "@rogatio/compiler";
 import { normalizeSiteOrigin } from "@rogatio/schema";
 import {
   type ExtensionDiagnostic,
   extensionDiagnostic,
 } from "./diagnostics.js";
+import { installHeaderRules } from "./installer.js";
 import { declaredPermissionOrigins } from "./permissions.js";
+import { projectHeaders } from "./projection.js";
 import { type ExtensionRequest, parseRequest } from "./protocol.js";
 
 type PermissionAdapter = {
@@ -101,6 +108,16 @@ function operationStatuses(
       return { ...status };
     }
     // redirect and query operations are installable; pass through status
+    if (operation?.kind === "header") {
+      if (status.status === "active") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "active",
+        };
+      }
+      return { ...status };
+    }
     if (status.status === "active") {
       return {
         groupId: status.groupId,
@@ -165,6 +182,12 @@ export function createExtensionApplication(
       await options.badge?.(badge);
       return { statuses: [], badge };
     }
+    const _matcherOps = compiled.operations.filter(
+      (op): op is MatcherOperation => op.kind === "matcher",
+    );
+    const headerOps = compiled.operations.filter(
+      (op): op is HeaderOperation => op.kind === "header",
+    );
     const declared = declaredPermissionOrigins({
       operations: compiled.operations,
     });
@@ -175,6 +198,11 @@ export function createExtensionApplication(
       installedRuleIds = installed.map((operation) => operation.ruleId);
     } catch {
       installedRuleIds = [];
+    }
+    if (headerOps.length > 0) {
+      const headerProjections = projectHeaders(headerOps);
+      const result = await installHeaderRules(headerProjections);
+      installedRuleIds.push(...result.installed.map(String));
     }
     const statuses = operationStatuses(
       compiled.operations,
