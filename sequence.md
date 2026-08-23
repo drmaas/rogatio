@@ -34,7 +34,7 @@ All three depend only on `schema` + `compiler` and are mutually independent, so 
 
 Both depend on the core platform landing in Phase 2.
 
-- **F7 — Chrome MV3 extension shell.** Manifest, background service worker, neutral→WebExtensions/DNR translation, permission flow (review & grant only declared site access), project import/export, project selector with explicit **Switch**, create/import/update/remove (cancelable confirmation), group activation kept separate from permission, conflict refresh path, 64-project cap with exactly one active project, rule status rendering, toolbar badge, and the bounded/redacted/live-only `[Rogatio]` DevTools Console record. *Depends on: F4, F5.*
+- **F7 — Chrome MV3 extension shell.** Manifest, background service worker, deterministic matcher projection for future WebExtensions/DNR action slices, permission flow (review & grant only declared site access), project import/export, project selector with explicit **Switch**, create/import/update/remove (cancelable confirmation), group activation kept separate from permission, conflict refresh path, 64-project cap with exactly one active project, and rule status rendering plus toolbar badge. Actionless F3 matcher operations are reported as `unsupported` and are not installed until a later action slice defines their DNR action. The bounded/redacted/live-only `[Rogatio]` DevTools Console record is explicitly deferred to a later feature specification. *Depends on: F4, F5.*
 - **F8 — CLI `edit` + `verify`.** Editor host wrapping F5, `.rogatio.json` file verification (`verify`), and validate/save/cancel against the file. *Depends on: F4, F5; `verify` also uses F3.*
 
 ---

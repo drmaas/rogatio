@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Rogatio",
+  "version": "0.0.0",
+  "description": "Local-first browser request and response rules.",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Rogatio",
+    "default_popup": "index.html"
+  },
+  "permissions": ["storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

@@ -1,0 +1,403 @@
+import {
+  computeBadge,
+  computeRuleStatuses,
+  ProjectRepository,
+  type RuleInstallerAdapter,
+  type StorageAdapter,
+} from "@rogatio/browser-core";
+import { compileProject, type MatcherOperation } from "@rogatio/compiler";
+import { normalizeSiteOrigin } from "@rogatio/schema";
+import {
+  type ExtensionDiagnostic,
+  extensionDiagnostic,
+} from "./diagnostics.js";
+import { declaredPermissionOrigins } from "./permissions.js";
+import { type ExtensionRequest, parseRequest } from "./protocol.js";
+
+type PermissionAdapter = {
+  contains(origins: readonly string[]): Promise<boolean>;
+  request(origins: readonly string[]): Promise<boolean>;
+  remove(origins: readonly string[]): Promise<boolean>;
+};
+
+export interface ExtensionApplicationOptions {
+  readonly storage: StorageAdapter;
+  readonly permissions: PermissionAdapter;
+  readonly installer: RuleInstallerAdapter;
+  readonly badge?: (value: {
+    readonly text: string;
+    readonly attention: boolean;
+  }) => Promise<void>;
+  readonly generateId?: () => string;
+  readonly now?: () => number;
+}
+
+type StateProjection = {
+  readonly statuses: readonly Record<string, unknown>[];
+  readonly badge: { readonly text: string; readonly attention: boolean };
+};
+
+type Success = { readonly ok: true; readonly value?: unknown };
+type Failure = {
+  readonly ok: false;
+  readonly diagnostic: ExtensionDiagnostic;
+  readonly kind?: "conflict";
+  readonly current?: unknown;
+};
+export type ApplicationResponse = Success | Failure;
+
+function failure(
+  code: ExtensionDiagnostic["code"],
+  params: Readonly<Record<string, unknown>> = {},
+): Failure {
+  return { ok: false, diagnostic: extensionDiagnostic(code, params) };
+}
+
+function conflict(current: unknown): Failure {
+  return {
+    ok: false,
+    kind: "conflict",
+    current,
+    diagnostic: extensionDiagnostic("extension.conflict"),
+  };
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function arrayOfStrings(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.every((item) => typeof item === "string") ? value : undefined;
+}
+
+function operationStatuses(
+  operations: readonly MatcherOperation[],
+  enabledGroupIds: readonly string[],
+  grantedOrigins: readonly string[],
+): readonly Record<string, unknown>[] {
+  const statuses = computeRuleStatuses({
+    operations,
+    enabledGroupIds,
+    grantedOrigins,
+    installedRuleIds: operations.map((operation) => operation.ruleId),
+  });
+  return statuses.map(
+    (status): Record<string, unknown> =>
+      status.status === "active"
+        ? {
+            groupId: status.groupId,
+            ruleId: status.ruleId,
+            status: "unsupported",
+            diagnostics: [extensionDiagnostic("extension.unsupported")],
+          }
+        : { ...status },
+  );
+}
+
+export interface ExtensionApplication {
+  handle(value: unknown): Promise<ApplicationResponse>;
+}
+
+export function createExtensionApplication(
+  options: ExtensionApplicationOptions,
+): ExtensionApplication {
+  const repository = new ProjectRepository({
+    storage: options.storage,
+    generateId: options.generateId,
+    now: options.now,
+  });
+  let pendingProjectId: string | null = null;
+
+  async function grantedOriginsFor(
+    origins: readonly string[],
+  ): Promise<readonly string[]> {
+    const result: string[] = [];
+    for (const origin of origins) {
+      if (await options.permissions.contains([origin])) result.push(origin);
+    }
+    return result;
+  }
+
+  async function projectState(envelope: {
+    readonly activeProjectId: string | null;
+    readonly projects: Readonly<
+      Record<
+        string,
+        {
+          readonly data: unknown;
+          readonly enabledGroupIds: readonly string[];
+        }
+      >
+    >;
+  }): Promise<StateProjection> {
+    if (envelope.activeProjectId === null) {
+      const badge = { text: "", attention: false };
+      await options.badge?.(badge);
+      return { statuses: [], badge };
+    }
+    const project = envelope.projects[envelope.activeProjectId];
+    if (!project) {
+      const badge = { text: "", attention: false };
+      await options.badge?.(badge);
+      return { statuses: [], badge };
+    }
+    const compiled = compileProject(project.data);
+    if (!compiled.ok) {
+      const badge = { text: "", attention: true };
+      await options.badge?.(badge);
+      return { statuses: [], badge };
+    }
+    const declared = declaredPermissionOrigins({
+      operations: compiled.operations,
+    });
+    const granted = await grantedOriginsFor(declared);
+    const statuses = operationStatuses(
+      compiled.operations,
+      project.enabledGroupIds,
+      granted,
+    );
+    const badgeStatuses = statuses.map((status) => ({
+      groupId: String(status.groupId),
+      ruleId: String(status.ruleId),
+      status: status.status as
+        | "active"
+        | "disabled"
+        | "needs permission"
+        | "needs proxy"
+        | "unsupported"
+        | "error",
+    }));
+    const badge = computeBadge(badgeStatuses);
+    await options.badge?.(badge);
+    return { statuses, badge };
+  }
+
+  async function syncStoredGrants(
+    projectId: string,
+    declared: readonly string[],
+    granted: readonly string[],
+  ): Promise<void> {
+    const current = await repository.getProject(projectId);
+    if (!current.ok) return;
+    const grantedSet = new Set(granted);
+    const storedSet = new Set(current.value.grantedOrigins);
+    for (const origin of declared) {
+      if (grantedSet.has(origin) && !storedSet.has(origin)) {
+        await repository.grantOrigin(projectId, origin);
+      } else if (!grantedSet.has(origin) && storedSet.has(origin)) {
+        await repository.revokeOrigin(projectId, origin);
+      }
+    }
+  }
+
+  async function state(): Promise<ApplicationResponse> {
+    const result = await repository.state();
+    if (!result.ok) return failure("extension.storage-failed");
+    const projection = await projectState(result.value);
+    return {
+      ok: true,
+      value: {
+        ...result.value,
+        ruleStatuses: projection.statuses,
+        badge: projection.badge,
+      },
+    };
+  }
+
+  async function handleRequest(
+    request: ExtensionRequest,
+  ): Promise<ApplicationResponse> {
+    const data = request as Record<string, unknown>;
+    if (request.command === "get-state" || request.command === "refresh") {
+      return state();
+    }
+    if (request.command === "select-project") {
+      const projectId = stringValue(data.projectId);
+      if (!projectId) return failure("extension.invalid-message");
+      const current = await repository.state();
+      if (!current.ok || !Object.hasOwn(current.value.projects, projectId)) {
+        return failure("extension.not-found");
+      }
+      pendingProjectId = projectId;
+      return {
+        ok: true,
+        value: {
+          pendingProjectId,
+          activeProjectId: current.value.activeProjectId,
+        },
+      };
+    }
+    if (request.command === "switch-project") {
+      const projectId = stringValue(data.projectId) ?? pendingProjectId;
+      if (!projectId) return failure("extension.invalid-message");
+      const result = await repository.switchProject(projectId);
+      if (!result.ok) {
+        return result.kind === "conflict"
+          ? conflict(result.current)
+          : failure("extension.not-found");
+      }
+      pendingProjectId = projectId;
+      const projection = await projectState(result.value);
+      return {
+        ok: true,
+        value: {
+          ...result.value,
+          ruleStatuses: projection.statuses,
+          badge: projection.badge,
+        },
+      };
+    }
+    if (
+      request.command === "create-project" ||
+      request.command === "import-project"
+    ) {
+      const result =
+        request.command === "create-project"
+          ? await repository.createProject(data.data)
+          : await repository.importProject(data.data, {
+              id: stringValue(data.projectId),
+              expectedRevision:
+                typeof data.expectedRevision === "number"
+                  ? data.expectedRevision
+                  : undefined,
+            });
+      if (!result.ok) {
+        return result.kind === "conflict"
+          ? conflict(result.current)
+          : failure("extension.storage-failed");
+      }
+      await state();
+      return { ok: true, value: result.value };
+    }
+    if (request.command === "save-project") {
+      const projectId = stringValue(data.projectId);
+      const revision = data.expectedRevision;
+      if (!projectId || typeof revision !== "number") {
+        return failure("extension.invalid-message");
+      }
+      const result = await repository.saveProject(
+        projectId,
+        data.data,
+        revision,
+      );
+      if (!result.ok) {
+        return result.kind === "conflict"
+          ? conflict(result.current)
+          : failure("extension.storage-failed");
+      }
+      await state();
+      return { ok: true, value: result.value };
+    }
+    if (request.command === "remove-project") {
+      const projectId = stringValue(data.projectId);
+      if (!projectId || data.confirm !== true) {
+        return failure("extension.invalid-message");
+      }
+      const result = await repository.removeProject(projectId);
+      if (!result.ok) return failure("extension.not-found");
+      await state();
+      return { ok: true, value: result.value };
+    }
+    if (request.command === "export-project") {
+      const projectId = stringValue(data.projectId);
+      if (!projectId) return failure("extension.invalid-message");
+      const result = await repository.exportProject(projectId);
+      return result.ok
+        ? { ok: true, value: result.value }
+        : failure("extension.not-found");
+    }
+    if (request.command === "set-group-enabled") {
+      const projectId = stringValue(data.projectId);
+      const groupId = stringValue(data.groupId);
+      if (!projectId || !groupId || typeof data.enabled !== "boolean") {
+        return failure("extension.invalid-message");
+      }
+      const result = await repository.setGroupEnabled(
+        projectId,
+        groupId,
+        data.enabled,
+      );
+      if (!result.ok) return failure("extension.not-found");
+      await state();
+      return { ok: true, value: result.value };
+    }
+    if (
+      request.command === "review-permissions" ||
+      request.command === "grant-permissions" ||
+      request.command === "revoke-permission"
+    ) {
+      const projectId = stringValue(data.projectId);
+      if (!projectId) return failure("extension.invalid-message");
+      const exported = await repository.exportProject(projectId);
+      if (!exported.ok) return failure("extension.not-found");
+      const compiled = compileProject(exported.value);
+      if (!compiled.ok) return failure("extension.storage-failed");
+      let declared: readonly string[];
+      try {
+        declared = declaredPermissionOrigins({
+          operations: compiled.operations,
+        });
+      } catch {
+        return failure("extension.invalid-origin");
+      }
+      const grantedOrigins = await grantedOriginsFor(declared);
+      if (request.command === "review-permissions") {
+        await syncStoredGrants(projectId, declared, grantedOrigins);
+        const current = await repository.state();
+        if (!current.ok) return failure("extension.storage-failed");
+        const projection = await projectState(current.value);
+        return {
+          ok: true,
+          value: {
+            origins: declared,
+            granted: grantedOrigins.length === declared.length,
+            state: {
+              ...current.value,
+              ruleStatuses: projection.statuses,
+              badge: projection.badge,
+            },
+          },
+        };
+      }
+      const requested = arrayOfStrings(data.origins);
+      if (!requested) return failure("extension.invalid-message");
+      const normalized = requested.map((origin) => normalizeSiteOrigin(origin));
+      if (normalized.some((origin) => origin === null))
+        return failure("extension.invalid-origin");
+      const exact = normalized as string[];
+      if (exact.some((origin) => !declared.includes(origin)))
+        return failure("extension.invalid-origin");
+      const changed =
+        request.command === "grant-permissions"
+          ? await options.permissions.request(exact)
+          : await options.permissions.remove(exact);
+      if (!changed) return failure("extension.permission-failed");
+      const currentGranted = await grantedOriginsFor(declared);
+      await syncStoredGrants(projectId, declared, currentGranted);
+      await state();
+      return {
+        ok: true,
+        value: {
+          origins: declared,
+          granted: currentGranted.length === declared.length,
+        },
+      };
+    }
+    return failure("extension.invalid-message");
+  }
+
+  return {
+    async handle(value) {
+      const parsed = parseRequest(value);
+      if (!parsed.ok) return { ok: false, diagnostic: parsed.diagnostic };
+      try {
+        return await handleRequest(parsed.value);
+      } catch {
+        return failure("extension.storage-failed");
+      }
+    },
+  };
+}
+
+export type { PermissionAdapter };

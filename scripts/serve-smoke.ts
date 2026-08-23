@@ -12,6 +12,10 @@ const editorRoot = resolve(
   import.meta.dirname,
   "../packages/editor/dist/browser",
 );
+const extensionRoot = resolve(
+  import.meta.dirname,
+  "../packages/extension/dist",
+);
 function resolveWithin(root: string, requestPath: string): string | undefined {
   const candidate = resolve(root, requestPath);
   const relativePath = relative(root, candidate);
@@ -40,7 +44,9 @@ const server = createServer(async (request, response) => {
     ? resolveWithin(browserRoot, requestPath.slice("browser/".length))
     : requestPath.startsWith("editor/")
       ? resolveWithin(editorRoot, requestPath.slice("editor/".length))
-      : resolveWithin(fixtureRoot, requestPath);
+      : requestPath.startsWith("extension/")
+        ? resolveWithin(extensionRoot, requestPath.slice("extension/".length))
+        : resolveWithin(fixtureRoot, requestPath);
   if (!filePath) {
     response.writeHead(404);
     response.end("Not found");

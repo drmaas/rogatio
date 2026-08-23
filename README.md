@@ -4,7 +4,7 @@ Rogatio is a planned local-first tool for creating, reviewing, and running brows
 
 ## Current Status
 
-Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, and Feature 4, the released `@rogatio/browser-core` package, are complete. F5, the `@rogatio/editor` package, Feature 6, the `@rogatio/runtime` foundation package, and F8, the `@rogatio/cli` package (providing `rogatio edit` and `rogatio verify`, with `rogatio runtime` as a documented stub), are implemented and verified in isolated worktrees. Other product packages remain intentionally unimplemented.
+Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, Feature 4, the released `@rogatio/browser-core` package, F5, the `@rogatio/editor` package, Feature 6, the `@rogatio/runtime` foundation package, F7, the Chrome MV3 `@rogatio/extension` shell, and F8, the `@rogatio/cli` package (providing `rogatio edit` and `rogatio verify`, with `rogatio runtime` as a documented stub), are implemented and verified in this worktree. Action-specific rule slices, packaging, and release automation remain intentionally unimplemented.
 
 ## CLI
 
@@ -36,6 +36,9 @@ See [`docs/specs/f8-cli-edit-verify.md`](docs/specs/f8-cli-edit-verify.md) for t
 - [`docs/plans/f8-cli-edit-verify.md`](docs/plans/f8-cli-edit-verify.md): Feature 8 implementation plan.
 - [`docs/f8-workflow.md`](docs/f8-workflow.md): Feature 8 workflow record (SDD stages, review, verification).
 - [`docs/f6-workflow.md`](docs/f6-workflow.md): Feature 6 workflow record.
+- [`docs/specs/f7-extension-shell.md`](docs/specs/f7-extension-shell.md): Feature 7 Chrome MV3 extension specification.
+- [`docs/plans/f7-extension-shell.md`](docs/plans/f7-extension-shell.md): Feature 7 implementation plan.
+- [`docs/f7-workflow.md`](docs/f7-workflow.md): Feature 7 workflow record.
 
 ## Development Workflow
 
@@ -75,7 +78,7 @@ F1 retains pnpm's default lifecycle-script blocking. No broad install-script all
 - `pnpm format:check` checks formatting; `pnpm format` writes it.
 - `pnpm lint` runs Biome linting.
 - `pnpm typecheck` runs the pinned strict TypeScript compiler.
-- `pnpm build` creates and verifies Node and browser ESM smoke artifacts plus the Node ESM schema, compiler, and browser-core artifacts.
+- `pnpm build` creates and verifies Node and browser ESM artifacts, including the browser-safe MV3 service worker and extension page bundles.
 - `pnpm test` builds and runs the non-empty Vitest smoke suite.
 - `pnpm test:browser` builds and runs the Chromium Playwright smoke journey.
 - `pnpm validate` runs the complete fail-fast validation sequence, including negative fixtures.
@@ -84,11 +87,17 @@ F1 retains pnpm's default lifecycle-script blocking. No broad install-script all
 
 F1 validation is pinned to a known-good toolchain: Node `24.19.0`, pnpm `10.32.1`, and `typescript@7.0.2`. The original F1 validation evidence is recorded in `docs/f1-workflow.md`.
 
+## F7 Extension Boundary
+
+F7 adds the private `@rogatio/extension` package with a Chrome Manifest V3 service worker, extension page, project lifecycle controls, explicit project switching, least-privilege permission review/grant, separate group activation, deterministic actionless matcher projection, stable status/badge rendering, and a shared F5 editor host. F7 deliberately does not install actionless DNR rules or implement action-specific rule slices. Its MV3 bundles use a browser-safe validator and contain no Node globals, dynamic evaluation, remote code, or Ajv runtime compiler. The `[Rogatio]` DevTools Console record is deferred to a later specification.
+
+See [`docs/specs/f7-extension-shell.md`](docs/specs/f7-extension-shell.md) for the approved contract and [`docs/f7-workflow.md`](docs/f7-workflow.md) for validation evidence.
+
 ## F1 Package Boundaries
 
-F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary; F3 adds the `@rogatio/compiler` matcher transformation boundary; F4 adds the `@rogatio/browser-core` core platform layer. The `editor/runtime -> extension` layers follow the implementation sequence; the `@rogatio/cli` boundary is implemented in F8. The F1 bootstrap itself ships no F5-F20 product API or behavior.
+F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary; F3 adds the `@rogatio/compiler` matcher transformation boundary; F4 adds the `@rogatio/browser-core` core platform layer; F7 supplies the Chrome extension shell; and F8 supplies the `@rogatio/cli` boundary. Action-specific rule slices, packaging, and release automation remain outside the current implementation.
 
-The F1 bootstrap does not itself ship a product CLI, browser extension, or runtime; the `@rogatio/cli` package is delivered by F8. Do not infer product behavior from the F1 bootstrap smoke packages.
+The current implementation includes the F7 extension shell and F8 CLI; browser-store packaging, action-specific rule slices, and release automation remain intentionally unimplemented.
 
 ## Editor Boundary
 
