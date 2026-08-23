@@ -5,4 +5,6 @@ export type {
   CompilerDiagnosticCode,
   MatcherOperation,
   NormalizedMatcher,
+  RedirectOperation,
+  RogatioOperation,
 } from "./types.js";

@@ -1,4 +1,4 @@
-import type { MatcherOperation } from "@rogatio/compiler";
+import type { RogatioOperation } from "@rogatio/compiler";
 import type { CoreDiagnostic } from "./diagnostics.js";
 import { coreDiagnostic } from "./diagnostics.js";
 import type {
@@ -8,8 +8,8 @@ import type {
 } from "./types.js";
 
 function sameOperations(
-  left: readonly MatcherOperation[],
-  right: readonly MatcherOperation[],
+  left: readonly RogatioOperation[],
+  right: readonly RogatioOperation[],
 ): boolean {
   if (left.length !== right.length) return false;
   // Both sides are plain, serializable operation data produced by the same
@@ -25,7 +25,7 @@ export class InstallService {
     this.installer = installer;
   }
 
-  apply(desired: readonly MatcherOperation[]): Promise<InstallOutcome> {
+  apply(desired: readonly RogatioOperation[]): Promise<InstallOutcome> {
     const run = this.tail.then(() => this.applyNow(desired));
     this.tail = run.then(
       () => undefined,
@@ -35,9 +35,9 @@ export class InstallService {
   }
 
   private async applyNow(
-    desired: readonly MatcherOperation[],
+    desired: readonly RogatioOperation[],
   ): Promise<InstallOutcome> {
-    let previous: readonly MatcherOperation[];
+    let previous: readonly RogatioOperation[];
     try {
       previous = await this.installer.current();
     } catch {
@@ -72,7 +72,7 @@ export class InstallService {
   }
 
   private async tryInstall(
-    operations: readonly MatcherOperation[],
+    operations: readonly RogatioOperation[],
   ): Promise<InstallResult> {
     try {
       return await this.installer.install(operations);

@@ -1,4 +1,4 @@
-import type { MatcherOperation } from "@rogatio/compiler";
+import type { RogatioOperation } from "@rogatio/compiler";
 import type { RogatioProject } from "@rogatio/schema";
 import type { CoreDiagnostic } from "./diagnostics.js";
 
@@ -39,8 +39,8 @@ export interface StorageAdapter {
  * must serialize concurrent operations.
  */
 export interface RuleInstallerAdapter {
-  current(): Promise<readonly MatcherOperation[]>;
-  install(operations: readonly MatcherOperation[]): Promise<InstallResult>;
+  current(): Promise<readonly RogatioOperation[]>;
+  install(operations: readonly RogatioOperation[]): Promise<InstallResult>;
 }
 
 export type InstallResult =
@@ -50,7 +50,7 @@ export type InstallResult =
 export type InstallOutcome =
   | {
       readonly ok: true;
-      readonly installed: readonly MatcherOperation[];
+      readonly installed: readonly RogatioOperation[];
       readonly noop: boolean;
     }
   | {
@@ -80,7 +80,7 @@ export interface BadgeState {
 }
 
 export interface RuleStatusInput {
-  readonly operations: readonly MatcherOperation[];
+  readonly operations: readonly RogatioOperation[];
   readonly enabledGroupIds: readonly string[];
   readonly grantedOrigins: readonly string[];
   readonly installedRuleIds: readonly string[];

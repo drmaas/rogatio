@@ -5,7 +5,7 @@ import {
   type RuleInstallerAdapter,
   type StorageAdapter,
 } from "@rogatio/browser-core";
-import { compileProject, type MatcherOperation } from "@rogatio/compiler";
+import { compileProject, type RogatioOperation } from "@rogatio/compiler";
 import { normalizeSiteOrigin } from "@rogatio/schema";
 import {
   type ExtensionDiagnostic,
@@ -72,7 +72,8 @@ function arrayOfStrings(value: unknown): readonly string[] | undefined {
 }
 
 function operationStatuses(
-  operations: readonly MatcherOperation[],
+  operations: readonly RogatioOperation[],
+  installedRuleIds: readonly string[],
   enabledGroupIds: readonly string[],
   grantedOrigins: readonly string[],
 ): readonly Record<string, unknown>[] {
@@ -80,19 +81,37 @@ function operationStatuses(
     operations,
     enabledGroupIds,
     grantedOrigins,
-    installedRuleIds: operations.map((operation) => operation.ruleId),
+    installedRuleIds,
   });
-  return statuses.map(
-    (status): Record<string, unknown> =>
-      status.status === "active"
-        ? {
-            groupId: status.groupId,
-            ruleId: status.ruleId,
-            status: "unsupported",
-            diagnostics: [extensionDiagnostic("extension.unsupported")],
-          }
-        : { ...status },
-  );
+  return statuses.map((status): Record<string, unknown> => {
+    const operation = operations.find(
+      (candidate) =>
+        candidate.ruleId === status.ruleId &&
+        candidate.groupId === status.groupId,
+    );
+    // Actionless matcher operations are never installable. When enabled they
+    // would be active (or error, since nothing installs them), so report
+    // unsupported; disabled/needs-permission states still pass through.
+    if (operation?.kind === "matcher") {
+      if (status.status === "active" || status.status === "error") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "unsupported",
+          diagnostics: [extensionDiagnostic("extension.unsupported")],
+        };
+      }
+      return { ...status };
+    }
+    if (status.status === "active") {
+      return {
+        groupId: status.groupId,
+        ruleId: status.ruleId,
+        status: "active",
+      };
+    }
+    return { ...status };
+  });
 }
 
 export interface ExtensionApplication {
@@ -152,8 +171,16 @@ export function createExtensionApplication(
       operations: compiled.operations,
     });
     const granted = await grantedOriginsFor(declared);
+    let installedRuleIds: string[] = [];
+    try {
+      const installed = await options.installer.current();
+      installedRuleIds = installed.map((operation) => operation.ruleId);
+    } catch {
+      installedRuleIds = [];
+    }
     const statuses = operationStatuses(
       compiled.operations,
+      installedRuleIds,
       project.enabledGroupIds,
       granted,
     );

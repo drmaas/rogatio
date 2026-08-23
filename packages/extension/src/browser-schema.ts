@@ -41,6 +41,8 @@ export const LIMITS = Object.freeze({
   maxResourceTypesPerRule: 16,
   minPriority: 1,
   maxPriority: 1000,
+  maxRedirectDestinationLength: 2048,
+  maxCaptureGroups: 9,
 });
 
 type JsonRecord = Record<string, unknown>;
@@ -170,6 +172,126 @@ export function isValidUrlRegex(value: unknown): value is string {
   return typeof value === "string" && compileUrlRegex(value) !== null;
 }
 
+export interface RedirectDestinationIssue {
+  readonly code: string;
+  readonly message: string;
+}
+
+function skipBalancedGroup(source: string, start: number): number {
+  let depth = 0;
+  let index = start;
+  const length = source.length;
+  while (index < length) {
+    const char = source[index];
+    if (char === "\\") {
+      index += 2;
+      continue;
+    }
+    if (char === "(") {
+      depth += 1;
+    } else if (char === ")") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+    index += 1;
+  }
+  return length;
+}
+
+function countCapturingGroups(urlRegex: string): number {
+  let count = 0;
+  let index = 0;
+  const length = urlRegex.length;
+  while (index < length) {
+    const char = urlRegex[index];
+    if (char === "\\") {
+      index += 2;
+      continue;
+    }
+    if (char === "(") {
+      if (urlRegex[index + 1] === "?") {
+        index = skipBalancedGroup(urlRegex, index);
+        continue;
+      }
+      count += 1;
+    }
+    index += 1;
+  }
+  return count;
+}
+
+export function validateRedirectDestination(
+  destination: string,
+  urlRegex: string,
+): readonly RedirectDestinationIssue[] {
+  const issues: RedirectDestinationIssue[] = [];
+  if (typeof destination !== "string" || destination.length === 0) {
+    return [
+      {
+        code: "schema.required",
+        message: "Redirect destination must be a non-empty string.",
+      },
+    ];
+  }
+  if (destination.length > LIMITS.maxRedirectDestinationLength) {
+    return [
+      {
+        code: "schema.out-of-range",
+        message: `Redirect destination must be at most ${LIMITS.maxRedirectDestinationLength} characters.`,
+      },
+    ];
+  }
+  let url: URL;
+  try {
+    url = new URL(destination);
+  } catch {
+    return [
+      {
+        code: "schema.invalid-format",
+        message: "Redirect destination must be an absolute URL.",
+      },
+    ];
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return [
+      {
+        code: "schema.invalid-value",
+        message: "Redirect destination must use the http or https scheme.",
+      },
+    ];
+  }
+  if (url.username.length > 0 || url.password.length > 0) {
+    return [
+      {
+        code: "schema.invalid-value",
+        message: "Redirect destination must not contain credentials.",
+      },
+    ];
+  }
+  if (url.hostname.length === 0 || url.hostname.includes("*")) {
+    return [
+      {
+        code: "schema.invalid-format",
+        message: "Redirect destination must have a valid host.",
+      },
+    ];
+  }
+  const groups = countCapturingGroups(urlRegex);
+  const backreference = /\\([1-9])/g;
+  let match = backreference.exec(destination);
+  while (match !== null) {
+    const referenced = Number(match[1]);
+    if (referenced > groups) {
+      issues.push({
+        code: "schema.invalid-value",
+        message: `Redirect destination references capture group ${referenced} but the URL pattern defines ${groups}.`,
+      });
+    }
+    match = backreference.exec(destination);
+  }
+  return issues;
+}
+
 export interface ValidationIssue {
   instancePath: string;
   keyword: string;
@@ -204,6 +326,8 @@ const RULE_KEYS = [
   "resourceTypes",
   "priority",
   "method",
+  "type",
+  "redirect",
 ] as const;
 
 export function validateProjectDetailed(
@@ -340,6 +464,32 @@ export function validateProjectDetailed(
         !HTTP_METHODS.includes(rule.method as HttpMethod)
       )
         errors.push(issue(`${rulePath}/method`, "invalid-value"));
+      if (rule.type !== undefined && rule.type !== "redirect")
+        errors.push(issue(`${rulePath}/type`, "invalid-value"));
+      if (rule.type === "redirect") {
+        const redirect = (rule as Record<string, unknown>).redirect;
+        const destination =
+          redirect !== null &&
+          typeof redirect === "object" &&
+          typeof (redirect as Record<string, unknown>).destination === "string"
+            ? ((redirect as Record<string, unknown>).destination as string)
+            : undefined;
+        if (destination === undefined) {
+          errors.push(issue(`${rulePath}/redirect/destination`, "required"));
+        } else {
+          for (const destIssue of validateRedirectDestination(
+            destination,
+            typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+          )) {
+            errors.push({
+              instancePath: `${rulePath}/redirect/destination`,
+              keyword: destIssue.code,
+              message: destIssue.message,
+              params: {},
+            });
+          }
+        }
+      }
       const effective = [
         ...(Array.isArray(group.origins) ? group.origins : []),
         ...(Array.isArray(rule.origins) ? rule.origins : []),

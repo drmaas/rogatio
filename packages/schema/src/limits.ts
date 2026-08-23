@@ -10,4 +10,6 @@ export const LIMITS = Object.freeze({
   maxResourceTypesPerRule: 16,
   minPriority: 1,
   maxPriority: 1000,
+  maxRedirectDestinationLength: 2048,
+  maxCaptureGroups: 9,
 });

@@ -1,4 +1,4 @@
-import { compileProject, type MatcherOperation } from "@rogatio/compiler";
+import { compileProject, type RogatioOperation } from "@rogatio/compiler";
 import { coreDiagnostic } from "./diagnostics.js";
 import type {
   BadgeState,
@@ -18,10 +18,10 @@ function originSets(
 }
 
 export function computeDesiredRules(input: {
-  readonly operations: readonly MatcherOperation[];
+  readonly operations: readonly RogatioOperation[];
   readonly enabledGroupIds: readonly string[];
   readonly grantedOrigins: readonly string[];
-}): readonly MatcherOperation[] {
+}): readonly RogatioOperation[] {
   const { enabled, granted } = originSets(
     input.enabledGroupIds,
     input.grantedOrigins,
