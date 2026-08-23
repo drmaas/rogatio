@@ -147,3 +147,6 @@ build-manifest.json
 packages/*/dist/
 playwright-report/
 test-results/
+
+# OCX local project state (receipts, machine-specific paths)
+.ocx/
