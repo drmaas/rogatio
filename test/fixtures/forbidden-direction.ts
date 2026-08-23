@@ -1,3 +1,3 @@
-import { browserCoreValue } from "@rogatio/browser-core";
+import { extensionValue } from "@rogatio/extension";
 
-export { browserCoreValue };
+export { extensionValue };

@@ -4,7 +4,7 @@ Rogatio is a planned local-first tool for creating, reviewing, and running brows
 
 ## Current Status
 
-Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, and Feature 3, the released `@rogatio/compiler` package, are complete. Other product packages remain intentionally unimplemented.
+Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, and Feature 4, the released `@rogatio/browser-core` package, are complete. The editor, runtime, extension, and CLI packages remain intentionally unimplemented.
 
 ## Project Documents
 
@@ -17,6 +17,8 @@ Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/sch
 - [`docs/plans/f2-schema.md`](docs/plans/f2-schema.md): Feature 2 implementation plan.
 - [`docs/specs/f3-compiler.md`](docs/specs/f3-compiler.md): Feature 3 compiler specification.
 - [`docs/plans/f3-compiler.md`](docs/plans/f3-compiler.md): Feature 3 implementation plan.
+- [`docs/plans/f4-browser-core.md`](docs/plans/f4-browser-core.md): Feature 4 implementation plan.
+- [`docs/f4-workflow.md`](docs/f4-workflow.md): Feature 4 workflow log.
 
 ## Development Workflow
 
@@ -54,7 +56,7 @@ F1 retains pnpm's default lifecycle-script blocking. No broad install-script all
 - `pnpm format:check` checks formatting; `pnpm format` writes it.
 - `pnpm lint` runs Biome linting.
 - `pnpm typecheck` runs the pinned strict TypeScript compiler.
-- `pnpm build` creates and verifies Node and browser ESM smoke artifacts plus the Node ESM schema and compiler artifacts.
+- `pnpm build` creates and verifies Node and browser ESM smoke artifacts plus the Node ESM schema, compiler, and browser-core artifacts.
 - `pnpm test` builds and runs the non-empty Vitest smoke suite.
 - `pnpm test:browser` builds and runs the Chromium Playwright smoke journey.
 - `pnpm validate` runs the complete fail-fast validation sequence, including negative fixtures.
@@ -65,7 +67,7 @@ F1 validation is pinned to a known-good toolchain: Node `24.19.0`, pnpm `10.32.1
 
 ## F1 Package Boundaries
 
-F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary; F3 adds the `@rogatio/compiler` matcher transformation boundary. The future `browser-core/editor/runtime -> extension/cli` layers are documented boundaries only. No F4-F20 product API or behavior is present.
+F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary; F3 adds the `@rogatio/compiler` matcher transformation boundary; F4 adds the `@rogatio/browser-core` core platform layer. The future `editor/runtime -> extension/cli` layers are documented boundaries only. No F5-F20 product API or behavior is present.
 
 There is no installable CLI, browser extension, or runtime yet. Do not infer product behavior from the F1 bootstrap smoke packages.
 
@@ -76,3 +78,7 @@ F2 adds `@rogatio/schema` as the local validation boundary for the common versio
 ## Compiler Boundary
 
 F3 adds `@rogatio/compiler` as a pure Node ESM boundary from the fully validated F2 envelope to one fresh, data-only matcher operation per source rule. It normalizes and sorts effective origins, orders resource types canonically, preserves regex source, method, priority, and source order, and maps validation failures to stable diagnostics. It does not execute matching, define priority precedence, add actions, or access browser, runtime, filesystem, network, persistence, permission, or telemetry APIs. MV3-safe packaging remains deferred with the F2 browser boundary.
+
+## Browser-Core Boundary
+
+F4 adds `@rogatio/browser-core` as the browser-neutral core platform layer depending only on `@rogatio/schema` and `@rogatio/compiler`. It owns versioned project storage and migrations, the compare-and-swap lifecycle, per-project permission grants and group enablement, atomic rule installation with recovery, the rule status and badge model, and the in-memory runtime state model. Chrome/WebExtensions/DNR translation, editor and CLI surfaces, rule actions, and runtime persistence remain out of scope until their sequence items land. The package's Node ESM artifact is verified by the root build and validation; MV3-safe packaging is deferred to the extension boundary.
