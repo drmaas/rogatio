@@ -17,10 +17,12 @@ Read `rogatio-overview.md` and `sequence.md` before changing scope. Respect the 
 
 Every workflow must choose one agent tier at the start and use it for every delegated role. If the user did not specify `free` or `normal`, ask them to choose before delegating work:
 
-- **Free:** Use only the pinned OpenCode Zen free model for each phase. Never silently fall back to another free model, a paid model, the session model, or another provider. If the pinned model is unavailable, stop and ask the user to switch tiers or explicitly approve a replacement.
+- **Free:** Route each phase to its documented primary model, falling back to the documented fallback only when the primary is unavailable. Never silently substitute an unlisted free model, a paid model, or the session model; the free catalog spans both OpenCode Zen free and OpenRouter free. If both primary and fallback are unavailable, stop and ask the user to switch tiers or explicitly approve a replacement.
 - **Normal:** Use the existing role-specific model chains below. Before using a paid normal model, check whether the exact model or a clearly equivalent free OpenCode Zen model is available; prefer that free equivalent. Do not substitute a merely convenient or unrelated free model and call it equivalent. Normal mode may fall back through its existing provider chain and finally the session model.
 
-The free catalog from the current OpenCode Zen provider is:
+The free catalog spans the current OpenCode Zen free provider and OpenRouter free models:
+
+OpenCode Zen free:
 
 - `opencode/x-preview-f-free` (Ox Alpha Free)
 - `opencode/nemotron-3-ultra-free` (Nemotron 3 Ultra Free)
@@ -30,7 +32,24 @@ The free catalog from the current OpenCode Zen provider is:
 - `opencode/mimo-v2.5-free` (MiMo V2.5 Free)
 - `opencode/big-pickle` (Big Pickle)
 
-Free mode uses pinned phase assignments documented in the `sdd` and `doit` skills; it does not use fallback chains. SDD pins Nemotron Ultra to brainstorm/architecture/specification, MiMo to planning, Muse Spark to tests, Ox Alpha to implementation, Hy3 to verification/documentation, and Big Pickle to independent review. doit pins Nemotron Ultra to brainstorming, MiMo to architecture/planning, Muse Spark to tests, Ox Alpha to implementation, Hy3 to verification/documentation, and Big Pickle to independent review.
+OpenRouter free:
+
+- `openrouter/poolside/laguna-s-2.1:free` (Laguna S 2.1)
+- `openrouter/thinkingmachines/inkling-small:free` (Inkling Small)
+- `openrouter/dots-studio/dots-3-note-preview:free` (Dots3-Note Preview)
+
+Free mode routes each phase to a primary model with a documented fallback. If the primary is unavailable, use the fallback rather than the session model or a paid provider; never silently substitute an unlisted model. Phase-to-model routing is defined per workflow in the `sdd` and `doit` skills. The canonical phase routing is:
+
+| Phase | Primary | Fallback |
+| --- | --- | --- |
+| Brainstorm / architecture | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
+| Specification | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
+| Plan | `opencode/hy3-free` | `opencode/nemotron-3-ultra-free` |
+| Tests authoring | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
+| Implementation (code) | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
+| Verification / debug loop | `opencode/nemotron-3.5-lightning-free` | `openrouter/poolside/laguna-s-2.1:free` |
+| Independent review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
+| Documentation | `opencode/hy3-free` | `openrouter/dots-studio/dots-3-note-preview:free` |
 
 Normal-tier role chains remain:
 

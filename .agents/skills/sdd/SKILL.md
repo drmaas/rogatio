@@ -33,7 +33,9 @@ Choose exactly one tier before Stage 1 and carry that tier through every role in
 
 ### Free tier
 
-Free tier uses only the OpenCode Zen free catalog. Current exact model IDs are:
+Free tier uses the OpenCode Zen free catalog and OpenRouter free models. Current exact model IDs are:
+
+OpenCode Zen free:
 
 - `opencode/x-preview-f-free` (Ox Alpha Free)
 - `opencode/nemotron-3-ultra-free` (Nemotron 3 Ultra Free)
@@ -43,25 +45,31 @@ Free tier uses only the OpenCode Zen free catalog. Current exact model IDs are:
 - `opencode/mimo-v2.5-free` (MiMo V2.5 Free)
 - `opencode/big-pickle` (Big Pickle)
 
-Free mode pins one model to each model-assisted phase; do not choose a different free model by fallback. If the pinned model is unavailable, stop and ask the user to switch to normal tier or explicitly approve a replacement. Never use the session model or a paid provider as a free-tier fallback.
+OpenRouter free:
 
-#### SDD free-phase pins
+- `openrouter/poolside/laguna-s-2.1:free` (Laguna S 2.1)
+- `openrouter/thinkingmachines/inkling-small:free` (Inkling Small)
+- `openrouter/dots-studio/dots-3-note-preview:free` (Dots3-Note Preview)
 
-| Stage | Phase | Pinned model |
-| --- | --- | --- |
-| 1 | Brainstorm | `opencode/nemotron-3-ultra-free` |
-| 2 | Architecture | `opencode/nemotron-3-ultra-free` |
-| 3 | Specification | `opencode/nemotron-3-ultra-free` |
-| 4 | Human review gate | No delegated model; wait for the user |
-| 5 | Implementation plan | `opencode/mimo-v2.5-free` |
-| 6 | Tests first | `opencode/muse-spark-1.2-contributor-free` |
-| 7 | Implementation | `opencode/x-preview-f-free` |
-| 8 | Verification and tests | `opencode/hy3-free` |
-| 9 | Independent fresh-context review | `opencode/big-pickle` |
-| 10 | Documentation | `opencode/hy3-free` |
-| 11 | Release actions | No delegated model; require user authorization |
+Free mode routes each phase to a primary model with a documented fallback. If the primary is unavailable, use the fallback rather than the session model or a paid provider. Never silently substitute an unlisted model; if both primary and fallback are unavailable, stop and ask the user to switch to normal tier or explicitly approve a replacement.
 
-The stronger Nemotron Ultra Free model is intentionally pinned to the reasoning-heavy discovery and design stages; the review stage uses Big Pickle so it remains a separate model from implementation.
+#### SDD free-phase routing
+
+| Stage | Phase | Primary | Fallback |
+| --- | --- | --- | --- |
+| 1 | Brainstorm | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
+| 2 | Architecture | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
+| 3 | Specification | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
+| 4 | Human review gate | No delegated model; wait for the user | |
+| 5 | Implementation plan | `opencode/hy3-free` | `opencode/nemotron-3-ultra-free` |
+| 6 | Tests first | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
+| 7 | Implementation | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
+| 8 | Verification and tests | `opencode/nemotron-3.5-lightning-free` | `openrouter/poolside/laguna-s-2.1:free` |
+| 9 | Independent fresh-context review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
+| 10 | Documentation | `opencode/hy3-free` | `openrouter/dots-studio/dots-3-note-preview:free` |
+| 11 | Release actions | No delegated model; require user authorization | |
+
+The reasoning-heavy discovery and design stages (brainstorm, architecture, specification) use Nemotron 3 Ultra Free as primary because it pairs the strongest reasoning with the fastest speed in the catalog. Plan and documentation use Hy3 Free as primary. Implementation and tests use Laguna S 2.1 as primary with Inkling Small as fallback on both speed and coding score. Verification uses Nemotron 3.5 Lightning as primary for its speed, falling back to Laguna S 2.1. Review uses Nemotron 3 Ultra with Inkling Small as fallback so the reviewer stays separate from the implementation model.
 
 ### Normal tier
 
