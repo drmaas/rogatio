@@ -76,6 +76,21 @@ importers:
         specifier: workspace:*
         version: link:../schema
 
+  packages/extension:
+    dependencies:
+      '@rogatio/browser-core':
+        specifier: workspace:*
+        version: link:../browser-core
+      '@rogatio/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@rogatio/editor':
+        specifier: workspace:*
+        version: link:../editor
+      '@rogatio/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/runtime:
     dependencies:
       '@rogatio/compiler':

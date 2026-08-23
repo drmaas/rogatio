@@ -1,0 +1,26 @@
+{
+  "name": "@rogatio/extension",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/browser/index.js"
+    }
+  },
+  "scripts": {
+    "format": "biome format --write src test public",
+    "format:check": "biome check --formatter-enabled=true --linter-enabled=false src test public",
+    "lint": "biome check --formatter-enabled=false --linter-enabled=true src test public",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "build": "node ../../scripts/build.ts"
+  },
+  "dependencies": {
+    "@rogatio/browser-core": "workspace:*",
+    "@rogatio/compiler": "workspace:*",
+    "@rogatio/editor": "workspace:*",
+    "@rogatio/schema": "workspace:*"
+  }
+}

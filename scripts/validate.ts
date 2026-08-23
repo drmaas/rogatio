@@ -61,12 +61,53 @@ async function checkArtifacts(): Promise<void> {
     "packages/compiler/dist/node/index.js",
     "packages/browser-core/dist/node/index.js",
     "packages/cli/dist/node/index.js",
+    "packages/extension/dist/browser/index.js",
+    "packages/extension/dist/background.js",
+    "packages/extension/dist/extension-page.js",
   ];
   if (
     expected.length !== Object.keys(manifest).length ||
     expected.some((artifact) => !(artifact in manifest))
   )
     throw new Error("Build manifest does not contain the expected artifacts");
+  const extensionManifest = JSON.parse(
+    await readFile(
+      resolve(root, "packages/extension/dist/manifest.json"),
+      "utf8",
+    ),
+  ) as {
+    manifest_version?: number;
+    background?: { service_worker?: string };
+    action?: { default_popup?: string };
+    permissions?: string[];
+    optional_host_permissions?: string[];
+    content_security_policy?: { extension_pages?: string };
+  };
+  if (
+    extensionManifest.manifest_version !== 3 ||
+    extensionManifest.background?.service_worker !== "background.js" ||
+    extensionManifest.action?.default_popup !== "index.html" ||
+    !extensionManifest.permissions?.includes("storage") ||
+    JSON.stringify(extensionManifest.optional_host_permissions) !==
+      JSON.stringify(["http://*/*", "https://*/*"]) ||
+    extensionManifest.content_security_policy?.extension_pages !==
+      "script-src 'self'; object-src 'self'"
+  )
+    throw new Error("Extension manifest does not meet the MV3 shell contract");
+  for (const artifact of [
+    "packages/extension/dist/background.js",
+    "packages/extension/dist/extension-page.js",
+  ]) {
+    const contents = await readFile(resolve(root, artifact), "utf8");
+    if (
+      /new Function|eval\(|node:|process\.|Buffer|ajv|Ajv2020|@rogatio\//u.test(
+        contents,
+      )
+    )
+      throw new Error(
+        `MV3 artifact contains a forbidden runtime dependency: ${artifact}`,
+      );
+  }
   for (const [artifact, metadata] of Object.entries(manifest)) {
     if (metadata.bytes <= 0)
       throw new Error(`Empty artifact in manifest: ${artifact}`);
@@ -250,6 +291,21 @@ async function checkBoundaries(): Promise<void> {
     throw new Error(
       "Compiler must depend only on the schema workspace package",
     );
+  const extensionManifest = JSON.parse(
+    await readFile(resolve(root, "packages/extension/package.json"), "utf8"),
+  ) as { dependencies?: Record<string, string> };
+  const extensionDependencies = extensionManifest.dependencies ?? {};
+  if (
+    Object.keys(extensionDependencies).length !== 4 ||
+    extensionDependencies["@rogatio/browser-core"] !== "workspace:*" ||
+    extensionDependencies["@rogatio/compiler"] !== "workspace:*" ||
+    extensionDependencies["@rogatio/editor"] !== "workspace:*" ||
+    extensionDependencies["@rogatio/schema"] !== "workspace:*"
+  )
+    throw new Error(
+      "Extension must declare its four upstream workspace dependencies",
+    );
+
   const browserCoreManifest = JSON.parse(
     await readFile(resolve(root, "packages/browser-core/package.json"), "utf8"),
   ) as { dependencies?: Record<string, string> };

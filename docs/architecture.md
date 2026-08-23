@@ -1,7 +1,6 @@
 # Rogatio Architecture
 
-## Overview
-Rogatio is a local-first tool for creating, reviewing, and running browser request/response rules. It consists of a version-controlled `.rogatio.json` file, a CLI, and a Chrome extension, with an extensible browser-extension boundary.
+**Status:** F1 bootstrap, F2 schema, F3 compiler, F4 browser-core, F7 extension shell, and F8 CLI are released through Stage 10 (verification and documentation complete). F5 editor and F6 runtime foundation are implemented and verified in this worktree.
 
 ## Package Boundaries
 
@@ -66,6 +65,18 @@ Compiler diagnostics use stable codes, severity, JSON-pointer paths, and structu
 ## F4 Browser-Core Architecture
 
 F4 adds `@rogatio/browser-core` as the browser-neutral core platform layer between `compiler` and the future extension/CLI surfaces. It owns versioned project storage, migrations, per-project permissions and enablement, compare-and-swap lifecycle, atomic rule installation with recovery, the in-memory runtime state model, rule status and badge computation, and stable core diagnostics. Every platform-specific capability enters through narrow injected adapters, so the same logic runs under Vitest and inside the future Chrome MV3 service worker. The verified distribution target remains Node ESM with `@rogatio/schema` and `@rogatio/compiler` externalized; MV3 packaging stays a later extension-boundary decision.
+
+## F7 Chrome MV3 Extension Architecture
+
+F7 adds a private `@rogatio/extension` package as the first downstream browser boundary. The extension owns Chrome MV3 adapters, the service-worker message protocol, the extension-page project-management shell, and the translation from F4 matcher operations to deterministic Chrome Declarative Net Request rules. It depends on `browser-core`, `compiler`, `editor`, and `schema`; upstream packages remain browser-neutral and do not import Chrome APIs.
+
+The service worker is the authority for `storage.local` persistence, permissions, project lifecycle commands, group enablement, actionless matcher projection, rule statuses, and the action badge; DNR installation remains deferred until action-bearing slices exist. It injects narrow adapters into the F4 `ProjectRepository` and `InstallService`, so CAS, conflict preservation, single-active-project, 64-project, enablement, status, and rollback invariants remain implemented once. The extension page sends versioned, validated messages and mounts the shared F5 editor for the active project's canonical source. Selecting a project is local UI state; only an explicit Switch command invokes the repository switch operation.
+
+MV3 output is browser-bundled from the approved browser-safe source graph. The extension must not load the Node-oriented Ajv artifact or any Node global at runtime. Chrome API failures, malformed messages, hostile imported/storage values, and unknown protocol versions fail closed with stable extension diagnostics. Permission requests are projected from F4's sorted effective origins and never include undeclared origins or broad host patterns. Group activation remains separate from permission grant, and project creation/import/save never grants or enables anything automatically.
+
+The common F7 translator emits only a deterministic browser-neutral matcher projection. It preserves regex source, resource types, method, priority, and effective origins, assigns deterministic numeric ids for future action translation, and rejects unsupported operation kinds without installation. Because the F3 matcher operation has no action, F7 reports actionless rules as `unsupported` and never sends them to DNR; it must not invent an allow or no-op action that changes browser behavior. `InstallService` remains the atomicity/recovery seam for later action-bearing DNR adapters. Action-specific operation kinds and their UI/editor extensions are deferred to F9-F17.
+
+F7 emits no traffic or console diagnostics. The `[Rogatio]` DevTools Console record from the broader product overview is deferred to a later explicitly specified feature so its Chrome event source and redaction contract are not guessed inside the extension shell. F7 does not add network, runtime, native messaging, proxy, TLS, telemetry, or traffic persistence behavior.
 
 Storage is a single versioned envelope (`version`, a project record keyed by stable id, and `activeProjectId`) persisted through a `StorageAdapter` whose `compareAndSwap` is the atomicity authority. Reads defensively snapshot raw storage and validate envelope structure; unknown versions, structural violations, cycles, symbols, accessors, and proxies fail closed with `core.storage-corrupt` and no writes. Project data is fully validated through the F2/F3 boundary at write time. Repository operations are read-modify-compare-and-swap: non-explicit operations retry on transient CAS failure, while editor-style saves and strict imports carry an expected revision and return a `conflict` result preserving the committed project for an explicit refresh path.
 
