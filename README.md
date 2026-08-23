@@ -1,116 +1,137 @@
 # Rogatio
 
-Rogatio is a planned local-first tool for creating, reviewing, and running browser request and response rules from a canonical `.rogatio.json` file.
+> Local-first browser request & response rules, version-controlled in a single `.rogatio.json` file.
 
-## Current Status
+Rogatio is a local-first tool for creating, reviewing, and running browser request and
+response rules. It replaces scattered Requestly-style workflows with one
+version-controlled file, a CLI, and a Chrome extension. There are no accounts, no hosted
+runtime, no cloud sync, no telemetry, and no retained traffic history.
 
-Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, Feature 4, the released `@rogatio/browser-core` package, F5, the `@rogatio/editor` package, Feature 6, the `@rogatio/runtime` foundation package, F7, the Chrome MV3 `@rogatio/extension` shell, and F8, the `@rogatio/cli` package (providing `rogatio edit` and `rogatio verify`, with `rogatio runtime` as a documented stub), are implemented and verified in this worktree. Action-specific rule slices, packaging, and release automation remain intentionally unimplemented.
+- **One canonical file.** All rules live in a `.rogatio.json` file you keep in version
+  control. Moving changes between the file and your browser is an explicit import/export.
+- **Visual editor.** Edit, test, and verify rules in an accessible, framework-free editor
+  shared by the CLI and the Chrome extension.
+- **Browser-native.** Redirects, query params, and headers run entirely in the browser via
+  Chrome Manifest V3 Declarative Net Request. Mocks and body rewriting use an optional local
+  runtime.
+- **Private by design.** No accounts, no cloud, no telemetry. Site access is granted only
+  for declared origins, and you activate groups explicitly.
 
-## CLI
+## Features
 
-The `@rogatio/cli` package installs the `rogatio` binary.
+Rules belong to named groups. Each rule can target a stable ID, a case-sensitive URL regular
+expression, resource types, priority, and (where supported) an HTTP method.
 
-- `rogatio edit [path]` — launches a browser editor for a `.rogatio.json` project (creates an empty project if the file is missing). Binds a local HTTP server to `127.0.0.1` and opens your default browser; `--port <n>` fixes the port.
-- `rogatio verify [path]` — validates a `.rogatio.json` file with the schema (F2) and compiler (F3). Use `-` to read from stdin and `--json` for machine-readable diagnostics. Exit codes: `0` valid, `1` invalid, `2` error.
-- `rogatio runtime` — documented stub for the future native-messaging runtime (F14+); exits `1`.
+- **Redirects** — send matching HTTP(S) requests to an absolute destination, including
+  regular-expression capture substitution.
+- **Query parameters** — add missing parameters and replace existing values for configured
+  names while preserving everything else.
+- **Headers** — set, append, or remove a named request/response header, subject to
+  immutable forbidden-header lists.
+- **Mocks** — return a configured status, headers, optional delay, and an inline body or a
+  single approved local file snapshot. Mocks never contact upstream.
+- **Response-body rewriting** — fetch an authorized public GET and perform bounded
+  replacement through a local runtime.
+- **Request-body modification** — replace or apply bounded regex replacement to eligible
+  POST/PUT/PATCH XHR bodies, via native messaging to a local runtime.
 
-See [`docs/specs/f8-cli-edit-verify.md`](docs/specs/f8-cli-edit-verify.md) for the full contract.
+Every rule can be dry-run against a bounded batch of URLs before saving. The offline check
+reports regex, origin, method, and resource-type results without contacting the target or
+changing installed rules.
 
-## Project Documents
+## Installation
 
-- [`rogatio-overview.md`](rogatio-overview.md): product and technical scope.
-- [`sequence.md`](sequence.md): ordered feature sequence and dependencies.
-- [`docs/architecture.md`](docs/architecture.md): current planned boundaries and decisions.
-- [`docs/specs/f1-monorepo-tooling.md`](docs/specs/f1-monorepo-tooling.md): Feature 1 specification.
-- [`docs/plans/f1-monorepo-tooling.md`](docs/plans/f1-monorepo-tooling.md): Feature 1 implementation plan.
-- [`docs/specs/f2-schema.md`](docs/specs/f2-schema.md): Feature 2 schema specification.
-- [`docs/plans/f2-schema.md`](docs/plans/f2-schema.md): Feature 2 implementation plan.
-- [`docs/specs/f3-compiler.md`](docs/specs/f3-compiler.md): Feature 3 compiler specification.
-- [`docs/plans/f3-compiler.md`](docs/plans/f3-compiler.md): Feature 3 implementation plan.
-- [`docs/plans/f4-browser-core.md`](docs/plans/f4-browser-core.md): Feature 4 implementation plan.
-- [`docs/f4-workflow.md`](docs/f4-workflow.md): Feature 4 workflow log.
-- [`docs/specs/f5-editor.md`](docs/specs/f5-editor.md): Feature 5 editor specification.
-- [`docs/f5-workflow.md`](docs/f5-workflow.md): Feature 5 workflow record.
-- [`docs/specs/f6-runtime-foundation.md`](docs/specs/f6-runtime-foundation.md): Feature 6 runtime foundation specification.
-- [`docs/specs/f8-cli-edit-verify.md`](docs/specs/f8-cli-edit-verify.md): Feature 8 CLI `edit`/`verify` specification.
-- [`docs/plans/f8-cli-edit-verify.md`](docs/plans/f8-cli-edit-verify.md): Feature 8 implementation plan.
-- [`docs/f8-workflow.md`](docs/f8-workflow.md): Feature 8 workflow record (SDD stages, review, verification).
-- [`docs/f6-workflow.md`](docs/f6-workflow.md): Feature 6 workflow record.
-- [`docs/specs/f7-extension-shell.md`](docs/specs/f7-extension-shell.md): Feature 7 Chrome MV3 extension specification.
-- [`docs/plans/f7-extension-shell.md`](docs/plans/f7-extension-shell.md): Feature 7 implementation plan.
-- [`docs/f7-workflow.md`](docs/f7-workflow.md): Feature 7 workflow record.
+Rogatio requires **Node.js 24+** and **pnpm 10.32.1**.
 
-## Development Workflow
+Install the CLI from the workspace:
 
-Every workflow chooses one agent tier before it starts. **Free** uses only OpenCode Zen free models and never silently escalates to a paid model or the session model. **Normal** retains the existing role-specific chains, but checks for an exact or clearly equivalent free OpenCode Zen model first; the current exact equivalence is `opencode/hy3-free` for verification and documentation. Record the selected tier, role models, and fallbacks in the workflow log.
+```sh
+pnpm install --frozen-lockfile
+pnpm build
+```
 
-The current OpenCode Zen free catalog is `opencode/x-preview-f-free` (Ox Alpha Free), `opencode/nemotron-3-ultra-free` (Nemotron 3 Ultra Free), `opencode/nemotron-3.5-lightning-free` (Nemotron 3.5 Lightning Free), `opencode/muse-spark-1.2-contributor-free` (Muse Spark 1.2 Free), `opencode/hy3-free` (Hy3 Free), `opencode/mimo-v2.5-free` (MiMo V2.5 Free), and `opencode/big-pickle` (Big Pickle). Free mode uses pinned phase assignments, not fallback chains: the `sdd` and `doit` skills pin Nemotron Ultra to the reasoning-heavy discovery phases, MiMo to planning, Muse Spark to tests, Ox Alpha to implementation, Hy3 to verification/documentation, and Big Pickle to independent review. Under a single-model session, keep the role passes distinct and use a fresh-context self-review. Raw brainstorm output is ephemeral and is not part of the durable project documentation.
+The Chrome extension is built as an unsigned MV3 package and loaded manually from the
+release ZIP (no browser-store install or auto-update). See
+[`docs/architecture.md`](docs/architecture.md) for packaging details.
 
-## Foundation
+## Quick start
 
-Feature 1 establishes:
+```sh
+# Launch the visual editor for a project (creates an empty .rogatio.json if missing)
+rogatio edit
 
-- pnpm `10.32.1` workspace tooling.
-- Strict TypeScript 7 (pinned `7.0.2`) with ESM/NodeNext.
-- Biome formatting and linting.
-- esbuild builds.
-- Vitest unit-test infrastructure.
-- Playwright browser-test infrastructure.
-- Baseline GitHub Actions validation.
+# Validate a .rogatio.json file (0 = valid, 1 = invalid, 2 = error)
+rogatio verify path/to/.rogatio.json
 
-## Prerequisites and Install
+# Validate from stdin with machine-readable diagnostics
+cat .rogatio.json | rogatio verify - --json
+```
 
-- Node.js 24 or newer; Node 24 is the CI baseline.
-- pnpm 10.32.1.
-- Chromium for browser smoke tests.
+| Command | Description |
+| --- | --- |
+| `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port. |
+| `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
+| `rogatio runtime` | Documented stub for the future native-messaging runtime (currently exits `1`). |
 
-Install with the frozen lockfile:
+Typical workflow: run `rogatio edit`, build and test rules, `rogatio verify`, then import
+the file into Chrome, grant only declared site access, and activate the groups you need.
+
+## Project layout
+
+This is a strict-TypeScript 7, ESM/NodeNext pnpm monorepo.
+
+| Package | Purpose |
+| --- | --- |
+| `@rogatio/schema` | Version-1 JSON schema, validation, origins, bounds, forbidden headers. |
+| `@rogatio/compiler` | Transforms validated source into browser-neutral operations and stable diagnostics. |
+| `@rogatio/browser-core` | Versioned storage, migrations, permissions, enablement, lifecycle, runtime state. |
+| `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
+| `@rogatio/extension` | Chrome MV3 service worker and extension page (WebExtensions/DNR translation). |
+| `@rogatio/runtime` | Reusable mock, response-body, and request-body transformation components. |
+| `@rogatio/cli` | Editor host, file verification, and runtime dispatch (`rogatio` binary). |
+
+## Local development
+
+Prerequisites:
+
+- Node.js **24** or newer (Node 24 is the CI baseline)
+- pnpm **10.32.1**
+- Chromium, for browser smoke tests
+
+Install dependencies and the browser test binary:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm exec playwright install chromium
 ```
 
-F1 retains pnpm's default lifecycle-script blocking. No broad install-script allowance is configured; any future exception requires review and documentation.
+Common scripts:
 
-## Scripts
+| Script | What it does |
+| --- | --- |
+| `pnpm format` / `pnpm format:check` | Write or check Biome formatting. |
+| `pnpm lint` | Run Biome linting. |
+| `pnpm typecheck` | Run the pinned strict TypeScript compiler. |
+| `pnpm build` | Build and verify Node and browser ESM artifacts. |
+| `pnpm test` | Build and run the Vitest unit suite. |
+| `pnpm test:browser` | Build and run the Chromium Playwright smoke journey. |
+| `pnpm validate` | Run the complete fail-fast validation sequence (includes negative fixtures). |
 
-- `pnpm format:check` checks formatting; `pnpm format` writes it.
-- `pnpm lint` runs Biome linting.
-- `pnpm typecheck` runs the pinned strict TypeScript compiler.
-- `pnpm build` creates and verifies Node and browser ESM artifacts, including the browser-safe MV3 service worker and extension page bundles.
-- `pnpm test` builds and runs the non-empty Vitest smoke suite.
-- `pnpm test:browser` builds and runs the Chromium Playwright smoke journey.
-- `pnpm validate` runs the complete fail-fast validation sequence, including negative fixtures.
+Use `pnpm validate` before opening a pull request.
 
-## F1 Verification Baseline
+## Contributing
 
-F1 validation is pinned to a known-good toolchain: Node `24.19.0`, pnpm `10.32.1`, and `typescript@7.0.2`. The original F1 validation evidence is recorded in `docs/f1-workflow.md`.
+Contributions are welcome. Please read
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, branching, coding standards, and the
+validation workflow before you start.
 
-## F7 Extension Boundary
+## Documentation
 
-F7 adds the private `@rogatio/extension` package with a Chrome Manifest V3 service worker, extension page, project lifecycle controls, explicit project switching, least-privilege permission review/grant, separate group activation, deterministic actionless matcher projection, stable status/badge rendering, and a shared F5 editor host. F7 deliberately does not install actionless DNR rules or implement action-specific rule slices. Its MV3 bundles use a browser-safe validator and contain no Node globals, dynamic evaluation, remote code, or Ajv runtime compiler. The `[Rogatio]` DevTools Console record is deferred to a later specification.
+- [`rogatio-overview.md`](rogatio-overview.md) — product and technical overview.
+- [`sequence.md`](sequence.md) — ordered feature sequence and dependencies.
+- [`docs/architecture.md`](docs/architecture.md) — package boundaries and decisions.
+- [`docs/specs/`](docs/specs) and [`docs/plans/`](docs/plans) — per-feature specs and plans.
 
-See [`docs/specs/f7-extension-shell.md`](docs/specs/f7-extension-shell.md) for the approved contract and [`docs/f7-workflow.md`](docs/f7-workflow.md) for validation evidence.
+## License
 
-## F1 Package Boundaries
-
-F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary; F3 adds the `@rogatio/compiler` matcher transformation boundary; F4 adds the `@rogatio/browser-core` core platform layer; F7 supplies the Chrome extension shell; and F8 supplies the `@rogatio/cli` boundary. Action-specific rule slices, packaging, and release automation remain outside the current implementation.
-
-The current implementation includes the F7 extension shell and F8 CLI; browser-store packaging, action-specific rule slices, and release automation remain intentionally unimplemented.
-
-## Editor Boundary
-
-F5 adds the private `@rogatio/editor` package with a framework-free DOM controller and accessible view. It owns common project editing, local draft state, navigation, search, validation presentation, and host callbacks. Persistence and browser lifecycle remain host responsibilities. The browser entry uses a host-supplied F2/F3-compatible validation adapter rather than importing the current Node-only runtime artifacts directly. See [`docs/specs/f5-editor.md`](docs/specs/f5-editor.md) for the contract.
-
-## Schema Boundary
-
-F2 adds `@rogatio/schema` as the local validation boundary for the common version-1 `.rogatio.json` envelope. It owns project/group/rule matcher data, explicit HTTP(S) site origins, bounded inputs, and frozen forbidden-header policy lists. Its verified distribution artifact is Node ESM; MV3-safe browser packaging is deferred to the extension boundary. Rule actions, compiler operations, browser integration, persistence, and runtime behavior remain out of scope until their sequence items land.
-
-## Compiler Boundary
-
-F3 adds `@rogatio/compiler` as a pure Node ESM boundary from the fully validated F2 envelope to one fresh, data-only matcher operation per source rule. It normalizes and sorts effective origins, orders resource types canonically, preserves regex source, method, priority, and source order, and maps validation failures to stable diagnostics. It does not execute matching, define priority precedence, add actions, or access browser, runtime, filesystem, network, persistence, permission, or telemetry APIs. MV3-safe packaging remains deferred with the F2 browser boundary.
-
-## Browser-Core Boundary
-
-F4 adds `@rogatio/browser-core` as the browser-neutral core platform layer depending only on `@rogatio/schema` and `@rogatio/compiler`. It owns versioned project storage and migrations, the compare-and-swap lifecycle, per-project permission grants and group enablement, atomic rule installation with recovery, the rule status and badge model, and the in-memory runtime state model. Chrome/WebExtensions/DNR translation, editor and CLI surfaces, rule actions, and runtime persistence remain out of scope until their sequence items land. The package's Node ESM artifact is verified by the root build and validation; MV3-safe packaging is deferred to the extension boundary.
+[MIT](LICENSE) © 2026 Dan Maas
