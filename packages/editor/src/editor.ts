@@ -1,4 +1,5 @@
 import type { HttpMethod, ResourceType } from "@rogatio/schema";
+import { builtInRuleTypes } from "./rule-types/index.js";
 import {
   type EditorController,
   type EditorDiagnostic,
@@ -753,7 +754,10 @@ function isHTMLElement(value: unknown): value is HTMLElement {
 function normalizeExtensions(
   value: readonly RuleTypeFieldExtension[] | undefined,
 ): readonly RuleTypeFieldExtension[] {
-  if (value === undefined) return [];
+  const ids = new Set<string>();
+  const merged: RuleTypeFieldExtension[] = [...builtInRuleTypes];
+  for (const extension of builtInRuleTypes) ids.add(extension.id);
+  if (value === undefined) return Object.freeze(merged);
   if (!Array.isArray(value)) {
     throw new EditorInitializationError([
       diagnostic(
@@ -763,8 +767,6 @@ function normalizeExtensions(
       ),
     ]);
   }
-  const ids = new Set<string>();
-  const extensions: RuleTypeFieldExtension[] = [];
   for (let index = 0; index < value.length; index += 1) {
     const extension = value[index];
     if (
@@ -786,10 +788,12 @@ function normalizeExtensions(
         ),
       ]);
     }
+    const existing = merged.findIndex((e) => e.id === extension.id);
+    if (existing >= 0) merged[existing] = extension;
+    else merged.push(extension);
     ids.add(extension.id);
-    extensions.push(extension);
   }
-  return Object.freeze(extensions);
+  return Object.freeze(merged);
 }
 
 class EditorControllerImpl implements EditorController {
@@ -1024,6 +1028,14 @@ class EditorControllerImpl implements EditorController {
         target.dataset.resourceType ?? "",
         target.checked,
       );
+      return;
+    }
+    if (
+      target instanceof HTMLSelectElement &&
+      target.dataset.ruleTypeSelect !== undefined
+    ) {
+      const ruleTypePath = target.dataset.ruleTypePath ?? "";
+      if (ruleTypePath) this.setRuleType(ruleTypePath, target.value);
       return;
     }
     const path = target.dataset.path;
@@ -1343,6 +1355,21 @@ class EditorControllerImpl implements EditorController {
       this.markChanged();
       this.render();
     }
+  }
+
+  private setRuleType(rulePath: string, typeId: string): void {
+    if (this.saving) return;
+    if (typeId === "") {
+      deleteValueAtPath(this.draft, `${rulePath}/action`);
+      this.markChanged();
+      this.render();
+      return;
+    }
+    const extension = this.extensions.find((entry) => entry.id === typeId);
+    if (!extension?.defaultAction) return;
+    setValueAtPath(this.draft, `${rulePath}/action`, extension.defaultAction());
+    this.markChanged();
+    this.render();
   }
 
   private markChanged(): void {
@@ -2154,32 +2181,35 @@ class EditorControllerImpl implements EditorController {
     card.append(matcherFields);
 
     if (this.extensions.length > 0) {
-      const typeFields = this.document.createElement("fieldset");
+      const currentType = this.extensions.find((e) =>
+        e.matches(rule as Readonly<Record<string, unknown>>),
+      )?.id ?? safeText(rule.type);
+      const typeFieldset = this.document.createElement("fieldset");
       const typeLegend = this.document.createElement("legend");
-      typeLegend.textContent = "Rule type";
-      typeFields.append(typeLegend);
-      const typeGrid = this.document.createElement("div");
-      typeGrid.dataset.editorFields = "true";
+      typeLegend.textContent = `Rule type for ${ruleName}`;
+      const typeField = this.document.createElement("div");
+      typeField.dataset.editorField = "true";
+      const typeLabel = this.document.createElement("label");
+      typeLabel.textContent = "Rule type";
       const typeSelect = this.document.createElement("select");
-      const noneOption = this.document.createElement("option");
-      noneOption.value = "";
-      noneOption.textContent = "Actionless (matcher only)";
-      typeSelect.append(noneOption);
+      typeSelect.dataset.ruleTypeSelect = "true";
+      typeSelect.dataset.ruleTypePath = rulePath;
+      typeSelect.disabled = this.saving;
+      const noOption = this.document.createElement("option");
+      noOption.value = "";
+      noOption.textContent = "No action (choose a rule type)";
+      typeSelect.append(noOption);
       for (const extension of this.extensions) {
         const option = this.document.createElement("option");
         option.value = extension.id;
         option.textContent = extension.label;
         typeSelect.append(option);
       }
-      typeSelect.value = safeText(rule.type);
-      this.renderField(
-        typeGrid,
-        `Rule type for ${ruleName}`,
-        `${rulePath}/type`,
-        typeSelect,
-      );
-      typeFields.append(typeGrid);
-      card.append(typeFields);
+      typeSelect.value = currentType ?? "";
+      typeLabel.append(typeSelect);
+      typeField.append(typeLabel);
+      typeFieldset.append(typeLegend, typeField);
+      card.append(typeFieldset);
     }
 
     const match = this.findExtension(rule, rulePath);

@@ -438,63 +438,32 @@ discriminant `type: "redirect"`, the redirect payload, and translates it to Chro
   cases mirroring node validation.
 - `editor/test/redirect.test.ts`: `createRedirectRuleType` matches/validate.
 
-## F11 Request & Response Header Rules (action slice)
+## F10 Query Parameter Rules (first rule-action slice)
 
-F11 is the first *action* slice. It introduces the rule-type discriminant and the neutral
-`HeaderOperation`, and translates it to Chrome DNR `modifyHeaders`.
+F10 adds the shared rule `action` discriminator to the version-1 schema and implements the first browser-only action: **query parameter rules**. It spans `@rogatio/schema`, `@rogatio/compiler`, `@rogatio/extension`, and `@rogatio/editor`. F7's actionless `unsupported` rule model is replaced by action-bearing installable rules for the `query` type; later browser-only slices (F9 redirect, F11 header, F13 mock) extend the same `action` union.
 
-### Rule-type discriminant
-- `schema/src/schema.ts` `rule` $def gains a required `type` (const `"header"` for this
-  slice) plus `headerDirection`, `headerOperation`, `headerName`, optional `headerValue`.
-  `additionalProperties: false` is preserved; no unvalidated `action` passthrough.
-- `schema/src/types.ts`: `RogatioRule` becomes a discriminated union (`HeaderRule |
-  future`). `HeaderRule` carries the matcher fields (id/name/urlRegex/origins/resourceTypes/
-  priority/method) plus the header payload.
-- `schema/src/validation.ts`: semantic checks — `headerValue` required for set/append,
-  rejected for remove; `headerName` checked via `isForbiddenHeader(name, direction)`
-  (case-insensitive, `proxy-*`/`sec-*` prefixes). New diagnostic codes map in `compiler`.
+### Schema (F2 boundary change)
 
-### Compiler
-- `compiler/src/types.ts`: add `HeaderOperation { kind:"header"; groupId; ruleId;
-  matcher: NormalizedMatcher; header: { direction; operation; name; value? } }`; widen
-  `CompileResult.operations` to `readonly (MatcherOperation | HeaderOperation)[]`. Add
-  `CompilerDiagnosticCode`s: `compiler.invalid-header-direction`,
-  `compiler.invalid-header-operation`, `compiler.forbidden-header`,
-  `compiler.header-value-required`, `compiler.header-value-unexpected`.
-- `compiler/src/compile.ts`: `compileOperations` detects `type:"header"` and emits a
-  `HeaderOperation`; delegates matcher normalization to `compileMatcher`.
-- `compiler/src/diagnostics.ts`: map new codes; add safe param keys.
+`RogatioRule` gains an `action` object with a `type` discriminant. F10 defines `QueryAction = { type: "query"; params: { name: string; value: string }[] }`. The schema `rule` `$defs` adds `action` (additionalProperties still false) and a `queryAction`/`action` subschema. New bounds: `maxQueryParamsPerRule`, `maxQueryNameLength`, `maxQueryValueLength`. Semantic validation adds a duplicate-param-name check and the non-empty/length bounds. `browser-schema.ts` mirrors the same `action` validation and bounds because the MV3 bundle cannot load Ajv. `action` is optional to preserve backward compatibility with F7 actionless projects.
 
-### Extension (Chrome MV3)
-- `extension/src/browser-schema.ts` (hand-duplicated schema): mirror `RULE_KEYS` and
-  `validateProjectDetailed` to accept header rules and reject forbidden/missing-value.
-- `extension/src/projection.ts`: replace matcher-only projection with a header-aware
-  projector returning installable DNR `modifyHeaders` rules (requestHeaders/responseHeaders,
-  operation set/append/remove, value for set/append, condition from matcher via
-  `compileUrlRegex`, `resourceTypes`, `requestMethods` when method set, `initiatorDomains`
-  from normalized origins; `priority`; stable id `1_000_001 + index`). Matcher-only ops
-  (future actionless) remain `installable:false`.
-- `extension/src/service-worker.ts` `operationStatuses`: stop forcing `unsupported` for
-  header operations; only non-installable ops fall back to `unsupported`.
-- New DNR installer adapter: `install(operations)` → `chrome.declarativeNetRequest`
-  `updateDynamicRules` (remove prior rule ids, add projected header rules).
+### Compiler (F3 boundary change)
 
-### browser-core
-- Widen `RuleInstallerAdapter.current/install`, `RuleStatusInput.operations`,
-  `computeDesiredRules`, `computeRuleStatuses`, `computeDeclaredOrigins` from
-  `MatcherOperation[]` to `MatcherOperation | HeaderOperation`. Status logic operates on
-  `operation.matcher`, so it is unchanged for header ops.
+Compiler emits distinct operation types: `MatcherOperation` (actionless), `RedirectOperation` (F9), and `QueryOperation` (F10). `compileProject` emits the appropriate operation type based on `rule.type`. A pure helper `queryParamsToDNR(action)` produces the DNR `addOrReplaceParams` array (`replaceOnly: false`) for unit testing without a browser. This is the durable foundation F11/F13 extend by adding new operation types.
 
-### Editor
-- A `RuleTypeFieldExtension` (id `"header-rule"`) is supplied by the CLI/extension host:
-  `matches` returns `rule.type === "header"`; `mount` renders direction/operation/name/value
-  controls and calls `setField("type","header")` if absent; `validate` enforces forbidden name
-  and value-required. No editor-core change beyond an optional `type` hint on the extension.
+### Extension (F7 boundary change)
 
-### Testing seams
-- `schema/test/schema.test.ts`: header semantic validation (forbidden, value rules).
-- `compiler/test/compiler.test.ts`: update op-shape assertions; add header cases; keep
-  adversarial sparse/cyclic tests green.
-- `extension/test/projection.test.ts` + `fixtures.ts`: header→DNR projection; installable.
-- `editor/test/editor.test.ts` + `test/browser/editor.spec.ts`: header extension registration.
-- `browser-core/test/{install,status}.test.ts`: union acceptance.
+`projection.ts` `projectMatchers` dispatches on operation kind. For `QueryOperation` it builds a DNR rule with `redirect.transform.query`; for `RedirectOperation` it builds a DNR `redirect` rule; for `MatcherOperation` it returns `installable: false`. `service-worker.ts` `operationStatuses` reports redirect and query rules as `active` when compiled, enabled, and granted; actionless matchers remain `unsupported`. Permission domains derive from origin hostnames (requestDomains/initiatorDomains). The `[Rogatio]` DevTools record stays deferred.
+
+### Editor (F5 boundary change)
+
+The `RuleTypeFieldExtension` registry gains a `query` extension whose `matches(rule)` returns `rule.action?.type === "query"`. The editor adds a `Rule type` selector listing registered extension labels; selecting `query` initializes `action = { type: "query", params: [] }` and mounts the extension's param name/value form (add/remove rows). The extension `validate` enforces field-level diagnostics. Unknown action data with no owning extension is not persisted (preserves the F5 rejection of arbitrary `action` passthrough).
+
+### Migration / compatibility
+
+The version-1 schema keeps `action` optional to preserve backward compatibility with F7 actionless projects. Rules without `type`/`action` remain valid actionless matchers (reported `unsupported`). F10 is browser-only and supported on Linux/Windows/macOS; activation is in-browser, no native runtime.
+
+### Rejected alternatives
+
+- Keep `action` optional to preserve F7 actionless projects: accepted for backward compatibility; actionless rules remain valid but `unsupported`.
+- Add-or-replace via separate `addParams`/`removeParams`/`replaceParams` DNR fields: rejected; `addOrReplaceParams` with `replaceOnly: false` is exactly the required add-or-replace semantics in one field.
+- Implement query rewriting in the extension service worker rather than DNR `transform.query`: rejected; DNR is browser-native, declarative, and offline, matching F7's design.

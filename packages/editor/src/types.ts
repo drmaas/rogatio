@@ -34,6 +34,8 @@ export interface RuleTypeFieldExtension {
     rule: Readonly<Record<string, unknown>>,
     rulePath: string,
   ) => readonly EditorDiagnostic[];
+  /** Returns a fresh default action object when the user selects this type. */
+  readonly defaultAction?: () => unknown;
 }
 
 export interface RuleTypeFieldContext {

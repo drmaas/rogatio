@@ -103,6 +103,7 @@ function operationStatuses(
       }
       return { ...status };
     }
+    // redirect and query operations are installable; pass through status
     if (status.status === "active") {
       return {
         groupId: status.groupId,

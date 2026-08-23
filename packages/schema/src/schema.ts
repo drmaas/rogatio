@@ -96,7 +96,7 @@ const projectSchemaDefinition = {
           maximum: LIMITS.maxPriority,
         },
         method: { type: "string", enum: [...HTTP_METHODS] },
-        type: { type: "string", enum: ["redirect"] },
+        type: { type: "string", enum: ["redirect", "query"] },
         redirect: {
           type: "object",
           additionalProperties: false,
@@ -104,6 +104,38 @@ const projectSchemaDefinition = {
           properties: {
             destination: { type: "string" },
           },
+        },
+        action: { $ref: "#/$defs/queryAction" },
+      },
+    },
+    queryParam: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "value"],
+      properties: {
+        name: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxQueryNameLength,
+        },
+        value: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxQueryValueLength,
+        },
+      },
+    },
+    queryAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["type", "params"],
+      properties: {
+        type: { const: "query" },
+        params: {
+          type: "array",
+          minItems: 1,
+          maxItems: LIMITS.maxQueryParamsPerRule,
+          items: { $ref: "#/$defs/queryParam" },
         },
       },
       allOf: [
@@ -115,6 +147,16 @@ const projectSchemaDefinition = {
           // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
           then: {
             required: ["redirect"],
+          },
+        },
+        {
+          if: {
+            required: ["type"],
+            properties: { type: { const: "query" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["action"],
           },
         },
       ],

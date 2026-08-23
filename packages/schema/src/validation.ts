@@ -269,6 +269,26 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
           params: {},
         });
       }
+
+      const action = rule.action;
+      if (action && action.type === "query") {
+        const seenNames = new Set<string>();
+        for (let p = 0; p < action.params.length; p += 1) {
+          const param = action.params[p];
+          if (!param) continue;
+          const paramName = param.name;
+          if (seenNames.has(paramName)) {
+            issues.push({
+              instancePath: `${rulePath}/action/params/${p}/name`,
+              keyword: "uniqueQueryParamName",
+              message: `query param name must be unique; duplicate "${paramName}"`,
+              params: { name: paramName },
+            });
+          } else {
+            seenNames.add(paramName);
+          }
+        }
+      }
     }
   }
 

@@ -1,4 +1,10 @@
-import type { HttpMethod, ResourceType } from "@rogatio/schema";
+import type {
+  HttpMethod,
+  RedirectAction,
+  ResourceType,
+  RogatioQueryAction,
+  RogatioRuleAction,
+} from "@rogatio/schema";
 
 export interface NormalizedMatcher {
   readonly urlRegex: {
@@ -26,7 +32,15 @@ export interface RedirectOperation {
   readonly redirect: { readonly destination: string };
 }
 
-export type RogatioOperation = MatcherOperation | RedirectOperation;
+export interface QueryOperation {
+  readonly kind: "query";
+  readonly groupId: string;
+  readonly ruleId: string;
+  readonly matcher: NormalizedMatcher;
+  readonly action: RogatioQueryAction;
+}
+
+export type RogatioOperation = MatcherOperation | RedirectOperation | QueryOperation;
 
 export type CompilerDiagnosticCode =
   | "schema.required"

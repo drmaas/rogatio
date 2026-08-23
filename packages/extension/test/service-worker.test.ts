@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { createExtensionApplication } from "../src/service-worker.js";
 import { project } from "./fixtures.js";
 
+const queryProject = structuredClone(project);
+queryProject.groups[0].rules[0].action = {
+  type: "query",
+  params: [{ name: "utm_source", value: "rogatio" }],
+};
+
 function harnessOptions() {
   let stored: unknown;
   const install = vi.fn(async () => ({ ok: true as const }));
@@ -120,6 +126,35 @@ describe("F7 extension application", () => {
     expect(result).toMatchObject({
       ok: true,
       value: { ruleStatuses: [{ status: "unsupported" }] },
+    });
+  });
+
+  it("reports enabled query rules as active in state (F10)", async () => {
+    const { options } = harnessOptions();
+    const app = createExtensionApplication({
+      ...options,
+      permissions: {
+        ...options.permissions,
+        contains: async () => true,
+      },
+    });
+    await app.handle({
+      version: 1,
+      command: "create-project",
+      data: queryProject,
+    });
+    await app.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "project-a",
+      groupId: "group-a",
+      enabled: true,
+    });
+    const result = await app.handle({ version: 1, command: "get-state" });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { ruleStatuses: [{ status: "active" }] },
     });
   });
 

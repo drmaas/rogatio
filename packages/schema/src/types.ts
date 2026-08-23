@@ -34,12 +34,24 @@ export const HTTP_METHODS = Object.freeze([
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
-export type RuleType = "redirect";
+export type RuleType = "redirect" | "query";
 
 export interface RedirectAction {
   /** Absolute http(s) URL. May contain \1..\9 backreferences to urlRegex capture groups. */
   destination: string;
 }
+
+export interface RogatioQueryParam {
+  name: string;
+  value: string;
+}
+
+export interface RogatioQueryAction {
+  type: "query";
+  params: RogatioQueryParam[];
+}
+
+export type RogatioRuleAction = RedirectAction | RogatioQueryAction;
 
 export interface RogatioRule {
   id: string;
@@ -55,6 +67,9 @@ export interface RogatioRule {
 
   /** Required iff type === "redirect". */
   redirect?: RedirectAction;
+
+  /** Required iff type === "query". */
+  action?: RogatioRuleAction;
 }
 
 export interface RogatioGroup {
