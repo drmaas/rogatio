@@ -1,6 +1,6 @@
 # Rogatio Architecture
 
-**Status:** F1 bootstrap, F2 schema, F3 compiler, and F4 browser-core are released.
+**Status:** F1 bootstrap, F2 schema, F3 compiler, F4 browser-core, and F6 runtime foundation are released through Stage 10 (verification and documentation complete).
 
 ## Product Boundary
 
@@ -233,3 +233,130 @@ The editor browser artifact must contain no `node:` imports, Node globals, files
 - Full string-template rendering was rejected because it increases XSS and focus-loss risk; the view uses safe DOM construction.
 - Drag-and-drop and visible-index reorder were rejected because they exclude keyboard users and become unsafe under filtering.
 - An arbitrary `action: unknown` passthrough was rejected because it bypasses strict F2 validation and can lose or persist unsupported data.
+
+## F6 Runtime Foundation
+
+F6 adds a private Node ESM `@rogatio/runtime` package depending on
+`@rogatio/schema` and `@rogatio/compiler`, with no HTTP framework, proxy
+framework, native-messaging, TLS, browser, or additional product dependency.
+The package is implemented and verified through Stage 10.
+
+### Ownership and data flow
+
+F2 remains authoritative for HTTP method names and common validation policy. F3
+provides the detached matcher operations that identify the source group and
+rule. Runtime-specific grants are a separate F6 authorization record: each
+grant names one source rule, one opaque operation ID, one primitive kind, one
+canonical target, and one exact method. Outbound grants are restricted to
+public HTTP(S) GET or HEAD targets whose origin belongs to the corresponding
+F3 matcher; file grants carry an exact logical path. F6 does not execute the F3
+regular expression, select a matching rule, resolve priority, or interpret a
+future action payload. The trusted controller supplies the already-selected
+grant; the runtime verifies that the grant is bound to the corresponding F3
+matcher operation and to the immutable preset digest.
+
+The package has four owned layers:
+
+- **Policy core:** validates hostile input, creates detached immutable runtime
+  presets, canonicalizes targets, computes a versioned SHA-256 digest, issues
+  the bootstrap capability, and performs deny-by-default exact authorization.
+- **Protocol adapter:** exposes only versioned pairing and authorization
+  routes through Node `node:http`, accepts HTTP/1.1 on `127.0.0.1` only, bounds
+  streams, and serializes stable redacted errors.
+- **Outbound connector:** accepts only an authorized `outbound-http` grant,
+  resolves A and AAAA records, rejects any unsafe result, connects once to a
+  selected numeric address without proxy or re-resolution, strips credentials,
+  and rejects redirects.
+- **Confined reader:** accepts only an authorized `confined-file` grant under
+  the configured root, reads from a verified descriptor with no-follow
+  guarantees, and denies the operation when the host platform cannot prove
+  confinement.
+
+The protocol adapter returns an authorization decision, not a mock response.
+The outbound connector and confined reader are explicit primitives for later
+consumers. F13 owns mock status, headers, bodies, delays, file-snapshot
+semantics, and browser integration. F14 owns native messaging, TLS/PAC,
+request-body handling, and its separate process. Neither later feature is
+implemented or specified as an F6 action here.
+
+### Preset, digest, and capability boundary
+
+The F6 preset is an internal, independently versioned data contract. Its
+canonical form contains F3 matcher data, F6 grants, and fixed resource limits;
+it excludes the random capability, session values, timestamps, and the local
+filesystem root. Objects use a fixed key order, grants use a deterministic
+tuple order, values are limited to strings, booleans, integers, arrays, and
+null, and canonical bytes are whitespace-free UTF-8 JSON. The format is a
+versioned closed F6 profile rather than an assumption that ordinary
+`JSON.stringify` is canonical. The digest is
+`sha256:<64 lowercase hexadecimal characters>` over those bytes.
+
+Starting a server creates a fresh 32-byte random bootstrap capability and an
+ephemeral port. The controller receives the bootstrap material in-process;
+the server never places it in a URL, log, or error. `POST /v1/pair` requires
+the capability and preset digest in dedicated headers, consumes the bootstrap
+capability once, and returns a short-lived random session capability. Every
+authorization request requires the session capability and the same digest.
+Capabilities are compared with fixed-length timing-safe comparison, are
+memory-only, and expire with the server session. Stopping the server
+invalidates all capabilities and aborts active work. There is no hot policy
+reload; changing a preset requires a new server, so no partial policy can be
+observed.
+
+### Exact authorization and failure behavior
+
+Authorization is an AND of transport admission, active session, capability,
+preset digest, grant identity, primitive kind, canonical target, and exact
+method. A failure in one condition cannot be broadened by another grant,
+priority, wildcard, fallback, or source order. Authorization completes before
+DNS, socket, filesystem, or response-body work. Unknown routes, malformed
+control data, missing credentials, mismatches, unsafe addresses, redirect
+responses, file confinement failures, timeouts, and size violations map to a
+closed set of stable F6 error codes. Responses never contain raw URLs,
+credentials, headers, bodies, local paths, DNS answers, addresses, stack
+traces, or third-party error text.
+
+### Network and file security
+
+Outbound targets use one strict WHATWG URL policy: HTTP(S) only, no userinfo,
+fragment, controls, backslashes, ambiguous invalid encoding, raw non-ASCII
+authority text, trailing-dot hostname, or unsupported port. F6-v1 allows only
+ports 80 and 443 and outbound GET or HEAD. All resolver results are classified,
+including IPv4-mapped IPv6. Any loopback, unspecified, private, link-local,
+multicast, carrier-grade, documentation, benchmarking, reserved, or otherwise
+non-public result denies the complete operation. The connector selects one
+allowed numeric address, disables address racing and proxy configuration,
+preserves the authorized hostname for HTTP Host and HTTPS SNI, and never
+retries or follows a redirect.
+
+File grants contain a relative logical path, never an arbitrary server path.
+Absolute, traversal, encoded traversal, alternate-separator, drive, UNC, NUL,
+control, symlink, non-regular, and over-limit paths are denied. `realpath` is
+used only as part of validation; it is not treated as a race-free primitive.
+The reader anchors the configured root, uses no-follow descriptor operations,
+checks the opened object, and reads only from that descriptor. A platform
+without the required guarantees reports an unsupported operation instead of
+falling back to a path-only check.
+
+### Alternatives rejected
+
+- A general forward proxy or catch-all file route is rejected because it would
+  turn loopback reachability into unrestricted SSRF or filesystem authority.
+- A single mutable policy or watcher is rejected; stop-and-recreate gives
+  atomic policy identity and a simple rollback story.
+- Redirect following is rejected in F6; a second authorization and DNS
+  decision would expand the trust boundary without being needed by the
+  foundation.
+- Per-operation browser-visible capabilities are deferred; one-use bootstrap
+  pairing plus a short-lived session supports repeated read-only operations
+  without adding a capability-minting round trip. Side-effecting operations
+  require a later specification.
+- `realpath`-only confinement and the default fetch/proxy client are rejected
+  because neither proves descriptor or address pinning.
+- A full RFC 8785 dependency is not required for the closed internal preset;
+  F6 instead defines and versions a narrow canonical JSON profile and does not
+  add a dependency solely for serialization.
+
+The complete proposed contract and acceptance criteria are in
+`docs/specs/f6-runtime-foundation.md`; the staged workflow record is in
+`docs/f6-workflow.md`.

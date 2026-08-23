@@ -4,7 +4,7 @@ Rogatio is a planned local-first tool for creating, reviewing, and running brows
 
 ## Current Status
 
-Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, and Feature 4, the released `@rogatio/browser-core` package, are complete. F5, the `@rogatio/editor` package, is implemented and verified in the isolated `feature/f5-editor` worktree. Other product packages remain intentionally unimplemented.
+Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, and Feature 4, the released `@rogatio/browser-core` package, are complete. F5, the `@rogatio/editor` package, and Feature 6, the `@rogatio/runtime` foundation package, are implemented and verified in isolated worktrees. Other product packages remain intentionally unimplemented.
 
 ## Project Documents
 
@@ -21,6 +21,8 @@ Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/sch
 - [`docs/f4-workflow.md`](docs/f4-workflow.md): Feature 4 workflow log.
 - [`docs/specs/f5-editor.md`](docs/specs/f5-editor.md): Feature 5 editor specification.
 - [`docs/f5-workflow.md`](docs/f5-workflow.md): Feature 5 workflow record.
+- [`docs/specs/f6-runtime-foundation.md`](docs/specs/f6-runtime-foundation.md): Feature 6 runtime foundation specification.
+- [`docs/f6-workflow.md`](docs/f6-workflow.md): Feature 6 workflow record.
 
 ## Development Workflow
 
