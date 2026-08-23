@@ -49,16 +49,30 @@ The planned root validation sequence is:
 
 F1 uses explicit target-specific build settings rather than a custom internal build framework. Repository orchestration should use Node-based scripts so supported operating systems do not depend on Bash behavior.
 
-## Workflow Model Roles
+## Workflow Agent Tiers
 
-The `sdd` and `doit` skills in `.agents/skills/` define per-role model preferences and the fallback chain. Preferred models are drawn from the `opencode-go` and `openrouter` providers, with the session's active model as the final fallback when a preferred variant is unavailable.
+The `sdd` and `doit` skills in `.agents/skills/` define two selectable agent tiers. The tier is selected once at workflow start and applies to every delegated role.
+
+**Free tier** is restricted to the current OpenCode Zen free catalog:
+
+- `opencode/x-preview-f-free` (Ox Alpha Free)
+- `opencode/nemotron-3-ultra-free` (Nemotron 3 Ultra Free)
+- `opencode/nemotron-3.5-lightning-free` (Nemotron 3.5 Lightning Free)
+- `opencode/muse-spark-1.2-contributor-free` (Muse Spark 1.2 Free)
+- `opencode/hy3-free` (Hy3 Free)
+- `opencode/mimo-v2.5-free` (MiMo V2.5 Free)
+- `opencode/big-pickle` (Big Pickle)
+
+Free mode never falls back to a paid model, another provider, or the session model. The `sdd` and `doit` skills pin one free model to each phase: Nemotron Ultra for reasoning-heavy discovery, architecture, and specification; MiMo for planning; Muse Spark for tests; Ox Alpha for implementation; Hy3 for verification/documentation; and Big Pickle for independent review. If a pinned model is unavailable, the workflow pauses for an explicit tier change or a confirmed replacement ID.
+
+**Normal tier** retains the existing role-specific chains, but checks for an exact or clearly equivalent free OpenCode Zen model before using a paid normal model. The current exact equivalence is `opencode/hy3-free` for `opencode-go/hy3` verification/documentation; other free models are not automatic equivalents merely because they are available.
 
 - Primary brainstorm, architecture, SDD specification, tests, and coding: `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → session model.
 - Adversarial brainstorm: `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `openrouter/anthropic/claude-opus-5` → session model.
 - Implementation plans and independent review: `opencode-go/glm-5.3` → `opencode-go/glm-5.2` → `openrouter/anthropic/claude-sonnet-5` → session model.
-- Verification and documentation: `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model.
+- Verification and documentation: `opencode/hy3-free` → `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model.
 
-Raw brainstorm output is ephemeral. Only synthesized architecture decisions, specifications, plans, verification evidence, and final documentation are durable. Model availability is checked once at workflow start; a preferred model being unavailable triggers a recorded fallback rather than blocking the whole workflow. Under a single-model session (for example Freebuff), one model performs every role and the fresh-context review becomes a deliberate self-review pass that re-reads the final diff without the implementer's working notes.
+Raw brainstorm output is ephemeral. Only synthesized architecture decisions, specifications, plans, verification evidence, and final documentation are durable. Verify catalog availability once at workflow start, record the selected tier and every role/fallback, and keep real command execution as the verification evidence. Under a single-model session, keep the role passes distinct and use a fresh-context self-review.
 
 ## Compatibility Baseline
 

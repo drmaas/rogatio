@@ -13,16 +13,35 @@ Read `rogatio-overview.md` and `sequence.md` before changing scope. Respect the 
 - Workflow logs record stage status, approvals, review rounds, verification evidence, and release state.
 - Documentation changes must keep `docs/architecture.md`, `README.md`, `AGENTS.md`, and any affected specification, plan, or workflow log synchronized.
 
-## Model Roles
+## Agent Model Tiers
 
-The `sdd` and `doit` skills define the per-role model preferences and fallback chain. Summary:
+Every workflow must choose one agent tier at the start and use it for every delegated role. If the user did not specify `free` or `normal`, ask them to choose before delegating work:
 
-- Primary brainstorm, architecture, SDD specification, tests, and coding: `opencode-go/gpt-5.6-luna`, falling back to `openrouter/openai/gpt-5.6-luna`, then the session model.
-- Adversarial brainstorm: `opencode-go/minimax-m3`, falling back to `opencode-go/minimax-m2.7`, `openrouter/anthropic/claude-opus-5`, then the session model.
-- Implementation plans and independent review: `opencode-go/glm-5.3`, falling back to `opencode-go/glm-5.2`, `openrouter/anthropic/claude-sonnet-5`, then the session model.
-- Verification and documentation: `opencode-go/hy3`, falling back to `openrouter/openai/gpt-5.5`, then the session model.
+- **Free:** Use only the pinned OpenCode Zen free model for each phase. Never silently fall back to another free model, a paid model, the session model, or another provider. If the pinned model is unavailable, stop and ask the user to switch tiers or explicitly approve a replacement.
+- **Normal:** Use the existing role-specific model chains below. Before using a paid normal model, check whether the exact model or a clearly equivalent free OpenCode Zen model is available; prefer that free equivalent. Do not substitute a merely convenient or unrelated free model and call it equivalent. Normal mode may fall back through its existing provider chain and finally the session model.
 
-Verify model availability once at workflow start with `opencode models opencode-go` (or the session's provider list). Record which model served each role; record a fallback as a note, not a blocker. A missing preferred model is never an excuse to silently widen scope or skip a stage. Under a single-model session (for example Freebuff), one model performs every role and the fresh-context review becomes a deliberate self-review pass that re-reads the final diff without the implementer's working notes.
+The free catalog from the current OpenCode Zen provider is:
+
+- `opencode/x-preview-f-free` (Ox Alpha Free)
+- `opencode/nemotron-3-ultra-free` (Nemotron 3 Ultra Free)
+- `opencode/nemotron-3.5-lightning-free` (Nemotron 3.5 Lightning Free)
+- `opencode/muse-spark-1.2-contributor-free` (Muse Spark 1.2 Free)
+- `opencode/hy3-free` (Hy3 Free)
+- `opencode/mimo-v2.5-free` (MiMo V2.5 Free)
+- `opencode/big-pickle` (Big Pickle)
+
+Free mode uses pinned phase assignments documented in the `sdd` and `doit` skills; it does not use fallback chains. SDD pins Nemotron Ultra to brainstorm/architecture/specification, MiMo to planning, Muse Spark to tests, Ox Alpha to implementation, Hy3 to verification/documentation, and Big Pickle to independent review. doit pins Nemotron Ultra to brainstorming, MiMo to architecture/planning, Muse Spark to tests, Ox Alpha to implementation, Hy3 to verification/documentation, and Big Pickle to independent review.
+
+Normal-tier role chains remain:
+
+- Primary brainstorm, architecture, SDD specification, tests, and coding: `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → session model.
+- Adversarial brainstorm: `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `openrouter/anthropic/claude-opus-5` → session model.
+- Implementation plans and independent review: `opencode-go/glm-5.3` → `opencode-go/glm-5.2` → `openrouter/anthropic/claude-sonnet-5` → session model.
+- Verification and documentation: `opencode/hy3-free` → `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model.
+
+Verify model availability once at workflow start with `opencode models` or the session's provider list. Record the selected tier and the model that served each role; record normal-tier fallbacks as notes, while free-tier unavailability pauses the workflow. A missing preferred model is never an excuse to silently widen scope or skip a stage. Under a single-model session, keep the role passes distinct and use a fresh-context self-review.
+
+The `sdd` and `doit` skills repeat the operational tier-selection rules and role defaults so they remain usable when loaded independently.
 
 ## Repository Rules
 

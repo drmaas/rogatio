@@ -22,7 +22,9 @@ Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/sch
 
 ## Development Workflow
 
-The planning workflow uses role-specific models with a recorded fallback chain. Preferred models are drawn from the `opencode-go` and `openrouter` providers, with the session's active model as the final fallback: primary brainstorm, architecture, specification, tests, and coding prefer `opencode-go/gpt-5.6-luna`; adversarial brainstorm prefers `opencode-go/minimax-m3`; plans and review prefer `opencode-go/glm-5.3`; verification and documentation prefer `opencode-go/hy3`. Under a single-model session (for example Freebuff), one model performs every role and the fresh-context review becomes a self-review pass. Raw brainstorm output is ephemeral and is not part of the durable project documentation.
+Every workflow chooses one agent tier before it starts. **Free** uses only OpenCode Zen free models and never silently escalates to a paid model or the session model. **Normal** retains the existing role-specific chains, but checks for an exact or clearly equivalent free OpenCode Zen model first; the current exact equivalence is `opencode/hy3-free` for verification and documentation. Record the selected tier, role models, and fallbacks in the workflow log.
+
+The current OpenCode Zen free catalog is `opencode/x-preview-f-free` (Ox Alpha Free), `opencode/nemotron-3-ultra-free` (Nemotron 3 Ultra Free), `opencode/nemotron-3.5-lightning-free` (Nemotron 3.5 Lightning Free), `opencode/muse-spark-1.2-contributor-free` (Muse Spark 1.2 Free), `opencode/hy3-free` (Hy3 Free), `opencode/mimo-v2.5-free` (MiMo V2.5 Free), and `opencode/big-pickle` (Big Pickle). Free mode uses pinned phase assignments, not fallback chains: the `sdd` and `doit` skills pin Nemotron Ultra to the reasoning-heavy discovery phases, MiMo to planning, Muse Spark to tests, Ox Alpha to implementation, Hy3 to verification/documentation, and Big Pickle to independent review. Under a single-model session, keep the role passes distinct and use a fresh-context self-review. Raw brainstorm output is ephemeral and is not part of the durable project documentation.
 
 ## Foundation
 

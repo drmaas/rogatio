@@ -27,30 +27,54 @@ Do not silently skip stages. If a stage is not applicable, record why in the wor
 - Keep state-inspection commands clearly scoped so branch, path, and status output cannot be confused; a failed or malformed tool call is a no-op, not a reason to guess.
 - Commit, push, PR creation, merge, and cleanup are separate release actions for audit purposes, but one explicit authorization for a clearly defined set remains valid for that set. Ask again only when authorization is absent, ambiguous, or the scope changes; never force-push or push directly to a protected default branch. Prompt immediately before deleting files/directories or removing worktrees.
 
-## Model Roles
+## Agent Model Tiers
 
-This workflow uses role-specific models for rigor, but role separation must not become ceremony. The rule: try the preferred model for each role; if it is unavailable, fall back to an alternate variant in the same family; if no alternate is available, use the session's active model for that role and record the fallback. Never block the whole workflow on a single missing model identifier.
+Choose exactly one tier before Stage 1 and carry that tier through every role in the workflow. If the user did not specify `free` or `normal`, ask them to choose before delegating work. Do not silently change tiers mid-workflow.
 
-### Two execution modes
+### Free tier
 
-- **opencode / opencode-go session (multi-model):** Delegate each role to its preferred model below. Alternate between `opencode-go/*` and `openrouter/*` variants of the same family so a provider outage does not stall work.
-- **Freebuff or other single-model session:** The session-start model performs every role. Still keep the role passes distinct (brainstorm → adversarial → architecture → spec → plan → tests → code → verify → review) so the rigor survives; the fresh-context review becomes a deliberate self-review pass that re-reads the final diff against the spec without the implementer's working notes.
+Free tier uses only the OpenCode Zen free catalog. Current exact model IDs are:
 
-### Preferred models per role
+- `opencode/x-preview-f-free` (Ox Alpha Free)
+- `opencode/nemotron-3-ultra-free` (Nemotron 3 Ultra Free)
+- `opencode/nemotron-3.5-lightning-free` (Nemotron 3.5 Lightning Free)
+- `opencode/muse-spark-1.2-contributor-free` (Muse Spark 1.2 Free)
+- `opencode/hy3-free` (Hy3 Free)
+- `opencode/mimo-v2.5-free` (MiMo V2.5 Free)
+- `opencode/big-pickle` (Big Pickle)
 
-Primary and adversarial brainstorm are different models even in single-model mode — the adversarial pass re-reads the primary output with a critical prompt rather than restating it.
+Free mode pins one model to each model-assisted phase; do not choose a different free model by fallback. If the pinned model is unavailable, stop and ask the user to switch to normal tier or explicitly approve a replacement. Never use the session model or a paid provider as a free-tier fallback.
 
-- **Primary brainstorm:** `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → session model.
+#### SDD free-phase pins
+
+| Stage | Phase | Pinned model |
+| --- | --- | --- |
+| 1 | Brainstorm | `opencode/nemotron-3-ultra-free` |
+| 2 | Architecture | `opencode/nemotron-3-ultra-free` |
+| 3 | Specification | `opencode/nemotron-3-ultra-free` |
+| 4 | Human review gate | No delegated model; wait for the user |
+| 5 | Implementation plan | `opencode/mimo-v2.5-free` |
+| 6 | Tests first | `opencode/muse-spark-1.2-contributor-free` |
+| 7 | Implementation | `opencode/x-preview-f-free` |
+| 8 | Verification and tests | `opencode/hy3-free` |
+| 9 | Independent fresh-context review | `opencode/big-pickle` |
+| 10 | Documentation | `opencode/hy3-free` |
+| 11 | Release actions | No delegated model; require user authorization |
+
+The stronger Nemotron Ultra Free model is intentionally pinned to the reasoning-heavy discovery and design stages; the review stage uses Big Pickle so it remains a separate model from implementation.
+
+### Normal tier
+
+Normal tier retains the existing role chains, but prefers an exact or clearly equivalent free OpenCode Zen model before a paid normal model. The current exact equivalence is `opencode/hy3-free` for the existing `opencode-go/hy3` verification/documentation role. Other free models are alternatives by capability, not automatic equivalents.
+
+- **Primary brainstorm, architecture, SDD specification, tests, and coding:** `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → session model.
 - **Adversarial brainstorm:** `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `openrouter/anthropic/claude-opus-5` → session model.
-- **Architecture synthesis:** `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → session model.
-- **Specification synthesis:** `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna-pro` → session model.
-- **Plan writing:** `opencode-go/glm-5.3` → `opencode-go/glm-5.2` → `openrouter/openai/gpt-5.5` → session model.
-- **Tests and coding:** `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → `opencode-go/kimi-k2.7-code` → session model.
-- **Verification:** `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model. The workflow still executes real commands and captures their output; a model report alone is not evidence.
-- **Independent review:** `opencode-go/glm-5.3` → `openrouter/anthropic/claude-sonnet-5` → `opencode-go/glm-5.2` → a different model than the one that implemented (session model if that is the only option, with a fresh-context re-read).
-- **Documentation:** `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model.
+- **Plan writing and independent review:** `opencode-go/glm-5.3` → `opencode-go/glm-5.2` → `openrouter/openai/gpt-5.5` → session model.
+- **Verification and documentation:** `opencode/hy3-free` → `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model.
 
-Verify model availability once at workflow start with `opencode models opencode-go` (or the session's provider list). Record which model served each role in the workflow log; record any fallback as a note, not a blocker.
+### Selection and recording
+
+At workflow start, verify the selected tier's IDs with `opencode models` or the session's provider list. Record the selected tier, the model used for each role, and every fallback in the workflow log. A model report is not verification evidence; all required commands still run for real. Under a single-model session, keep the role passes distinct and perform the fresh-context review as a deliberate self-review.
 
 ## Workflow state and artifacts
 
