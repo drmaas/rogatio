@@ -58,6 +58,7 @@ async function checkArtifacts(): Promise<void> {
     "packages/sanity/dist/node/index.js",
     "packages/schema/dist/node/index.js",
     "packages/compiler/dist/node/index.js",
+    "packages/browser-core/dist/node/index.js",
   ];
   if (
     expected.length !== Object.keys(manifest).length ||
@@ -131,6 +132,86 @@ async function checkEmittedModules(): Promise<void> {
     throw new Error(
       "Compiler emitted Node module accepted an unknown property",
     );
+
+  const core = (await import(
+    pathToFileURL(resolve(root, "packages/browser-core/dist/node/index.js"))
+      .href
+  )) as {
+    ProjectRepository?: new (options: {
+      storage: {
+        read: () => Promise<unknown>;
+        compareAndSwap: (previous: unknown, next: unknown) => Promise<boolean>;
+      };
+      generateId?: () => string;
+      now?: () => number;
+    }) => {
+      createProject: (
+        data: unknown,
+        options?: { id?: string },
+      ) => Promise<{ ok: boolean; value?: { id: string } }>;
+      switchProject: (id: string) => Promise<{
+        ok: boolean;
+        value?: { activeProjectId: string | null };
+      }>;
+    };
+    computeRuleStatuses?: (input: {
+      operations: readonly unknown[];
+      enabledGroupIds: readonly string[];
+      grantedOrigins: readonly string[];
+      installedRuleIds: readonly string[];
+    }) => readonly { status: string }[];
+    computeBadge?: (statuses: readonly { status: string }[]) => {
+      text: string;
+      attention: boolean;
+    };
+  };
+  if (typeof core.ProjectRepository !== "function")
+    throw new Error(
+      "Browser-core emitted Node module did not export a repository",
+    );
+  const memory: { value: unknown } = { value: undefined };
+  const repository = new core.ProjectRepository({
+    storage: {
+      read: async () => memory.value,
+      compareAndSwap: async (previous, next) => {
+        if (JSON.stringify(memory.value) !== JSON.stringify(previous))
+          return false;
+        memory.value = next;
+        return true;
+      },
+    },
+    generateId: () => "emitted-project",
+    now: () => 1,
+  });
+  const created = await repository.createProject(project, {
+    id: "emitted-project",
+  });
+  if (!created.ok || created.value?.id !== "emitted-project")
+    throw new Error(
+      "Browser-core emitted Node module did not create a project",
+    );
+  const switched = await repository.switchProject("emitted-project");
+  if (!switched.ok || switched.value?.activeProjectId !== "emitted-project")
+    throw new Error(
+      "Browser-core emitted Node module did not switch the active project",
+    );
+  if (!compiled?.ok || typeof core.computeRuleStatuses !== "function")
+    throw new Error("Browser-core emitted module needs compiler operations");
+  const statuses = core.computeRuleStatuses({
+    operations: compiled.operations,
+    enabledGroupIds: [],
+    grantedOrigins: [],
+    installedRuleIds: [],
+  });
+  if (statuses.length !== 1 || statuses[0]?.status !== "disabled")
+    throw new Error(
+      "Browser-core emitted Node module computed unexpected rule statuses",
+    );
+  const badge = core.computeBadge?.(statuses);
+  if (badge?.text !== "0" || badge.attention !== false)
+    throw new Error(
+      "Browser-core emitted Node module computed an unexpected badge",
+    );
 }
 async function checkBoundaries(): Promise<void> {
   const manifest = JSON.parse(
@@ -156,11 +237,27 @@ async function checkBoundaries(): Promise<void> {
     throw new Error(
       "Compiler must depend only on the schema workspace package",
     );
+  const browserCoreManifest = JSON.parse(
+    await readFile(resolve(root, "packages/browser-core/package.json"), "utf8"),
+  ) as { dependencies?: Record<string, string> };
+  const browserCoreDependencies = browserCoreManifest.dependencies ?? {};
+  if (
+    Object.keys(browserCoreDependencies).length !== 2 ||
+    browserCoreDependencies["@rogatio/schema"] !== "workspace:*" ||
+    browserCoreDependencies["@rogatio/compiler"] !== "workspace:*"
+  )
+    throw new Error(
+      "Browser-core must depend only on the schema and compiler workspace packages",
+    );
+  if ("@rogatio/browser-core" in (schemaManifest.dependencies ?? {}))
+    throw new Error("Schema must not depend on browser-core");
+  if ("@rogatio/browser-core" in compilerDependencies)
+    throw new Error("Compiler must not depend on browser-core");
   const forbidden = await readFile(
     resolve(root, "test/fixtures/forbidden-direction.ts"),
     "utf8",
   );
-  if (!forbidden.includes("@rogatio/browser-core"))
+  if (!forbidden.includes("@rogatio/extension"))
     throw new Error("Forbidden-direction fixture was altered");
 }
 run("format", pnpm, ["format:check"]);

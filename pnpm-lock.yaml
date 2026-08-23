@@ -30,6 +30,15 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@types/node@26.2.0)(vite@8.2.2(@types/node@26.2.0)(esbuild@0.28.2))
 
+  packages/browser-core:
+    dependencies:
+      '@rogatio/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@rogatio/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/compiler:
     dependencies:
       '@rogatio/schema':
