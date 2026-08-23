@@ -57,11 +57,11 @@ Free mode routes each phase to a primary model with a documented fallback. If th
 
 | Stage | Phase | Primary | Fallback |
 | --- | --- | --- | --- |
-| 1 | Brainstorm | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
-| 2 | Architecture | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
-| 3 | Specification | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
+| 1 | Brainstorm | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
+| 2 | Architecture | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
+| 3 | Specification | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
 | 4 | Human review gate | No delegated model; wait for the user | |
-| 5 | Implementation plan | `opencode/hy3-free` | `opencode/nemotron-3-ultra-free` |
+| 5 | Implementation plan | `opencode/hy3-free` | `openrouter/thinkingmachines/inkling-small:free` |
 | 6 | Tests first | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
 | 7 | Implementation | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
 | 8 | Verification and tests | `opencode/nemotron-3.5-lightning-free` | `openrouter/poolside/laguna-s-2.1:free` |

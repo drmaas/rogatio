@@ -42,9 +42,9 @@ Free mode routes each phase to a primary model with a documented fallback. If th
 
 | Phase | Primary | Fallback |
 | --- | --- | --- |
-| Brainstorm / architecture | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
-| Specification | `opencode/nemotron-3-ultra-free` | `opencode/hy3-free` |
-| Plan | `opencode/hy3-free` | `opencode/nemotron-3-ultra-free` |
+| Brainstorm / architecture | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
+| Specification | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
+| Plan | `opencode/hy3-free` | `openrouter/thinkingmachines/inkling-small:free` |
 | Tests authoring | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
 | Implementation (code) | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
 | Verification / debug loop | `opencode/nemotron-3.5-lightning-free` | `openrouter/poolside/laguna-s-2.1:free` |
