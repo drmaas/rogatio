@@ -55,9 +55,10 @@ async function checkArtifacts(): Promise<void> {
   const expected = [
     "packages/smoke/dist/node/index.js",
     "packages/smoke/dist/browser/index.js",
+    "packages/schema/dist/node/index.js",
+    "packages/schema/dist/browser/index.js",
     "packages/editor/dist/browser/index.js",
     "packages/sanity/dist/node/index.js",
-    "packages/schema/dist/node/index.js",
     "packages/compiler/dist/node/index.js",
     "packages/browser-core/dist/node/index.js",
     "packages/cli/dist/node/index.js",

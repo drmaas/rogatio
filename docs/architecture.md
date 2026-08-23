@@ -1,6 +1,6 @@
 # Rogatio Architecture
 
-**Status:** F1 bootstrap, F2 schema, F3 compiler, F4 browser-core, F7 extension shell, and F8 CLI are released through Stage 10 (verification and documentation complete). F5 editor and F6 runtime foundation are implemented and verified in this worktree.
+**Status:** F1 bootstrap, F2 schema, F3 compiler, F4 browser-core, F7 extension shell, F8 CLI, and **F9 redirect rules** are released through Stage 10 (verification and documentation complete). F5 editor and F6 runtime foundation are implemented and verified in this worktree.
 
 ## Package Boundaries
 
@@ -351,3 +351,150 @@ rogatio edit [path]
 | WebSocket for editor comms | HTTP sufficient; simpler; no WS dependency |
 | Fixed port | Conflicts common; random + open browser is UX standard |
 | Long-lived server | Edit is single-session; no need for daemon |
+
+## F9: Redirect Rules (action slice)
+
+F9 is the first *action* slice introducing a browser-side effect. It adds the rule-type
+discriminant `type: "redirect"`, the redirect payload, and translates it to Chrome DNR
+`redirect` rules.
+
+### Rule-type discriminant
+
+- `schema/src/types.ts`: `RuleType = "redirect"`, `RedirectAction { destination: string }`,
+  `RogatioRule.type?: RuleType`, `RogatioRule.redirect?: RedirectAction`. Optional `type`
+  preserves backward compatibility; rules without `type` remain actionless matchers
+  (reported `unsupported`).
+- `schema/src/schema.ts`: `rule` $def gains `type` (enum `["redirect"]`) and `redirect`
+  object with required `destination`. AJV `if/then` requires `redirect` when
+  `type === "redirect"`. `additionalProperties: false` preserved; no unvalidated action
+  passthrough.
+- `schema/src/limits.ts`: `maxRedirectDestinationLength: 2048`, `maxCaptureGroups: 9`.
+- `schema/src/validation.ts`: semantic validation `validateRedirectDestination(destination,
+  urlRegex)` checks absolute HTTP(S) URL, no credentials, valid host, no `*`, backreferences
+  `\1`–`\9` within capture-group count of `urlRegex`. New `countCapturingGroups(urlRegex)`
+  helper counts non-capturing/lookahead-exclusive groups. Diagnostics at
+  `/groups/N/rules/M/redirect/destination` with codes `schema.invalid-format`,
+  `schema.invalid-value`.
+
+### Compiler
+
+- `compiler/src/types.ts`: add `RedirectOperation { kind:"redirect"; groupId; ruleId;
+  matcher: NormalizedMatcher; redirect: { destination: string } }`; widen
+  `CompileResult.operations` to `readonly (MatcherOperation | RedirectOperation)[]`.
+- `compiler/src/compile.ts`: `compileOperations` emits `RedirectOperation` when
+  `rule.type === "redirect"`, else `MatcherOperation`. Matcher normalization unchanged.
+
+### Extension (Chrome MV3)
+
+- `extension/src/dnr.ts` (NEW): `translateRedirectToDnr(op, id)` builds deterministic DNR
+  rule `{ id, priority, action:{type:"redirect", redirect:{url}}, condition:
+  {regexFilter, resourceTypes, initiatorDomains:hostnamesFromOrigins(op.matcher.origins)} }`.
+  `createDnrInstaller(api)` implements `RuleInstallerAdapter` tracking installed redirect
+  operations in a Map keyed by DNR rule id; `current()` reads back via
+  `chrome.declarativeNetRequest.getDynamicRules()`; `install(ops)` computes add/remove and
+  calls `updateDynamicRules`. Guarded for missing `declarativeNetRequest`.
+- `extension/src/chrome.ts`: `ChromeApi.declarativeNetRequest` made optional (`?`) to
+  preserve test fixture compatibility.
+- `extension/src/background.ts`: wires real `createDnrInstaller(api)` replacing stub.
+- `extension/src/service-worker.ts`: `operationStatuses` maps installed redirect ops to
+  `active`; actionless matchers are always `unsupported` regardless of install state.
+  `projectState` fetches `installedRuleIds` from `installer.current()` for accurate status.
+- `extension/src/browser-schema.ts`: mirrors redirect validation with local
+  `validateRedirectDestination` + `countCapturingGroups` to avoid circular alias; exports
+  `validateRedirectDestination` so the browser build's `@rogatio/schema` alias supplies it
+  to the bundled editor redirect extension.
+
+### browser-core
+
+- `browser-core/src/types.ts`: `RuleInstallerAdapter.current()` returns
+  `Promise<readonly RogatioOperation[]>`; `RuleStatusInput.operations`,
+  `computeRuleStatuses`, `InstallService.install` widened to `RogatioOperation[]`.
+- Status logic operates on `operation.matcher`, unchanged for redirect ops.
+
+### Editor
+
+- `editor/src/types.ts`: `RuleTypeFieldExtension` / `RuleTypeFieldContext` unchanged.
+- `editor/src/editor.ts`: `COMMON_RULE_FIELDS` gains `"type"`; renders a rule-type
+  `<select>` when `ruleTypes` are registered (options: empty = "Actionless (matcher
+  only)", plus each extension's `id`/`label`). `updateCommonField` handles `type`:
+  clearing to empty deletes `type` and invokes `clearActionFields()`; switching to a
+  non-redirect type clears `redirect`; switching to `redirect` preserves other fields.
+- `editor/src/rule-types/redirect.ts` (NEW): `createRedirectRuleType()` — `matches`
+  `rule.type === "redirect"`; `mount` renders labeled URL input bound to
+  `redirect.destination` via `getField/setField/registerControl`; `validate` reuses
+  `validateRedirectDestination` from `@rogatio/schema` for consistent validation.
+
+### Testing seams
+
+- `schema/test/redirect.test.ts`: redirect semantic validation (URL, backrefs, limits),
+  `countCapturingGroups`, `validateRedirectDestination`.
+- `compiler/test/redirect.test.ts`: redirect rule → `RedirectOperation`; untyped →
+  `MatcherOperation`.
+- `extension/test/dnr.test.ts`: `translateRedirectToDnr` mapping; `createDnrInstaller`
+  install via `updateDynamicRules`; missing DNR API → `{ok:false}` / `[]`.
+- `extension/test/redirect-status.test.ts`: installed redirect → `active`; matcher →
+  `unsupported`.
+- `extension/test/browser-schema-redirect.test.ts`: hand-rolled browser schema redirect
+  cases mirroring node validation.
+- `editor/test/redirect.test.ts`: `createRedirectRuleType` matches/validate.
+
+## F11 Request & Response Header Rules (action slice)
+
+F11 is the first *action* slice. It introduces the rule-type discriminant and the neutral
+`HeaderOperation`, and translates it to Chrome DNR `modifyHeaders`.
+
+### Rule-type discriminant
+- `schema/src/schema.ts` `rule` $def gains a required `type` (const `"header"` for this
+  slice) plus `headerDirection`, `headerOperation`, `headerName`, optional `headerValue`.
+  `additionalProperties: false` is preserved; no unvalidated `action` passthrough.
+- `schema/src/types.ts`: `RogatioRule` becomes a discriminated union (`HeaderRule |
+  future`). `HeaderRule` carries the matcher fields (id/name/urlRegex/origins/resourceTypes/
+  priority/method) plus the header payload.
+- `schema/src/validation.ts`: semantic checks — `headerValue` required for set/append,
+  rejected for remove; `headerName` checked via `isForbiddenHeader(name, direction)`
+  (case-insensitive, `proxy-*`/`sec-*` prefixes). New diagnostic codes map in `compiler`.
+
+### Compiler
+- `compiler/src/types.ts`: add `HeaderOperation { kind:"header"; groupId; ruleId;
+  matcher: NormalizedMatcher; header: { direction; operation; name; value? } }`; widen
+  `CompileResult.operations` to `readonly (MatcherOperation | HeaderOperation)[]`. Add
+  `CompilerDiagnosticCode`s: `compiler.invalid-header-direction`,
+  `compiler.invalid-header-operation`, `compiler.forbidden-header`,
+  `compiler.header-value-required`, `compiler.header-value-unexpected`.
+- `compiler/src/compile.ts`: `compileOperations` detects `type:"header"` and emits a
+  `HeaderOperation`; delegates matcher normalization to `compileMatcher`.
+- `compiler/src/diagnostics.ts`: map new codes; add safe param keys.
+
+### Extension (Chrome MV3)
+- `extension/src/browser-schema.ts` (hand-duplicated schema): mirror `RULE_KEYS` and
+  `validateProjectDetailed` to accept header rules and reject forbidden/missing-value.
+- `extension/src/projection.ts`: replace matcher-only projection with a header-aware
+  projector returning installable DNR `modifyHeaders` rules (requestHeaders/responseHeaders,
+  operation set/append/remove, value for set/append, condition from matcher via
+  `compileUrlRegex`, `resourceTypes`, `requestMethods` when method set, `initiatorDomains`
+  from normalized origins; `priority`; stable id `1_000_001 + index`). Matcher-only ops
+  (future actionless) remain `installable:false`.
+- `extension/src/service-worker.ts` `operationStatuses`: stop forcing `unsupported` for
+  header operations; only non-installable ops fall back to `unsupported`.
+- New DNR installer adapter: `install(operations)` → `chrome.declarativeNetRequest`
+  `updateDynamicRules` (remove prior rule ids, add projected header rules).
+
+### browser-core
+- Widen `RuleInstallerAdapter.current/install`, `RuleStatusInput.operations`,
+  `computeDesiredRules`, `computeRuleStatuses`, `computeDeclaredOrigins` from
+  `MatcherOperation[]` to `MatcherOperation | HeaderOperation`. Status logic operates on
+  `operation.matcher`, so it is unchanged for header ops.
+
+### Editor
+- A `RuleTypeFieldExtension` (id `"header-rule"`) is supplied by the CLI/extension host:
+  `matches` returns `rule.type === "header"`; `mount` renders direction/operation/name/value
+  controls and calls `setField("type","header")` if absent; `validate` enforces forbidden name
+  and value-required. No editor-core change beyond an optional `type` hint on the extension.
+
+### Testing seams
+- `schema/test/schema.test.ts`: header semantic validation (forbidden, value rules).
+- `compiler/test/compiler.test.ts`: update op-shape assertions; add header cases; keep
+  adversarial sparse/cyclic tests green.
+- `extension/test/projection.test.ts` + `fixtures.ts`: header→DNR projection; installable.
+- `editor/test/editor.test.ts` + `test/browser/editor.spec.ts`: header extension registration.
+- `browser-core/test/{install,status}.test.ts`: union acceptance.

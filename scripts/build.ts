@@ -29,10 +29,26 @@ const targets: BuildTarget[] = [
     target: "es2022",
   },
   {
+    entry: "packages/schema/src/index.ts",
+    output: "packages/schema/dist/node/index.js",
+    platform: "node",
+    target: "node24",
+    external: ["ajv"],
+  },
+  {
+    entry: "packages/schema/src/browser-index.ts",
+    output: "packages/schema/dist/browser/index.js",
+    platform: "browser",
+    target: "es2022",
+  },
+  {
     entry: "packages/editor/src/index.ts",
     output: "packages/editor/dist/browser/index.js",
     platform: "browser",
     target: "es2022",
+    alias: {
+      "@rogatio/schema": resolve(root, "packages/schema/dist/browser/index.js"),
+    },
   },
   {
     entry: "packages/sanity/src/index.ts",
@@ -40,13 +56,6 @@ const targets: BuildTarget[] = [
     platform: "node",
     target: "node24",
     external: ["@rogatio/smoke"],
-  },
-  {
-    entry: "packages/schema/src/index.ts",
-    output: "packages/schema/dist/node/index.js",
-    platform: "node",
-    target: "node24",
-    external: ["ajv"],
   },
   {
     entry: "packages/compiler/src/index.ts",

@@ -94,4 +94,3 @@ Canonical validation evidence:
 
 - Awaits explicit user authorization for commit/PR/merge.
 - Worktree audit: no generated output, secrets, or unrelated changes in tracked/untracked.
-- All canonical checks green in worktree.
