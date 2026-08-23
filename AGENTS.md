@@ -66,3 +66,15 @@ The `sdd` and `doit` skills repeat the operational tier-selection rules and role
 Use a dedicated feature worktree for implementation. Before declaring an implementation complete, run the project validation sequence and record evidence against the relevant acceptance criteria. Before release, audit staged, unstaged, tracked, and untracked files for unrelated changes, generated output, local settings, and secrets. A single explicit user authorization for a clearly defined set of commit, push, PR, merge, or cleanup actions remains valid for that set; ask again only when authorization is absent, ambiguous, or scope changes. Never force-push or push directly to a protected default branch. After merge, reconcile release/status documentation and verify the default branch, worktrees, and remote refs are in the intended final state.
 
 Always prompt before deleting files or directories.
+
+## Worktree Convention (opencode-worktree plugin)
+
+All implementation work uses the `opencode-worktree` OpenCode plugin rather than manual `git worktree add`.
+
+- Create a worktree with the plugin tool `worktree_create(branch, baseBranch?)` (defaults `baseBranch` to HEAD). This creates a git worktree, syncs files per `.opencode/worktree.jsonc`, runs `postCreate` hooks (e.g. `pnpm install`), and spawns a terminal.
+- Tear down with `worktree_delete(reason)`; it auto-commits changes and removes the worktree.
+- Worktrees are checked out outside the repo at `~/.local/share/opencode/worktree/<project-id>/<branch>/` (plugin default; not configurable without patching). The earlier `/tmp/rogatio` idea is superseded by this convention.
+- `.opencode/worktree.jsonc` holds sync/hook config (copy `.env`/`.env.local`, symlink `node_modules`, `postCreate: ["pnpm install"]`).
+- The plugin is vendored into `.opencode/plugins/` by OCX and is SHA-verified; `.opencode/` is excluded from project typecheck and Biome.
+- Exception: the pre-existing manual worktree `~/Projects/github/drmaas/rogatio-f7` (branch `feature/f7-extension-shell`) remains in place; new work uses the plugin.
+- Note: terminal auto-spawn targets the current terminal (ghostty here). In headless runs the worktree is still created on disk even if no terminal opens.

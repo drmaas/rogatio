@@ -7,7 +7,8 @@
       "!!coverage",
       "!!playwright-report",
       "!!test-results",
-      "!!test/fixtures"
+      "!!test/fixtures",
+      "!!.opencode"
     ]
   },
   "formatter": {
