@@ -4,7 +4,17 @@ Rogatio is a planned local-first tool for creating, reviewing, and running brows
 
 ## Current Status
 
-Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, and Feature 4, the released `@rogatio/browser-core` package, are complete. F5, the `@rogatio/editor` package, and Feature 6, the `@rogatio/runtime` foundation package, are implemented and verified in isolated worktrees. Other product packages remain intentionally unimplemented.
+Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/schema` package, Feature 3, the released `@rogatio/compiler` package, and Feature 4, the released `@rogatio/browser-core` package, are complete. F5, the `@rogatio/editor` package, Feature 6, the `@rogatio/runtime` foundation package, and F8, the `@rogatio/cli` package (providing `rogatio edit` and `rogatio verify`, with `rogatio runtime` as a documented stub), are implemented and verified in isolated worktrees. Other product packages remain intentionally unimplemented.
+
+## CLI
+
+The `@rogatio/cli` package installs the `rogatio` binary.
+
+- `rogatio edit [path]` — launches a browser editor for a `.rogatio.json` project (creates an empty project if the file is missing). Binds a local HTTP server to `127.0.0.1` and opens your default browser; `--port <n>` fixes the port.
+- `rogatio verify [path]` — validates a `.rogatio.json` file with the schema (F2) and compiler (F3). Use `-` to read from stdin and `--json` for machine-readable diagnostics. Exit codes: `0` valid, `1` invalid, `2` error.
+- `rogatio runtime` — documented stub for the future native-messaging runtime (F14+); exits `1`.
+
+See [`docs/specs/f8-cli-edit-verify.md`](docs/specs/f8-cli-edit-verify.md) for the full contract.
 
 ## Project Documents
 
@@ -22,6 +32,9 @@ Feature 1, monorepo and tooling bootstrap, Feature 2, the released `@rogatio/sch
 - [`docs/specs/f5-editor.md`](docs/specs/f5-editor.md): Feature 5 editor specification.
 - [`docs/f5-workflow.md`](docs/f5-workflow.md): Feature 5 workflow record.
 - [`docs/specs/f6-runtime-foundation.md`](docs/specs/f6-runtime-foundation.md): Feature 6 runtime foundation specification.
+- [`docs/specs/f8-cli-edit-verify.md`](docs/specs/f8-cli-edit-verify.md): Feature 8 CLI `edit`/`verify` specification.
+- [`docs/plans/f8-cli-edit-verify.md`](docs/plans/f8-cli-edit-verify.md): Feature 8 implementation plan.
+- [`docs/f8-workflow.md`](docs/f8-workflow.md): Feature 8 workflow record (SDD stages, review, verification).
 - [`docs/f6-workflow.md`](docs/f6-workflow.md): Feature 6 workflow record.
 
 ## Development Workflow
@@ -73,9 +86,9 @@ F1 validation is pinned to a known-good toolchain: Node `24.19.0`, pnpm `10.32.1
 
 ## F1 Package Boundaries
 
-F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary; F3 adds the `@rogatio/compiler` matcher transformation boundary; F4 adds the `@rogatio/browser-core` core platform layer. The future `editor/runtime -> extension/cli` layers are documented boundaries only. No F5-F20 product API or behavior is present.
+F1 tooling verification uses `@rogatio/smoke` and `@rogatio/sanity`; F2 adds the `@rogatio/schema` validation boundary; F3 adds the `@rogatio/compiler` matcher transformation boundary; F4 adds the `@rogatio/browser-core` core platform layer. The `editor/runtime -> extension` layers follow the implementation sequence; the `@rogatio/cli` boundary is implemented in F8. The F1 bootstrap itself ships no F5-F20 product API or behavior.
 
-There is no installable CLI, browser extension, or runtime yet. Do not infer product behavior from the F1 bootstrap smoke packages.
+The F1 bootstrap does not itself ship a product CLI, browser extension, or runtime; the `@rogatio/cli` package is delivered by F8. Do not infer product behavior from the F1 bootstrap smoke packages.
 
 ## Editor Boundary
 

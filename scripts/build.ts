@@ -60,6 +60,13 @@ const targets: BuildTarget[] = [
     target: "node24",
     external: ["@rogatio/schema", "@rogatio/compiler"],
   },
+  {
+    entry: "packages/cli/src/index.ts",
+    output: "packages/cli/dist/node/index.js",
+    platform: "node",
+    target: "node24",
+    external: ["@rogatio/schema", "@rogatio/compiler", "@rogatio/editor"],
+  },
 ];
 const manifest: Record<string, { sha256: string; bytes: number }> = {};
 for (const target of targets) {

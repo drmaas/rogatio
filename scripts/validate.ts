@@ -60,6 +60,7 @@ async function checkArtifacts(): Promise<void> {
     "packages/schema/dist/node/index.js",
     "packages/compiler/dist/node/index.js",
     "packages/browser-core/dist/node/index.js",
+    "packages/cli/dist/node/index.js",
   ];
   if (
     expected.length !== Object.keys(manifest).length ||
