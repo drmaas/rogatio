@@ -22,7 +22,7 @@ free routing table was therefore not exercised; this is recorded, not silently s
 - [x] Stage 8 — Verification. All 254 tests pass; lint clean; typecheck clean.
 - [x] Stage 9 — Independent review (fresh-context self-review). No actionable findings.
 - [x] Stage 10 — Documentation. Architecture, specification, workflow log updated.
-- [ ] Stage 11 — Release (requires explicit authorization).
+- [x] Stage 11 — Release (commit 04278f5, PR #13 created).
 
 ## Key findings (from codebase exploration)
 
