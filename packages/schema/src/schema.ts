@@ -96,7 +96,28 @@ const projectSchemaDefinition = {
           maximum: LIMITS.maxPriority,
         },
         method: { type: "string", enum: [...HTTP_METHODS] },
+        type: { type: "string", enum: ["redirect"] },
+        redirect: {
+          type: "object",
+          additionalProperties: false,
+          required: ["destination"],
+          properties: {
+            destination: { type: "string" },
+          },
+        },
       },
+      allOf: [
+        {
+          if: {
+            required: ["type"],
+            properties: { type: { const: "redirect" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["redirect"],
+          },
+        },
+      ],
     },
   },
 } as const;

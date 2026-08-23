@@ -3,16 +3,14 @@ import {
   createStorageAdapter,
   setBadge,
 } from "./chrome.js";
+import { createDnrInstaller } from "./dnr.js";
 import { createExtensionApplication } from "./service-worker.js";
 
 const api = chrome;
 const application = createExtensionApplication({
   storage: createStorageAdapter(api),
   permissions: createPermissionAdapter(api),
-  installer: {
-    current: async () => [],
-    install: async () => ({ ok: true }),
-  },
+  installer: createDnrInstaller(api),
   badge: (value) => setBadge(value, api),
 });
 

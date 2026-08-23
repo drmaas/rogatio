@@ -13,6 +13,8 @@ import type {
   CompileResult,
   MatcherOperation,
   NormalizedMatcher,
+  RedirectOperation,
+  RogatioOperation,
 } from "./types.js";
 
 function compareCodeUnits(left: string, right: string): number {
@@ -194,8 +196,8 @@ function compileMatcher(
   return matcher;
 }
 
-function compileOperations(project: RogatioProject): MatcherOperation[] {
-  const operations: MatcherOperation[] = [];
+function compileOperations(project: RogatioProject): RogatioOperation[] {
+  const operations: RogatioOperation[] = [];
   for (
     let groupIndex = 0;
     groupIndex < project.groups.length;
@@ -204,12 +206,25 @@ function compileOperations(project: RogatioProject): MatcherOperation[] {
     const group = project.groups[groupIndex];
     for (let ruleIndex = 0; ruleIndex < group.rules.length; ruleIndex += 1) {
       const rule = group.rules[ruleIndex];
-      operations.push({
-        kind: "matcher",
-        groupId: group.id,
-        ruleId: rule.id,
-        matcher: compileMatcher(group, rule, groupIndex, ruleIndex),
-      });
+      const matcher = compileMatcher(group, rule, groupIndex, ruleIndex);
+      if (rule.type === "redirect") {
+        const operation: RedirectOperation = {
+          kind: "redirect",
+          groupId: group.id,
+          ruleId: rule.id,
+          matcher,
+          redirect: { destination: rule.redirect?.destination ?? "" },
+        };
+        operations.push(operation);
+      } else {
+        const operation: MatcherOperation = {
+          kind: "matcher",
+          groupId: group.id,
+          ruleId: rule.id,
+          matcher,
+        };
+        operations.push(operation);
+      }
     }
   }
   return operations;

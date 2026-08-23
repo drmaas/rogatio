@@ -23,7 +23,9 @@ const ajv = new Ajv2020({
   removeAdditional: false,
   useDefaults: false,
   ownProperties: true,
-  strict: true,
+  // The redirect `then` clause requires `redirect` via `if/then` while the
+  // property is declared on the enclosing rule, which strictRequired forbids.
+  strictRequired: false,
 });
 
 ajv.addFormat("rogatio-origin", {
@@ -207,6 +209,40 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
         ids.set(rule.id, `${rulePath}/id`);
       }
 
+      if (rule.type !== undefined && rule.type !== "redirect") {
+        issues.push({
+          instancePath: `${rulePath}/type`,
+          keyword: "enum",
+          message: 'must be "redirect"',
+          params: { allowedValue: "redirect" },
+        });
+      }
+
+      if (rule.type === "redirect") {
+        const destination =
+          rule.redirect !== undefined ? rule.redirect.destination : undefined;
+        if (rule.redirect === undefined || typeof destination !== "string") {
+          issues.push({
+            instancePath: `${rulePath}/redirect/destination`,
+            keyword: "required",
+            message: "Redirect rules require a destination string.",
+            params: {},
+          });
+        } else {
+          for (const issue of validateRedirectDestination(
+            destination,
+            rule.urlRegex,
+          )) {
+            issues.push({
+              instancePath: `${rulePath}/redirect/destination`,
+              keyword: issue.code,
+              message: issue.message,
+              params: {},
+            });
+          }
+        }
+      }
+
       const effectiveOrigins = new Set<string>();
       for (
         let originIndex = 0;
@@ -245,6 +281,123 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
     });
   }
 
+  return issues;
+}
+
+export interface RedirectDestinationIssue {
+  readonly code: string;
+  readonly message: string;
+}
+
+function skipBalancedGroup(source: string, start: number): number {
+  let depth = 0;
+  let index = start;
+  const length = source.length;
+  while (index < length) {
+    const char = source[index];
+    if (char === "\\") {
+      index += 2;
+      continue;
+    }
+    if (char === "(") {
+      depth += 1;
+    } else if (char === ")") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+    index += 1;
+  }
+  return length;
+}
+
+export function countCapturingGroups(urlRegex: string): number {
+  let count = 0;
+  let index = 0;
+  const length = urlRegex.length;
+  while (index < length) {
+    const char = urlRegex[index];
+    if (char === "\\") {
+      index += 2;
+      continue;
+    }
+    if (char === "(") {
+      if (urlRegex[index + 1] === "?") {
+        // Non-capturing: (?:...), (?=...), (?!...), (?<=...), (?<!...),
+        // and named (?<name>...). All are excluded from the capture count.
+        index = skipBalancedGroup(urlRegex, index);
+        continue;
+      }
+      count += 1;
+    }
+    index += 1;
+  }
+  return count;
+}
+
+export function validateRedirectDestination(
+  destination: string,
+  urlRegex: string,
+): readonly RedirectDestinationIssue[] {
+  const issues: RedirectDestinationIssue[] = [];
+  if (typeof destination !== "string" || destination.length === 0) {
+    issues.push({
+      code: "schema.required",
+      message: "Redirect destination must be a non-empty string.",
+    });
+    return issues;
+  }
+  if (destination.length > LIMITS.maxRedirectDestinationLength) {
+    issues.push({
+      code: "schema.out-of-range",
+      message: `Redirect destination must be at most ${LIMITS.maxRedirectDestinationLength} characters.`,
+    });
+    return issues;
+  }
+  let url: URL;
+  try {
+    url = new URL(destination);
+  } catch {
+    issues.push({
+      code: "schema.invalid-format",
+      message: "Redirect destination must be an absolute URL.",
+    });
+    return issues;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    issues.push({
+      code: "schema.invalid-value",
+      message: "Redirect destination must use the http or https scheme.",
+    });
+    return issues;
+  }
+  if (url.username.length > 0 || url.password.length > 0) {
+    issues.push({
+      code: "schema.invalid-value",
+      message: "Redirect destination must not contain credentials.",
+    });
+    return issues;
+  }
+  if (url.hostname.length === 0 || url.hostname.includes("*")) {
+    issues.push({
+      code: "schema.invalid-format",
+      message: "Redirect destination must have a valid host.",
+    });
+    return issues;
+  }
+
+  const groups = countCapturingGroups(urlRegex);
+  const backreference = /\\([1-9])/g;
+  let match = backreference.exec(destination);
+  while (match !== null) {
+    const referenced = Number(match[1]);
+    if (referenced > groups) {
+      issues.push({
+        code: "schema.invalid-value",
+        message: `Redirect destination references capture group ${referenced} but the URL pattern defines ${groups}.`,
+      });
+    }
+    match = backreference.exec(destination);
+  }
   return issues;
 }
 

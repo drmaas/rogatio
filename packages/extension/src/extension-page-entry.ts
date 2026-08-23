@@ -1,4 +1,8 @@
-import { createEditor, type EditorController } from "@rogatio/editor";
+import {
+  createEditor,
+  createRedirectRuleType,
+  type EditorController,
+} from "@rogatio/editor";
 import { validateProjectDetailed } from "./browser-schema.js";
 
 interface StoredProject {
@@ -229,6 +233,7 @@ function renderShell(): void {
   if (ids.length > 0) {
     editor = createEditor({
       root: editorRoot,
+      ruleTypes: [createRedirectRuleType()],
       initialProject: safeProjectData(),
       validate(value) {
         const result = validateProjectDetailed(value);

@@ -48,6 +48,7 @@ const COMMON_RULE_FIELDS = new Set([
   "resourceTypes",
   "priority",
   "method",
+  "type",
 ]);
 const FORBIDDEN_EXTENSION_FIELDS = new Set([
   "__proto__",
@@ -695,6 +696,40 @@ function isValidExtensionName(name: string): boolean {
   );
 }
 
+function clearActionFields(rule: unknown): boolean {
+  if (!isRecord(rule)) return false;
+  if (!Object.hasOwn(rule, "redirect")) return false;
+  delete rule.redirect;
+  return true;
+}
+
+function extensionFieldParent(
+  rule: JsonRecord,
+  name: string,
+): { parent: JsonRecord; key: string } | undefined {
+  const segments = name.split(".");
+  if (segments.length === 0) return undefined;
+  let current: unknown = rule;
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    if (!isRecord(current)) return undefined;
+    const next = (current as JsonRecord)[segments[index]];
+    if (!isRecord(next)) {
+      const created: JsonRecord = {};
+      Object.defineProperty(current as JsonRecord, segments[index], {
+        configurable: true,
+        enumerable: true,
+        value: created,
+        writable: true,
+      });
+      current = created;
+    } else {
+      current = next;
+    }
+  }
+  if (!isRecord(current)) return undefined;
+  return { parent: current, key: segments[segments.length - 1] };
+}
+
 function toSearchText(value: unknown): string {
   return typeof value === "string" || typeof value === "number"
     ? String(value).normalize("NFKC").toLowerCase()
@@ -1264,6 +1299,24 @@ class EditorControllerImpl implements EditorController {
     } else if (finalSegment === "description" && rawValue === "") {
       const changed = deleteValueAtPath(this.draft, path);
       if (changed) this.markChanged();
+      return changed;
+    } else if (finalSegment === "type") {
+      const ruleContainerPath = pointer(...(segments?.slice(0, -1) ?? []));
+      if (rawValue === "") {
+        const changedType = deleteValueAtPath(this.draft, path);
+        const ruleContainer = valueAtPath(this.draft, ruleContainerPath);
+        const cleared = clearActionFields(ruleContainer);
+        if (changedType || cleared) this.markChanged();
+        return changedType || cleared;
+      }
+      const changed = setValueAtPath(this.draft, path, rawValue);
+      if (changed) {
+        if (rawValue !== "redirect") {
+          const ruleContainer = valueAtPath(this.draft, ruleContainerPath);
+          clearActionFields(ruleContainer);
+        }
+        this.markChanged();
+      }
       return changed;
     }
     const changed = setValueAtPath(this.draft, path, value);
@@ -2100,6 +2153,35 @@ class EditorControllerImpl implements EditorController {
     matcherFields.append(matcherGrid);
     card.append(matcherFields);
 
+    if (this.extensions.length > 0) {
+      const typeFields = this.document.createElement("fieldset");
+      const typeLegend = this.document.createElement("legend");
+      typeLegend.textContent = "Rule type";
+      typeFields.append(typeLegend);
+      const typeGrid = this.document.createElement("div");
+      typeGrid.dataset.editorFields = "true";
+      const typeSelect = this.document.createElement("select");
+      const noneOption = this.document.createElement("option");
+      noneOption.value = "";
+      noneOption.textContent = "Actionless (matcher only)";
+      typeSelect.append(noneOption);
+      for (const extension of this.extensions) {
+        const option = this.document.createElement("option");
+        option.value = extension.id;
+        option.textContent = extension.label;
+        typeSelect.append(option);
+      }
+      typeSelect.value = safeText(rule.type);
+      this.renderField(
+        typeGrid,
+        `Rule type for ${ruleName}`,
+        `${rulePath}/type`,
+        typeSelect,
+      );
+      typeFields.append(typeGrid);
+      card.append(typeFields);
+    }
+
     const match = this.findExtension(rule, rulePath);
     if (match.extension)
       this.mountExtension(card, match.extension, groupId, ruleId, rulePath);
@@ -2242,9 +2324,11 @@ class EditorControllerImpl implements EditorController {
       getField: (name) => {
         if (!isValidExtensionName(name)) return undefined;
         const rule = this.ruleById(groupId, ruleId);
-        return rule && Object.hasOwn(rule, name)
-          ? cloneSnapshot(rule[name])
-          : undefined;
+        if (!rule) return undefined;
+        const resolved = extensionFieldParent(rule, name);
+        if (!resolved) return undefined;
+        const value = resolved.parent[resolved.key];
+        return value === undefined ? undefined : cloneSnapshot(value);
       },
       setField: (name, value) => {
         if (!isValidExtensionName(name)) {
@@ -2272,8 +2356,20 @@ class EditorControllerImpl implements EditorController {
         }
         const rule = this.ruleById(groupId, ruleId);
         if (!rule || this.saving) return;
-        if (!Object.is(rule[name], snapshot.value)) {
-          Object.defineProperty(rule, name, {
+        const resolved = extensionFieldParent(rule, name);
+        if (!resolved) {
+          this.extensionErrors.set(
+            rulePath,
+            diagnostic(
+              "editor.extension-field",
+              rulePath,
+              "An additional rule field could not be resolved.",
+            ),
+          );
+          return;
+        }
+        if (!Object.is(resolved.parent[resolved.key], snapshot.value)) {
+          Object.defineProperty(resolved.parent, resolved.key, {
             configurable: true,
             enumerable: true,
             value: snapshot.value,

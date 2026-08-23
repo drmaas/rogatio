@@ -221,7 +221,7 @@ function generateEditorHtml(
      { "imports": { "@rogatio/editor": "/vendor/editor.js" } }
    </script>
    <script type="module">
-     import { createEditor } from '@rogatio/editor';
+      import { createEditor, createRedirectRuleType } from '@rogatio/editor';
     
     const root = document.getElementById('editor-root');
     const apiBase = '${apiBase}';
@@ -271,6 +271,7 @@ function generateEditorHtml(
     const project = await fetchProject();
     
     const editor = createEditor(root, {
+      ruleTypes: [createRedirectRuleType()],
       initialProject: project,
       validate: async (value) => {
         const result = await validateProject(value);

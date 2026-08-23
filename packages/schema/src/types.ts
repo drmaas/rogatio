@@ -34,6 +34,13 @@ export const HTTP_METHODS = Object.freeze([
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
+export type RuleType = "redirect";
+
+export interface RedirectAction {
+  /** Absolute http(s) URL. May contain \1..\9 backreferences to urlRegex capture groups. */
+  destination: string;
+}
+
 export interface RogatioRule {
   id: string;
   name: string;
@@ -42,6 +49,12 @@ export interface RogatioRule {
   resourceTypes: ResourceType[];
   priority: number;
   method?: HttpMethod;
+
+  /** Action selector. Absent => actionless (still valid, surfaced as "unsupported"). */
+  type?: RuleType;
+
+  /** Required iff type === "redirect". */
+  redirect?: RedirectAction;
 }
 
 export interface RogatioGroup {

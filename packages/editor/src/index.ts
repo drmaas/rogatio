@@ -1,4 +1,5 @@
 export { createEditor } from "./editor.js";
+export { createRedirectRuleType } from "./rule-types/redirect.js";
 export type {
   EditorController,
   EditorDiagnostic,

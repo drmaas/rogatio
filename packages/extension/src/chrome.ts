@@ -28,11 +28,24 @@ export interface ChromeRuntime {
   };
 }
 
+export interface ChromeDynamicRule {
+  readonly id: number;
+}
+
+export interface ChromeDeclarativeNetRequest {
+  getDynamicRules(): Promise<Array<ChromeDynamicRule>>;
+  updateDynamicRules(details: {
+    removeRuleIds: number[];
+    addRules: unknown[];
+  }): Promise<void>;
+}
+
 export interface ChromeApi {
   storage: { local: ChromeStorageArea };
   permissions: ChromePermissions;
   action: ChromeAction;
   runtime: ChromeRuntime;
+  declarativeNetRequest?: ChromeDeclarativeNetRequest;
 }
 
 declare global {

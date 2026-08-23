@@ -18,6 +18,16 @@ export interface MatcherOperation {
   readonly matcher: NormalizedMatcher;
 }
 
+export interface RedirectOperation {
+  readonly kind: "redirect";
+  readonly groupId: string;
+  readonly ruleId: string;
+  readonly matcher: NormalizedMatcher;
+  readonly redirect: { readonly destination: string };
+}
+
+export type RogatioOperation = MatcherOperation | RedirectOperation;
+
 export type CompilerDiagnosticCode =
   | "schema.required"
   | "schema.unknown-property"
@@ -42,7 +52,7 @@ export interface CompilerDiagnostic {
 export type CompileResult =
   | {
       readonly ok: true;
-      readonly operations: readonly MatcherOperation[];
+      readonly operations: readonly RogatioOperation[];
       readonly diagnostics: readonly CompilerDiagnostic[];
     }
   | {
