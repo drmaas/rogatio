@@ -82,6 +82,8 @@ The `sdd` and `doit` skills repeat the operational tier-selection rules and role
 
 ## Workflow
 
+**Enter the worktree FIRST.** Before ANY specification, architecture, brainstorm output, plan, test, or code change — create or enter the feature worktree via `worktree_create` and confirm the shell is operating in it. No edits of any kind (including `docs/specs/`, `docs/plans/`, `docs/architecture.md`) happen in the main checkout.
+
 Use a dedicated feature worktree for implementation. Before declaring an implementation complete, run the project validation sequence and record evidence against the relevant acceptance criteria. Before release, audit staged, unstaged, tracked, and untracked files for unrelated changes, generated output, local settings, and secrets. A single explicit user authorization for a clearly defined set of commit, push, PR, merge, or cleanup actions remains valid for that set; ask again only when authorization is absent, ambiguous, or scope changes. Never force-push or push directly to a protected default branch. After merge, reconcile release/status documentation and verify the default branch, worktrees, and remote refs are in the intended final state.
 
 Always prompt before deleting files or directories.
