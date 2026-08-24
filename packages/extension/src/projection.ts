@@ -51,6 +51,10 @@ export interface RuleProjection {
   readonly dnrRule?: DnrRule;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function isMatcherOperation(value: unknown): value is MatcherOperation {
   if (!isRecord(value) || value.kind !== "matcher") return false;
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")

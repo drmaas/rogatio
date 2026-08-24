@@ -1,6 +1,6 @@
+export type { RogatioQueryAction } from "@rogatio/schema";
 export { compileProject } from "./compile.js";
 export { applyQueryTransform, queryParamsToDNR } from "./query.js";
-export type { RogatioQueryAction } from "@rogatio/schema";
 export type {
   CompileResult,
   CompilerDiagnostic,

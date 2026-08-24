@@ -78,7 +78,7 @@ describe("F9 browser schema redirect rules", () => {
         groups: [
           {
             ...baseProject.groups[0],
-            rules: [{ ...redirectRule, type: "header" }],
+            rules: [{ ...redirectRule, type: "unknown" }],
           },
         ],
       }),

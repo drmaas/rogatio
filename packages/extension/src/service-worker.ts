@@ -89,9 +89,6 @@ function operationStatuses(
         candidate.ruleId === status.ruleId &&
         candidate.groupId === status.groupId,
     );
-    // Actionless matcher operations are never installable. When enabled they
-    // would be active (or error, since nothing installs them), so report
-    // unsupported; disabled/needs-permission states still pass through.
     if (operation?.kind === "matcher") {
       if (status.status === "active" || status.status === "error") {
         return {

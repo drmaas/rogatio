@@ -20,8 +20,8 @@ export {
 } from "./extension-page.js";
 export { declaredPermissionOrigins } from "./permissions.js";
 export {
-  type MatcherProjection,
   projectMatchers,
+  type RuleProjection,
 } from "./projection.js";
 export {
   type ExtensionCommand,

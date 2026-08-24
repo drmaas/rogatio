@@ -209,12 +209,16 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
         ids.set(rule.id, `${rulePath}/id`);
       }
 
-      if (rule.type !== undefined && rule.type !== "redirect") {
+      if (
+        rule.type !== undefined &&
+        rule.type !== "redirect" &&
+        rule.type !== "query"
+      ) {
         issues.push({
           instancePath: `${rulePath}/type`,
           keyword: "enum",
-          message: 'must be "redirect"',
-          params: { allowedValue: "redirect" },
+          message: 'must be "redirect" or "query"',
+          params: { allowedValues: ["redirect", "query"] },
         });
       }
 
@@ -271,7 +275,11 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
       }
 
       const action = rule.action;
-      if (action && action.type === "query") {
+      if (action && "type" in action && action.type === "query") {
+        const _queryAction = action as {
+          type: "query";
+          params: { name: string; value: string }[];
+        };
         const seenNames = new Set<string>();
         for (let p = 0; p < action.params.length; p += 1) {
           const param = action.params[p];

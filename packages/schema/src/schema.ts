@@ -107,6 +107,28 @@ const projectSchemaDefinition = {
         },
         action: { $ref: "#/$defs/queryAction" },
       },
+      allOf: [
+        {
+          if: {
+            required: ["type"],
+            properties: { type: { const: "redirect" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["redirect"],
+          },
+        },
+        {
+          if: {
+            required: ["type"],
+            properties: { type: { const: "query" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["action"],
+          },
+        },
+      ],
     },
     queryParam: {
       type: "object",
@@ -138,28 +160,6 @@ const projectSchemaDefinition = {
           items: { $ref: "#/$defs/queryParam" },
         },
       },
-      allOf: [
-        {
-          if: {
-            required: ["type"],
-            properties: { type: { const: "redirect" } },
-          },
-          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
-          then: {
-            required: ["redirect"],
-          },
-        },
-        {
-          if: {
-            required: ["type"],
-            properties: { type: { const: "query" } },
-          },
-          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
-          then: {
-            required: ["action"],
-          },
-        },
-      ],
     },
   },
 } as const;

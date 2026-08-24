@@ -1,8 +1,10 @@
+import type { RogatioOperation } from "@rogatio/compiler";
 import { describe, expect, it, vi } from "vitest";
 import { createExtensionApplication } from "../src/service-worker.js";
 import { project } from "./fixtures.js";
 
 const queryProject = structuredClone(project);
+queryProject.groups[0].rules[0].type = "query";
 queryProject.groups[0].rules[0].action = {
   type: "query",
   params: [{ name: "utm_source", value: "rogatio" }],
@@ -10,7 +12,11 @@ queryProject.groups[0].rules[0].action = {
 
 function harnessOptions() {
   let stored: unknown;
-  const install = vi.fn(async () => ({ ok: true as const }));
+  let installedOps: RogatioOperation[] = [];
+  const install = vi.fn(async (operations: readonly RogatioOperation[]) => {
+    installedOps = [...operations];
+    return { ok: true as const };
+  });
   const request = vi.fn(async () => true);
   const options = {
     storage: {
@@ -27,7 +33,7 @@ function harnessOptions() {
       remove: async () => true,
     },
     installer: {
-      current: async () => [],
+      current: async () => installedOps,
       install,
     },
     generateId: () => "project-a",
@@ -129,7 +135,7 @@ describe("F7 extension application", () => {
     });
   });
 
-  it("reports enabled query rules as active in state (F10)", async () => {
+  it("reports enabled query rules as error when not installed (F10)", async () => {
     const { options } = harnessOptions();
     const app = createExtensionApplication({
       ...options,
@@ -150,12 +156,22 @@ describe("F7 extension application", () => {
       groupId: "group-a",
       enabled: true,
     });
+    await app.handle({
+      version: 1,
+      command: "grant-permissions",
+      projectId: "project-a",
+      origins: ["https://example.com"],
+    });
     const result = await app.handle({ version: 1, command: "get-state" });
 
-    expect(result).toMatchObject({
-      ok: true,
-      value: { ruleStatuses: [{ status: "active" }] },
-    });
+    expect(result.ok).toBe(true);
+    const value = result.ok ? result.value : undefined;
+    expect(value).toBeDefined();
+    const ruleStatuses = (value as { ruleStatuses: unknown[] }).ruleStatuses;
+    expect(ruleStatuses).toBeDefined();
+    expect(Array.isArray(ruleStatuses)).toBe(true);
+    expect(ruleStatuses.length).toBeGreaterThan(0);
+    expect((ruleStatuses[0] as { status: string }).status).toBe("error");
   });
 
   it("returns statuses and clears the badge when the last project is removed", async () => {

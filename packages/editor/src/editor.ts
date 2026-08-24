@@ -2181,9 +2181,10 @@ class EditorControllerImpl implements EditorController {
     card.append(matcherFields);
 
     if (this.extensions.length > 0) {
-      const currentType = this.extensions.find((e) =>
-        e.matches(rule as Readonly<Record<string, unknown>>),
-      )?.id ?? safeText(rule.type);
+      const currentType =
+        this.extensions.find((e) =>
+          e.matches(rule as Readonly<Record<string, unknown>>),
+        )?.id ?? safeText(rule.type);
       const typeFieldset = this.document.createElement("fieldset");
       const typeLegend = this.document.createElement("legend");
       typeLegend.textContent = `Rule type for ${ruleName}`;

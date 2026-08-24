@@ -1,10 +1,10 @@
-import type { MatcherOperation } from "@rogatio/compiler";
+import type { QueryOperation, RogatioOperation } from "@rogatio/compiler";
 import { describe, expect, it } from "vitest";
 import { projectMatchers } from "../src/projection.js";
 import { operation } from "./fixtures.js";
 
-const queryOperation: MatcherOperation = {
-  kind: "matcher",
+const queryOperation: QueryOperation = {
+  kind: "query",
   groupId: "group-a",
   ruleId: "rule-a",
   matcher: {
@@ -15,6 +15,20 @@ const queryOperation: MatcherOperation = {
     method: "GET",
   },
   action: { type: "query", params: [{ name: "a", value: "1" }] },
+};
+
+const redirectOperation: RogatioOperation = {
+  kind: "redirect",
+  groupId: "group-a",
+  ruleId: "rule-b",
+  matcher: {
+    urlRegex: { source: "^https://example\\.com/", flags: "" },
+    origins: ["https://example.com"],
+    resourceTypes: ["main_frame", "script"],
+    priority: 200,
+    method: "POST",
+  },
+  redirect: { destination: "https://other.example.com/redirected" },
 };
 
 describe("F7 matcher projection", () => {
@@ -95,6 +109,31 @@ describe("F7 matcher projection", () => {
               ],
             },
           },
+        },
+      },
+    });
+  });
+
+  it("builds an installable DNR redirect rule for a redirect action (F9)", () => {
+    const result = projectMatchers([redirectOperation]);
+
+    expect(result).toHaveLength(1);
+    const record = result[0];
+    expect(record.installable).toBe(true);
+    expect(record.dnrRule).toEqual({
+      id: 1000001,
+      priority: 200,
+      condition: {
+        regexFilter: "^https://example\\.com/",
+        resourceTypes: ["main_frame", "script"],
+        requestMethods: ["POST"],
+        requestDomains: ["example.com"],
+        initiatorDomains: ["example.com"],
+      },
+      action: {
+        type: "redirect",
+        redirect: {
+          destination: "https://other.example.com/redirected",
         },
       },
     });

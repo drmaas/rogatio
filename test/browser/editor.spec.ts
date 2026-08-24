@@ -10,7 +10,16 @@ declare global {
       createEditor(options: Record<string, unknown>): unknown;
     };
     editorTest: {
-      saveCalls: unknown[];
+      saveCalls: Array<{
+        groups: Array<{
+          rules: Array<{
+            action?: {
+              type: string;
+              params: Array<{ name: string; value: string }>;
+            };
+          }>;
+        }>;
+      }>;
       setSaveMode(mode: string): void;
       resolveSave(index: number, result: unknown): void;
     };
@@ -427,7 +436,7 @@ test("selects the Query parameters rule type and round-trips the action through 
     .getByRole("button", { name: "One", exact: true })
     .click();
   const card = page
-    .locator('[data-rule-card]')
+    .locator("[data-rule-card]")
     .filter({ hasText: "First rule" })
     .first();
 

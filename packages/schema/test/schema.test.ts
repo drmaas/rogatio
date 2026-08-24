@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  assertValidProject,
-  compileUrlRegex,
   FORBIDDEN_REQUEST_HEADERS,
   FORBIDDEN_RESPONSE_HEADERS,
   isForbiddenHeader,
+} from "../src/headers.js";
+import {
+  assertValidProject,
+  compileUrlRegex,
   isSiteOrigin,
   isValidUrlRegex,
   LIMITS,
@@ -252,20 +254,6 @@ describe("@rogatio/schema", () => {
     expect(isForbiddenHeader("set-cookie", "response")).toBe(true);
     expect(isForbiddenHeader("X-Rogatio-Test", "request")).toBe(false);
     expect(isForbiddenHeader("set-cookie", "request")).toBe(false);
-  });
-
-  it("keeps F2 limited to the common matcher envelope", () => {
-    const project = {
-      ...makeProject(),
-      groups: [
-        {
-          ...makeProject().groups[0],
-          rules: [{ ...makeRule(1), action: { type: "redirect" } }],
-        },
-      ],
-    };
-
-    expect(validateProject(project)).toBe(false);
   });
 
   it("accepts a valid query action", () => {

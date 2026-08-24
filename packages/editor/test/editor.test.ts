@@ -1,6 +1,10 @@
 import { LIMITS } from "@rogatio/schema";
 import { describe, expect, it } from "vitest";
-import { builtInRuleTypes, queryRuleType, urlToExactRegex } from "../src/index.js";
+import {
+  builtInRuleTypes,
+  queryRuleType,
+  urlToExactRegex,
+} from "../src/index.js";
 
 describe("@rogatio/editor URL conversion", () => {
   it("serializes and escapes an absolute URL as an exact source", () => {
@@ -64,9 +68,9 @@ describe("@rogatio/editor query rule type (F10)", () => {
   });
 
   it("matches only a rule carrying a query action", () => {
-    expect(queryRuleType.matches({ action: { type: "query", params: [] } })).toBe(
-      true,
-    );
+    expect(
+      queryRuleType.matches({ action: { type: "query", params: [] } }),
+    ).toBe(true);
     expect(
       queryRuleType.matches({ action: { type: "redirect", params: [] } }),
     ).toBe(false);
@@ -100,8 +104,8 @@ describe("@rogatio/editor query rule type (F10)", () => {
       },
       rulePath,
     );
-    expect(
-      dup.some((d) => d.code === "editor.query-duplicate-param"),
-    ).toBe(true);
+    expect(dup.some((d) => d.code === "editor.query-duplicate-param")).toBe(
+      true,
+    );
   });
 });

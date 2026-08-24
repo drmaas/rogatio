@@ -1,6 +1,6 @@
 export { createEditor } from "./editor.js";
-export { createRedirectRuleType } from "./rule-types/redirect.js";
 export { builtInRuleTypes, queryRuleType } from "./rule-types/index.js";
+export { createRedirectRuleType } from "./rule-types/redirect.js";
 export type {
   EditorController,
   EditorDiagnostic,

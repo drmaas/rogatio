@@ -7,7 +7,10 @@ export type ExtensionDiagnosticCode =
   | "extension.install-failed"
   | "extension.not-found"
   | "extension.conflict"
-  | "extension.unsupported";
+  | "extension.unsupported"
+  | "extension.invalid-header"
+  | "extension.forbidden-header"
+  | "extension.dnr-error";
 
 export interface ExtensionDiagnostic {
   readonly code: ExtensionDiagnosticCode;
@@ -30,6 +33,11 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.conflict": "The committed project changed; refresh before saving.",
   "extension.unsupported":
     "This rule is not supported by the current extension slice.",
+  "extension.invalid-header":
+    "The header rule contains invalid header configuration.",
+  "extension.forbidden-header":
+    "The header name is forbidden for the given direction.",
+  "extension.dnr-error": "The declarativeNetRequest operation failed.",
 };
 
 export function extensionDiagnostic(

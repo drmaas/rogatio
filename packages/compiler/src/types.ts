@@ -1,9 +1,7 @@
 import type {
   HttpMethod,
-  RedirectAction,
   ResourceType,
   RogatioQueryAction,
-  RogatioRuleAction,
 } from "@rogatio/schema";
 
 export interface NormalizedMatcher {
@@ -40,7 +38,10 @@ export interface QueryOperation {
   readonly action: RogatioQueryAction;
 }
 
-export type RogatioOperation = MatcherOperation | RedirectOperation | QueryOperation;
+export type RogatioOperation =
+  | MatcherOperation
+  | RedirectOperation
+  | QueryOperation;
 
 export type CompilerDiagnosticCode =
   | "schema.required"

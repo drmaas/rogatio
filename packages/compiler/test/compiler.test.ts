@@ -527,6 +527,7 @@ describe("@rogatio/compiler", () => {
     const project = makeProject(
       {},
       {
+        type: "query",
         action: {
           type: "query",
           params: [{ name: "utm_source", value: "rogatio" }],
@@ -537,11 +538,17 @@ describe("@rogatio/compiler", () => {
     const result = compileProject(project);
 
     expect(result.ok).toBe(true);
+    if (!result.ok) {
+      console.log("Diagnostics:", result.diagnostics);
+    }
     if (result.ok) {
-      expect(result.operations[0]?.action).toEqual({
-        type: "query",
-        params: [{ name: "utm_source", value: "rogatio" }],
-      });
+      expect(result.operations[0]?.kind).toBe("query");
+      if (result.operations[0]?.kind === "query") {
+        expect(result.operations[0].action).toEqual({
+          type: "query",
+          params: [{ name: "utm_source", value: "rogatio" }],
+        });
+      }
     }
   });
 });

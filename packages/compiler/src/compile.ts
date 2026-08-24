@@ -5,9 +5,8 @@ import {
   type ResourceType,
   type RogatioGroup,
   type RogatioProject,
-  type RogatioRule,
   type RogatioQueryAction,
-  type RogatioRuleAction,
+  type RogatioRule,
   validateProjectDetailed,
 } from "@rogatio/schema";
 import { invariantDiagnostic, mapValidationIssues } from "./diagnostics.js";
@@ -219,13 +218,19 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
           redirect: { destination: rule.redirect?.destination ?? "" },
         };
         operations.push(operation);
-      } else if (rule.type === "query" && rule.action && rule.action.type === "query") {
+      } else if (
+        rule.type === "query" &&
+        rule.action &&
+        "type" in rule.action &&
+        rule.action.type === "query"
+      ) {
+        const action = rule.action as RogatioQueryAction;
         const operation: QueryOperation = {
           kind: "query",
           groupId: group.id,
           ruleId: rule.id,
           matcher,
-          action: rule.action,
+          action,
         };
         operations.push(operation);
       } else {

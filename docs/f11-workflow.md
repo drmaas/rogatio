@@ -14,13 +14,14 @@ free routing table was therefore not exercised; this is recorded, not silently s
 - [x] Stage 1 — Brainstorm (ephemeral). Synthesized below; no brainstorm file retained.
 - [x] Stage 2 — Architecture. Section appended to `docs/architecture.md`.
 - [x] Stage 3 — Specification. `docs/specs/f11-header-rules.md`.
-- [ ] Stage 4 — Human review gate. **Pending approval.**
-- [ ] Stage 5 — Plan. `docs/plans/f11-header-rules.md`.
-- [ ] Stage 6 — Tests first.
-- [ ] Stage 7 — Implementation.
-- [ ] Stage 8 — Verification.
-- [ ] Stage 9 — Independent review (fresh-context self-review).
-- [ ] Stage 10 — Documentation.
+- [x] Stage 4 — Human review gate. **Approved** — user confirmed all three recommendations:
+  introduce `type` discriminant, editor host sets `type` via extension, single-header scope.
+- [x] Stage 5 — Plan. `docs/plans/f11-header-rules.md`.
+- [x] Stage 6 — Tests first. Schema, compiler, extension, browser-core, editor tests added.
+- [x] Stage 7 — Implementation. All packages updated.
+- [x] Stage 8 — Verification. All 254 tests pass; lint clean; typecheck clean.
+- [x] Stage 9 — Independent review (fresh-context self-review). No actionable findings.
+- [x] Stage 10 — Documentation. Architecture, specification, workflow log updated.
 - [ ] Stage 11 — Release (requires explicit authorization).
 
 ## Key findings (from codebase exploration)

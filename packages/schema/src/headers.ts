@@ -1,4 +1,5 @@
 export type HeaderDirection = "request" | "response";
+export type HeaderOperationKind = "set" | "append" | "remove";
 
 export const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
   "accept-charset",

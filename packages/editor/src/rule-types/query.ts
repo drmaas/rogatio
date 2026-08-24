@@ -44,11 +44,13 @@ export const queryRuleType: RuleTypeFieldExtension = {
   label: "Query parameters",
 
   matches(rule): boolean {
-    return asQueryAction(rule) !== undefined;
+    return (
+      asQueryAction((rule as Record<string, unknown>).action) !== undefined
+    );
   },
 
   validate(rule, rulePath): readonly EditorDiagnostic[] {
-    const action = asQueryAction(rule);
+    const action = asQueryAction((rule as Record<string, unknown>).action);
     if (action === undefined) return [];
     const diagnostics: EditorDiagnostic[] = [];
     if (!Array.isArray(action.params) || action.params.length === 0) {

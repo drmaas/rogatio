@@ -72,7 +72,7 @@ describe("@rogatio/schema redirect rules", () => {
   });
 
   it("rejects an unknown rule type value", () => {
-    const rule = redirectRule({ type: "header" });
+    const rule = redirectRule({ type: "unknown" as never });
     const result = validateProjectDetailed(projectWith(rule));
     expect(result).toMatchObject({
       valid: false,
