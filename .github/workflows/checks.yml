@@ -69,6 +69,7 @@ jobs:
   cross-platform:
     name: Cross-platform smoke (${{ matrix.os }})
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}

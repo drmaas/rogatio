@@ -19,6 +19,17 @@ function descriptorPath(file: FileHandle): string | null {
   return null;
 }
 
+function normalizePrivateRoot(path: string): string {
+  // macOS exposes the same directory through both `/var` and `/private/var`
+  // (the latter is the canonical symlink target). `realpath` of the root and
+  // `realpath` of an opened `/dev/fd/N` descriptor disagree on that prefix,
+  // which would make the containment check reject every file. Normalize both
+  // sides so the comparison is consistent.
+  return process.platform === "darwin" && path.startsWith("/private")
+    ? path.slice("/private".length)
+    : path;
+}
+
 function withinRoot(root: string, candidate: string): boolean {
   const rest = relative(root, candidate);
   return (
@@ -47,7 +58,12 @@ export async function openConfinedFile(
       return failure("runtime.platform-unsupported");
     }
     const actualPath = await realpath(descriptor);
-    if (!withinRoot(canonicalRoot, actualPath)) {
+    if (
+      !withinRoot(
+        normalizePrivateRoot(canonicalRoot),
+        normalizePrivateRoot(actualPath),
+      )
+    ) {
       await file.close();
       return failure("runtime.file-race-rejected");
     }
