@@ -594,7 +594,8 @@ function setValueAtPath(root: unknown, path: string, value: unknown): boolean {
   if (
     !Object.hasOwn(current, finalSegment) &&
     finalSegment !== "description" &&
-    finalSegment !== "method"
+    finalSegment !== "method" &&
+    finalSegment !== "action"
   ) {
     return false;
   }
@@ -993,7 +994,8 @@ class EditorControllerImpl implements EditorController {
       return;
     }
     const path = target.dataset.path;
-    if (!path || target.type === "checkbox") return;
+    if (!path || target.type === "checkbox" || this.extensionControls.has(path))
+      return;
     if (this.updateCommonField(path, target.value)) {
       if (!this.composing) this.render();
     }
@@ -1039,7 +1041,7 @@ class EditorControllerImpl implements EditorController {
       return;
     }
     const path = target.dataset.path;
-    if (!path) return;
+    if (!path || this.extensionControls.has(path)) return;
     if (this.updateCommonField(path, target.value)) this.render();
   };
 
@@ -1367,9 +1369,15 @@ class EditorControllerImpl implements EditorController {
     }
     const extension = this.extensions.find((entry) => entry.id === typeId);
     if (!extension?.defaultAction) return;
-    setValueAtPath(this.draft, `${rulePath}/action`, extension.defaultAction());
-    this.markChanged();
-    this.render();
+    const changed = setValueAtPath(
+      this.draft,
+      `${rulePath}/action`,
+      extension.defaultAction(),
+    );
+    if (changed) {
+      this.markChanged();
+      this.render();
+    }
   }
 
   private markChanged(): void {
@@ -2438,6 +2446,7 @@ class EditorControllerImpl implements EditorController {
           return;
         }
         const absolutePath = `${rulePath}${fieldPath}`;
+        control.dataset.path = absolutePath;
         this.extensionControls.set(absolutePath, control);
       },
     };
