@@ -1,6 +1,6 @@
 # Rogatio Architecture
 
-**Status:** F1 bootstrap, F2 schema, F3 compiler, F4 browser-core, F7 extension shell, F8 CLI, **F9 redirect rules**, and **F11 header rules** are released through Stage 10 (verification and documentation complete). F5 editor and F6 runtime foundation are implemented and verified in this worktree.
+**Status:** F1 bootstrap, F2 schema, F3 compiler, F4 browser-core, F7 extension shell, F8 CLI, **F9 redirect rules**, and **F11 header rules** are released through Stage 10 (verification and documentation complete). F5 editor and F6 runtime foundation are implemented and verified in this worktree. **F14 macOS native-messaging runtime** is specified and under implementation in this worktree.
 
 ## Package Boundaries
 
@@ -216,6 +216,38 @@ File grants contain a relative logical path, never an arbitrary server path. Abs
 - A full RFC 8785 dependency is not required for the closed internal preset; F6 instead defines and versions a narrow canonical JSON profile and does not add a dependency solely for serialization.
 
 The complete proposed contract and acceptance criteria are in `docs/specs/f6-runtime-foundation.md`; the staged workflow record is in `docs/f6-workflow.md`.
+
+## F14: macOS Native-Messaging Runtime
+
+F14 adds the separately installed macOS runtime that response-body and request-body rules reach through Chrome native messaging. It is a distinct process and protocol (`f14-v1`) from the F6 mock/response server, and adds no F6 action, proxy, TLS, or native-messaging behavior to that package.
+
+### Ownership and data flow
+
+`@rogatio/runtime` gains F14 control, lifecycle, revalidation, envelope, and interception-gate modules. `@rogatio/cli` gains a real `rogatio runtime` command (`start` / `stop` / `status` / `--help`). F2 remains authoritative for the project shape and origins; F3 remains authoritative for matcher operations used in revalidation. F14 does not add F15/F16/F17 rule behavior, only the runtime those slices depend on.
+
+Four owned layers:
+
+- **Lifecycle controller:** explicit `start` / `stop` / `status` with guarded states `stopped → starting → started → stopping → stopped`, idempotent `stop()`, and a capability-based activation gate that reports `unsupported` only when a trusted device-local CA cannot be provisioned or Chrome PAC routing would collide with an existing controlling proxy/PAC/extension/enterprise policy.
+- **Revalidation core:** `revalidateAuthority(context)` independently re-derives authority from the validated F2 project and compiled F3 operation for an incoming request. It does not trust the browser's grant; the AND of rule existence, urlRegex match, effective-origin membership, method match, resource-type match, initiator scope, and target-origin membership must all hold.
+- **Control envelope:** a versioned `f14-v1` JSON channel (`start`, `stop`, `status`, `authorize`, `transform-request-meta`, `transform-response-meta`) carrying metadata only. Bodies never cross the envelope; a structural test proves it.
+- **Interception gate (capability-based):** scoped Chrome PAC generation as a deterministic pure function, plus an ephemeral TLS proxy / device-local CA module reachable only after a successful capability-based activation. When the required capabilities are absent, it returns `runtime.unsupported` and performs no socket or certificate work, regardless of OS.
+
+### Authority boundary
+
+The browser grant is not a security boundary. Every transformation request is re-checked against the canonical `.rogatio.json`: the rule must exist, its URL regular expression must match the request URL, the request origin and target origin must be within the rule's effective origins, the method must match when the rule specifies one, the resource type must be allowed, and the initiator origin must be within granted scope. A denied request triggers no interception and no body oracle. Revalidation completes before any body work, is deterministic, and never trusts a supplied grant boolean.
+
+### Body confidentiality
+
+Observed request/response bodies are processed in-process only. The native-messaging envelope carries bounded metadata and transform instructions, never body bytes, credentials, sensitive header values, or file contents. A diagnostic sink, if present, receives only redacted lifecycle/counter events.
+
+### Alternatives rejected
+
+- Trusting the browser grant as authority is rejected; revalidation re-derives from the canonical project.
+- A general forward proxy is rejected; only explicitly granted origins are routed through the scoped PAC.
+- Persisting interception, capability, or traffic state is rejected; F14 keeps no history.
+- Live TLS interception and CA trust installation require a platform where a trusted device-local CA can be provisioned and Chrome PAC routing does not collide with an existing controlling proxy/PAC/enterprise policy. macOS is the reference supported platform; Linux/Windows may also activate when those capabilities are present. F14 ships the capability-gated module and deterministic PAC generation; the live interception is completed by F15/F17 where the capabilities exist.
+
+The complete proposed contract and acceptance criteria are in `docs/specs/f14-macos-runtime.md`; the staged workflow record is in `docs/f14-workflow.md`.
 
 ## F8: CLI Package Architecture
 

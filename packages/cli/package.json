@@ -24,6 +24,7 @@
     "@rogatio/compiler": "workspace:*",
     "@rogatio/dry-run": "workspace:*",
     "@rogatio/editor": "workspace:*",
+    "@rogatio/runtime": "workspace:*",
     "@rogatio/schema": "workspace:*"
   },
   "devDependencies": {
