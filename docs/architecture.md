@@ -352,6 +352,137 @@ rogatio edit [path]
 | Fixed port | Conflicts common; random + open browser is UX standard |
 | Long-lived server | Edit is single-session; no need for daemon |
 
+## F12: Offline Dry-Run / Test Feature
+
+### Overview
+
+F12 adds a pure-offline, bounded URL-batch dry-run capability that evaluates matcher operations (from F3) against a list of test cases without contacting the network, requesting permissions, changing installed rules, connecting to runtime, or saving test data. It is usable from both the CLI (`rogatio test`) and the Editor (`Test rules` route/panel).
+
+### Components
+
+**1. Dry-Run Package (`@rogatio/dry-run`)**
+
+- **`src/types.ts`** — Type definitions: `DryRunTestCase`, `DryRunResult`, `MatchDimension` (state + detail), `RuleMatchResult`, `UrlDryRunResult`, `DryRunError`, `DryRunSummary`, `DryRunOptions` (maxCases, previewAction), `PreviewActionFn`.
+- **`src/url.ts`** — `parseTestUrl(input: unknown)`: WHATWG URL parsing, rejects non-string, empty, non-absolute, non-http(s); no network.
+- **`src/dryrun.ts`** — `dryRunProject(operations, cases, options?)`: core engine:
+  - Defensive case validation: rejects proxies, accessors, symbols, cycles without invoking getters; returns `dryrun.invalid-case`.
+  - `maxCases` default 256; exceeding returns `dryrun.batch-limit`.
+  - Regex cache per operation (`compileUrlRegex` from `@rogatio/schema`).
+  - Four matching dimensions per rule:
+    - `urlRegex`: `regex.test(fullUrl)` → matched/unmatched.
+    - `effectiveOrigin`: `parsed.origin in matcher.origins` → matched/unmatched.
+    - `method`: not-applicable if test case omits; matched if rule.method undefined or equal; else unmatched.
+    - `resourceType`: not-applicable if test case omits; matched if rule.resourceTypes empty or includes; else unmatched.
+  - Overall `matched = regex && origin && method!=='unmatched' && rt!=='unmatched'`.
+  - `actionPreview` via `options.previewAction` (try/catch, null when absent).
+  - Summary: `caseCount`, `urlCount`, `matchedUrlCount`, `matchedRuleTotal`.
+  - Never fetches, writes FS, or contacts runtime.
+
+**2. CLI Command (`rogatio test`)**
+
+- Arguments: `[path]` (default `.rogatio.json`, `-` for stdin).
+- Options: `--urls` (comma-separated), `--urls-file` (JSON array path or `-`), `--method`, `--resource-type`, `--max-cases`, `--json`.
+- Reads project, runs schema + compiler validation, then dry-run.
+- Exit codes: 0=success, 1=validation/compile/test errors, 2=usage error.
+- Output: human-readable (per-URL per-rule with badges) or JSON.
+
+**3. Server Endpoint (`POST /api/dry-run`)**
+
+- CSRF protected (`x-csrf-token`).
+- Body: `{ project, cases, options? }`.
+- Server-side compile (validates project first).
+- Returns `DryRunResult` (200) or diagnostics (400) or CSRF error (403).
+
+**4. Editor Integration**
+
+- **`types.ts`**: Local DryRun type definitions (no `@rogatio/dry-run` import in browser bundle), `EditorDryRunHandler`, added to `EditorOptions`.
+- **`editor.ts`**: New `route.kind === "test"` with:
+  - Rail navigation button "Test rules" (accessible, announced).
+  - Panel: URLs textarea (one per line), method/resource-type defaults, maxCases input, Run button.
+  - Results rendering: per-URL cards with matched/unmatched badges, 4-dimension badges (color-coded: green=matched, red=unmatched, gray=not-applicable), detail text, actionPreview when present.
+  - Keyboard complete, SR announcements, forced-colors/200% zoom compatible (uses CSS variables, native elements, live regions).
+
+### Data Flow
+
+```
+CLI / Editor
+     │
+     ▼
+┌──────────────────────┐
+│ Read .rogatio.json   │
+└─────────┬────────────┘
+          │
+          ▼
+┌──────────────────────┐
+│ validateProjectDetailed (F2) │
+└─────────┬────────────┘
+          │
+          ▼
+┌──────────────────────┐
+│ compileProject (F3)  │ → MatcherOperation[]
+└─────────┬────────────┘
+          │
+          ▼
+┌──────────────────────┐
+│ dryRunProject (F12)  │
+│ - parse/validate cases
+│ - cache regex
+│ - 4-dim match per rule
+│ - summary
+└─────────┬────────────┘
+          │
+          ▼
+┌──────────────────────┐
+│ Render results       │
+│ (CLI JSON/human,    │
+│  Editor badges)     │
+└──────────────────────┘
+```
+
+### Security and Privacy
+
+- **No network** — WHATWG URL parsing only; regex test is local.
+- **No persistence** — test cases never written to disk.
+- **No permission/request/runtime** — purely in-memory evaluation.
+- **Defensive validation** — rejects hostile objects (proxies, accessors, symbols, cycles) via `Object.getOwnPropertyDescriptor` checks.
+- **CSRF protection** — server endpoint validates `x-csrf-token`.
+- **Batch limit** — `maxCases` (default 256) prevents resource exhaustion.
+
+### Testing Seams
+
+- Unit tests for `parseTestUrl`, `dryRunProject` (258 tests total).
+- CLI integration tests (exit codes, JSON output, stdin/file inputs).
+- Server endpoint tests (200/403/400).
+- Editor panel accessibility tests (keyboard, SR, forced-colors, 200% zoom via Playwright).
+
+### Dependencies
+
+```
+@rogatio/schema (F2) ──► @rogatio/compiler (F3) ──► @rogatio/dry-run (F12)
+                                          │              │
+                                          ▼              ▼
+                                   @rogatio/editor (F5) @rogatio/cli (F8)
+```
+
+### Acceptance Criteria Coverage
+
+| AC | Description | Test |
+|----|-------------|------|
+| AC-001 | Simple match | `dryrun.test.ts` |
+| AC-002 | Four dimensions with states | `dryrun.test.ts` |
+| AC-003 | Invalid case → dryrun.invalid-case | `dryrun.test.ts` |
+| AC-004 | Invalid URL → dryrun.invalid-url | `dryrun.test.ts` |
+| AC-005 | Default maxCases 256 | `dryrun.test.ts` |
+| AC-006 | Configurable maxCases | `dryrun.test.ts` |
+| AC-007 | Summary counts | `dryrun.test.ts` |
+| AC-008 | previewAction seam | `dryrun.test.ts` |
+
+### Open Questions Resolved
+
+- **Option A approved** — matcher-level dry-run now + `previewAction` seam; redirect/query previews deferred to F9/F10.
+- **maxCases default 256** — accepted per user gate.
+- **Editor dry-run via host adapter** — no Node import in browser bundle, consistent with F5.
+
 ## F9: Redirect Rules (action slice)
 
 F9 is the first *action* slice introducing a browser-side effect. It adds the rule-type

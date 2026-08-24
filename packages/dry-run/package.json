@@ -1,5 +1,5 @@
 {
-  "name": "@rogatio/cli",
+  "name": "@rogatio/dry-run",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,9 +8,6 @@
       "types": "./src/index.ts",
       "import": "./dist/node/index.js"
     }
-  },
-  "bin": {
-    "rogatio": "./dist/node/index.js"
   },
   "scripts": {
     "format": "biome format --write src test",
@@ -22,8 +19,6 @@
   },
   "dependencies": {
     "@rogatio/compiler": "workspace:*",
-    "@rogatio/dry-run": "workspace:*",
-    "@rogatio/editor": "workspace:*",
     "@rogatio/schema": "workspace:*"
   },
   "devDependencies": {

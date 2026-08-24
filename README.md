@@ -70,11 +70,25 @@ cat .rogatio.json | rogatio verify - --json
 | Command | Description |
 | --- | --- |
 | `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port. |
+| `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
 | `rogatio runtime` | Documented stub for the future native-messaging runtime (currently exits `1`). |
 
-Typical workflow: run `rogatio edit`, build and test rules, `rogatio verify`, then import
+Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome, grant only declared site access, and activate the groups you need.
+
+## Dry-run testing
+
+```sh
+# Test URLs against a project (human-readable output)
+rogatio test .rogatio.json --urls "https://example.com/,https://other.com/" --method GET --resource-type main_frame
+
+# Test from JSON file with explicit cases
+rogatio test .rogatio.json --urls-file test-cases.json --json
+
+# Test from stdin
+cat test-cases.json | rogatio test .rogatio.json --urls-file -
+```
 
 ## Project layout
 
@@ -84,11 +98,12 @@ This is a strict-TypeScript 7, ESM/NodeNext pnpm monorepo.
 | --- | --- |
 | `@rogatio/schema` | Version-1 JSON schema, validation, origins, bounds, forbidden headers. |
 | `@rogatio/compiler` | Transforms validated source into browser-neutral operations and stable diagnostics. |
+| `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (4-dim matching, preview seam). |
 | `@rogatio/browser-core` | Versioned storage, migrations, permissions, enablement, lifecycle, runtime state. |
 | `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
 | `@rogatio/extension` | Chrome MV3 service worker and extension page (WebExtensions/DNR translation). |
 | `@rogatio/runtime` | Reusable mock, response-body, and request-body transformation components. |
-| `@rogatio/cli` | Editor host, file verification, and runtime dispatch (`rogatio` binary). |
+| `@rogatio/cli` | Editor host, file verification, test runner, and runtime dispatch (`rogatio` binary). |
 
 ## Local development
 

@@ -2,6 +2,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { editCommand } from "./commands/edit.js";
 import { runtimeCommand } from "./commands/runtime.js";
+import { testCommand, testCommandNeedsStdin } from "./commands/test.js";
 import { verifyCommand } from "./commands/verify.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,8 @@ export async function cli(
   switch (command) {
     case "edit":
       return handleEdit(commandArgs);
+    case "test":
+      return handleTest(commandArgs);
     case "verify":
       return handleVerify(commandArgs);
     case "runtime":
@@ -75,6 +78,30 @@ async function handleRuntime(args: string[]): Promise<number> {
   return runtimeCommand(args);
 }
 
+async function handleTest(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    showTestHelp();
+    return 0;
+  }
+  let stdinInput: string | undefined;
+  if (testCommandNeedsStdin(args)) {
+    try {
+      const chunks: string[] = [];
+      for await (const chunk of process.stdin) {
+        chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+      }
+      stdinInput = chunks.join("");
+    } catch (error) {
+      console.error(
+        `Error: Unable to read stdin (${error instanceof Error ? error.message : "read failed"})`,
+      );
+      return 2;
+    }
+  }
+  const result = await testCommand(args, stdinInput);
+  return typeof result === "number" ? result : 1;
+}
+
 function showHelp(): number {
   console.log(`Rogatio CLI - Local-first browser request/response rules
 
@@ -82,6 +109,7 @@ Usage: rogatio <command> [options]
 
 Commands:
   edit [path]     Launch browser editor for .rogatio.json
+  test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
   runtime         Native messaging runtime (not yet implemented)
 
@@ -137,6 +165,39 @@ Options:
   --help, -h      Show this help
 
 Note: This command is not yet implemented.`);
+}
+
+function showTestHelp(): void {
+  console.log(`Usage: rogatio test [options] [path] [url...]
+
+Run offline dry-run tests against a .rogatio.json project file.
+
+Arguments:
+  path            Path to .rogatio.json (default: .rogatio.json in current directory)
+                   Use '-' to read project JSON from stdin
+  url...          URLs to test; when path is omitted, first URL is detected automatically
+
+Options:
+  --urls <list>        Comma-separated list of URLs to test
+  --urls-file <path>   Path to JSON file containing array of test cases
+                       Each case: { "url": "...", "method"?: "...", "resourceType"?: "..." }
+                       Use '-' to read from stdin
+  --method <m>         Default HTTP method for all test cases (GET, POST, etc.)
+  --resource-type <t>  Default resource type for all test cases
+  --max-cases <n>      Maximum number of test cases (default: 256)
+  --json               Output results as JSON
+  --help, -h           Show this help
+
+Test case format (JSON):
+  [
+    { "url": "https://example.com/", "method": "GET", "resourceType": "main_frame" },
+    { "url": "https://example.com/script.js" }
+  ]
+
+Exit codes:
+  0  Success (all valid, results may include non-matches)
+  1  Validation/compile/test errors
+  2  Usage error (invalid arguments, missing input)`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
