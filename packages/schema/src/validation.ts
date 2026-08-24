@@ -1,6 +1,6 @@
 import type { ErrorObject, ValidateFunction } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { isForbiddenHeader, type HeaderDirection } from "./headers.js";
+import { type HeaderDirection, isForbiddenHeader } from "./headers.js";
 import { LIMITS } from "./limits.js";
 import { isSiteOrigin, normalizeSiteOrigin } from "./origins.js";
 import { compileUrlRegex } from "./regex.js";

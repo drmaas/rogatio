@@ -1,8 +1,8 @@
-export type { RogatioQueryAction } from "@rogatio/schema";
 export type {
   HeaderAction,
   HeaderDirection,
   HeaderOperationKind,
+  RogatioQueryAction,
 } from "@rogatio/schema";
 export { compileProject } from "./compile.js";
 export { applyQueryTransform, queryParamsToDNR } from "./query.js";
