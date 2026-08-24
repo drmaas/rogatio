@@ -101,9 +101,12 @@ describe("F6 confined file reader", () => {
       const result = await readConfinedFile(fileOperation(target), root);
       expect(result.ok).toBe(false);
       if (!result.ok) {
-        expect(["runtime.file-denied", "runtime.file-race-rejected"]).toContain(
-          result.error.code,
-        );
+        const allowed = [
+          "runtime.file-denied",
+          "runtime.file-race-rejected",
+          ...(isConfinedFileSupported() ? [] : ["runtime.platform-unsupported"]),
+        ];
+        expect(allowed).toContain(result.error.code);
         expect(JSON.stringify(result)).not.toContain(outside);
       }
     }
