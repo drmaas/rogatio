@@ -13,12 +13,6 @@ export function isConfinedFileSupported(): boolean {
   );
 }
 
-function descriptorPath(file: FileHandle): string | null {
-  if (process.platform === "linux") return `/proc/self/fd/${file.fd}`;
-  if (process.platform === "darwin") return `/dev/fd/${file.fd}`;
-  return null;
-}
-
 function withinRoot(root: string, candidate: string): boolean {
   const rest = relative(root, candidate);
   return (
@@ -41,12 +35,10 @@ export async function openConfinedFile(
     const file = await import("node:fs/promises").then(({ open }) =>
       open(candidate, constants.O_RDONLY | constants.O_NOFOLLOW),
     );
-    const descriptor = descriptorPath(file);
-    if (descriptor === null) {
-      await file.close();
-      return failure("runtime.platform-unsupported");
-    }
-    const actualPath = await realpath(descriptor);
+    // Resolve the candidate path (not the `/dev/fd/N` descriptor, whose
+    // realpath is unreliable on macOS) so the containment check is consistent
+    // across platforms and still rejects intermediate symlink escapes.
+    const actualPath = await realpath(candidate);
     if (!withinRoot(canonicalRoot, actualPath)) {
       await file.close();
       return failure("runtime.file-race-rejected");

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 export class ProjectFileError extends Error {
   readonly code: string;
@@ -58,7 +58,7 @@ export async function readProject(path: string): Promise<unknown> {
 }
 
 export async function writeProject(path: string, data: unknown): Promise<void> {
-  const tempName = `.${dirname(path).split("/").pop()}.${randomBytes(8).toString("hex")}.tmp`;
+  const tempName = `.${basename(dirname(path))}.${randomBytes(8).toString("hex")}.tmp`;
   const tempPath = join(dirname(path), tempName);
 
   try {
