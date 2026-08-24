@@ -72,7 +72,7 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port. |
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
-| `rogatio runtime` | Documented stub for the future native-messaging runtime (currently exits `1`). |
+| `rogatio runtime <start\|stop\|status>` | Native-messaging runtime control. Capability-gated: `start` reports `unsupported` on platforms that cannot provision a trusted device-local CA or where Chrome PAC routing would collide with an existing controlling proxy/PAC/extension/enterprise policy. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome, grant only declared site access, and activate the groups you need.

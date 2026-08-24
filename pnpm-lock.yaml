@@ -50,6 +50,9 @@ importers:
       '@rogatio/editor':
         specifier: workspace:*
         version: link:../editor
+      '@rogatio/runtime':
+        specifier: workspace:*
+        version: link:../runtime
       '@rogatio/schema':
         specifier: workspace:*
         version: link:../schema

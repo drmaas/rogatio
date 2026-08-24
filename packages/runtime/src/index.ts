@@ -1,6 +1,12 @@
 export { classifyAddress, isPublicAddress } from "./address-policy.js";
 export { authorizeExact } from "./authorization.js";
 export { isConfinedFileSupported, readConfinedFile } from "./confined-file.js";
+export * from "./f14-envelope.js";
+export * from "./f14-interception.js";
+export * from "./f14-lifecycle.js";
+export * from "./f14-pac.js";
+export * from "./f14-revalidate.js";
+export * from "./f14-types.js";
 export { RUNTIME_LIMITS } from "./limits.js";
 export { fetchAuthorized } from "./outbound.js";
 export { normalizeRuntimePreset } from "./preset.js";

@@ -55,7 +55,7 @@ Each is a vertical slice through schema → compiler → extension DNR, plus its
 Both depend on the `runtime` package patterns but are independent processes and may run together. F6 (mock server) already landed in Phase 2.
 
 - **F13 — Mock rules.** Configured status, headers, optional delay, and either an inline body or a live UTF-8 snapshot of one approved local file. Never contacts upstream. Integrates the rule slice with F6's server, the editor, and the extension, including the single user-clicked Check-and-connect request whose status reflects the last check. *Depends on: F6, F7, F5.*
-- **F14 — macOS native-messaging runtime.** `rogatio runtime` control for response-body and request-body transformation routing, scoped Chrome PAC/proxy routing, ephemeral TLS proxy, device-local CA, and independent revalidation of project/rule/URL/method/initiator/target/permission/grant authority. Observed bodies are never persisted, logged, exported, or transferred through native messaging. Explicit Start/Stop controls. *Depends on: F2, F3. Early start: may begin in Phase 2 in parallel, since its only hard dependency is schema/compiler.*
+- **F14 — Native-messaging runtime.** `rogatio runtime` control for response-body and request-body transformation routing, scoped Chrome PAC/proxy routing, ephemeral TLS proxy, device-local CA, and independent revalidation of project/rule/URL/method/initiator/target/permission/grant authority. Observed bodies are never persisted, logged, exported, or transferred through native messaging. Explicit Start/Stop controls. Activation is capability-based: the runtime activates where a trusted device-local CA can be provisioned and Chrome PAC routing does not collide with an existing controlling proxy/PAC/extension/enterprise policy; macOS is the reference supported platform. *Depends on: F2, F3. Early start: may begin in Phase 2 in parallel, since its only hard dependency is schema/compiler.*
 
 ---
 
@@ -65,7 +65,7 @@ F16 must precede F17; F15 runs in parallel with both.
 
 - **F15 — Response-body rewriting rules.** Authorized public GET without browser credentials; bounded textual replacement via native messaging to the explicitly started local runtime. *Depends on: F14, F7, F5.*
 - **F16 — Request-body trust lifecycle.** `rogatio runtime install | status | trust | untrust | uninstall`. *Depends on: F14.*
-- **F17 — Request-body replacement/modification rules.** Full body replace or bounded global ECMAScript regex replace on eligible POST/PUT/PATCH XHR; bounded UTF-8 JSON / form-encoded / textual inputs (reject unsupported framing/encoding/signatures). Activation is macOS-only and cannot compose with another controlling proxy, PAC, extension, or enterprise policy; Linux/Windows allow verify/edit/import/export/dry-run but report activation as `unsupported`. Uses the runtime-owned TLS proxy. *Depends on: F14, F16, F7, F5.*
+- **F17 — Request-body replacement/modification rules.** Full body replace or bounded global ECMAScript regex replace on eligible POST/PUT/PATCH XHR; bounded UTF-8 JSON / form-encoded / textual inputs (reject unsupported framing/encoding/signatures). Activation is capability-based and cannot compose with another controlling proxy, PAC, extension, or enterprise policy; where the required capabilities are absent, activation reports `unsupported` and Linux/Windows may still verify/edit/import/export/dry-run. Uses the runtime-owned TLS proxy. *Depends on: F14, F16, F7, F5.*
 
 ---
 

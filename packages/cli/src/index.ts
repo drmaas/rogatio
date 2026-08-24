@@ -111,7 +111,7 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
-  runtime         Native messaging runtime (not yet implemented)
+  runtime         Native messaging runtime control (start|stop|status)
 
 Global Options:
   --help, -h      Show help
@@ -157,14 +157,21 @@ Exit codes:
 }
 
 function showRuntimeHelp(): void {
-  console.log(`Usage: rogatio runtime [options]
+  console.log(`Usage: rogatio runtime <command> [options]
 
-Native messaging runtime for response-body and request-body rules.
+Native messaging runtime control for response-body and request-body rules.
+
+Commands:
+  start     Start the runtime (capability-gated; explicit, no auto-start)
+  stop      Stop the runtime (idempotent)
+  status    Show the current runtime state
 
 Options:
   --help, -h      Show this help
 
-Note: This command is not yet implemented.`);
+The runtime activates only where a trusted device-local CA can be provisioned and
+Chrome PAC routing does not collide with an existing controlling proxy/PAC/extension
+or enterprise policy. On incapable platforms 'start' reports 'unsupported'.`);
 }
 
 function showTestHelp(): void {
