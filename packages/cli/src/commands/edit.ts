@@ -289,6 +289,17 @@ function generateEditorHtml(
         }
         return { ok: false, code: result.code, message: result.message };
       },
+      dryRun: async (currentProject, cases, options) => {
+        const res = await fetch(apiBase + '/api/dry-run', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          body: JSON.stringify({ project: currentProject, cases, options }),
+        });
+        return res.json();
+      },
       onCancel: () => {
         cancel();
       },

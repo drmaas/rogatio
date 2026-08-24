@@ -62,6 +62,7 @@ async function checkArtifacts(): Promise<void> {
     "packages/compiler/dist/node/index.js",
     "packages/browser-core/dist/node/index.js",
     "packages/cli/dist/node/index.js",
+    "packages/dry-run/dist/node/index.js",
     "packages/extension/dist/browser/index.js",
     "packages/extension/dist/background.js",
     "packages/extension/dist/extension-page.js",

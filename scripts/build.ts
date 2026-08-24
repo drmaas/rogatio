@@ -65,6 +65,13 @@ const targets: BuildTarget[] = [
     external: ["@rogatio/schema"],
   },
   {
+    entry: "packages/dry-run/src/index.ts",
+    output: "packages/dry-run/dist/node/index.js",
+    platform: "node",
+    target: "node24",
+    external: ["@rogatio/schema", "@rogatio/compiler"],
+  },
+  {
     entry: "packages/browser-core/src/index.ts",
     output: "packages/browser-core/dist/node/index.js",
     platform: "node",
@@ -77,6 +84,9 @@ const targets: BuildTarget[] = [
     platform: "node",
     target: "node24",
     external: ["@rogatio/schema", "@rogatio/compiler", "@rogatio/editor"],
+    alias: {
+      "@rogatio/dry-run": resolve(root, "packages/dry-run/dist/node/index.js"),
+    },
   },
   {
     entry: "packages/extension/src/index.ts",

@@ -1,6 +1,8 @@
 import type { HttpMethod, ResourceType } from "@rogatio/schema";
 import { builtInRuleTypes } from "./rule-types/index.js";
 import {
+  type DryRunResult,
+  type DryRunTestCase,
   type EditorController,
   type EditorDiagnostic,
   EditorInitializationError,
@@ -361,6 +363,89 @@ const EDITOR_CSS = `
     transition: none !important;
   }
 }
+.rogatio-editor [data-test-description] {
+  color: var(--editor-muted);
+  margin-block: 0 1rem;
+}
+.rogatio-editor [data-test-panel] {
+  display: grid;
+  gap: 1rem;
+}
+.rogatio-editor [data-test-defaults] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.rogatio-editor [data-test-result-card] {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid var(--editor-border);
+  border-radius: 0.4rem;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.rogatio-editor [data-test-result-card][data-matched="false"] {
+  border-style: dashed;
+}
+.rogatio-editor [data-test-result-header] {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.rogatio-editor [data-test-rule] {
+  padding: 0.5rem;
+  border-radius: 0.3rem;
+  background: #f6f8fa;
+}
+.rogatio-editor [data-test-rule-header] {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.rogatio-editor [data-test-dimension] {
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+.rogatio-editor [data-test-badge] {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+.rogatio-editor [data-test-badge][data-variant="matched"] {
+  background: #dcfce7;
+  color: #166534;
+}
+.rogatio-editor [data-test-badge][data-variant="unmatched"] {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.rogatio-editor [data-test-badge][data-variant="na"] {
+  background: #e5e7eb;
+  color: #374151;
+}
+.rogatio-editor [data-test-errors] {
+  margin-block: 0 1rem;
+  color: var(--editor-danger);
+}
+.rogatio-editor [data-test-action-preview] {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--editor-muted);
+}
+@media (forced-colors: active) {
+  .rogatio-editor [data-test-rule] {
+    border: 1px solid ButtonText;
+    background: Canvas;
+  }
+  .rogatio-editor [data-test-badge] {
+    border: 1px solid ButtonText;
+  }
+}
 `;
 
 type JsonRecord = Record<string, unknown>;
@@ -385,7 +470,10 @@ type DraftProject = JsonRecord & {
   groups: DraftGroup[];
 };
 type FormControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
-type Route = { kind: "project" } | { kind: "group"; groupId: string };
+type Route =
+  | { kind: "project" }
+  | { kind: "group"; groupId: string }
+  | { kind: "test" };
 type Confirmation =
   | { kind: "cancel" }
   | { kind: "remove-group"; groupId: string; name: string }
@@ -832,6 +920,13 @@ class EditorControllerImpl implements EditorController {
   private statusMessage = "";
   private controlNumber = 0;
   private previousFocus: FocusSnapshot | undefined;
+  private testUrls = "";
+  private testMethod: HttpMethod | "" = "";
+  private testResourceType: ResourceType | "" = "";
+  private testMaxCases = "256";
+  private testResult: DryRunResult | undefined = undefined;
+  private testRunning = false;
+  private testRequestId = 0;
 
   constructor(
     options: EditorOptions,
@@ -993,6 +1088,14 @@ class EditorControllerImpl implements EditorController {
       this.render();
       return;
     }
+    if (target.dataset.testUrls !== undefined) {
+      this.testUrls = target.value;
+      return;
+    }
+    if (target.dataset.testMaxCases !== undefined) {
+      this.testMaxCases = target.value;
+      return;
+    }
     const path = target.dataset.path;
     if (!path || target.type === "checkbox" || this.extensionControls.has(path))
       return;
@@ -1038,6 +1141,20 @@ class EditorControllerImpl implements EditorController {
     ) {
       const ruleTypePath = target.dataset.ruleTypePath ?? "";
       if (ruleTypePath) this.setRuleType(ruleTypePath, target.value);
+      return;
+    }
+    if (
+      target instanceof HTMLSelectElement &&
+      target.dataset.testMethod !== undefined
+    ) {
+      this.testMethod = (target.value || "") as HttpMethod | "";
+      return;
+    }
+    if (
+      target instanceof HTMLSelectElement &&
+      target.dataset.testResourceType !== undefined
+    ) {
+      this.testResourceType = (target.value || "") as ResourceType | "";
       return;
     }
     const path = target.dataset.path;
@@ -1172,6 +1289,10 @@ class EditorControllerImpl implements EditorController {
       const groupId = element.dataset.groupId;
       const ruleId = element.dataset.ruleId;
       if (groupId && ruleId) this.convertUrl(groupId, ruleId);
+    }
+    if (command === "test:run") {
+      void this.runTest();
+      return;
     }
   }
 
@@ -1719,14 +1840,175 @@ class EditorControllerImpl implements EditorController {
     this.render();
   }
 
+  private async runTest(): Promise<void> {
+    if (!this.options.dryRun) {
+      this.statusMessage =
+        "Dry-run is not configured for this editor instance.";
+      this.render();
+      return;
+    }
+    const urlsText = this.testUrls.trim();
+    if (!urlsText) {
+      this.statusMessage = "Please enter at least one URL to test.";
+      this.render();
+      return;
+    }
+
+    const lines = urlsText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    const cases: DryRunTestCase[] = lines.map((url) => ({
+      url,
+      method: this.testMethod === "" ? undefined : this.testMethod,
+      resourceType:
+        this.testResourceType === "" ? undefined : this.testResourceType,
+    }));
+    const maxCasesRaw = Number.parseInt(this.testMaxCases, 10);
+    const maxCases =
+      Number.isSafeInteger(maxCasesRaw) && maxCasesRaw > 0
+        ? maxCasesRaw
+        : undefined;
+
+    const requestId = ++this.testRequestId;
+    this.testRunning = true;
+    this.statusMessage = "Running dry-run...";
+    this.render();
+
+    try {
+      const result = await this.options.dryRun(
+        this.getDraft(),
+        cases,
+        maxCases === undefined ? undefined : { maxCases },
+      );
+      if (requestId !== this.testRequestId) return;
+      this.testResult = result;
+      this.testRunning = false;
+      const matched = result.summary.matchedUrlCount;
+      const total = result.summary.urlCount;
+      this.statusMessage = `Test complete: ${matched}/${total} URLs matched at least one rule.`;
+    } catch (e) {
+      if (requestId !== this.testRequestId) return;
+      this.testRunning = false;
+      const message = e instanceof Error ? e.message : "Test failed";
+      this.statusMessage = `Test error: ${message}`;
+    }
+    this.render();
+  }
+
+  private renderTestResults(result: DryRunResult): void {
+    const resultsSection = this.host.querySelector<HTMLElement>(
+      "[data-test-results]",
+    );
+    if (!resultsSection) return;
+    resultsSection.replaceChildren();
+
+    const heading = this.document.createElement("h3");
+    heading.textContent = "Results";
+    resultsSection.append(heading);
+
+    if (result.errors.length > 0) {
+      const errorsList = this.document.createElement("ul");
+      errorsList.dataset.testErrors = "true";
+      for (const err of result.errors) {
+        const item = this.document.createElement("li");
+        item.textContent = `${err.code}: ${err.message}${
+          err.index !== undefined ? ` (case ${err.index})` : ""
+        }`;
+        errorsList.append(item);
+      }
+      resultsSection.append(errorsList);
+    }
+
+    if (result.results.length === 0 && result.errors.length === 0) {
+      const empty = this.document.createElement("p");
+      empty.dataset.testEmpty = "true";
+      empty.textContent = "No valid URLs to test.";
+      resultsSection.append(empty);
+      return;
+    }
+
+    for (const urlResult of result.results) {
+      const card = this.document.createElement("article");
+      card.dataset.testResultCard = "true";
+      const matched = urlResult.matchedRuleCount > 0;
+      card.dataset.matched = matched ? "true" : "false";
+
+      const urlHeader = this.document.createElement("div");
+      urlHeader.dataset.testResultHeader = "true";
+      const urlText = this.document.createElement("strong");
+      urlText.textContent = urlResult.url;
+      const urlBadge = this.document.createElement("span");
+      urlBadge.dataset.testBadge = "true";
+      urlBadge.dataset.variant = matched ? "matched" : "unmatched";
+      urlBadge.textContent = matched ? "MATCHED" : "NO MATCH";
+      urlHeader.append(urlText, urlBadge);
+      card.append(urlHeader);
+
+      for (const rule of urlResult.rules) {
+        const ruleDiv = this.document.createElement("div");
+        ruleDiv.dataset.testRule = "true";
+        const ruleHeader = this.document.createElement("div");
+        ruleHeader.dataset.testRuleHeader = "true";
+        const ruleName = this.document.createElement("strong");
+        ruleName.textContent = `${rule.groupId}/${rule.ruleId}`;
+        const ruleBadge = this.document.createElement("span");
+        ruleBadge.dataset.testBadge = "true";
+        ruleBadge.dataset.variant = rule.matched ? "matched" : "unmatched";
+        ruleBadge.textContent = rule.matched ? "✓ MATCHED" : "✗ NOT MATCHED";
+        ruleHeader.append(ruleName, ruleBadge);
+        ruleDiv.append(ruleHeader);
+
+        const dims: Array<{ label: string; dim: typeof rule.urlRegex }> = [
+          { label: "urlRegex", dim: rule.urlRegex },
+          { label: "effectiveOrigin", dim: rule.effectiveOrigin },
+          { label: "method", dim: rule.method },
+          { label: "resourceType", dim: rule.resourceType },
+        ];
+        for (const { label, dim } of dims) {
+          const dimDiv = this.document.createElement("div");
+          dimDiv.dataset.testDimension = "true";
+          const badge = this.document.createElement("span");
+          badge.dataset.testBadge = "true";
+          badge.dataset.variant =
+            dim.state === "matched"
+              ? "matched"
+              : dim.state === "unmatched"
+                ? "unmatched"
+                : "na";
+          badge.textContent = dim.state.toUpperCase();
+          dimDiv.append(
+            badge,
+            this.document.createTextNode(`${label}: ${dim.detail}`),
+          );
+          ruleDiv.append(dimDiv);
+        }
+
+        if (rule.actionPreview) {
+          const apDiv = this.document.createElement("div");
+          apDiv.dataset.testActionPreview = "true";
+          apDiv.textContent = `Action preview: ${rule.actionPreview.kind} - ${rule.actionPreview.summary}`;
+          ruleDiv.append(apDiv);
+        }
+
+        card.append(ruleDiv);
+      }
+
+      resultsSection.append(card);
+    }
+  }
+
   private navigate(route: string, groupId: string | undefined): void {
     if (route === "project") {
       this.route = { kind: "project" };
+    } else if (route === "test") {
+      this.route = { kind: "test" };
     } else if (route === "group" && groupId && this.groupById(groupId)) {
       this.route = { kind: "group", groupId };
     } else {
       return;
     }
+    this.testRequestId += 1;
     this.statusMessage = "";
     this.render();
   }
@@ -1812,6 +2094,8 @@ class EditorControllerImpl implements EditorController {
     this.form.replaceChildren();
     if (this.route.kind === "project") {
       this.renderProject();
+    } else if (this.route.kind === "test") {
+      this.renderTest();
     } else {
       this.renderGroup(this.route.groupId);
     }
@@ -1861,8 +2145,14 @@ class EditorControllerImpl implements EditorController {
       option.textContent = displayName(group.name, "Unnamed group");
       select.append(option);
     }
+    const testOption = this.document.createElement("option");
+    testOption.value = "test";
+    testOption.textContent = "Test rules";
+    select.append(testOption);
     if (this.route.kind === "project") {
       select.value = "project";
+    } else if (this.route.kind === "test") {
+      select.value = "test";
     } else {
       const groupId = this.route.groupId;
       const options = Array.from(select.options);
@@ -1899,6 +2189,12 @@ class EditorControllerImpl implements EditorController {
       }
       this.rail.append(button);
     }
+    const testBtn = this.createButton("Test rules", "route:test");
+    testBtn.dataset.route = "test";
+    testBtn.dataset.editorKey = "route:test";
+    if (this.route.kind === "test")
+      testBtn.setAttribute("aria-current", "page");
+    this.rail.append(testBtn);
   }
 
   private renderCommandBar(): void {
@@ -1912,6 +2208,12 @@ class EditorControllerImpl implements EditorController {
     if (this.route.kind === "project") {
       this.commandBar.append(
         this.createCommandButton("Add group", "add-group", this.saving),
+      );
+      return;
+    }
+    if (this.route.kind === "test") {
+      this.commandBar.append(
+        this.createCommandButton("Run test", "test:run", this.saving),
       );
       return;
     }
@@ -2063,6 +2365,129 @@ class EditorControllerImpl implements EditorController {
     }
     rulesSection.append(list);
     this.form.append(rulesSection);
+  }
+
+  private renderTest(): void {
+    const heading = this.document.createElement("h2");
+    heading.textContent = "Test rules (dry-run)";
+    this.form.append(heading);
+
+    const description = this.document.createElement("p");
+    description.dataset.testDescription = "true";
+    description.textContent =
+      "Run offline dry-run tests against the current project. Enter test cases (one URL per line) and optional method/resource type defaults. No network requests are made.";
+    this.form.append(description);
+
+    const panel = this.document.createElement("div");
+    panel.dataset.testPanel = "true";
+
+    const urlsFieldset = this.document.createElement("fieldset");
+    const urlsLegend = this.document.createElement("legend");
+    urlsLegend.textContent = "Test URLs";
+    urlsFieldset.append(urlsLegend);
+
+    const urlsField = this.document.createElement("div");
+    urlsField.dataset.editorField = "true";
+    const urlsLabel = this.document.createElement("label");
+    urlsLabel.textContent = "One test URL per line";
+    const urlsTextarea = this.document.createElement("textarea");
+    urlsTextarea.rows = 8;
+    urlsTextarea.placeholder =
+      "https://example.com/page\nhttps://example.com/script.js\nhttps://other.com/";
+    urlsTextarea.value = this.testUrls;
+    urlsTextarea.dataset.testUrls = "true";
+    urlsLabel.append(urlsTextarea);
+    urlsField.append(urlsLabel);
+    urlsFieldset.append(urlsField);
+    panel.append(urlsFieldset);
+
+    const defaultsFieldset = this.document.createElement("fieldset");
+    const defaultsLegend = this.document.createElement("legend");
+    defaultsLegend.textContent =
+      "Defaults (applied to all URLs without explicit values)";
+    defaultsFieldset.append(defaultsLegend);
+
+    const defaultsGrid = this.document.createElement("div");
+    defaultsGrid.dataset.testDefaults = "true";
+
+    const methodField = this.document.createElement("div");
+    methodField.dataset.editorField = "true";
+    const methodLabel = this.document.createElement("label");
+    methodLabel.textContent = "Default HTTP method";
+    const methodSelect = this.document.createElement("select");
+    methodSelect.dataset.testMethod = "true";
+    methodSelect.value = this.testMethod;
+    const methodEmpty = this.document.createElement("option");
+    methodEmpty.value = "";
+    methodEmpty.textContent = "(none — not-applicable)";
+    methodSelect.append(methodEmpty);
+    for (const m of HTTP_METHODS) {
+      const opt = this.document.createElement("option");
+      opt.value = m;
+      opt.textContent = m;
+      methodSelect.append(opt);
+    }
+    methodLabel.append(methodSelect);
+    methodField.append(methodLabel);
+
+    const rtField = this.document.createElement("div");
+    rtField.dataset.editorField = "true";
+    const rtLabel = this.document.createElement("label");
+    rtLabel.textContent = "Default resource type";
+    const rtSelect = this.document.createElement("select");
+    rtSelect.dataset.testResourceType = "true";
+    rtSelect.value = this.testResourceType;
+    const rtEmpty = this.document.createElement("option");
+    rtEmpty.value = "";
+    rtEmpty.textContent = "(none — not-applicable)";
+    rtSelect.append(rtEmpty);
+    for (const rt of RESOURCE_TYPES) {
+      const opt = this.document.createElement("option");
+      opt.value = rt;
+      opt.textContent = rt;
+      rtSelect.append(opt);
+    }
+    rtLabel.append(rtSelect);
+    rtField.append(rtLabel);
+
+    defaultsGrid.append(methodField, rtField);
+    defaultsFieldset.append(defaultsGrid);
+    panel.append(defaultsFieldset);
+
+    const maxCasesField = this.document.createElement("div");
+    maxCasesField.dataset.editorField = "true";
+    const maxCasesLabel = this.document.createElement("label");
+    maxCasesLabel.textContent = "Max test cases";
+    const maxCasesInput = this.document.createElement("input");
+    maxCasesInput.type = "number";
+    maxCasesInput.min = "1";
+    maxCasesInput.max = "10000";
+    maxCasesInput.value = this.testMaxCases;
+    maxCasesInput.style.width = "8rem";
+    maxCasesInput.dataset.testMaxCases = "true";
+    maxCasesLabel.append(maxCasesInput);
+    maxCasesField.append(maxCasesLabel);
+    panel.append(maxCasesField);
+
+    const runBtn = this.createButton("Run test", "test:run");
+    runBtn.type = "button";
+    runBtn.dataset.testRun = "true";
+    runBtn.disabled = this.saving || this.testRunning;
+    panel.append(runBtn);
+
+    this.form.append(panel);
+
+    const resultsSection = this.document.createElement("section");
+    resultsSection.dataset.testResults = "true";
+    this.form.append(resultsSection);
+    if (this.testResult) {
+      this.renderTestResults(this.testResult);
+    } else if (this.testRunning) {
+      const pending = this.document.createElement("p");
+      pending.dataset.testPending = "true";
+      pending.textContent = "Running dry-run...";
+      resultsSection.append(pending);
+    }
   }
 
   private renderRule(

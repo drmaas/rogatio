@@ -33,6 +33,65 @@ export type EditorSaveHandler = (
   project: EditorProjectSnapshot,
 ) => EditorSaveResult | Promise<EditorSaveResult>;
 
+export interface DryRunTestCase {
+  readonly url: string;
+  readonly method?: HttpMethod;
+  readonly resourceType?: ResourceType;
+}
+
+export interface DryRunMatchDimension {
+  readonly state: "matched" | "unmatched" | "not-applicable";
+  readonly matched: boolean | null;
+  readonly detail: string;
+}
+
+export interface DryRunActionPreview {
+  readonly kind: string;
+  readonly summary: string;
+}
+
+export interface DryRunRuleMatchResult {
+  readonly groupId: string;
+  readonly ruleId: string;
+  readonly matched: boolean;
+  readonly urlRegex: DryRunMatchDimension;
+  readonly effectiveOrigin: DryRunMatchDimension;
+  readonly method: DryRunMatchDimension;
+  readonly resourceType: DryRunMatchDimension;
+  readonly actionPreview: DryRunActionPreview | null;
+}
+
+export interface DryRunUrlResult {
+  readonly url: string;
+  readonly rules: readonly DryRunRuleMatchResult[];
+  readonly matchedRuleCount: number;
+}
+
+export interface DryRunError {
+  readonly code: string;
+  readonly message: string;
+  readonly index?: number;
+}
+
+export interface DryRunSummary {
+  readonly caseCount: number;
+  readonly urlCount: number;
+  readonly matchedUrlCount: number;
+  readonly matchedRuleTotal: number;
+}
+
+export interface DryRunResult {
+  readonly results: readonly DryRunUrlResult[];
+  readonly errors: readonly DryRunError[];
+  readonly summary: DryRunSummary;
+}
+
+export type EditorDryRunHandler = (
+  project: EditorProjectSnapshot,
+  cases: readonly DryRunTestCase[],
+  options?: { maxCases?: number },
+) => DryRunResult | Promise<DryRunResult>;
+
 export interface RuleTypeFieldExtension {
   readonly id: string;
   readonly label: string;
@@ -67,6 +126,7 @@ export interface EditorOptions {
   readonly save: EditorSaveHandler;
   readonly onCancel?: () => void;
   readonly ruleTypes?: readonly RuleTypeFieldExtension[];
+  readonly dryRun?: EditorDryRunHandler;
 }
 
 export interface EditorController {
