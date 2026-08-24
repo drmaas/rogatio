@@ -96,7 +96,7 @@ const projectSchemaDefinition = {
           maximum: LIMITS.maxPriority,
         },
         method: { type: "string", enum: [...HTTP_METHODS] },
-        type: { type: "string", enum: ["redirect", "query"] },
+        type: { type: "string", enum: ["redirect", "query", "header"] },
         redirect: {
           type: "object",
           additionalProperties: false,
@@ -106,6 +106,17 @@ const projectSchemaDefinition = {
           },
         },
         action: { $ref: "#/$defs/queryAction" },
+        headerDirection: { type: "string", enum: ["request", "response"] },
+        headerOperation: { type: "string", enum: ["set", "append", "remove"] },
+        headerName: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxHeaderNameLength,
+        },
+        headerValue: {
+          type: "string",
+          maxLength: LIMITS.maxHeaderValueLength,
+        },
       },
       allOf: [
         {
@@ -126,6 +137,46 @@ const projectSchemaDefinition = {
           // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
           then: {
             required: ["action"],
+          },
+        },
+        {
+          if: {
+            required: ["type"],
+            properties: { type: { const: "header" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["headerDirection", "headerOperation", "headerName"],
+          },
+        },
+        {
+          if: {
+            required: ["headerOperation"],
+            properties: { headerOperation: { const: "set" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["headerValue"],
+          },
+        },
+        {
+          if: {
+            required: ["headerOperation"],
+            properties: { headerOperation: { const: "append" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["headerValue"],
+          },
+        },
+        {
+          if: {
+            required: ["headerOperation"],
+            properties: { headerOperation: { const: "remove" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            not: { required: ["headerValue"] },
           },
         },
       ],

@@ -15,4 +15,6 @@ export const LIMITS = Object.freeze({
   maxQueryParamsPerRule: 64,
   maxQueryNameLength: 256,
   maxQueryValueLength: 2048,
+  maxHeaderNameLength: 256,
+  maxHeaderValueLength: 4096,
 });

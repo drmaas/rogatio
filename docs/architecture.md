@@ -1,6 +1,6 @@
 # Rogatio Architecture
 
-**Status:** F1 bootstrap, F2 schema, F3 compiler, F4 browser-core, F7 extension shell, F8 CLI, and **F9 redirect rules** are released through Stage 10 (verification and documentation complete). F5 editor and F6 runtime foundation are implemented and verified in this worktree.
+**Status:** F1 bootstrap, F2 schema, F3 compiler, F4 browser-core, F7 extension shell, F8 CLI, **F9 redirect rules**, and **F11 header rules** are released through Stage 10 (verification and documentation complete). F5 editor and F6 runtime foundation are implemented and verified in this worktree.
 
 ## Package Boundaries
 

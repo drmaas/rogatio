@@ -1,4 +1,6 @@
 import {
+  type HeaderDirection,
+  type HeaderOperationKind,
   LIMITS,
   RESOURCE_TYPES,
   type RogatioProject,
@@ -10,6 +12,7 @@ import {
   type CompileResult,
   type CompilerDiagnostic,
   compileProject,
+  type HeaderOperation,
 } from "../src/index.js";
 
 function makeRule(
@@ -23,6 +26,26 @@ function makeRule(
     origins: [],
     resourceTypes: ["image", "main_frame"],
     priority: 100 + index,
+    ...overrides,
+  } as RogatioRule & Record<string, unknown>;
+}
+
+function makeHeaderRule(
+  index: number,
+  overrides: Record<string, unknown> = {},
+): RogatioRule & Record<string, unknown> {
+  return {
+    id: `header-${index}`,
+    name: `Header Rule ${index}`,
+    urlRegex: "^https://example\\.com/",
+    origins: [],
+    resourceTypes: ["main_frame"],
+    priority: 100 + index,
+    type: "header",
+    headerDirection: "request",
+    headerOperation: "set",
+    headerName: "X-Custom-Header",
+    headerValue: "test-value",
     ...overrides,
   } as RogatioRule & Record<string, unknown>;
 }
@@ -550,5 +573,96 @@ describe("@rogatio/compiler", () => {
         });
       }
     }
+  });
+
+  describe("header rules", () => {
+    it("compiles a valid header rule into a HeaderOperation", () => {
+      const project = makeProject({}, { ...makeHeaderRule(1) });
+      const result = compileProject(project);
+      if (!result.ok) {
+        console.log(
+          "Validation failed:",
+          JSON.stringify(result.diagnostics, null, 2),
+        );
+      }
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const op = result.operations[0] as HeaderOperation;
+        expect(op.kind).toBe("header");
+        expect(op.groupId).toBe("group-main");
+        expect(op.ruleId).toBe("header-1");
+        expect(op.matcher).toBeDefined();
+        expect(op.header.direction).toBe("request");
+        expect(op.header.operation).toBe("set");
+        expect(op.header.name).toBe("X-Custom-Header");
+        expect(op.header.value).toBe("test-value");
+      }
+    });
+
+    it("compiles a response header rule", () => {
+      const project = makeProject(
+        {},
+        {
+          ...makeHeaderRule(1),
+          headerDirection: "response" as HeaderDirection,
+        },
+      );
+      const result = compileProject(project);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const op = result.operations[0] as HeaderOperation;
+        expect(op.header.direction).toBe("response");
+      }
+    });
+
+    it("compiles append and remove operations", () => {
+      for (const opKind of ["append", "remove"] as HeaderOperationKind[]) {
+        const project = makeProject(
+          {},
+          {
+            ...makeHeaderRule(1),
+            headerOperation: opKind,
+            headerValue: opKind === "remove" ? undefined : "value",
+          },
+        );
+        const result = compileProject(project);
+
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          const op = result.operations[0] as HeaderOperation;
+          expect(op.header.operation).toBe(opKind);
+          if (opKind === "remove") {
+            expect(op.header).not.toHaveProperty("value");
+          } else {
+            expect(op.header.value).toBe("value");
+          }
+        }
+      }
+    });
+
+    it("preserves matcher fields for header rules", () => {
+      const project = makeProject(
+        { origins: ["https://example.com"] },
+        {
+          ...makeHeaderRule(1),
+          origins: ["http://localhost:80"],
+          method: "POST",
+          priority: 500,
+        },
+      );
+      const result = compileProject(project);
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        const op = result.operations[0] as HeaderOperation;
+        expect(op.matcher.origins).toEqual([
+          "http://localhost",
+          "https://example.com",
+        ]);
+        expect(op.matcher.method).toBe("POST");
+        expect(op.matcher.priority).toBe(500);
+      }
+    });
   });
 });

@@ -1,4 +1,9 @@
-import type { HttpMethod, ResourceType, RogatioProject } from "@rogatio/schema";
+import type {
+  HeaderDirection,
+  HttpMethod,
+  ResourceType,
+  RogatioProject,
+} from "@rogatio/schema";
 
 const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
   "accept-charset",
@@ -43,9 +48,7 @@ const FORBIDDEN_RESPONSE_HEADERS = Object.freeze([
 
 const FORBIDDEN_REQUEST_PREFIXES = Object.freeze(["proxy-", "sec-"]);
 
-type HeaderDirection = "request" | "response";
-
-function _isForbiddenHeader(name: string, direction: HeaderDirection): boolean {
+function isForbiddenHeader(name: string, direction: HeaderDirection): boolean {
   const normalized = name.toLowerCase();
   const forbidden =
     direction === "request"
@@ -107,6 +110,9 @@ export const LIMITS = Object.freeze({
   maxQueryParamsPerRule: 64,
   maxQueryNameLength: 256,
   maxQueryValueLength: 2048,
+  maxHeaderNameLength: 256,
+  maxHeaderValueLength: 4096,
+  maxHeadersPerRule: 1,
 });
 
 type JsonRecord = Record<string, unknown>;
@@ -393,6 +399,10 @@ const RULE_KEYS = [
   "type",
   "redirect",
   "action",
+  "headerDirection",
+  "headerOperation",
+  "headerName",
+  "headerValue",
 ] as const;
 
 const QUERY_ACTION_KEYS = ["type", "params"] as const;
@@ -593,7 +603,8 @@ export function validateProjectDetailed(
       if (
         rule.type !== undefined &&
         rule.type !== "redirect" &&
-        rule.type !== "query"
+        rule.type !== "query" &&
+        rule.type !== "header"
       )
         errors.push(issue(`${rulePath}/type`, "invalid-value"));
       if (rule.type === "redirect") {
@@ -622,6 +633,47 @@ export function validateProjectDetailed(
       }
       if (rule.action !== undefined)
         validateQueryAction(errors, rule.action, `${rulePath}/action`);
+      if (rule.type === "header") {
+        const direction = (rule as Record<string, unknown>).headerDirection;
+        const operation = (rule as Record<string, unknown>).headerOperation;
+        const headerName = (rule as Record<string, unknown>).headerName;
+        const headerValue = (rule as Record<string, unknown>).headerValue;
+        if (direction !== "request" && direction !== "response") {
+          errors.push(issue(`${rulePath}/direction`, "invalid-value"));
+        }
+        if (
+          operation !== "set" &&
+          operation !== "append" &&
+          operation !== "remove"
+        ) {
+          errors.push(issue(`${rulePath}/operation`, "invalid-value"));
+        }
+        if (
+          typeof headerName !== "string" ||
+          headerName.length === 0 ||
+          headerName.length > LIMITS.maxHeaderNameLength
+        ) {
+          errors.push(issue(`${rulePath}/headerName`, "out-of-range"));
+        }
+        if (
+          typeof headerName === "string" &&
+          direction !== undefined &&
+          isForbiddenHeader(headerName, direction as HeaderDirection)
+        ) {
+          errors.push(issue(`${rulePath}/headerName`, "forbidden"));
+        }
+        if (operation === "set" || operation === "append") {
+          if (
+            typeof headerValue !== "string" ||
+            headerValue.length > LIMITS.maxHeaderValueLength
+          ) {
+            errors.push(issue(`${rulePath}/headerValue`, "out-of-range"));
+          }
+        }
+        if (operation === "remove" && headerValue !== undefined) {
+          errors.push(issue(`${rulePath}/headerValue`, "unexpected"));
+        }
+      }
       const effective = [
         ...(Array.isArray(group.origins) ? group.origins : []),
         ...(Array.isArray(rule.origins) ? rule.origins : []),
