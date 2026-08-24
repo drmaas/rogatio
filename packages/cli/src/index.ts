@@ -183,7 +183,7 @@ The native runtime activates only where a trusted device-local CA can be provisi
 and Chrome PAC routing does not collide with an existing controlling proxy/PAC/extension
 or enterprise policy. On incapable platforms 'start' reports 'unsupported'.
 The mock runtime prints connection instructions; open the extension and click
-\"Check and connect\" to install mock rules.
+"Check and connect" to install mock rules.
 
 Exit codes:
   0  Stopped cleanly

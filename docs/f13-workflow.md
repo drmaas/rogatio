@@ -42,7 +42,7 @@
 - [x] Stage 10 - documentation (README `rogatio runtime` row corrected; mock-rules
   usage section added; architecture.md + spec + plan + workflow log already
   synchronized)
-- [ ] Stage 11 - release actions (separate authorization)
+- [x] Stage 11 - release actions (commit-only authorization completed; no push/PR)
 
 ## Stage 0 Evidence
 
@@ -361,4 +361,18 @@ own base; the conflict resolution is a release-stage concern and does not affect
 - `rogatio-overview.md` / `sequence.md`: already describe F13 mock rules and the
   single Check-and-connect UX at the right level of detail; no changes needed.
 - `AGENTS.md`: no process changes; no edits needed.
-- `format:check`: 172 files clean.
+- `format:check`: 183 files clean on the combined F13+F14 tree.
+
+## Stage 11 Evidence — Release
+
+- User explicitly authorized **commit only**; no push or PR was performed.
+- Original F13 commits were rebased onto current `main` (`64fda51`, F14).
+- Rebase conflicts in README, architecture, CLI runtime, and CLI help were resolved
+  by preserving F14 native runtime commands (`start`, `stop`, `status`) and adding
+  F13 mock-runtime startup as the path/option form of `rogatio runtime`.
+- Rebasing replayed the implementation as `2bd07d6`; the final local follow-up commit
+  `3f7de99` preserves F14 command compatibility, updates the CLI tests, and records
+  the rebase/validation evidence.
+- Combined-tree validation after conflict resolution: `pnpm validate` passed — 48
+  Vitest files / 357 tests, 14 Playwright tests, build/typecheck/lint/artifact checks.
+- No push or PR was performed.

@@ -147,6 +147,22 @@ async function nativeRuntimeCommand(args: string[]): Promise<number> {
   }
 }
 
+export function runtimeCommand(
+  args: ["start" | "stop" | "status", ...string[]],
+  options?: { stdinInput?: string },
+): Promise<number>;
+export function runtimeCommand(
+  args: ["--help" | "-h", ...string[]],
+  options?: { stdinInput?: string },
+): Promise<number>;
+export function runtimeCommand(
+  args: [string, ...string[]],
+  options?: { stdinInput?: string },
+): Promise<RuntimeCommandResult>;
+export function runtimeCommand(
+  args: string[],
+  options?: { stdinInput?: string },
+): Promise<number | RuntimeCommandResult>;
 export async function runtimeCommand(
   args: string[],
   options: { stdinInput?: string } = {},

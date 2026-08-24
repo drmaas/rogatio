@@ -56,11 +56,9 @@ describe("rogatio runtime command (F13)", () => {
     await writeProject(projectPath, mockProject());
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
 
-    const { exitCode, shutdown } = await runtimeCommand([
-      projectPath,
-      "--port",
-      "0",
-    ]);
+    const result = await runtimeCommand([projectPath, "--port", "0"]);
+    if (typeof result === "number") throw new Error("expected mock runtime");
+    const { exitCode, shutdown } = result;
 
     const output = log.mock.calls.map((call) => String(call[0])).join("\n");
     const portMatch = /http:\/\/127\.0\.0\.1:(\d+)/.exec(output);
@@ -116,7 +114,9 @@ describe("rogatio runtime command (F13)", () => {
     );
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const { exitCode, shutdown } = await runtimeCommand([projectPath]);
+    const result = await runtimeCommand([projectPath]);
+    if (typeof result === "number") throw new Error("expected mock runtime");
+    const { exitCode, shutdown } = result;
     const code = await exitCode;
     expect(code).toBe(1);
     expect(error).toHaveBeenCalledWith(expect.stringContaining("mock"));
@@ -131,10 +131,12 @@ describe("rogatio runtime command (F13)", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const first = await runtimeCommand([projectPath, "--port", "0"]);
+    if (typeof first === "number") throw new Error("expected mock runtime");
     const output = log.mock.calls.map((call) => String(call[0])).join("\n");
     const port = Number(/http:\/\/127\.0\.0\.1:(\d+)/.exec(output)?.[1]);
 
     const second = await runtimeCommand([projectPath, "--port", String(port)]);
+    if (typeof second === "number") throw new Error("expected mock runtime");
     const secondCode = await second.exitCode;
     expect(secondCode).toBe(2);
     expect(error).toHaveBeenCalled();
@@ -174,11 +176,9 @@ describe("rogatio runtime command (F13)", () => {
     );
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const { exitCode, shutdown } = await runtimeCommand([
-      projectPath,
-      "--root",
-      testDir,
-    ]);
+    const result = await runtimeCommand([projectPath, "--root", testDir]);
+    if (typeof result === "number") throw new Error("expected mock runtime");
+    const { exitCode, shutdown } = result;
     const code = await exitCode;
     expect(code).toBe(1);
     shutdown();
