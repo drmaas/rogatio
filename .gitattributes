@@ -1,0 +1,8 @@
+# Force LF line endings on checkout so biome/format checks and the
+# emitted-module builds behave identically on Windows, macOS, and Linux.
+# Without this, Windows runners normalize text files to CRLF and the
+# `format:check` step fails cross-platform.
+* text=auto eol=lf
+
+# Lockfile must stay byte-stable across platforms.
+pnpm-lock.yaml text eol=lf

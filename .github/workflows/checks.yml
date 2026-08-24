@@ -68,7 +68,6 @@ jobs:
 
   cross-platform:
     name: Cross-platform smoke (${{ matrix.os }})
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
