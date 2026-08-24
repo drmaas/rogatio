@@ -75,7 +75,8 @@ async function handleRuntime(args: string[]): Promise<number> {
     showRuntimeHelp();
     return 0;
   }
-  return runtimeCommand(args);
+  const result = await runtimeCommand(args);
+  return typeof result === "number" ? result : await result.exitCode;
 }
 
 async function handleTest(args: string[]): Promise<number> {
@@ -111,7 +112,8 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
-  runtime         Native messaging runtime control (start|stop|status)
+  runtime <start|stop|status>  Native messaging runtime control
+  runtime [path]  Start the mock runtime server (F13)
 
 Global Options:
   --help, -h      Show help
@@ -158,20 +160,35 @@ Exit codes:
 
 function showRuntimeHelp(): void {
   console.log(`Usage: rogatio runtime <command> [options]
+       rogatio runtime [options] [path]
 
-Native messaging runtime control for response-body and request-body rules.
+Native messaging runtime control for response-body and request-body rules, or
+start the local mock runtime for F13 mock rules.
 
-Commands:
+Native runtime commands:
   start     Start the runtime (capability-gated; explicit, no auto-start)
   stop      Stop the runtime (idempotent)
   status    Show the current runtime state
 
+Mock runtime arguments:
+  path      Path to .rogatio.json (default: .rogatio.json in current directory)
+            Use '-' to read project JSON from stdin
+
 Options:
+  --port <n>      Port for the mock runtime (default: 8890; use 0 for ephemeral)
+  --root <dir>    Root for confined file mocks (default: project directory)
   --help, -h      Show this help
 
-The runtime activates only where a trusted device-local CA can be provisioned and
-Chrome PAC routing does not collide with an existing controlling proxy/PAC/extension
-or enterprise policy. On incapable platforms 'start' reports 'unsupported'.`);
+The native runtime activates only where a trusted device-local CA can be provisioned
+and Chrome PAC routing does not collide with an existing controlling proxy/PAC/extension
+or enterprise policy. On incapable platforms 'start' reports 'unsupported'.
+The mock runtime prints connection instructions; open the extension and click
+\"Check and connect\" to install mock rules.
+
+Exit codes:
+  0  Stopped cleanly
+  1  Invalid project (diagnostics present) or file outside the root
+  2  Error (IO, startup, port conflict)`);
 }
 
 function showTestHelp(): void {

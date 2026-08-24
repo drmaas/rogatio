@@ -34,7 +34,7 @@ export const HTTP_METHODS = Object.freeze([
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
-export type RuleType = "redirect" | "query" | "header";
+export type RuleType = "redirect" | "query" | "header" | "mock";
 
 export type HeaderDirection = "request" | "response";
 export type HeaderOperationKind = "set" | "append" | "remove";
@@ -63,6 +63,23 @@ export interface HeaderAction {
   headerValue?: string;
 }
 
+export interface MockHeader {
+  name: string;
+  value: string;
+}
+
+export interface MockAction {
+  /** HTTP status to serve, integer in [200, 599]. */
+  status: number;
+  headers?: MockHeader[];
+  /** Bounded artificial delay in milliseconds before the response. */
+  delayMs?: number;
+  /** Inline UTF-8 response body. Exactly one of `body`/`file` is set. */
+  body?: string;
+  /** Relative logical path of one approved local file snapshot. */
+  file?: string;
+}
+
 export interface RogatioRule {
   id: string;
   name: string;
@@ -85,6 +102,9 @@ export interface RogatioRule {
   headerOperation?: HeaderOperationKind;
   headerName?: string;
   headerValue?: string;
+
+  /** Required iff type === "mock". */
+  mock?: MockAction;
 }
 
 export interface RogatioGroup {

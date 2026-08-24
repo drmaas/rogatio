@@ -14,10 +14,27 @@ export {
   extensionDiagnostic,
 } from "./diagnostics.js";
 export {
+  createDnrInstaller,
+  type DnrAllowRule,
+  type DnrInstallerOptions,
+  type DnrRedirectRule,
+  type DnrRule,
+  mockLoopProtectionRule,
+  translateMockToDnr,
+  translateRedirectToDnr,
+} from "./dnr.js";
+export {
   createExtensionPageModel,
   type ExtensionPageModel,
   type ExtensionPageModelOptions,
 } from "./extension-page.js";
+export {
+  createMockConnectionHolder,
+  DEFAULT_MOCK_PORT,
+  fetchMockConnection,
+  type MockConnectionHolder,
+  type MockRuntimeConnection,
+} from "./mock-runtime.js";
 export { declaredPermissionOrigins } from "./permissions.js";
 export {
   projectMatchers,

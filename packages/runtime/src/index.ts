@@ -14,6 +14,7 @@ export { createRuntimeServer } from "./server.js";
 export type {
   AddressClassification,
   AuthorizedOperation,
+  MockConnectionInfo,
   NormalizedRuntimePreset,
   OutboundOptions,
   OutboundRequest,
@@ -27,6 +28,7 @@ export type {
   RuntimeErrorCode,
   RuntimeGrant,
   RuntimeLimits,
+  RuntimeMockConfig,
   RuntimeOperationKind,
   RuntimePresetV1,
   RuntimeResult,

@@ -103,6 +103,11 @@ export interface RuleTypeFieldExtension {
   ) => readonly EditorDiagnostic[];
   /** Returns a fresh default action object when the user selects this type. */
   readonly defaultAction?: () => unknown;
+  /**
+   * Rule field the default action writes to (default "action"). Payload types
+   * such as mock live at a named top-level field instead.
+   */
+  readonly actionField?: string;
 }
 
 export interface RuleTypeFieldContext {

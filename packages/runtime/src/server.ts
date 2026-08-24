@@ -11,6 +11,7 @@ import {
 } from "./capability.js";
 import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
+import { mintToken, parseMockToken, serveMock } from "./mock.js";
 import { normalizeRuntimePreset } from "./preset.js";
 import {
   CAPABILITY_HEADER,
@@ -25,6 +26,8 @@ import {
   validateRequest,
 } from "./protocol.js";
 import type {
+  NormalizedRuntimePreset,
+  RuntimeMockConfig,
   RuntimeResult,
   RuntimeServer,
   RuntimeServerOptions,
@@ -32,6 +35,8 @@ import type {
 
 const PAIR_PATH = "/v1/pair";
 const AUTHORIZE_PATH = "/v1/authorize";
+const CONNECTION_PATH = "/v1/connection";
+const MOCK_PROTOCOL = "f13-v1";
 
 function isTrustedRoot(value: unknown): value is string {
   if (typeof value !== "string" || !isAbsolute(value)) return false;
@@ -52,6 +57,10 @@ function hasFileGrant(
   return preset.grants.some((grant) => grant.kind === "confined-file");
 }
 
+function hasFileMock(preset: NormalizedRuntimePreset): boolean {
+  return (preset.mocks ?? []).some((mock) => mock.file !== undefined);
+}
+
 function badRoute(path: string | undefined): boolean {
   return path?.includes("://") === true || path === "*";
 }
@@ -64,12 +73,31 @@ export async function createRuntimeServer(
     limits: options.preset.limits,
     matchers: options.preset.matchers,
     grants: options.preset.grants,
+    ...(options.preset.mocks !== undefined
+      ? { mocks: options.preset.mocks }
+      : {}),
   };
   const normalized = normalizeRuntimePreset(input);
   if (!normalized.ok) return normalized;
-  if (hasFileGrant(normalized.value) && !isTrustedRoot(options.fileRoot)) {
+  if (
+    (hasFileGrant(normalized.value) || hasFileMock(normalized.value)) &&
+    !isTrustedRoot(options.fileRoot)
+  ) {
     return failure("runtime.invalid-preset");
   }
+
+  const mockTokens = new Map<string, RuntimeMockConfig>();
+  const mockRuleTokens = new Map<string, string>();
+  const mockGroupIds = new Map<string, string>();
+  for (const mock of normalized.value.mocks ?? []) {
+    const token = mintToken();
+    mockTokens.set(token, mock);
+    mockRuleTokens.set(mock.ruleId, token);
+  }
+  for (const matcher of normalized.value.matchers) {
+    mockGroupIds.set(matcher.ruleId, matcher.groupId);
+  }
+  const mockStopController = new AbortController();
 
   const clock = options.clock ?? Date.now;
   let state: ReturnType<typeof createCapabilityState>;
@@ -80,6 +108,8 @@ export async function createRuntimeServer(
   }
 
   const sockets = new Set<Socket>();
+  let activeMockCount = 0;
+  let boundPort = 0;
   const server = createServer(
     {
       maxHeaderSize: RUNTIME_LIMITS.maxRequestHeaderBytes,
@@ -95,6 +125,72 @@ export async function createRuntimeServer(
       }
 
       const path = request.url;
+
+      if (path === CONNECTION_PATH) {
+        if (
+          request.method !== "GET" ||
+          request.socket.remoteAddress !== "127.0.0.1"
+        ) {
+          request.resume();
+          sendError(response, 404, "runtime.request-malformed");
+          return;
+        }
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        sendJson(response, 200, {
+          protocol: MOCK_PROTOCOL,
+          port: boundPort,
+          presetDigest: normalized.value.digest,
+          mocks: [...mockRuleTokens.entries()].map(([ruleId, token]) => ({
+            ruleId,
+            token,
+          })),
+        });
+        return;
+      }
+
+      const mockToken = parseMockToken(path);
+      if (mockToken !== null) {
+        if (request.socket.remoteAddress !== "127.0.0.1") {
+          request.resume();
+          sendError(response, 404, "runtime.request-malformed");
+          return;
+        }
+        const mock = mockTokens.get(mockToken);
+        if (mock === undefined) {
+          request.resume();
+          sendError(response, 404, "runtime.request-malformed");
+          return;
+        }
+        if (activeMockCount >= RUNTIME_LIMITS.maxConcurrentOperations) {
+          request.resume();
+          sendError(response, 429, "runtime.overloaded");
+          return;
+        }
+        activeMockCount += 1;
+        const controller = new AbortController();
+        const onClose = () => controller.abort();
+        request.on("close", onClose);
+        const signal = AbortSignal.any([
+          controller.signal,
+          mockStopController.signal,
+        ]);
+        try {
+          await serveMock({
+            request,
+            response,
+            mock,
+            fileRoot: options.fileRoot,
+            presetDigest: normalized.value.digest,
+            groupId: mockGroupIds.get(mock.ruleId) ?? "",
+            signal,
+          });
+        } finally {
+          activeMockCount -= 1;
+          request.off("close", onClose);
+        }
+        return;
+      }
+
       if (path !== PAIR_PATH && path !== AUTHORIZE_PATH) {
         request.resume();
         sendError(
@@ -209,12 +305,15 @@ export async function createRuntimeServer(
   try {
     await new Promise<void>((resolveListen, rejectListen) => {
       server.once("error", rejectListen);
-      server.listen({ host: "127.0.0.1", port: 0 }, () => resolveListen());
+      server.listen({ host: "127.0.0.1", port: options.port ?? 0 }, () =>
+        resolveListen(),
+      );
     });
     const address = server.address();
     if (address === null || typeof address === "string")
       throw new Error("invalid address");
     const info = address as AddressInfo;
+    boundPort = info.port;
     const bootstrap = Object.freeze({
       host: "127.0.0.1" as const,
       port: info.port,
@@ -225,6 +324,9 @@ export async function createRuntimeServer(
     const stop = async (): Promise<void> => {
       if (stopped) return;
       stopped = true;
+      mockStopController.abort();
+      mockTokens.clear();
+      mockRuleTokens.clear();
       closeCapabilityState(state);
       for (const socket of sockets) socket.destroy();
       if (!server.listening) return;

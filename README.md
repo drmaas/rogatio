@@ -73,6 +73,7 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
 | `rogatio runtime <start\|stop\|status>` | Native-messaging runtime control. Capability-gated: `start` reports `unsupported` on platforms that cannot provision a trusted device-local CA or where Chrome PAC routing would collide with an existing controlling proxy/PAC/extension/enterprise policy. |
+| `rogatio runtime [path]` | Starts the local mock runtime on `127.0.0.1:8890` (override with `--port <n>`; `--root <dir>` confines mock file reads). Print "Check and connect" in the extension to install mock rules. Press Ctrl+C to stop. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome, grant only declared site access, and activate the groups you need.
@@ -89,6 +90,25 @@ rogatio test .rogatio.json --urls-file test-cases.json --json
 # Test from stdin
 cat test-cases.json | rogatio test .rogatio.json --urls-file -
 ```
+
+## Mock rules
+
+A `mock` rule returns a configured status, optional headers, optional delay, and
+an inline body or a live UTF-8 snapshot of one approved local file — without
+contacting upstream. Mocks are served by the local runtime and installed into
+the browser via a single Check-and-connect request.
+
+```sh
+# Start the mock runtime (default port 8890)
+rogatio runtime .rogatio.json
+
+# Override the port and file root
+rogatio runtime .rogatio.json --port 9000 --root ~/projects/demo
+```
+
+Then open the extension, click **Check and connect**, and matched requests
+will be redirected to the configured mock response. Mock rules report
+`needs proxy` while the runtime is disconnected and `active` when connected.
 
 ## Project layout
 

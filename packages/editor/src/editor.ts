@@ -683,7 +683,10 @@ function setValueAtPath(root: unknown, path: string, value: unknown): boolean {
     !Object.hasOwn(current, finalSegment) &&
     finalSegment !== "description" &&
     finalSegment !== "method" &&
-    finalSegment !== "action"
+    finalSegment !== "type" &&
+    finalSegment !== "action" &&
+    finalSegment !== "redirect" &&
+    finalSegment !== "mock"
   ) {
     return false;
   }
@@ -786,11 +789,19 @@ function isValidExtensionName(name: string): boolean {
   );
 }
 
-function clearActionFields(rule: unknown): boolean {
+const ACTION_FIELDS = ["redirect", "action", "mock"] as const;
+
+function clearActionFields(rule: unknown, keep?: string): boolean {
   if (!isRecord(rule)) return false;
-  if (!Object.hasOwn(rule, "redirect")) return false;
-  delete rule.redirect;
-  return true;
+  let changed = false;
+  for (const field of ACTION_FIELDS) {
+    if (field === keep) continue;
+    if (Object.hasOwn(rule, field)) {
+      delete rule[field];
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 function extensionFieldParent(
@@ -1446,10 +1457,11 @@ class EditorControllerImpl implements EditorController {
       }
       const changed = setValueAtPath(this.draft, path, rawValue);
       if (changed) {
-        if (rawValue !== "redirect") {
-          const ruleContainer = valueAtPath(this.draft, ruleContainerPath);
-          clearActionFields(ruleContainer);
-        }
+        const ruleContainer = valueAtPath(this.draft, ruleContainerPath);
+        clearActionFields(
+          ruleContainer,
+          rawValue === "redirect" || rawValue === "mock" ? rawValue : undefined,
+        );
         this.markChanged();
       }
       return changed;
@@ -1482,20 +1494,27 @@ class EditorControllerImpl implements EditorController {
 
   private setRuleType(rulePath: string, typeId: string): void {
     if (this.saving) return;
+    const ruleContainer = valueAtPath(this.draft, rulePath);
     if (typeId === "") {
-      deleteValueAtPath(this.draft, `${rulePath}/action`);
-      this.markChanged();
-      this.render();
+      const changedType = deleteValueAtPath(this.draft, `${rulePath}/type`);
+      const cleared = clearActionFields(ruleContainer);
+      if (changedType || cleared) {
+        this.markChanged();
+        this.render();
+      }
       return;
     }
     const extension = this.extensions.find((entry) => entry.id === typeId);
     if (!extension?.defaultAction) return;
-    const changed = setValueAtPath(
+    const actionField = extension.actionField ?? "action";
+    const changedType = setValueAtPath(this.draft, `${rulePath}/type`, typeId);
+    const changedAction = setValueAtPath(
       this.draft,
-      `${rulePath}/action`,
+      `${rulePath}/${actionField}`,
       extension.defaultAction(),
     );
-    if (changed) {
+    const cleared = clearActionFields(ruleContainer, actionField);
+    if (changedType || changedAction || cleared) {
       this.markChanged();
       this.render();
     }

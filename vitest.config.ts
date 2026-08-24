@@ -25,6 +25,10 @@ export default defineConfig({
         __dirname,
         "packages/editor/dist/browser/index.js",
       ),
+      "@rogatio/runtime": resolve(
+        __dirname,
+        "packages/runtime/dist/node/index.js",
+      ),
     },
   },
 });

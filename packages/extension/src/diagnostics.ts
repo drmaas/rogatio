@@ -10,7 +10,9 @@ export type ExtensionDiagnosticCode =
   | "extension.unsupported"
   | "extension.invalid-header"
   | "extension.forbidden-header"
-  | "extension.dnr-error";
+  | "extension.dnr-error"
+  | "extension.mock-token-missing"
+  | "extension.mock-check-in-progress";
 
 export interface ExtensionDiagnostic {
   readonly code: ExtensionDiagnosticCode;
@@ -38,6 +40,10 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.forbidden-header":
     "The header name is forbidden for the given direction.",
   "extension.dnr-error": "The declarativeNetRequest operation failed.",
+  "extension.mock-token-missing":
+    "The mock runtime has no token for this rule; restart rogatio runtime after changing the project.",
+  "extension.mock-check-in-progress":
+    "A mock runtime check is already in progress.",
 };
 
 export function extensionDiagnostic(

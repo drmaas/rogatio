@@ -15,6 +15,18 @@ export interface RuntimeGrant {
   readonly method: HttpMethod;
 }
 
+export interface RuntimeMockConfig {
+  readonly ruleId: string;
+  readonly status: number;
+  readonly headers?: readonly {
+    readonly name: string;
+    readonly value: string;
+  }[];
+  readonly delayMs?: number;
+  readonly body?: string;
+  readonly file?: string;
+}
+
 export interface RuntimeLimits {
   readonly maxPresetBytes: number;
   readonly maxRequestLineBytes: number;
@@ -42,6 +54,17 @@ export interface RuntimePresetV1 {
   readonly limits: RuntimeLimits;
   readonly matchers: readonly MatcherOperation[];
   readonly grants: readonly RuntimeGrant[];
+  readonly mocks?: readonly RuntimeMockConfig[];
+}
+
+export interface MockConnectionInfo {
+  readonly protocol: "f13-v1";
+  readonly port: number;
+  readonly presetDigest: PresetDigest;
+  readonly mocks: readonly {
+    readonly ruleId: string;
+    readonly token: string;
+  }[];
 }
 
 export interface NormalizedRuntimePreset extends RuntimePresetV1 {
@@ -65,6 +88,7 @@ export interface RuntimeServerOptions {
   readonly preset: NormalizedRuntimePreset;
   readonly fileRoot?: string;
   readonly clock?: () => number;
+  readonly port?: number;
 }
 
 export interface AuthorizedOperation {

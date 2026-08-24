@@ -96,7 +96,7 @@ const projectSchemaDefinition = {
           maximum: LIMITS.maxPriority,
         },
         method: { type: "string", enum: [...HTTP_METHODS] },
-        type: { type: "string", enum: ["redirect", "query", "header"] },
+        type: { type: "string", enum: ["redirect", "query", "header", "mock"] },
         redirect: {
           type: "object",
           additionalProperties: false,
@@ -117,6 +117,7 @@ const projectSchemaDefinition = {
           type: "string",
           maxLength: LIMITS.maxHeaderValueLength,
         },
+        mock: { $ref: "#/$defs/mockAction" },
       },
       allOf: [
         {
@@ -147,6 +148,16 @@ const projectSchemaDefinition = {
           // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
           then: {
             required: ["headerDirection", "headerOperation", "headerName"],
+          },
+        },
+        {
+          if: {
+            required: ["type"],
+            properties: { type: { const: "mock" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["mock"],
           },
         },
         {
@@ -209,6 +220,53 @@ const projectSchemaDefinition = {
           minItems: 1,
           maxItems: LIMITS.maxQueryParamsPerRule,
           items: { $ref: "#/$defs/queryParam" },
+        },
+      },
+    },
+    mockHeader: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "value"],
+      properties: {
+        name: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxMockHeaderNameLength,
+        },
+        value: {
+          type: "string",
+          maxLength: LIMITS.maxMockHeaderValueLength,
+        },
+      },
+    },
+    mockAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["status"],
+      properties: {
+        status: {
+          type: "integer",
+          minimum: LIMITS.minMockStatus,
+          maximum: LIMITS.maxMockStatus,
+        },
+        headers: {
+          type: "array",
+          maxItems: LIMITS.maxMockHeadersPerRule,
+          items: { $ref: "#/$defs/mockHeader" },
+        },
+        delayMs: {
+          type: "integer",
+          minimum: 0,
+          maximum: LIMITS.maxMockDelayMs,
+        },
+        body: {
+          type: "string",
+          maxLength: LIMITS.maxMockInlineBodyLength,
+        },
+        file: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxMockFilePathLength,
         },
       },
     },

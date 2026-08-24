@@ -1,14 +1,17 @@
 import {
   computeBadge,
   computeRuleStatuses,
+  type MockRuntimePhase,
   ProjectRepository,
   type RuleInstallerAdapter,
+  RuntimeStateController,
   type StorageAdapter,
 } from "@rogatio/browser-core";
 import {
   compileProject,
   type HeaderOperation,
   type MatcherOperation,
+  type MockOperation,
   type RogatioOperation,
 } from "@rogatio/compiler";
 import { normalizeSiteOrigin } from "@rogatio/schema";
@@ -17,6 +20,10 @@ import {
   extensionDiagnostic,
 } from "./diagnostics.js";
 import { installHeaderRules } from "./installer.js";
+import {
+  DEFAULT_MOCK_PORT,
+  type MockRuntimeConnection,
+} from "./mock-runtime.js";
 import { declaredPermissionOrigins } from "./permissions.js";
 import { projectHeaders } from "./projection.js";
 import { type ExtensionRequest, parseRequest } from "./protocol.js";
@@ -37,6 +44,12 @@ export interface ExtensionApplicationOptions {
   }) => Promise<void>;
   readonly generateId?: () => string;
   readonly now?: () => number;
+  readonly mockRuntime?: {
+    readonly fetchConnection: (
+      port: number,
+    ) => Promise<MockRuntimeConnection | null>;
+    readonly setConnection?: (connection: MockRuntimeConnection | null) => void;
+  };
 }
 
 type StateProjection = {
@@ -83,6 +96,8 @@ function operationStatuses(
   installedRuleIds: readonly string[],
   enabledGroupIds: readonly string[],
   grantedOrigins: readonly string[],
+  mockPhase: MockRuntimePhase,
+  mockTokens: ReadonlyMap<string, string>,
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -107,7 +122,6 @@ function operationStatuses(
       }
       return { ...status };
     }
-    // redirect and query operations are installable; pass through status
     if (operation?.kind === "header") {
       if (status.status === "active") {
         return {
@@ -118,6 +132,36 @@ function operationStatuses(
       }
       return { ...status };
     }
+    if (operation?.kind === "mock") {
+      if (mockPhase !== "connected") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "needs proxy",
+        };
+      }
+      if (!mockTokens.has(operation.ruleId)) {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "error",
+          diagnostics: [
+            extensionDiagnostic("extension.mock-token-missing", {
+              ruleId: operation.ruleId,
+            }),
+          ],
+        };
+      }
+      if (status.status === "active") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "active",
+        };
+      }
+      return { ...status };
+    }
+    // redirect and query operations are installable; pass through status
     if (status.status === "active") {
       return {
         groupId: status.groupId,
@@ -141,6 +185,8 @@ export function createExtensionApplication(
     generateId: options.generateId,
     now: options.now,
   });
+  const mockRuntimeState = new RuntimeStateController(undefined, options.now);
+  let mockTokens = new Map<string, string>();
   let pendingProjectId: string | null = null;
 
   async function grantedOriginsFor(
@@ -153,18 +199,22 @@ export function createExtensionApplication(
     return result;
   }
 
-  async function projectState(envelope: {
-    readonly activeProjectId: string | null;
-    readonly projects: Readonly<
-      Record<
-        string,
-        {
-          readonly data: unknown;
-          readonly enabledGroupIds: readonly string[];
-        }
-      >
-    >;
-  }): Promise<StateProjection> {
+  async function projectState(
+    envelope: {
+      readonly activeProjectId: string | null;
+      readonly projects: Readonly<
+        Record<
+          string,
+          {
+            readonly data: unknown;
+            readonly enabledGroupIds: readonly string[];
+          }
+        >
+      >;
+    },
+    mockPhase: MockRuntimePhase,
+    mockTokens: ReadonlyMap<string, string>,
+  ): Promise<StateProjection> {
     if (envelope.activeProjectId === null) {
       const badge = { text: "", attention: false };
       await options.badge?.(badge);
@@ -209,6 +259,8 @@ export function createExtensionApplication(
       installedRuleIds,
       project.enabledGroupIds,
       granted,
+      mockPhase,
+      mockTokens,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),
@@ -247,13 +299,15 @@ export function createExtensionApplication(
   async function state(): Promise<ApplicationResponse> {
     const result = await repository.state();
     if (!result.ok) return failure("extension.storage-failed");
-    const projection = await projectState(result.value);
+    const mock = mockRuntimeState.snapshot().mock;
+    const projection = await projectState(result.value, mock.phase, mockTokens);
     return {
       ok: true,
       value: {
         ...result.value,
         ruleStatuses: projection.statuses,
         badge: projection.badge,
+        mockRuntimeState: mockRuntimeState.snapshot().mock,
       },
     };
   }
@@ -291,13 +345,19 @@ export function createExtensionApplication(
           : failure("extension.not-found");
       }
       pendingProjectId = projectId;
-      const projection = await projectState(result.value);
+      const mock = mockRuntimeState.snapshot().mock;
+      const projection = await projectState(
+        result.value,
+        mock.phase,
+        mockTokens,
+      );
       return {
         ok: true,
         value: {
           ...result.value,
           ruleStatuses: projection.statuses,
           badge: projection.badge,
+          mockRuntimeState: mockRuntimeState.snapshot().mock,
         },
       };
     }
@@ -375,6 +435,55 @@ export function createExtensionApplication(
       await state();
       return { ok: true, value: result.value };
     }
+    if (request.command === "check-mock-runtime") {
+      const port =
+        typeof data.port === "number" ? data.port : DEFAULT_MOCK_PORT;
+      const current = await repository.state();
+      if (!current.ok) return failure("extension.storage-failed");
+      const activeProjectId = current.value.activeProjectId;
+      if (activeProjectId === null) return failure("extension.not-found");
+      const project = current.value.projects[activeProjectId];
+      if (!project) return failure("extension.not-found");
+      const compiled = compileProject(project.data);
+      if (!compiled.ok) return failure("extension.storage-failed");
+      const enabledGroupIds = new Set(project.enabledGroupIds);
+      const enabledMockOps = compiled.operations.filter(
+        (op): op is MockOperation =>
+          op.kind === "mock" && enabledGroupIds.has(op.groupId),
+      );
+
+      const begin = mockRuntimeState.beginMockCheck();
+      if (!begin.ok) return failure("extension.mock-check-in-progress");
+
+      const connection = options.mockRuntime
+        ? await options.mockRuntime.fetchConnection(port)
+        : null;
+      if (connection === null) {
+        mockRuntimeState.completeMockCheck(false, "Mock runtime not reachable");
+        mockTokens = new Map();
+        options.mockRuntime?.setConnection?.(null);
+      } else {
+        mockTokens = new Map(
+          connection.mocks.map((mock) => [mock.ruleId, mock.token]),
+        );
+        mockRuntimeState.completeMockCheck(true);
+        options.mockRuntime?.setConnection?.(connection);
+        const declared = declaredPermissionOrigins({
+          operations: compiled.operations,
+        });
+        const granted = await grantedOriginsFor(declared);
+        const grantedSet = new Set(granted);
+        const installOps = enabledMockOps.filter(
+          (op) =>
+            op.matcher.origins.every((origin) => grantedSet.has(origin)) &&
+            mockTokens.has(op.ruleId),
+        );
+        if (installOps.length > 0) {
+          await options.installer.install(installOps);
+        }
+      }
+      return state();
+    }
     if (
       request.command === "review-permissions" ||
       request.command === "grant-permissions" ||
@@ -399,7 +508,12 @@ export function createExtensionApplication(
         await syncStoredGrants(projectId, declared, grantedOrigins);
         const current = await repository.state();
         if (!current.ok) return failure("extension.storage-failed");
-        const projection = await projectState(current.value);
+        const mock = mockRuntimeState.snapshot().mock;
+        const projection = await projectState(
+          current.value,
+          mock.phase,
+          mockTokens,
+        );
         return {
           ok: true,
           value: {
@@ -409,6 +523,7 @@ export function createExtensionApplication(
               ...current.value,
               ruleStatuses: projection.statuses,
               badge: projection.badge,
+              mockRuntimeState: mockRuntimeState.snapshot().mock,
             },
           },
         };
