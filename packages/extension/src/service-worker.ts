@@ -2,6 +2,7 @@ import {
   computeBadge,
   computeRuleStatuses,
   type MockRuntimePhase,
+  type NativeRuntimePhase,
   ProjectRepository,
   type RuleInstallerAdapter,
   RuntimeStateController,
@@ -44,6 +45,14 @@ export interface ExtensionApplicationOptions {
   }) => Promise<void>;
   readonly generateId?: () => string;
   readonly now?: () => number;
+  readonly nativeRuntime?: {
+    start(): Promise<{
+      readonly state: NativeRuntimePhase | "unsupported";
+      readonly message?: string;
+    }>;
+    stop(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
+    status(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
+  };
   readonly mockRuntime?: {
     readonly fetchConnection: (
       port: number,
@@ -98,6 +107,7 @@ function operationStatuses(
   grantedOrigins: readonly string[],
   mockPhase: MockRuntimePhase,
   mockTokens: ReadonlyMap<string, string>,
+  nativePhase: NativeRuntimePhase | "unsupported",
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -130,6 +140,22 @@ function operationStatuses(
           status: "active",
         };
       }
+      return { ...status };
+    }
+    if (operation?.kind === "response-body") {
+      if (nativePhase === "unsupported" || nativePhase !== "started") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "needs proxy",
+        };
+      }
+      if (status.status === "active" || status.status === "error")
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "active",
+        };
       return { ...status };
     }
     if (operation?.kind === "mock") {
@@ -187,6 +213,9 @@ export function createExtensionApplication(
   });
   const mockRuntimeState = new RuntimeStateController(undefined, options.now);
   let mockTokens = new Map<string, string>();
+  let nativePhase: NativeRuntimePhase | "unsupported" = options.nativeRuntime
+    ? "stopped"
+    : "unsupported";
   let pendingProjectId: string | null = null;
 
   async function grantedOriginsFor(
@@ -261,6 +290,7 @@ export function createExtensionApplication(
       granted,
       mockPhase,
       mockTokens,
+      nativePhase,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),
@@ -308,6 +338,7 @@ export function createExtensionApplication(
         ruleStatuses: projection.statuses,
         badge: projection.badge,
         mockRuntimeState: mockRuntimeState.snapshot().mock,
+        nativeRuntimeState: { phase: nativePhase },
       },
     };
   }
@@ -358,6 +389,7 @@ export function createExtensionApplication(
           ruleStatuses: projection.statuses,
           badge: projection.badge,
           mockRuntimeState: mockRuntimeState.snapshot().mock,
+          nativeRuntimeState: { phase: nativePhase },
         },
       };
     }
@@ -434,6 +466,42 @@ export function createExtensionApplication(
       if (!result.ok) return failure("extension.not-found");
       await state();
       return { ok: true, value: result.value };
+    }
+    if (
+      request.command === "start-native-runtime" ||
+      request.command === "stop-native-runtime" ||
+      request.command === "get-native-runtime-status"
+    ) {
+      if (!options.nativeRuntime) {
+        nativePhase = "unsupported";
+        return request.command === "get-native-runtime-status"
+          ? { ok: true, value: { nativeRuntimeState: { phase: nativePhase } } }
+          : failure("extension.native-runtime-unavailable");
+      }
+      if (request.command === "start-native-runtime") {
+        const result = await options.nativeRuntime.start();
+        nativePhase = result.state;
+        return result.state === "started"
+          ? state()
+          : {
+              ok: true,
+              value: {
+                nativeRuntimeState: { phase: nativePhase },
+                message: result.message,
+              },
+            };
+      }
+      if (request.command === "stop-native-runtime") {
+        const result = await options.nativeRuntime.stop();
+        nativePhase = result.state;
+        return state();
+      }
+      const result = await options.nativeRuntime.status();
+      nativePhase = result.state;
+      return {
+        ok: true,
+        value: { nativeRuntimeState: { phase: nativePhase } },
+      };
     }
     if (request.command === "check-mock-runtime") {
       const port =
@@ -524,6 +592,7 @@ export function createExtensionApplication(
               ruleStatuses: projection.statuses,
               badge: projection.badge,
               mockRuntimeState: mockRuntimeState.snapshot().mock,
+              nativeRuntimeState: { phase: nativePhase },
             },
           },
         };

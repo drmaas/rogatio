@@ -25,4 +25,7 @@ export const LIMITS = Object.freeze({
   maxMockInlineBodyLength: 65536,
   maxMockDelayMs: 30000,
   maxMockFilePathLength: 2048,
+  maxResponseBodyReplacements: 64,
+  maxResponseBodyPatternLength: 2048,
+  maxResponseBodyReplacementLength: 4096,
 });

@@ -2,6 +2,7 @@ export type {
   HeaderAction,
   HeaderDirection,
   HeaderOperationKind,
+  ResponseBodyAction,
   RogatioQueryAction,
 } from "@rogatio/schema";
 export { compileProject } from "./compile.js";
@@ -16,5 +17,6 @@ export type {
   NormalizedMatcher,
   QueryOperation,
   RedirectOperation,
+  ResponseBodyOperation,
   RogatioOperation,
 } from "./types.js";

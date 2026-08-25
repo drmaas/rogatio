@@ -18,6 +18,7 @@ import type {
   NormalizedMatcher,
   QueryOperation,
   RedirectOperation,
+  ResponseBodyOperation,
   RogatioOperation,
 } from "./types.js";
 
@@ -258,6 +259,15 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
           ruleId: rule.id,
           matcher,
           mock: rule.mock ?? { status: 200, body: "" },
+        };
+        operations.push(operation);
+      } else if (rule.type === "response-body") {
+        const operation: ResponseBodyOperation = {
+          kind: "response-body",
+          groupId: group.id,
+          ruleId: rule.id,
+          matcher,
+          responseBody: rule.responseBody ?? { replacements: [] },
         };
         operations.push(operation);
       } else {

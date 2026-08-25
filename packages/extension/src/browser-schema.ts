@@ -403,6 +403,8 @@ const RULE_KEYS = [
   "headerOperation",
   "headerName",
   "headerValue",
+  "mock",
+  "responseBody",
 ] as const;
 
 const QUERY_ACTION_KEYS = ["type", "params"] as const;
@@ -604,7 +606,9 @@ export function validateProjectDetailed(
         rule.type !== undefined &&
         rule.type !== "redirect" &&
         rule.type !== "query" &&
-        rule.type !== "header"
+        rule.type !== "header" &&
+        rule.type !== "mock" &&
+        rule.type !== "response-body"
       )
         errors.push(issue(`${rulePath}/type`, "invalid-value"));
       if (rule.type === "redirect") {

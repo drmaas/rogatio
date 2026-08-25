@@ -17,7 +17,10 @@ export type ExtensionCommand =
   | "grant-permissions"
   | "revoke-permission"
   | "set-group-enabled"
-  | "check-mock-runtime";
+  | "check-mock-runtime"
+  | "start-native-runtime"
+  | "stop-native-runtime"
+  | "get-native-runtime-status";
 
 export interface ExtensionRequest {
   readonly version: 1;
@@ -48,6 +51,9 @@ const COMMANDS = new Set<ExtensionCommand>([
   "revoke-permission",
   "set-group-enabled",
   "check-mock-runtime",
+  "start-native-runtime",
+  "stop-native-runtime",
+  "get-native-runtime-status",
 ]);
 
 function snapshot(value: unknown, ancestors = new WeakSet<object>()): unknown {
