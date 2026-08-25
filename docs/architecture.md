@@ -249,6 +249,38 @@ Observed request/response bodies are processed in-process only. The native-messa
 
 The complete proposed contract and acceptance criteria are in `docs/specs/f14-macos-runtime.md`; the staged workflow record is in `docs/f14-workflow.md`.
 
+## F16: Request-Body Trust Lifecycle
+
+F16 adds the **trust lifecycle** that request-body interception (F17) requires before any network interception can happen: it manages the native-messaging host registration and the device-local CA trust that F14's interception gate depends on. It is a distinct concern from F14's `start`/`stop`/`status` (which govern a running runtime *process*); F16 governs the *installed/trusted* standing of the host on the device. It depends only on F14 (REP-001) and adds no F15/F17 rule behavior, only the trust surface those slices pre-condition.
+
+### Ownership and data flow
+
+`@rogatio/runtime` gains a `trust` module with a `createRequestBodyTrustController` controller and pure helper functions. `@rogatio/cli` extends `rogatio runtime` with `install | status | trust | untrust | uninstall`. Five owned operations:
+
+- **install:** write the native-messaging host manifest (`com.rogatio.runtime.json`) into the platform's Chrome native-messaging manifest directory, pointing at the installed runtime host. Capability-based: the manifest directory must be resolvable and writable and the host path must exist; otherwise report `trust.unsupported`.
+- **status:** report `{ installed, trusted, platform, capabilityReasons }` without side effects; reads the manifest (present + well-formed) and the CA trust standing.
+- **trust:** provision a device-local CA into the OS trust store (capability-based; macOS keychain reference platform) and record it as trusted. Idempotent.
+- **untrust:** remove the device-local CA trust from the OS trust store. No-op when not trusted. Idempotent.
+- **uninstall:** remove the native-messaging host manifest. No-op when not installed. Idempotent.
+
+Three owned layers:
+
+- **Manifest generation (pure):** `generateNativeMessagingManifest(hostPath, name)` returns a fixed-shape JSON `{ name, description, path, type: "stdio", allowed_origins: [...] }`, deterministic for the same inputs. The manifest carries no secrets; `path` must be absolute and confined to an expected install root before emission.
+- **Capability gate:** `detectTrustCapabilities()` reports whether host-manifest install and CA trust install are possible on the current platform/config. Capability-based, not OS-name-based, mirroring F14 REQ-008: a non-macOS platform with the required tooling may still install/trust; a macOS platform missing the tooling reports `trust.unsupported`.
+- **Trust controller:** `install`/`uninstall`/`trust`/`untrust`/`status` with explicit idempotency and a single stable error set. No telemetry, no retained state beyond the manifest file and the OS trust store; nothing is persisted to the project, the runtime, or disk outside the manifest path.
+
+### Authority and confidentiality boundary
+
+F16 touches only device-local trust material: the manifest (which names the host) and a device-local CA. It never reads, writes, logs, or transmits request/response bodies; it does not contact upstream and does not implement F17 transformation. The CA is device-local and self-signed; its private key stays confined to the install root and is never placed on the native-messaging envelope. `status` echoes only booleans and the platform/capability reasons — never the manifest path, the host path, CA material, or third-party tooling text.
+
+### Alternatives rejected
+
+- Bundling host manifest + CA trust into F14 `start`: rejected because install/trust are device-level, persistent, and intentionally separate from the per-session runtime lifecycle; conflating them would force re-trust on every start.
+- Persisting trust state in the project file: rejected; trust is device-local, not project state, and must not travel with `.rogatio.json`.
+- Auto-install/auto-trust on `runtime start`: rejected; explicit, capability-gated user actions only, per F14's no-auto-start stance.
+
+The complete proposed contract and acceptance criteria are in `docs/specs/f16-request-body-trust.md`; the staged workflow record is in `docs/f16-workflow.md`.
+
 ## F8: CLI Package Architecture
 
 ### Components

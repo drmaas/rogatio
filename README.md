@@ -73,6 +73,7 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
 | `rogatio runtime <start\|stop\|status>` | Native-messaging runtime control. Capability-gated: `start` reports `unsupported` on platforms that cannot provision a trusted device-local CA or where Chrome PAC routing would collide with an existing controlling proxy/PAC/extension/enterprise policy. |
+| `rogatio runtime <install\|trust\|untrust\|uninstall>` | Request-body trust lifecycle. `install` writes the native-messaging host manifest; `trust` provisions and trusts the device-local CA; `untrust`/`uninstall` remove CA trust and the manifest (idempotent). All are capability-gated and report `unsupported` without error on incapable platforms. `rogatio runtime status` reports both runtime and trust state. |
 | `rogatio runtime [path]` | Starts the local mock runtime on `127.0.0.1:8890` (override with `--port <n>`; `--root <dir>` confines mock file reads). Print "Check and connect" in the extension to install mock rules. Press Ctrl+C to stop. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import

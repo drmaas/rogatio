@@ -1,9 +1,11 @@
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import {
   createNativeRuntimeController,
+  createRequestBodyTrustController,
   createRuntimeServer,
+  defaultTrustInstallRoot,
   normalizeRuntimePreset,
   RUNTIME_LIMITS,
   type RuntimeMockConfig,
@@ -31,7 +33,13 @@ start the local mock runtime for F13 mock rules.
 Native runtime commands:
   start     Start the runtime (capability-gated; explicit, no auto-start)
   stop      Stop the runtime (idempotent)
-  status    Show the current runtime state
+  status    Show the current runtime and trust state
+
+Request-body trust commands:
+  install   Install the native-messaging host manifest (capability-gated)
+  trust     Provision and trust the device-local CA (capability-gated)
+  untrust   Remove the device-local CA trust (idempotent)
+  uninstall Uninstall the native-messaging host manifest (idempotent)
 
 Mock runtime arguments:
   path      Path to .rogatio.json (default: .rogatio.json in current directory)
@@ -147,6 +155,88 @@ async function nativeRuntimeCommand(args: string[]): Promise<number> {
   }
 }
 
+function makeTrustController() {
+  const platform = process.platform;
+  const installRoot = defaultTrustInstallRoot(platform);
+  return createRequestBodyTrustController({
+    platform,
+    installRoot,
+    hostPath: join(installRoot, "runtime-host"),
+    hostName: "com.rogatio.runtime",
+    allowedOrigins: [],
+  });
+}
+
+function reportTrust(
+  subcommand: string,
+  result: { ok: boolean; state: string; reasons?: readonly string[] },
+  okMessage: string,
+): number {
+  if (result.ok) {
+    console.log(okMessage);
+    return 0;
+  }
+  if (result.state === "unsupported") {
+    console.error(
+      `trust unsupported: ${(result.reasons ?? ["unknown"]).join(", ")}`,
+    );
+    return 0;
+  }
+  console.error(
+    `trust ${subcommand} failed: ${(result.reasons ?? ["unknown"]).join(", ")}`,
+  );
+  return 1;
+}
+
+async function trustRuntimeCommand(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const controller = makeTrustController();
+  switch (subcommand) {
+    case "install":
+      return reportTrust(
+        "install",
+        await controller.install(),
+        "trust installed",
+      );
+    case "trust":
+      return reportTrust(
+        "trust",
+        await controller.trust(),
+        "trust established",
+      );
+    case "untrust":
+      return reportTrust(
+        "untrust",
+        await controller.untrust(),
+        "trust removed",
+      );
+    case "uninstall":
+      return reportTrust(
+        "uninstall",
+        await controller.uninstall(),
+        "trust manifest uninstalled",
+      );
+    default:
+      console.error(`Error: unknown runtime subcommand: ${subcommand ?? ""}`);
+      showRuntimeHelp();
+      return 2;
+  }
+}
+
+async function runtimeStatusCommand(_args: string[]): Promise<number> {
+  const controller = makeTrustController();
+  const status = await controller.status();
+  console.log(`runtime ${createNativeRuntimeController().status().state}`);
+  console.log(`trust installed: ${status.installed}`);
+  console.log(`trust established: ${status.trusted}`);
+  if (!status.installed || !status.trusted) {
+    console.error(
+      `trust unsupported: ${(status.capabilityReasons ?? ["unknown"]).join(", ")}`,
+    );
+  }
+  return 0;
+}
+
 export function runtimeCommand(
   args: ["start" | "stop" | "status", ...string[]],
   options?: { stdinInput?: string },
@@ -173,8 +263,15 @@ export async function runtimeCommand(
   }
 
   const first = args[0];
-  if (first === "start" || first === "stop" || first === "status")
-    return nativeRuntimeCommand(args);
+  if (
+    first === "install" ||
+    first === "trust" ||
+    first === "untrust" ||
+    first === "uninstall"
+  )
+    return trustRuntimeCommand(args);
+  if (first === "status") return runtimeStatusCommand(args);
+  if (first === "start" || first === "stop") return nativeRuntimeCommand(args);
   if (
     first !== undefined &&
     !first.startsWith("-") &&

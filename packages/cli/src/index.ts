@@ -112,7 +112,7 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
-  runtime <start|stop|status>  Native messaging runtime control
+  runtime <start|stop|status|install|trust|untrust|uninstall>  Native messaging runtime and request-body trust control
   runtime [path]  Start the mock runtime server (F13)
 
 Global Options:
