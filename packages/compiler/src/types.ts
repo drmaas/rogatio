@@ -2,6 +2,7 @@ import type {
   HeaderDirection,
   HeaderOperationKind,
   HttpMethod,
+  MockAction,
   ResourceType,
   RogatioQueryAction,
 } from "@rogatio/schema";
@@ -53,11 +54,20 @@ export interface HeaderOperation {
   };
 }
 
+export interface MockOperation {
+  readonly kind: "mock";
+  readonly groupId: string;
+  readonly ruleId: string;
+  readonly matcher: NormalizedMatcher;
+  readonly mock: MockAction;
+}
+
 export type RogatioOperation =
   | MatcherOperation
   | RedirectOperation
   | QueryOperation
-  | HeaderOperation;
+  | HeaderOperation
+  | MockOperation;
 
 export type CompilerDiagnosticCode =
   | "schema.required"

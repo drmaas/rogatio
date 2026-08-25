@@ -1,5 +1,6 @@
 import {
   createEditor,
+  createMockRuleType,
   createRedirectRuleType,
   type EditorController,
 } from "@rogatio/editor";
@@ -19,6 +20,14 @@ interface Envelope {
   readonly activeProjectId: string | null;
   readonly ruleStatuses?: readonly Record<string, unknown>[];
   readonly badge?: { readonly text: string; readonly attention: boolean };
+  readonly mockRuntimeState?: {
+    readonly phase: "disconnected" | "checking" | "connected" | "failed";
+    readonly lastCheck?: {
+      readonly at?: number;
+      readonly ok?: boolean;
+      readonly message?: string;
+    } | null;
+  };
 }
 
 interface ExtensionResponse {
@@ -122,6 +131,7 @@ function renderShell(): void {
       permissionGranted ? "Access granted" : "Grant declared access",
       "grant-permissions",
     ),
+    button("Check and connect", "check-mock-runtime"),
     button("Refresh", "refresh"),
     button("Export project", "export"),
     button("Remove project", "remove"),
@@ -184,6 +194,24 @@ function renderShell(): void {
     : "Active rules: 0";
   shell.append(badge);
 
+  const mockRuntime = document.createElement("p");
+  mockRuntime.dataset.mockRuntimeState = "true";
+  const mockPhase = state.mockRuntimeState?.phase ?? "disconnected";
+  const lastCheck = state.mockRuntimeState?.lastCheck;
+  if (mockPhase === "checking") {
+    mockRuntime.textContent = "Mock runtime: checking…";
+  } else if (mockPhase === "connected") {
+    mockRuntime.textContent = lastCheck?.ok
+      ? "Mock runtime: connected."
+      : "Mock runtime: connected.";
+  } else if (mockPhase === "failed") {
+    mockRuntime.textContent = `Mock runtime: unreachable${lastCheck?.message ? ` (${lastCheck.message})` : ""}. Start rogatio runtime and check again.`;
+  } else {
+    mockRuntime.textContent =
+      "Mock runtime: not connected. Start rogatio runtime, then choose Check and connect.";
+  }
+  shell.append(mockRuntime);
+
   const ruleStatuses = document.createElement("ul");
   ruleStatuses.dataset.ruleStatuses = "true";
   for (const ruleStatus of state.ruleStatuses ?? []) {
@@ -216,6 +244,7 @@ function renderShell(): void {
     if (command === "import") importInput.click();
     if (command === "review-permissions") void reviewPermissions();
     if (command === "grant-permissions") void grantPermissions();
+    if (command === "check-mock-runtime") void checkMockRuntime();
     if (command === "export") void exportProject();
     if (command === "remove") void removeProject();
   });
@@ -233,7 +262,7 @@ function renderShell(): void {
   if (ids.length > 0) {
     editor = createEditor({
       root: editorRoot,
-      ruleTypes: [createRedirectRuleType()],
+      ruleTypes: [createRedirectRuleType(), createMockRuleType()],
       initialProject: safeProjectData(),
       validate(value) {
         const result = validateProjectDetailed(value);
@@ -375,6 +404,18 @@ async function setGroupEnabled(
         ? "Group activated."
         : "Group deactivated."
       : "The group activation could not be changed.";
+  await refresh();
+}
+
+async function checkMockRuntime(): Promise<void> {
+  const response = await client.send({
+    version: 1,
+    command: "check-mock-runtime",
+  });
+  statusMessage =
+    response?.ok === true
+      ? "Mock runtime check complete."
+      : "The mock runtime could not be checked. Start rogatio runtime and try again.";
   await refresh();
 }
 

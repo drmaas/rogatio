@@ -17,4 +17,12 @@ export const LIMITS = Object.freeze({
   maxQueryValueLength: 2048,
   maxHeaderNameLength: 256,
   maxHeaderValueLength: 4096,
+  minMockStatus: 200,
+  maxMockStatus: 599,
+  maxMockHeadersPerRule: 32,
+  maxMockHeaderNameLength: 256,
+  maxMockHeaderValueLength: 4096,
+  maxMockInlineBodyLength: 65536,
+  maxMockDelayMs: 30000,
+  maxMockFilePathLength: 2048,
 });

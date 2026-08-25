@@ -11,6 +11,8 @@ export { projectSchema } from "./schema.js";
 export type {
   HeaderAction,
   HttpMethod,
+  MockAction,
+  MockHeader,
   RedirectAction,
   ResourceType,
   RogatioGroup,

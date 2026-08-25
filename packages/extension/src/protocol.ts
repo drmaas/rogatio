@@ -16,7 +16,8 @@ export type ExtensionCommand =
   | "review-permissions"
   | "grant-permissions"
   | "revoke-permission"
-  | "set-group-enabled";
+  | "set-group-enabled"
+  | "check-mock-runtime";
 
 export interface ExtensionRequest {
   readonly version: 1;
@@ -46,6 +47,7 @@ const COMMANDS = new Set<ExtensionCommand>([
   "grant-permissions",
   "revoke-permission",
   "set-group-enabled",
+  "check-mock-runtime",
 ]);
 
 function snapshot(value: unknown, ancestors = new WeakSet<object>()): unknown {

@@ -2,10 +2,11 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
-import type { DryRunTestCase } from "@rogatio/dry-run";
+import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject, parseTestUrl } from "@rogatio/dry-run";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { readProject } from "../utils/file.js";
+import { createMockPreviewAction } from "../utils/mock-preview.js";
 
 interface TestCaseInput {
   url: string;
@@ -110,8 +111,12 @@ function addDefaults(
 
 function resultOptions(
   maxCases: number | undefined,
-): undefined | { maxCases: number } {
-  return maxCases === undefined ? undefined : { maxCases };
+  operations: readonly RogatioOperation[],
+): DryRunOptions {
+  const options: DryRunOptions = {};
+  if (maxCases !== undefined) options.maxCases = maxCases;
+  options.previewAction = createMockPreviewAction(operations);
+  return options;
 }
 
 function diagnosticsFromSchema(projectData: unknown): Diagnostic[] {
@@ -360,7 +365,7 @@ async function testCommandImpl(
   const dryRunResult = dryRunProject(
     toMatcherOperations(compileResult.operations),
     testCases,
-    resultOptions(maxCases),
+    resultOptions(maxCases, compileResult.operations),
   );
 
   if (jsonMode) {

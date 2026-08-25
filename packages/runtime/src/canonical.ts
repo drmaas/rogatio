@@ -4,6 +4,7 @@ import type {
   PresetDigest,
   RuntimeGrant,
   RuntimeLimits,
+  RuntimeMockConfig,
   RuntimePresetV1,
 } from "./types.js";
 
@@ -55,6 +56,35 @@ function grantValue(grant: RuntimeGrant): string {
   return `{"groupId":${stringValue(grant.groupId)},"ruleId":${stringValue(grant.ruleId)},"operationId":${stringValue(grant.operationId)},"kind":${stringValue(grant.kind)},"target":${stringValue(grant.target)},"method":${stringValue(grant.method)}}`;
 }
 
+function mockHeaderValue(header: {
+  readonly name: string;
+  readonly value: string;
+}): string {
+  return `{"name":${stringValue(header.name)},"value":${stringValue(header.value)}}`;
+}
+
+function mockValue(mock: RuntimeMockConfig): string {
+  const headers =
+    mock.headers === undefined
+      ? ""
+      : `,"headers":[${mock.headers.map(mockHeaderValue).join(",")}]`;
+  const delay =
+    mock.delayMs === undefined ? "" : `,"delayMs":${String(mock.delayMs)}`;
+  const body =
+    mock.body !== undefined ? `,"body":${stringValue(mock.body)}` : "";
+  const file =
+    mock.file !== undefined ? `,"file":${stringValue(mock.file)}` : "";
+  return `{"ruleId":${stringValue(mock.ruleId)},"status":${String(mock.status)}${headers}${delay}${body}${file}}`;
+}
+
+export function sortMocks(
+  mocks: readonly RuntimeMockConfig[],
+): RuntimeMockConfig[] {
+  return [...mocks].sort((left, right) =>
+    compareStrings(left.ruleId, right.ruleId),
+  );
+}
+
 export function compareStrings(left: string, right: string): number {
   if (left < right) return -1;
   if (left > right) return 1;
@@ -78,7 +108,11 @@ export function canonicalPresetBytes(
   grants = preset.grants,
 ): Uint8Array {
   const matchers = preset.matchers.map(matcherValue).join(",");
-  const canonical = `{"version":1,"limits":${limitsValue(preset.limits)},"matchers":[${matchers}],"grants":[${sortGrants(grants).map(grantValue).join(",")}]}`;
+  const mocks =
+    preset.mocks === undefined || preset.mocks.length === 0
+      ? ""
+      : `,"mocks":[${sortMocks(preset.mocks).map(mockValue).join(",")}]`;
+  const canonical = `{"version":1,"limits":${limitsValue(preset.limits)},"matchers":[${matchers}],"grants":[${sortGrants(grants).map(grantValue).join(",")}]${mocks}}`;
   return new TextEncoder().encode(canonical);
 }
 

@@ -11,7 +11,7 @@
     "default_title": "Rogatio",
     "default_popup": "index.html"
   },
-  "permissions": ["storage"],
+  "permissions": ["storage", "declarativeNetRequest"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

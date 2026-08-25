@@ -1,4 +1,8 @@
+import { createMockRuleType } from "./mock.js";
 import { queryRuleType } from "./query.js";
 
-export { queryRuleType };
-export const builtInRuleTypes = Object.freeze([queryRuleType]);
+export { createMockRuleType, queryRuleType };
+export const builtInRuleTypes = Object.freeze([
+  queryRuleType,
+  createMockRuleType(),
+]);

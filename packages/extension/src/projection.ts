@@ -1,6 +1,7 @@
 import type {
   HeaderOperation,
   MatcherOperation,
+  MockOperation,
   NormalizedMatcher,
   QueryOperation,
   RedirectOperation,
@@ -137,6 +138,39 @@ function isRedirectOperation(value: unknown): value is RedirectOperation {
     return false;
   const redirect = value.redirect;
   return isRecord(redirect) && typeof redirect.destination === "string";
+}
+
+function isMockOperation(value: unknown): value is MockOperation {
+  if (!isRecord(value) || value.kind !== "mock") return false;
+  if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
+    return false;
+  const matcher = value.matcher;
+  if (!isRecord(matcher) || !isRecord(matcher.urlRegex)) return false;
+  if (
+    typeof matcher.urlRegex.source !== "string" ||
+    matcher.urlRegex.flags !== "" ||
+    compileUrlRegex(matcher.urlRegex.source) === null ||
+    !Array.isArray(matcher.origins) ||
+    !matcher.origins.every(
+      (origin) =>
+        typeof origin === "string" && normalizeSiteOrigin(origin) !== null,
+    ) ||
+    !Array.isArray(matcher.resourceTypes) ||
+    !matcher.resourceTypes.every((type) =>
+      RESOURCE_TYPES.includes(type as (typeof RESOURCE_TYPES)[number]),
+    ) ||
+    typeof matcher.priority !== "number" ||
+    !Number.isSafeInteger(matcher.priority) ||
+    matcher.priority < LIMITS.minPriority ||
+    matcher.priority > LIMITS.maxPriority
+  )
+    return false;
+  if (
+    matcher.method !== undefined &&
+    !HTTP_METHODS.includes(matcher.method as (typeof HTTP_METHODS)[number])
+  )
+    return false;
+  return isRecord(value.mock) && typeof value.mock.status === "number";
 }
 
 function isQueryOperation(value: unknown): value is QueryOperation {
@@ -319,6 +353,19 @@ export function projectMatchers(
           },
         },
       };
+    } else if (isMockOperation(operation)) {
+      // Mock rules are installable, but their DNR redirect target depends on the
+      // runtime connection info, so no dnrRule is emitted at projection time.
+      matcher = {
+        urlRegex: { ...operation.matcher.urlRegex },
+        origins: [...operation.matcher.origins],
+        resourceTypes: [...operation.matcher.resourceTypes],
+        priority: operation.matcher.priority,
+        ...(operation.matcher.method !== undefined
+          ? { method: operation.matcher.method }
+          : {}),
+      };
+      installable = true;
     } else {
       throw new Error(extensionDiagnostic("extension.invalid-operation").code);
     }

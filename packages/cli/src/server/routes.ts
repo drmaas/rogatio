@@ -6,6 +6,7 @@ import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject } from "@rogatio/dry-run";
 import { validateProjectDetailed } from "@rogatio/schema";
+import { createMockPreviewAction } from "../utils/mock-preview.js";
 
 export interface RouteContext {
   project: unknown;
@@ -432,7 +433,10 @@ export function createRoutes(context: RouteContext) {
       const result = dryRunProject(
         toMatcherOperations(compileResult.operations),
         body.cases as DryRunTestCase[],
-        body.options as DryRunOptions | undefined,
+        {
+          ...((body.options as DryRunOptions | undefined) ?? {}),
+          previewAction: createMockPreviewAction(compileResult.operations),
+        },
       );
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(result));

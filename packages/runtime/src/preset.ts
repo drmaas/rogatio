@@ -17,6 +17,7 @@ import type {
   NormalizedRuntimePreset,
   RuntimeGrant,
   RuntimeLimits,
+  RuntimeMockConfig,
   RuntimePresetV1,
   RuntimeResult,
 } from "./types.js";
@@ -40,6 +41,119 @@ function validMethod(value: unknown): value is HttpMethod {
   return (
     typeof value === "string" && HTTP_METHODS.includes(value as HttpMethod)
   );
+}
+
+function hasControl(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
+function normalizeMockHeader(
+  value: unknown,
+): { readonly name: string; readonly value: string } | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    return null;
+  if (!exactKeys(value, ["name", "value"])) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.name !== "string" ||
+    record.name.length === 0 ||
+    record.name.length > LIMITS.maxMockHeaderNameLength ||
+    hasControl(record.name) ||
+    record.name.includes(":")
+  )
+    return null;
+  if (
+    typeof record.value !== "string" ||
+    record.value.length > LIMITS.maxMockHeaderValueLength
+  )
+    return null;
+  return { name: record.name, value: record.value };
+}
+
+function normalizeMockConfig(
+  value: unknown,
+  matcherById: ReadonlyMap<string, MatcherOperation>,
+): RuntimeMockConfig | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    return null;
+  const record = value as Record<string, unknown>;
+  const allowedKeys = [
+    "ruleId",
+    "status",
+    "headers",
+    "delayMs",
+    "body",
+    "file",
+  ];
+  if (Object.keys(record).some((key) => !allowedKeys.includes(key)))
+    return null;
+  if (!validId(record.ruleId) || !matcherById.has(record.ruleId)) return null;
+  if (
+    typeof record.status !== "number" ||
+    !Number.isSafeInteger(record.status) ||
+    record.status < LIMITS.minMockStatus ||
+    record.status > LIMITS.maxMockStatus
+  )
+    return null;
+
+  let headers: RuntimeMockConfig["headers"];
+  if (hasOwn(record, "headers")) {
+    if (
+      !Array.isArray(record.headers) ||
+      record.headers.length > LIMITS.maxMockHeadersPerRule
+    )
+      return null;
+    const normalizedHeaders: {
+      readonly name: string;
+      readonly value: string;
+    }[] = [];
+    for (const headerValue of record.headers) {
+      const header = normalizeMockHeader(headerValue);
+      if (header === null) return null;
+      normalizedHeaders.push(header);
+    }
+    headers = Object.freeze(normalizedHeaders);
+  }
+
+  let delayMs: number | undefined;
+  if (hasOwn(record, "delayMs")) {
+    if (
+      typeof record.delayMs !== "number" ||
+      !Number.isSafeInteger(record.delayMs) ||
+      record.delayMs < 0 ||
+      record.delayMs > LIMITS.maxMockDelayMs
+    )
+      return null;
+    delayMs = record.delayMs;
+  }
+
+  const body = record.body;
+  const file = record.file;
+  const bodySet = typeof body === "string";
+  const fileSet = typeof file === "string";
+  if (bodySet === fileSet) return null;
+  if (bodySet && body.length > LIMITS.maxMockInlineBodyLength) return null;
+  if (fileSet) {
+    if (
+      file.length === 0 ||
+      file.length > LIMITS.maxMockFilePathLength ||
+      hasControl(file)
+    )
+      return null;
+  }
+
+  return Object.freeze({
+    ruleId: record.ruleId,
+    status: record.status,
+    ...(headers === undefined ? {} : { headers }),
+    ...(delayMs === undefined ? {} : { delayMs }),
+    ...(bodySet ? { body } : {}),
+    ...(fileSet ? { file } : {}),
+  });
 }
 
 function validResourceType(value: unknown): value is ResourceType {
@@ -274,7 +388,14 @@ export function normalizeRuntimePreset(
     return failure("runtime.invalid-preset");
   }
   const record = snapshot.value as Record<string, unknown>;
-  if (!exactKeys(record, ["version", "limits", "matchers", "grants"]))
+  const allowedKeys = ["version", "limits", "matchers", "grants", "mocks"];
+  const requiredKeys = ["version", "limits", "matchers", "grants"];
+  const keyCount = Object.keys(record).length;
+  if (
+    Object.keys(record).some((key) => !allowedKeys.includes(key)) ||
+    !requiredKeys.every((key) => hasOwn(record, key)) ||
+    (keyCount !== 4 && keyCount !== 5)
+  )
     return failure("runtime.invalid-preset");
   if (record.version !== 1 || !sameLimits(record.limits))
     return failure("runtime.invalid-preset");
@@ -301,11 +422,25 @@ export function normalizeRuntimePreset(
     grants.push(grant);
   }
 
+  const mocks: RuntimeMockConfig[] = [];
+  if (hasOwn(record, "mocks")) {
+    if (!Array.isArray(record.mocks)) return failure("runtime.invalid-preset");
+    const seenRuleIds = new Set<string>();
+    for (const value of record.mocks) {
+      const mock = normalizeMockConfig(value, matcherById);
+      if (mock === null || seenRuleIds.has(mock.ruleId))
+        return failure("runtime.invalid-preset");
+      seenRuleIds.add(mock.ruleId);
+      mocks.push(mock);
+    }
+  }
+
   const normalizedPreset: RuntimePresetV1 = Object.freeze({
     version: 1,
     limits: RUNTIME_LIMITS,
     matchers: Object.freeze(matchers),
     grants: Object.freeze(grants),
+    ...(mocks.length > 0 ? { mocks: Object.freeze(mocks) } : {}),
   });
   const bytes = canonicalPresetBytes(normalizedPreset);
   if (bytes.byteLength > RUNTIME_LIMITS.maxPresetBytes)
