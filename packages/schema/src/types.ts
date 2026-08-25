@@ -34,7 +34,12 @@ export const HTTP_METHODS = Object.freeze([
 
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
-export type RuleType = "redirect" | "query" | "header" | "mock";
+export type RuleType =
+  | "redirect"
+  | "query"
+  | "header"
+  | "mock"
+  | "response-body";
 
 export type HeaderDirection = "request" | "response";
 export type HeaderOperationKind = "set" | "append" | "remove";
@@ -80,6 +85,15 @@ export interface MockAction {
   file?: string;
 }
 
+export interface ResponseBodyReplacement {
+  pattern: string;
+  replacement: string;
+}
+
+export interface ResponseBodyAction {
+  replacements: ResponseBodyReplacement[];
+}
+
 export interface RogatioRule {
   id: string;
   name: string;
@@ -105,6 +119,8 @@ export interface RogatioRule {
 
   /** Required iff type === "mock". */
   mock?: MockAction;
+  /** Required iff type === "response-body". */
+  responseBody?: ResponseBodyAction;
 }
 
 export interface RogatioGroup {

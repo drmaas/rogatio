@@ -12,7 +12,9 @@ export type ExtensionDiagnosticCode =
   | "extension.forbidden-header"
   | "extension.dnr-error"
   | "extension.mock-token-missing"
-  | "extension.mock-check-in-progress";
+  | "extension.mock-check-in-progress"
+  | "extension.native-runtime-unavailable"
+  | "extension.native-runtime-transition";
 
 export interface ExtensionDiagnostic {
   readonly code: ExtensionDiagnosticCode;
@@ -44,6 +46,10 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
     "The mock runtime has no token for this rule; restart rogatio runtime after changing the project.",
   "extension.mock-check-in-progress":
     "A mock runtime check is already in progress.",
+  "extension.native-runtime-unavailable":
+    "The response-body runtime is unavailable on this platform.",
+  "extension.native-runtime-transition":
+    "The response-body runtime could not change state.",
 };
 
 export function extensionDiagnostic(

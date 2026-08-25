@@ -15,6 +15,8 @@ export type {
   MockHeader,
   RedirectAction,
   ResourceType,
+  ResponseBodyAction,
+  ResponseBodyReplacement,
   RogatioGroup,
   RogatioProject,
   RogatioQueryAction,

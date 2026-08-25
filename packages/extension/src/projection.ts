@@ -5,6 +5,7 @@ import type {
   NormalizedMatcher,
   QueryOperation,
   RedirectOperation,
+  ResponseBodyOperation,
   RogatioOperation,
 } from "@rogatio/compiler";
 import { queryParamsToDNR } from "@rogatio/compiler";
@@ -173,6 +174,39 @@ function isMockOperation(value: unknown): value is MockOperation {
   return isRecord(value.mock) && typeof value.mock.status === "number";
 }
 
+function isResponseBodyOperation(
+  value: unknown,
+): value is ResponseBodyOperation {
+  if (!isRecord(value) || value.kind !== "response-body") return false;
+  if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
+    return false;
+  const matcher = value.matcher;
+  if (!isRecord(matcher) || !isRecord(matcher.urlRegex)) return false;
+  if (
+    typeof matcher.urlRegex.source !== "string" ||
+    matcher.urlRegex.flags !== "" ||
+    compileUrlRegex(matcher.urlRegex.source) === null ||
+    !Array.isArray(matcher.origins) ||
+    !matcher.origins.every(
+      (origin) =>
+        typeof origin === "string" && normalizeSiteOrigin(origin) !== null,
+    ) ||
+    !Array.isArray(matcher.resourceTypes) ||
+    !matcher.resourceTypes.every((type) =>
+      RESOURCE_TYPES.includes(type as (typeof RESOURCE_TYPES)[number]),
+    ) ||
+    typeof matcher.priority !== "number" ||
+    !Number.isSafeInteger(matcher.priority) ||
+    matcher.priority < LIMITS.minPriority ||
+    matcher.priority > LIMITS.maxPriority
+  )
+    return false;
+  return (
+    isRecord(value.responseBody) &&
+    Array.isArray(value.responseBody.replacements)
+  );
+}
+
 function isQueryOperation(value: unknown): value is QueryOperation {
   if (!isRecord(value) || value.kind !== "query") return false;
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
@@ -316,6 +350,17 @@ export function projectMatchers(
           },
         },
       };
+    } else if (isResponseBodyOperation(operation)) {
+      matcher = {
+        urlRegex: { ...operation.matcher.urlRegex },
+        origins: [...operation.matcher.origins],
+        resourceTypes: [...operation.matcher.resourceTypes],
+        priority: operation.matcher.priority,
+        ...(operation.matcher.method !== undefined
+          ? { method: operation.matcher.method }
+          : {}),
+      };
+      installable = true;
     } else if (isQueryOperation(operation)) {
       matcher = {
         urlRegex: { ...operation.matcher.urlRegex },

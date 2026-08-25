@@ -4,6 +4,7 @@ import type {
   HttpMethod,
   MockAction,
   ResourceType,
+  ResponseBodyAction,
   RogatioQueryAction,
 } from "@rogatio/schema";
 
@@ -62,12 +63,21 @@ export interface MockOperation {
   readonly mock: MockAction;
 }
 
+export interface ResponseBodyOperation {
+  readonly kind: "response-body";
+  readonly groupId: string;
+  readonly ruleId: string;
+  readonly matcher: NormalizedMatcher;
+  readonly responseBody: ResponseBodyAction;
+}
+
 export type RogatioOperation =
   | MatcherOperation
   | RedirectOperation
   | QueryOperation
   | HeaderOperation
-  | MockOperation;
+  | MockOperation
+  | ResponseBodyOperation;
 
 export type CompilerDiagnosticCode =
   | "schema.required"

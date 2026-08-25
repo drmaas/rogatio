@@ -223,13 +223,23 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
         rule.type !== "redirect" &&
         rule.type !== "query" &&
         rule.type !== "header" &&
-        rule.type !== "mock"
+        rule.type !== "mock" &&
+        rule.type !== "response-body"
       ) {
         issues.push({
           instancePath: `${rulePath}/type`,
           keyword: "enum",
-          message: 'must be "redirect", "query", "header", or "mock"',
-          params: { allowedValues: ["redirect", "query", "header", "mock"] },
+          message:
+            'must be "redirect", "query", "header", "mock", or "response-body"',
+          params: {
+            allowedValues: [
+              "redirect",
+              "query",
+              "header",
+              "mock",
+              "response-body",
+            ],
+          },
         });
       }
 
@@ -320,6 +330,37 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
               headerDirection: direction,
             },
           });
+        }
+      }
+
+      if (rule.type === "response-body") {
+        const action = rule.responseBody;
+        const actionPath = `${rulePath}/responseBody`;
+        if (
+          !action ||
+          !Array.isArray(action.replacements) ||
+          action.replacements.length === 0
+        ) {
+          issues.push({
+            instancePath: `${actionPath}/replacements`,
+            keyword: "response-body-replacements",
+            message:
+              "A response-body rule must define at least one replacement.",
+            params: {},
+          });
+        } else {
+          for (let index = 0; index < action.replacements.length; index += 1) {
+            const replacement = action.replacements[index];
+            if (compileUrlRegex(replacement.pattern) === null) {
+              issues.push({
+                instancePath: `${actionPath}/replacements/${index}/pattern`,
+                keyword: "response-body-pattern",
+                message:
+                  "Response-body replacement patterns must be valid regular expressions.",
+                params: {},
+              });
+            }
+          }
         }
       }
 

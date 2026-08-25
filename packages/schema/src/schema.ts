@@ -96,7 +96,10 @@ const projectSchemaDefinition = {
           maximum: LIMITS.maxPriority,
         },
         method: { type: "string", enum: [...HTTP_METHODS] },
-        type: { type: "string", enum: ["redirect", "query", "header", "mock"] },
+        type: {
+          type: "string",
+          enum: ["redirect", "query", "header", "mock", "response-body"],
+        },
         redirect: {
           type: "object",
           additionalProperties: false,
@@ -118,6 +121,7 @@ const projectSchemaDefinition = {
           maxLength: LIMITS.maxHeaderValueLength,
         },
         mock: { $ref: "#/$defs/mockAction" },
+        responseBody: { $ref: "#/$defs/responseBodyAction" },
       },
       allOf: [
         {
@@ -158,6 +162,16 @@ const projectSchemaDefinition = {
           // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
           then: {
             required: ["mock"],
+          },
+        },
+        {
+          if: {
+            required: ["type"],
+            properties: { type: { const: "response-body" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["responseBody"],
           },
         },
         {
@@ -267,6 +281,36 @@ const projectSchemaDefinition = {
           type: "string",
           minLength: 1,
           maxLength: LIMITS.maxMockFilePathLength,
+        },
+      },
+    },
+    responseBodyReplacement: {
+      type: "object",
+      additionalProperties: false,
+      required: ["pattern", "replacement"],
+      properties: {
+        pattern: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxResponseBodyPatternLength,
+          format: "rogatio-url-regex",
+        },
+        replacement: {
+          type: "string",
+          maxLength: LIMITS.maxResponseBodyReplacementLength,
+        },
+      },
+    },
+    responseBodyAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["replacements"],
+      properties: {
+        replacements: {
+          type: "array",
+          minItems: 1,
+          maxItems: LIMITS.maxResponseBodyReplacements,
+          items: { $ref: "#/$defs/responseBodyReplacement" },
         },
       },
     },

@@ -2,6 +2,7 @@ import {
   createEditor,
   createMockRuleType,
   createRedirectRuleType,
+  createResponseBodyRuleType,
   type EditorController,
 } from "@rogatio/editor";
 import { validateProjectDetailed } from "./browser-schema.js";
@@ -28,6 +29,7 @@ interface Envelope {
       readonly message?: string;
     } | null;
   };
+  readonly nativeRuntimeState?: { readonly phase: string };
 }
 
 interface ExtensionResponse {
@@ -131,6 +133,8 @@ function renderShell(): void {
       permissionGranted ? "Access granted" : "Grant declared access",
       "grant-permissions",
     ),
+    button("Start response runtime", "start-native-runtime"),
+    button("Stop response runtime", "stop-native-runtime"),
     button("Check and connect", "check-mock-runtime"),
     button("Refresh", "refresh"),
     button("Export project", "export"),
@@ -194,6 +198,11 @@ function renderShell(): void {
     : "Active rules: 0";
   shell.append(badge);
 
+  const nativeRuntime = document.createElement("p");
+  nativeRuntime.dataset.nativeRuntimeState = "true";
+  nativeRuntime.textContent = `Response runtime: ${state.nativeRuntimeState?.phase ?? "stopped"}.`;
+  shell.append(nativeRuntime);
+
   const mockRuntime = document.createElement("p");
   mockRuntime.dataset.mockRuntimeState = "true";
   const mockPhase = state.mockRuntimeState?.phase ?? "disconnected";
@@ -244,6 +253,10 @@ function renderShell(): void {
     if (command === "import") importInput.click();
     if (command === "review-permissions") void reviewPermissions();
     if (command === "grant-permissions") void grantPermissions();
+    if (command === "start-native-runtime")
+      void nativeRuntimeCommand("start-native-runtime");
+    if (command === "stop-native-runtime")
+      void nativeRuntimeCommand("stop-native-runtime");
     if (command === "check-mock-runtime") void checkMockRuntime();
     if (command === "export") void exportProject();
     if (command === "remove") void removeProject();
@@ -262,7 +275,11 @@ function renderShell(): void {
   if (ids.length > 0) {
     editor = createEditor({
       root: editorRoot,
-      ruleTypes: [createRedirectRuleType(), createMockRuleType()],
+      ruleTypes: [
+        createRedirectRuleType(),
+        createMockRuleType(),
+        createResponseBodyRuleType(),
+      ],
       initialProject: safeProjectData(),
       validate(value) {
         const result = validateProjectDetailed(value);
@@ -404,6 +421,17 @@ async function setGroupEnabled(
         ? "Group activated."
         : "Group deactivated."
       : "The group activation could not be changed.";
+  await refresh();
+}
+
+async function nativeRuntimeCommand(
+  command: "start-native-runtime" | "stop-native-runtime",
+): Promise<void> {
+  const response = await client.send({ version: 1, command });
+  statusMessage =
+    response?.ok === true
+      ? "Response runtime state updated."
+      : "Response runtime action unavailable on this platform.";
   await refresh();
 }
 
