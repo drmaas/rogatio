@@ -1,11 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readConfinedFile } from "./confined-file.js";
-import type {
-  AuthorizedOperation,
-  PresetDigest,
-  RuntimeMockConfig,
-} from "./types.js";
+import { readMockFile } from "./mock-file.js";
+import type { PresetDigest, RuntimeMockConfig } from "./types.js";
 
 const MOCK_PREFIX = "/mock/";
 
@@ -72,8 +68,7 @@ export async function serveMock(options: {
   readonly groupId: string;
   readonly signal: AbortSignal;
 }): Promise<void> {
-  const { request, response, mock, fileRoot, presetDigest, groupId, signal } =
-    options;
+  const { request, response, mock, fileRoot, signal } = options;
   const method = request.method ?? "GET";
 
   if (method === "OPTIONS") {
@@ -110,24 +105,8 @@ export async function serveMock(options: {
       sendMockFailure(response, 500, "runtime.file-denied");
       return;
     }
-    const operation: AuthorizedOperation = {
-      groupId,
-      ruleId: mock.ruleId,
-      operationId: `mock:${mock.ruleId}`,
-      kind: "confined-file",
-      target: mock.file,
-      method: "GET",
-      presetDigest,
-    };
-    const read = await readConfinedFile(operation, fileRoot, signal);
+    const read = await readMockFile(fileRoot, mock.file);
     if (!read.ok) {
-      sendMockFailure(response, 500, "runtime.file-denied");
-      return;
-    }
-    try {
-      // Fatal UTF-8 validation: the file must be valid UTF-8 text.
-      new TextDecoder("utf-8", { fatal: true }).decode(read.value);
-    } catch {
       sendMockFailure(response, 500, "runtime.file-denied");
       return;
     }

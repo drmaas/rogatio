@@ -141,7 +141,7 @@ describe("F13 mock serving", () => {
     expect(response.headers["access-control-allow-origin"]).toBe("*");
   });
 
-  it("serves a live UTF-8 file snapshot re-read per request", async () => {
+  it("serves a live UTF-8 file snapshot re-read per request on every platform", async () => {
     const root = await mkdtemp(join(tmpdir(), "rogatio-f13-"));
     temporaryRoots.push(root);
     await writeFile(join(root, "data.json"), '{"v":1}', "utf8");
