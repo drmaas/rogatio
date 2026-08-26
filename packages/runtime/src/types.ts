@@ -47,6 +47,13 @@ export interface RuntimeLimits {
   readonly bodyIdleTimeoutMs: number;
   readonly operationTimeoutMs: number;
   readonly maxRedirects: 0;
+  readonly maxRequestBodyBytes: number;
+  readonly maxRequestBodyPatternLength: number;
+  readonly maxRequestBodyReplacementLength: number;
+  readonly maxRequestBodyOperations: number;
+  readonly maxRequestBodyTransforms: number;
+  readonly maxRegexDeadlineMs: number;
+  readonly maxLocalOrigins: number;
 }
 
 export interface RuntimePresetV1 {
@@ -178,7 +185,65 @@ export type RuntimeErrorCode =
   | "runtime.timeout"
   | "runtime.size-limit"
   | "runtime.overloaded"
-  | "runtime.internal";
+  | "runtime.internal"
+  | "runtime.native-frame-too-small"
+  | "runtime.native-frame-too-large"
+  | "runtime.native-frame-length-mismatch"
+  | "runtime.native-frame-invalid-protocol"
+  | "runtime.native-frame-invalid-json"
+  | "runtime.request-body-policy-stage-timeout"
+  | "runtime.request-body-policy-invalid-part-index"
+  | "runtime.request-body-policy-duplicate-part"
+  | "runtime.request-body-policy-incomplete"
+  | "runtime.request-body-policy-missing-part"
+  | "runtime.request-body-policy-byte-count-mismatch"
+  | "runtime.request-body-duplicate-rule-id"
+  | "runtime.request-body-invalid-source-order"
+  | "runtime.request-body-invalid-priority"
+  | "runtime.request-body-empty-origins"
+  | "runtime.request-body-invalid-resource-type"
+  | "runtime.request-body-replace-missing-body"
+  | "runtime.request-body-replace-too-large"
+  | "runtime.request-body-lone-surrogate"
+  | "runtime.request-body-regex-missing-pattern"
+  | "runtime.request-body-regex-pattern-too-large"
+  | "runtime.request-body-regex-invalid"
+  | "runtime.request-body-regex-deadline-exceeded"
+  | "runtime.request-body-regex-missing-replacement"
+  | "runtime.request-body-regex-replacement-too-large"
+  | "runtime.request-body-invalid-mode"
+  | "runtime.request-body-policy-invalid"
+  | "runtime.request-body-extension-id-invalid"
+  | "runtime.request-body-too-many-operations"
+  | "runtime.request-body-limits-mismatch"
+  | "runtime.request-body-invalid-scheme"
+  | "runtime.request-body-dns-failed"
+  | "runtime.request-body-dns-invalid"
+  | "runtime.request-body-dns-mixed-public-private"
+  | "runtime.request-body-target-credentials"
+  | "runtime.request-body-target-denied"
+  | "runtime.request-body-target-invalid"
+  | "runtime.request-body-unsupported-method"
+  | "runtime.request-body-missing-content-length"
+  | "runtime.request-body-invalid-content-length"
+  | "runtime.request-body-length-mismatch"
+  | "runtime.request-body-transfer-encoding-forbidden"
+  | "runtime.request-body-content-encoding-forbidden"
+  | "runtime.request-body-unsupported-content-encoding"
+  | "runtime.request-body-unsupported-mime-type"
+  | "runtime.request-body-invalid-charset"
+  | "runtime.request-body-forbidden-header"
+  | "runtime.request-body-duplicate-content-length"
+  | "runtime.request-body-invalid-utf8"
+  | "runtime.request-body-marker-missing"
+  | "runtime.request-body-marker-duplicate"
+  | "runtime.request-body-marker-invalid"
+  | "runtime.request-body-marker-mismatch"
+  | "runtime.request-body-marker-expired"
+  | "runtime.request-body-upstream-failed"
+  | "runtime.request-body-timeout"
+  | "runtime.tls-ca-not-loaded"
+  | "runtime.tls-leaf-generation-failed";
 
 export interface RuntimeError {
   readonly code: RuntimeErrorCode;

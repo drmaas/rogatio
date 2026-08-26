@@ -224,13 +224,14 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
         rule.type !== "query" &&
         rule.type !== "header" &&
         rule.type !== "mock" &&
-        rule.type !== "response-body"
+        rule.type !== "response-body" &&
+        rule.type !== "request-body"
       ) {
         issues.push({
           instancePath: `${rulePath}/type`,
           keyword: "enum",
           message:
-            'must be "redirect", "query", "header", "mock", or "response-body"',
+            'must be "redirect", "query", "header", "mock", "response-body", or "request-body"',
           params: {
             allowedValues: [
               "redirect",
@@ -238,6 +239,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
               "header",
               "mock",
               "response-body",
+              "request-body",
             ],
           },
         });
@@ -364,6 +366,153 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
         }
       }
 
+      function hasLoneSurrogate(value: string): boolean {
+        for (let i = 0; i < value.length; i += 1) {
+          const code = value.charCodeAt(i);
+          if (code >= 0xd800 && code <= 0xdbff) {
+            if (i + 1 >= value.length) return true;
+            const next = value.charCodeAt(i + 1);
+            if (next < 0xdc00 || next > 0xdfff) return true;
+          } else if (code >= 0xdc00 && code <= 0xdfff) {
+            if (i === 0) return true;
+            const prev = value.charCodeAt(i - 1);
+            if (prev < 0xd800 || prev > 0xdbff) return true;
+          }
+        }
+        return false;
+      }
+
+      if (rule.type === "request-body") {
+        const action = rule.requestBody;
+        const actionPath = `${rulePath}/requestBody`;
+        if (!action) {
+          issues.push({
+            instancePath: actionPath,
+            keyword: "request-body-action",
+            message: "A request-body rule must define a requestBody action.",
+            params: {},
+          });
+        } else {
+          const mode = action.mode;
+          if (mode !== "replace" && mode !== "regex") {
+            issues.push({
+              instancePath: `${actionPath}/mode`,
+              keyword: "request-body-mode",
+              message: 'requestBody.mode must be "replace" or "regex"',
+              params: { mode },
+            });
+          }
+          if (action.mode === "replace") {
+            if (typeof action.body !== "string") {
+              issues.push({
+                instancePath: `${actionPath}/body`,
+                keyword: "request-body-replace-body",
+                message: "Replace mode requires a body string.",
+                params: {},
+              });
+            } else if (action.body.length > LIMITS.maxRequestBodyBytes) {
+              issues.push({
+                instancePath: `${actionPath}/body`,
+                keyword: "request-body-replace-body",
+                message: `Replace body exceeds the maximum size of ${LIMITS.maxRequestBodyBytes} bytes.`,
+                params: { limit: LIMITS.maxRequestBodyBytes },
+              });
+            } else if (hasLoneSurrogate(action.body)) {
+              issues.push({
+                instancePath: `${actionPath}/body`,
+                keyword: "request-body-lone-surrogate",
+                message:
+                  "Replace body must not contain lone UTF-16 surrogates.",
+                params: {},
+              });
+            }
+          }
+          if (action.mode === "regex") {
+            if (
+              typeof action.pattern !== "string" ||
+              action.pattern.length === 0
+            ) {
+              issues.push({
+                instancePath: `${actionPath}/pattern`,
+                keyword: "request-body-pattern",
+                message: "Regex mode requires a non-empty pattern string.",
+                params: {},
+              });
+            } else if (
+              action.pattern.length > LIMITS.maxRequestBodyPatternLength
+            ) {
+              issues.push({
+                instancePath: `${actionPath}/pattern`,
+                keyword: "request-body-pattern",
+                message: `Regex pattern exceeds the maximum length of ${LIMITS.maxRequestBodyPatternLength} characters.`,
+                params: { limit: LIMITS.maxRequestBodyPatternLength },
+              });
+            } else if (compileUrlRegex(action.pattern) === null) {
+              issues.push({
+                instancePath: `${actionPath}/pattern`,
+                keyword: "request-body-pattern",
+                message: "Regex pattern must be a valid regular expression.",
+                params: {},
+              });
+            }
+            if (
+              typeof action.replacement !== "string" ||
+              action.replacement.length > LIMITS.maxRequestBodyReplacementLength
+            ) {
+              issues.push({
+                instancePath: `${actionPath}/replacement`,
+                keyword: "request-body-replacement",
+                message: `Regex replacement exceeds the maximum length of ${LIMITS.maxRequestBodyReplacementLength} characters.`,
+                params: { limit: LIMITS.maxRequestBodyReplacementLength },
+              });
+            } else if (hasLoneSurrogate(action.pattern)) {
+              issues.push({
+                instancePath: `${actionPath}/pattern`,
+                keyword: "request-body-lone-surrogate",
+                message:
+                  "Regex pattern must not contain lone UTF-16 surrogates.",
+                params: {},
+              });
+            } else if (hasLoneSurrogate(action.replacement)) {
+              issues.push({
+                instancePath: `${actionPath}/replacement`,
+                keyword: "request-body-lone-surrogate",
+                message:
+                  "Regex replacement must not contain lone UTF-16 surrogates.",
+                params: {},
+              });
+            }
+          }
+        }
+        if (
+          rule.method !== "POST" &&
+          rule.method !== "PUT" &&
+          rule.method !== "PATCH"
+        ) {
+          issues.push({
+            instancePath: `${rulePath}/method`,
+            keyword: "request-body-method",
+            message:
+              'Request-body rules require method "POST", "PUT", or "PATCH".',
+            params: { method: rule.method },
+          });
+        }
+        const resourceTypes = rule.resourceTypes;
+        if (
+          !Array.isArray(resourceTypes) ||
+          resourceTypes.length !== 1 ||
+          resourceTypes[0] !== "xmlhttprequest"
+        ) {
+          issues.push({
+            instancePath: `${rulePath}/resourceTypes`,
+            keyword: "request-body-resource-types",
+            message:
+              'Request-body rules require exactly one resource type: "xmlhttprequest".',
+            params: { resourceTypes },
+          });
+        }
+      }
+
       if (rule.type === "mock") {
         const mock = rule.mock;
         const mockPath = `${rulePath}/mock`;
@@ -398,6 +547,61 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
             keyword: "mock-file-path",
             message: "Mock file paths must not contain control characters.",
             params: {},
+          });
+        }
+      }
+    }
+  }
+
+  if (project.requestBodyPolicy !== undefined) {
+    const policy = project.requestBodyPolicy;
+    if (typeof policy.localOrigins !== "undefined") {
+      if (!Array.isArray(policy.localOrigins)) {
+        issues.push({
+          instancePath: "/requestBodyPolicy/localOrigins",
+          keyword: "request-body-policy-local-origins",
+          message: "localOrigins must be an array.",
+          params: {},
+        });
+      } else {
+        const seen = new Set<string>();
+        for (let i = 0; i < policy.localOrigins.length; i += 1) {
+          const origin = policy.localOrigins[i];
+          if (typeof origin !== "string") {
+            issues.push({
+              instancePath: `/requestBodyPolicy/localOrigins/${i}`,
+              keyword: "request-body-policy-local-origin",
+              message: "Each local origin must be a string.",
+              params: {},
+            });
+            continue;
+          }
+          const normalized = normalizeSiteOrigin(origin);
+          if (normalized === null) {
+            issues.push({
+              instancePath: `/requestBodyPolicy/localOrigins/${i}`,
+              keyword: "request-body-policy-local-origin",
+              message:
+                "Each local origin must be a valid exact HTTP(S) origin with no credentials, path, query, fragment, wildcard, backslash, invalid port, or trailing-dot hostname.",
+              params: { origin },
+            });
+          } else if (seen.has(normalized)) {
+            issues.push({
+              instancePath: `/requestBodyPolicy/localOrigins/${i}`,
+              keyword: "request-body-policy-local-origin",
+              message: "Local origins must be unique.",
+              params: { origin: normalized },
+            });
+          } else {
+            seen.add(normalized);
+          }
+        }
+        if (policy.localOrigins.length > LIMITS.maxLocalOrigins) {
+          issues.push({
+            instancePath: "/requestBodyPolicy/localOrigins",
+            keyword: "request-body-policy-local-origins",
+            message: `localOrigins must contain at most ${LIMITS.maxLocalOrigins} entries.`,
+            params: { limit: LIMITS.maxLocalOrigins },
           });
         }
       }

@@ -25,6 +25,11 @@ import {
   DEFAULT_MOCK_PORT,
   type MockRuntimeConnection,
 } from "./mock-runtime.js";
+import {
+  type NativeRuntimeConfig,
+  startNativeSession,
+  stopNativeSession,
+} from "./native-session.js";
 import { declaredPermissionOrigins } from "./permissions.js";
 import { projectHeaders } from "./projection.js";
 import { type ExtensionRequest, parseRequest } from "./protocol.js";
@@ -45,13 +50,15 @@ export interface ExtensionApplicationOptions {
   }) => Promise<void>;
   readonly generateId?: () => string;
   readonly now?: () => number;
+  readonly extensionId?: string;
   readonly nativeRuntime?: {
-    start(): Promise<{
+    start(config: NativeRuntimeConfig): Promise<{
       readonly state: NativeRuntimePhase | "unsupported";
       readonly message?: string;
     }>;
     stop(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
     status(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
+    sendPolicy(frames: Uint8Array[]): Promise<void>;
   };
   readonly mockRuntime?: {
     readonly fetchConnection: (
@@ -140,6 +147,22 @@ function operationStatuses(
           status: "active",
         };
       }
+      return { ...status };
+    }
+    if (operation?.kind === "request-body") {
+      if (nativePhase === "unsupported" || nativePhase !== "started") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "needs proxy",
+        };
+      }
+      if (status.status === "active" || status.status === "error")
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "active",
+        };
       return { ...status };
     }
     if (operation?.kind === "response-body") {
@@ -472,28 +495,83 @@ export function createExtensionApplication(
       request.command === "stop-native-runtime" ||
       request.command === "get-native-runtime-status"
     ) {
-      if (!options.nativeRuntime) {
+      if (!options.nativeRuntime || !options.extensionId) {
         nativePhase = "unsupported";
         return request.command === "get-native-runtime-status"
           ? { ok: true, value: { nativeRuntimeState: { phase: nativePhase } } }
           : failure("extension.native-runtime-unavailable");
       }
       if (request.command === "start-native-runtime") {
-        const result = await options.nativeRuntime.start();
-        nativePhase = result.state;
-        return result.state === "started"
-          ? state()
-          : {
-              ok: true,
-              value: {
-                nativeRuntimeState: { phase: nativePhase },
-                message: result.message,
-              },
-            };
+        const current = await repository.state();
+        if (!current.ok) return failure("extension.storage-failed");
+        const projectId = current.value.activeProjectId;
+        if (!projectId) return failure("extension.not-found");
+        const project = current.value.projects[projectId];
+        if (!project) return failure("extension.not-found");
+
+        const compileResult = compileProject(project.data);
+        if (!compileResult.ok) return failure("extension.storage-failed");
+
+        const hasRequestBody = compileResult.operations.some(
+          (op) => op.kind === "request-body",
+        );
+        const hasResponseBody = compileResult.operations.some(
+          (op) => op.kind === "response-body",
+        );
+
+        if (!hasRequestBody && !hasResponseBody) {
+          return failure("extension.native-runtime-unavailable");
+        }
+
+        const sessionResult = await startNativeSession({
+          extensionId: options.extensionId,
+          nativeRuntime: options.nativeRuntime,
+          getProject: async () => ({
+            data: project.data,
+            enabledGroupIds: project.enabledGroupIds,
+          }),
+          getGrantedOrigins: async () => {
+            const _declared = declaredPermissionOrigins({
+              operations: compileResult.operations,
+            });
+            return declaredPermissionOrigins({
+              operations: compileResult.operations,
+            });
+          },
+        });
+
+        if (!sessionResult.ok) {
+          return {
+            ok: true,
+            value: {
+              nativeRuntimeState: { phase: "error" },
+              message: sessionResult.reason,
+            },
+          };
+        }
+
+        nativePhase = "started";
+        return state();
       }
       if (request.command === "stop-native-runtime") {
-        const result = await options.nativeRuntime.stop();
-        nativePhase = result.state;
+        await stopNativeSession({
+          extensionId: options.extensionId ?? "",
+          nativeRuntime: options.nativeRuntime,
+          getProject: async () => {
+            const current = await repository.state();
+            if (!current.ok) return null;
+            const projectId = current.value.activeProjectId;
+            if (!projectId) return null;
+            const project = current.value.projects[projectId];
+            if (!project) return null;
+            return {
+              data: project.data,
+              enabledGroupIds: project.enabledGroupIds,
+            };
+          },
+          getGrantedOrigins: async () => [],
+        });
+        nativePhase = "stopped";
         return state();
       }
       const result = await options.nativeRuntime.status();

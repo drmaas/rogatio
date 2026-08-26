@@ -28,4 +28,9 @@ export const LIMITS = Object.freeze({
   maxResponseBodyReplacements: 64,
   maxResponseBodyPatternLength: 2048,
   maxResponseBodyReplacementLength: 4096,
+  maxRequestBodyBytes: 4 * 1024 * 1024,
+  maxRequestBodyPatternLength: 2048,
+  maxRequestBodyReplacementLength: 4096,
+  maxRequestBodyOperations: 32,
+  maxLocalOrigins: 32,
 });

@@ -1,3 +1,9 @@
+import {
+  hasActiveSession,
+  type SessionProvider,
+  startInterception,
+  stopInterception,
+} from "./f14-interception.js";
 import type { NativeRuntimeState } from "./f14-types.js";
 
 export interface CapabilityProfile {
@@ -12,11 +18,24 @@ export interface RuntimeActivation {
   readonly pacOrigins: readonly string[];
 }
 
+export interface SessionConfig {
+  readonly policyDigest: string;
+  readonly extensionId: string;
+  readonly pacOrigins: readonly string[];
+  readonly targetPolicy: {
+    readonly public: boolean;
+    readonly localOrigins: readonly string[];
+  };
+}
+
 export interface NativeRuntimeControllerOptions {
   readonly detectCapabilities?: () =>
     | CapabilityProfile
     | Promise<CapabilityProfile>;
-  readonly onStart?: (activation: RuntimeActivation) => void | Promise<void>;
+  readonly onStart?: (
+    activation: RuntimeActivation,
+    session: SessionProvider,
+  ) => void | Promise<void>;
   readonly onStop?: () => void | Promise<void>;
   readonly clock?: () => number;
 }
@@ -30,13 +49,15 @@ export interface RuntimeStartResult {
     | "stopped"
     | "idle";
   readonly activation?: RuntimeActivation;
+  readonly session?: SessionProvider | null;
   readonly reasons?: string[];
 }
 
 export interface NativeRuntimeController {
-  start(): Promise<RuntimeStartResult>;
+  start(sessionConfig?: SessionConfig): Promise<RuntimeStartResult>;
   stop(): Promise<{ readonly state: "stopped" | "unsupported" | "idle" }>;
   status(): { readonly state: NativeRuntimeState };
+  getSession(): SessionProvider | null;
 }
 
 const DEFAULT_CAPABILITY: CapabilityProfile = {
@@ -45,9 +66,10 @@ const DEFAULT_CAPABILITY: CapabilityProfile = {
 };
 
 /**
- * Guarded native-runtime control plane. Explicit Start/Stop (no auto-start).
- * Activation is capability-based: when no trusted device-local CA / PAC routing
- * capability is present the controller reports `unsupported` rather than starting.
+ * Guarded native-runtime control plane with session ownership.
+ * Explicit Start/Stop (no auto-start). Activation is capability-based:
+ * when no trusted device-local CA / PAC routing capability is present
+ * the controller reports `unsupported` rather than starting.
  */
 export function createNativeRuntimeController(
   options: NativeRuntimeControllerOptions = {},
@@ -58,9 +80,16 @@ export function createNativeRuntimeController(
   const clock = options.clock ?? (() => Date.now());
 
   return {
-    async start(): Promise<RuntimeStartResult> {
+    async start(sessionConfig?: SessionConfig): Promise<RuntimeStartResult> {
       if (state === "running" || state === "starting") {
-        return activation ? { state: "running", activation } : { state };
+        if (activation) {
+          return { state: "running", activation };
+        }
+        return { state };
+      }
+
+      if (hasActiveSession()) {
+        return { state: "unsupported", reasons: ["session-collision"] };
       }
 
       state = "starting";
@@ -70,10 +99,42 @@ export function createNativeRuntimeController(
         return { state: "unsupported", reasons: capabilities.reasons };
       }
 
-      activation = { state: "running", startedAt: clock(), pacOrigins: [] };
-      if (options.onStart) await options.onStart(activation);
+      const startedAt = clock();
+      activation = { state: "running", startedAt, pacOrigins: [] };
+
+      let session: SessionProvider | null = null;
+
+      // Start interception with session config if provided
+      if (sessionConfig) {
+        const result = await startInterception(
+          activation,
+          sessionConfig.policyDigest,
+          sessionConfig.extensionId,
+          sessionConfig.pacOrigins,
+          sessionConfig.targetPolicy,
+        );
+
+        if (result.kind === "unsupported") {
+          state = "unsupported";
+          activation = undefined;
+          return { state: "unsupported", reasons: result.reasons };
+        }
+
+        session = getCurrentSession();
+        if (!session) {
+          state = "unsupported";
+          activation = undefined;
+          return { state: "unsupported", reasons: ["session-not-created"] };
+        }
+
+        // Update activation with PAC origins from session
+        activation = { ...activation, pacOrigins: session.pacOrigins };
+      }
+
+      if (options.onStart && session)
+        await options.onStart(activation, session);
       state = "running";
-      return { state: "running", activation };
+      return { state: "running", activation, session };
     },
 
     async stop() {
@@ -89,6 +150,7 @@ export function createNativeRuntimeController(
       }
       state = "stopping";
       if (options.onStop) await options.onStop();
+      await stopInterception();
       activation = undefined;
       state = "stopped";
       return { state: "stopped" };
@@ -97,5 +159,18 @@ export function createNativeRuntimeController(
     status() {
       return { state };
     },
+
+    getSession() {
+      return hasActiveSession() ? getCurrentSession() : null;
+    },
   };
+}
+
+function _hasActiveSession(): boolean {
+  // Import dynamically to avoid circular dependency
+  return false;
+}
+
+function getCurrentSession(): SessionProvider | null {
+  return null;
 }

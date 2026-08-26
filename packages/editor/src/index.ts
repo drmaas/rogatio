@@ -3,6 +3,7 @@ export { createHeaderRuleType } from "./rule-types/header.js";
 export {
   builtInRuleTypes,
   createMockRuleType,
+  createRequestBodyRuleType,
   createResponseBodyRuleType,
   queryRuleType,
 } from "./rule-types/index.js";

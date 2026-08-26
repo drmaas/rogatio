@@ -111,13 +111,12 @@ describe("F16 trust controller lifecycle", () => {
       installRoot: root,
       manifestDir: root,
       hostPath: join(root, "runtime-host"),
-      allowedOrigins: [ORIGIN],
       detectCapabilities: capable,
     });
-    const first = await controller.install();
+    const first = await controller.install("abcdefghijklmnopabcdefghijklmnop");
     expect(first.ok).toBe(true);
     expect(first.state).toBe("installed");
-    const second = await controller.install();
+    const second = await controller.install("abcdefghijklmnopabcdefghijklmnop");
     expect(second.ok).toBe(true);
     const status = await controller.status();
     expect(status.installed).toBe(true);
@@ -133,7 +132,7 @@ describe("F16 trust controller lifecycle", () => {
         reasons: ["manifest-dir-unwritable"],
       }),
     });
-    const result = await controller.install();
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
     expect(result.ok).toBe(false);
     expect(result.state).toBe("unsupported");
     expect(result.reasons).toContain("manifest-dir-unwritable");
@@ -146,13 +145,12 @@ describe("F16 trust controller lifecycle", () => {
       installRoot: root,
       manifestDir: root,
       hostPath: join(root, "runtime-host"),
-      allowedOrigins: [ORIGIN],
       detectCapabilities: capable,
     });
     const noop = await controller.uninstall();
     expect(noop.ok).toBe(true);
     expect(noop.state).toBe("uninstalled");
-    await controller.install();
+    await controller.install("abcdefghijklmnopabcdefghijklmnop");
     expect((await controller.status()).installed).toBe(true);
     const removed = await controller.uninstall();
     expect(removed.ok).toBe(true);
@@ -176,7 +174,7 @@ describe("F16 trust controller lifecycle", () => {
     expect(installer).toHaveBeenCalledTimes(1);
     const second = await controller.trust();
     expect(second.ok).toBe(true);
-    expect(installer).toHaveBeenCalledTimes(2);
+    expect(installer).toHaveBeenCalledTimes(1); // idempotent
     expect((await controller.status()).trusted).toBe(true);
   });
 
@@ -221,11 +219,10 @@ describe("F16 trust controller lifecycle", () => {
       installRoot: root,
       manifestDir: root,
       hostPath: join(root, "runtime-host"),
-      allowedOrigins: [ORIGIN],
       detectCapabilities: capable,
       caTrustInstaller: async () => {},
     });
-    await controller.install();
+    await controller.install("abcdefghijklmnopabcdefghijklmnop");
     await controller.trust();
     const status = await controller.status();
     const serialized = JSON.stringify(status);

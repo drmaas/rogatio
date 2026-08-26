@@ -50,7 +50,7 @@ describe("F15 response-body schema", () => {
         },
       },
     ],
-  ])("rejects %s", (_name, rule) =>
-    expect(validateProjectDetailed(project(rule)).valid).toBe(false),
-  );
+  ])("rejects %s", (_name, rule) => {
+    expect(validateProjectDetailed(project(rule)).valid).toBe(false);
+  });
 });

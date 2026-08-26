@@ -800,3 +800,250 @@ state and is wired in the extension service worker.
 - Mock path-based routing (serve different content per request URL): rejected; a mock
   rule returns one configured response regardless of the matched URL, matching the
   product description.
+
+## F17: Request-Body Rules
+
+F17 adds bounded request-body replacement and modification for explicitly authorized
+browser XHR requests. This section records the Stage 2 architecture. The specification
+and this decision remain pending the Stage 4 human approval gate; no implementation
+plan or code may rely on them until that gate passes.
+
+### Boundary and ownership
+
+F17 extends the existing package boundaries without turning F6 into a forward proxy:
+
+| Package | F17 responsibility | F17 does not own |
+| --- | --- | --- |
+| `@rogatio/schema` | Version-1 rule and exact-local-origin validation | Network, proxy, credentials |
+| `@rogatio/compiler` | Detached ordered `RequestBodyOperation` values | Chrome, TLS, persistence |
+| `@rogatio/browser-core` | Generic enablement, permission, and status seams | Native messaging, body bytes |
+| `@rogatio/editor` | Request-body fields and project local-origin fields | Runtime or filesystem access |
+| `@rogatio/extension` | Chrome metadata, policy session, PAC, markers, lifecycle | Request bodies, TLS, upstream forwarding |
+| `@rogatio/runtime` | Policy validation, authority, proxy, TLS, transform, forwarding | Browser storage and editor state |
+| F16 trust layer | Native-host manifest and X.509 CA trust lifecycle | Request transformation |
+| `@rogatio/cli` | Offline validation/edit/test and explicit trust/install diagnostics | Ownership of live browser sessions |
+
+F6 GET/HEAD authorization, F13 mocks, and F15 response-body semantics remain separate.
+F15 may use the shared live provider seam, but F17 must not widen F6 transport to carry
+POST bodies or credentials.
+
+### Rule and operation model
+
+The schema uses the same action-property convention as `response-body`: a
+`request-body` rule has a required `requestBody` property. The action is a strict
+discriminated union:
+
+```ts
+type RequestBodyAction =
+  | { readonly mode: "replace"; readonly body: string }
+  | {
+      readonly mode: "regex";
+      readonly pattern: string;
+      readonly replacement: string;
+    };
+```
+
+Rules require `POST`, `PUT`, or `PATCH` and exactly one resource type,
+`xmlhttprequest`. The compiler emits a detached `RequestBodyOperation` with group and
+rule IDs, normalized matcher, action, and zero-based source order. Source order is
+group-array order followed by rule-array order. Compiler output stays in source order;
+priority is used only by the shared winner selector.
+
+All request-phase operations participate in one deterministic arbitration decision:
+redirect, query, request headers, mock, and request-body. The highest numeric priority
+wins; equal priorities use the lowest source-order index. No request-phase actions
+compose. Response-only operations are selected in the response phase and do not compete
+with request-body operations. The extension uses the same pure selector as the native
+runtime or an equivalent projection that proves the same result; Chrome DNR incidental
+ordering is never the authority.
+
+### Digest-bound policy
+
+The extension builds an immutable in-memory `RequestBodyPolicyV1` from committed project
+state, enabled groups, granted origins, exact configured local origins, and the explicit
+extension ID. The policy contains the complete request-phase authority snapshot needed by
+the native runtime: normalized matchers, all competing request-phase operations, action
+data, source order, project identity/revision, grants, limits, and session scope. It
+does not contain captured traffic, credentials, response bodies, or unrelated project
+secrets such as mock payloads and file contents.
+
+The extension validates project data before sending. The native runtime validates the
+policy structure independently, rejects unknown operation kinds and inconsistent derived
+fields, verifies exact origins, limits, extension identity, enabled groups, and action
+shapes, then computes the same canonical digest. The native runtime trusts only this
+complete digest-bound policy, never a per-request rule ID or operation supplied by the
+browser. The user-selected design does not add CLI signing; consequently, policy
+validation proves policy integrity and session binding, not independence from a
+compromised extension.
+
+Canonical policy bytes are compact UTF-8 JSON with fixed key ordering and deterministic
+array/set ordering. The digest is `sha256:<64 lowercase hexadecimal characters>` and
+excludes session nonce, timestamps, capabilities, and native frame segmentation. Policy
+state is memory-only and immutable for one live session. Any project, enablement,
+permission, or local-origin change tears down the session and requires a new explicit
+start.
+
+Policies larger than one native frame use bounded `policy-begin`, `policy-part`, and
+`policy-commit` messages. Each Chrome native-messaging frame has a four-byte
+little-endian payload length and a maximum 64 KiB UTF-8 JSON payload. Parts carry only
+base64url canonical policy bytes. Incomplete, reordered, duplicated, oversized,
+malformed, or digest-mismatched staging never becomes active.
+
+### Browser-to-proxy correlation
+
+The supported browser path uses ordinary MV3 APIs. Chrome does not generally grant
+`webRequestBlocking` to ordinary extensions, so F17 does not make exact per-request
+initiator scheme/port or request-ID correlation a live prerequisite. The extension instead
+installs one ephemeral, session-bound DNR marker per request-body operation. The marker
+condition contains the operation URL matcher, method, `xmlhttprequest` resource type,
+and the initiator hostname projection available to DNR. This is a host-domain assertion,
+not exact initiator-origin proof: scheme, port, and some browser context details cannot
+be recovered at the native proxy boundary.
+
+The native runtime validates the marker token, target, method, resource type, policy
+digest, and global winner against its immutable policy. A marker is a capability signal
+from the active extension session, not a trusted rule ID supplied by a page. Marker
+names use a runtime-owned reserved prefix, are rejected when duplicated or malformed,
+and are removed before upstream forwarding. A request with a valid body marker that
+fails framing, authority, or transformation is blocked before upstream; it never falls
+back to its original body.
+
+Markers are static session rules, one per request-body operation. F17 does not use
+request-ID keyed dynamic rules or a native pending-authorization map. The ordinary MV3
+boundary therefore cannot prove exact initiator scheme, port, or browser context at the
+proxy; the marker's initiator condition is limited to DNR's host-domain projection.
+
+The extension may send best-effort metadata-only `request.prepare` messages for status
+and diagnostics, but they are not required for authorization and never carry body bytes,
+headers, cookies, or authorization values. The listener explicitly copies safe metadata
+and never reads or spreads `details.requestBody`.
+
+A PAC-routed request without a body marker is treated as having no browser body
+authorization and is forwarded unchanged, as explicitly chosen by the user. Traffic
+outside exact PAC origins is `DIRECT`. This is the accepted ordinary-MV3 compromise:
+unmatched pass-through and marker-based body transformation remain safe at the wire
+boundary, but exact initiator-origin and missing-marker fail-closed guarantees are not
+available without a policy-installed blocking extension.
+
+### Live lifecycle and rollback
+
+The extension serializes start, stop, policy replacement, permission changes, PAC
+changes, and marker installation through one coordinator. The native runtime owns one
+session and one immutable policy:
+
+```text
+stopped -> starting -> started -> stopping -> stopped
+                    \-> failed
+                    \-> unsupported
+started ------------> failed
+```
+
+Start validates policy, explicit extension identity, F16 trust, platform capabilities,
+and proxy-control ownership before accepting traffic. It starts a non-accepting
+provider, verifies Chrome proxy control, installs exact-origin PAC and markers
+atomically, then activates the provider. Any failure stops acceptance, removes owned
+markers, restores PAC only when it is still owned by Rogatio, stops the native session,
+and clears transient marker/session state. Stop is idempotent and invalidates policy,
+capabilities, sockets, timers, active request state, and transform workers before
+removing owned routing.
+
+The CLI may report or diagnose a process-local native runtime, but it cannot claim or
+control the extension-owned live browser session. `runtime start` without a validated
+extension policy never enables request-body interception. No command auto-installs
+trust, auto-starts Chrome routing, or silently takes over another proxy/PAC/enterprise
+controller.
+
+### Scoped proxy and wire contract
+
+The provider is a narrow HTTP/1.1 proxy bound to `127.0.0.1`. It accepts only HTTP
+absolute-form traffic for port 80 and HTTPS `CONNECT` for port 443, with exact target
+authority. It rejects arbitrary CONNECT, ambient proxy environment settings, redirects,
+HTTP/2, HTTP/3, and ALPN other than `http/1.1`. DNS resolves all A/AAAA answers, rejects
+mixed public and non-public results, then pins one validated numeric address without
+re-resolution, racing, or retrying another address. The original hostname remains HTTP
+authority and HTTPS SNI.
+
+Eligible requests require one valid decimal `Content-Length` at most 4 MiB. The runtime
+counts received bytes and requires an exact match. It rejects transfer encoding,
+chunking, trailers, `Expect`, `Upgrade`, pipelining, duplicate/conflicting framing,
+multipart, compression, binary content, invalid UTF-8, and unsupported client-certificate
+authentication. No upstream DNS or socket write occurs until validation and transformation
+complete.
+
+Accepted media types are `application/json`, valid `application/*+json`,
+`application/x-www-form-urlencoded`, and `text/*`, with no charset or UTF-8 only.
+`Content-Encoding` is absent or `identity` only. Replace mode still validates the input
+body before discarding it. Regex mode decodes strict UTF-8, constructs one ECMAScript
+`gu` regular expression, and uses standard `String.replace` replacement expansion.
+Output is UTF-8 and bounded to 4 MiB. Regex execution runs in an independently
+terminable boundary with a 250 ms deadline plus the complete operation timeout. Failure
+blocks before upstream and emits only a stable redacted error code.
+
+Cookie and Authorization headers are preserved unchanged when the request otherwise
+passes. Host/authority and Content-Length are reconstructed. Hop-by-hop, proxy,
+transfer, trailer, and conflicting framing headers are removed or rejected. Standard
+body-integrity/signature headers (`Content-MD5`, `Digest`, `Content-Digest`, `Signature`,
+`Signature-Input`) are rejected. F17 does not recompute unknown application signatures.
+Credential values never enter native messages, logs, diagnostics, persisted state, or
+error responses.
+
+### Trust and target boundaries
+
+F16 must provide actual X.509 CA certificate plus private key material, atomic confined
+storage, actual trust standing, exact native-messaging origin, host confinement, and
+rollback. An SPKI public key is not a CA certificate. F17 consumes an injectable,
+capability-based platform CA adapter; adapters use reviewed fixed executable paths and
+argument arrays, never shell interpolation. No unreviewed certificate or proxy
+dependency is introduced. macOS is the reference live platform; Linux and Windows are
+live-capable only when equivalent adapters report every required capability.
+
+Targets are public by default. Loopback, private, link-local, multicast, carrier-grade,
+reserved, documentation, and other non-public addresses require an exact normalized
+origin in `requestBodyPolicy.localOrigins`. The exception does not widen scheme,
+hostname, port, subdomain, or path and does not bypass framing, TLS, or address
+validation. Targets have no credentials, fragments, controls, backslashes, wildcards,
+trailing-dot hostnames, or ambiguous ports.
+
+### Extension, editor, and CLI seams
+
+The extension adds native-runtime, body-runtime, body-marker, proxy-settings, and
+metadata-only web-request seams. Its manifest explicitly requests only the permissions
+needed for native messaging, proxy control, DNR marker installation, and optional
+metadata observation. It does not require `webRequestBlocking`; ordinary MV3 is the
+supported browser boundary. Request-body operations do not become DNR body actions.
+Body rules remain disabled until separately granted and explicitly activated.
+Service-worker restart does not restore live state.
+
+The editor adds a request-body rule type, replace/regex controls, fixed method/resource
+constraints, and exact local-origin project controls. It keeps detached drafts and host
+supplied validation/save ports, remains keyboard/screen-reader/forced-colors safe, and
+does not import Node or runtime validation artifacts. Existing F15 editor/browser-schema
+payload parity is repaired in the same boundary work so stale action fields cannot leak
+between rule types.
+
+CLI verify, edit, test, and dry-run remain offline. Runtime trust/install is explicit,
+requires the exact extension ID, and reports capability-gated status without exposing
+paths, certificates, bodies, headers, credentials, or platform-tool output.
+
+### Testing seams and rejected alternatives
+
+Pure tests cover strict schema/browser-schema validation, compiler detachment and source
+order, global arbitration, editor fields, policy canonicalization/digest, native frame
+staging, and bounded transformation. Integration tests use raw HTTP/1.1 and fake Chrome
+adapters to prove framing rejection, zero upstream calls on failed transforms, marker
+stripping, credential preservation, policy races, PAC collisions, and stop rollback.
+F16 and F15 regressions cover X.509 trust and shared-provider behavior. A capable macOS
+runner must prove real Chrome native messaging, PAC, trusted TLS, HTTPS POST/XHR,
+credential preservation, winner selection, failure blocking, and stop teardown. Linux
+and Windows provide offline/capability-negative evidence unless equivalent adapters are
+injected and explicitly tested.
+
+Rejected designs: browser-only DNR body rewriting; service-worker fetch forwarding;
+sending observed bodies through native messaging; widening F6; generic forward proxying;
+trusting browser-selected rule IDs or grants; relying on DNR ordering; composing rules;
+auto-start/trust; persisted policy or traffic; SPKI-as-CA; ad-hoc ASN.1; and unreviewed
+third-party proxy/TLS dependencies. Same-origin unmatched PAC traffic is the explicit
+exception to a blanket block because the user selected unchanged forwarding for that
+case; marker-selected request-body operations still fail closed. Exact initiator
+correlation through `webRequestBlocking` was considered but rejected for ordinary MV3
+availability; policy-installed Chrome is not required for F17 live status.

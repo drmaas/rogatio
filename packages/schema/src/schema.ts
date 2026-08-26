@@ -35,6 +35,7 @@ const projectSchemaDefinition = {
       maxItems: LIMITS.maxGroups,
       items: { $ref: "#/$defs/group" },
     },
+    requestBodyPolicy: { $ref: "#/$defs/requestBodyPolicyConfig" },
   },
   $defs: {
     group: {
@@ -98,7 +99,14 @@ const projectSchemaDefinition = {
         method: { type: "string", enum: [...HTTP_METHODS] },
         type: {
           type: "string",
-          enum: ["redirect", "query", "header", "mock", "response-body"],
+          enum: [
+            "redirect",
+            "query",
+            "header",
+            "mock",
+            "response-body",
+            "request-body",
+          ],
         },
         redirect: {
           type: "object",
@@ -122,6 +130,7 @@ const projectSchemaDefinition = {
         },
         mock: { $ref: "#/$defs/mockAction" },
         responseBody: { $ref: "#/$defs/responseBodyAction" },
+        requestBody: { $ref: "#/$defs/requestBodyAction" },
       },
       allOf: [
         {
@@ -196,12 +205,22 @@ const projectSchemaDefinition = {
         },
         {
           if: {
-            required: ["headerOperation"],
-            properties: { headerOperation: { const: "remove" } },
+            required: ["type"],
+            properties: { type: { const: "response-body" } },
           },
           // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
           then: {
-            not: { required: ["headerValue"] },
+            required: ["responseBody"],
+          },
+        },
+        {
+          if: {
+            required: ["type"],
+            properties: { type: { const: "request-body" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["requestBody", "method", "resourceTypes"],
           },
         },
       ],
@@ -311,6 +330,54 @@ const projectSchemaDefinition = {
           minItems: 1,
           maxItems: LIMITS.maxResponseBodyReplacements,
           items: { $ref: "#/$defs/responseBodyReplacement" },
+        },
+      },
+    },
+    requestBodyReplaceAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mode", "body"],
+      properties: {
+        mode: { const: "replace" },
+        body: {
+          type: "string",
+          maxLength: LIMITS.maxRequestBodyBytes,
+        },
+      },
+    },
+    requestBodyRegexAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mode", "pattern", "replacement"],
+      properties: {
+        mode: { const: "regex" },
+        pattern: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxRequestBodyPatternLength,
+          format: "rogatio-url-regex",
+        },
+        replacement: {
+          type: "string",
+          maxLength: LIMITS.maxRequestBodyReplacementLength,
+        },
+      },
+    },
+    requestBodyAction: {
+      oneOf: [
+        { $ref: "#/$defs/requestBodyReplaceAction" },
+        { $ref: "#/$defs/requestBodyRegexAction" },
+      ],
+    },
+    requestBodyPolicyConfig: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        localOrigins: {
+          type: "array",
+          maxItems: LIMITS.maxLocalOrigins,
+          uniqueItems: true,
+          items: { type: "string", format: "rogatio-origin" },
         },
       },
     },

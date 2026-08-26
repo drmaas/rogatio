@@ -17,6 +17,7 @@ export function normalizeSiteOrigin(value: string): string | null {
   if (url.origin === "null" || url.hostname.length === 0) return null;
   if (url.username.length > 0 || url.password.length > 0) return null;
   if (url.hostname.includes("*")) return null;
+  if (url.hostname.endsWith(".")) return null;
   if (url.pathname !== "/") return null;
 
   return url.origin;
