@@ -6,6 +6,7 @@
     "@semantic-release/changelog",
     ["@semantic-release/npm", { "pkgRoot": "packages/cli" }],
     "./scripts/release-extension-plugin.mjs",
+    "./scripts/release-notes-plugin.mjs",
     [
       "@semantic-release/github",
       {

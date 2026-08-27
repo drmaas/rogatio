@@ -11,6 +11,7 @@
 - `.github/workflows/deploy-site.yml` — GitHub Pages deploy on merge to `main`.
 - `.releaserc.json` — semantic-release plugin chain.
 - `scripts/release-extension-plugin.mjs` — stamps extension version + zips dist.
+- `scripts/release-notes-plugin.mjs` — appends npm link section to GitHub Release notes.
 - `packages/cli/package.json` — `private:false`, `publishConfig.access:public`, `files`,
   `repository`/`bugs`/`homepage`.
 - `package.json` — `semantic-release` + `@semantic-release/changelog` devDeps, `release`

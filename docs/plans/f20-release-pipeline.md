@@ -17,6 +17,8 @@ on-merge static-site deployment requested alongside it:
   - a local plugin (`scripts/release-extension-plugin.mjs`) that stamps the extension
     package version and zips `packages/extension/dist` into
     `rogatio-extension.zip`.
+  - a local `generateNotes` plugin (`scripts/release-notes-plugin.mjs`) that appends an
+    npm section linking the GitHub Release to the published `@rogatio/cli` version.
   - `@semantic-release/github` creating the GitHub Release and attaching the ZIP.
 - **`Deploy docs site` workflow** (`.github/workflows/deploy-site.yml`) builds
   `packages/docs-site` and deploys to GitHub Pages on merge to `main`.
@@ -49,6 +51,7 @@ the extension ZIP version are all set to the same release version. The extension
 ## Verification
 
 - `node --check scripts/release-extension-plugin.mjs` — plugin parses.
+- `node --check scripts/release-notes-plugin.mjs` — plugin parses.
 - `.releaserc.json` is valid JSON.
 - Full CI validation (`format:check`, `lint`, `typecheck`, `build`, `test`) passes.
 - `pnpm release --dry-run` validates the semantic-release configuration end-to-end.
