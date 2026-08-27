@@ -35,6 +35,13 @@ export {
   type MockConnectionHolder,
   type MockRuntimeConnection,
 } from "./mock-runtime.js";
+export {
+  buildNativePolicy,
+  type NativeRuntimeConfig,
+  type NativeSessionOptions,
+  startNativeSession,
+  stopNativeSession,
+} from "./native-session.js";
 export { declaredPermissionOrigins } from "./permissions.js";
 export {
   projectMatchers,

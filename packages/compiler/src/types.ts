@@ -3,6 +3,7 @@ import type {
   HeaderOperationKind,
   HttpMethod,
   MockAction,
+  RequestBodyAction,
   ResourceType,
   ResponseBodyAction,
   RogatioQueryAction,
@@ -71,13 +72,22 @@ export interface ResponseBodyOperation {
   readonly responseBody: ResponseBodyAction;
 }
 
+export interface RequestBodyOperation {
+  readonly kind: "request-body";
+  readonly groupId: string;
+  readonly ruleId: string;
+  readonly matcher: NormalizedMatcher;
+  readonly requestBody: RequestBodyAction;
+}
+
 export type RogatioOperation =
   | MatcherOperation
   | RedirectOperation
   | QueryOperation
   | HeaderOperation
   | MockOperation
-  | ResponseBodyOperation;
+  | ResponseBodyOperation
+  | RequestBodyOperation;
 
 export type CompilerDiagnosticCode =
   | "schema.required"

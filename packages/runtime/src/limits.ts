@@ -20,4 +20,11 @@ export const RUNTIME_LIMITS = Object.freeze({
   bodyIdleTimeoutMs: 10_000,
   operationTimeoutMs: 30_000,
   maxRedirects: 0 as const,
+  maxRequestBodyBytes: 4_194_304,
+  maxRequestBodyPatternLength: 2_048,
+  maxRequestBodyReplacementLength: 4_096,
+  maxRequestBodyOperations: 32,
+  maxRequestBodyTransforms: 32,
+  maxRegexDeadlineMs: 250,
+  maxLocalOrigins: 32,
 }) satisfies RuntimeLimits;

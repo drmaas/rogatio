@@ -37,6 +37,7 @@ Native runtime commands:
 
 Request-body trust commands:
   install   Install the native-messaging host manifest (capability-gated)
+            Requires --extension-id <32-char-id>
   trust     Provision and trust the device-local CA (capability-gated)
   untrust   Remove the device-local CA trust (idempotent)
   uninstall Uninstall the native-messaging host manifest (idempotent)
@@ -46,9 +47,10 @@ Mock runtime arguments:
             Use '-' to read project JSON from stdin
 
 Options:
-  --port <n>      Port for the mock runtime (default: 8890; use 0 for ephemeral)
-  --root <dir>    Root for confined file mocks (default: project directory)
-  --help, -h      Show this help
+  --port <n>        Port for the mock runtime (default: 8890; use 0 for ephemeral)
+  --root <dir>      Root for confined file mocks (default: project directory)
+  --extension-id    Extension ID for native messaging manifest (required for install)
+  --help, -h        Show this help
 
 The native runtime activates only where a trusted device-local CA can be provisioned
 and Chrome PAC routing does not collide with an existing controlling proxy/PAC/extension
@@ -190,12 +192,33 @@ function reportTrust(
 
 async function trustRuntimeCommand(args: string[]): Promise<number> {
   const subcommand = args[0];
+  let extensionId: string | undefined;
+
+  // Parse --extension-id for install command
+  if (subcommand === "install") {
+    const extIdIndex = args.indexOf("--extension-id");
+    if (extIdIndex === -1 || extIdIndex + 1 >= args.length) {
+      console.error("Error: --extension-id is required for install command");
+      showRuntimeHelp();
+      return 2;
+    }
+    extensionId = args[extIdIndex + 1];
+
+    // Validate extension ID format: 32 lowercase a-p
+    if (!/^[a-p]{32}$/.test(extensionId)) {
+      console.error(
+        "Error: --extension-id must be exactly 32 lowercase characters from a through p",
+      );
+      return 2;
+    }
+  }
+
   const controller = makeTrustController();
   switch (subcommand) {
     case "install":
       return reportTrust(
         "install",
-        await controller.install(),
+        await controller.install(extensionId ?? ""),
         "trust installed",
       );
     case "trust":

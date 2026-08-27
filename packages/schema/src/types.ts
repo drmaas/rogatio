@@ -39,7 +39,8 @@ export type RuleType =
   | "query"
   | "header"
   | "mock"
-  | "response-body";
+  | "response-body"
+  | "request-body";
 
 export type HeaderDirection = "request" | "response";
 export type HeaderOperationKind = "set" | "append" | "remove";
@@ -94,6 +95,27 @@ export interface ResponseBodyAction {
   replacements: ResponseBodyReplacement[];
 }
 
+export type RequestBodyMode = "replace" | "regex";
+
+export interface RequestBodyReplaceAction {
+  mode: "replace";
+  body: string;
+}
+
+export interface RequestBodyRegexAction {
+  mode: "regex";
+  pattern: string;
+  replacement: string;
+}
+
+export type RequestBodyAction =
+  | RequestBodyReplaceAction
+  | RequestBodyRegexAction;
+
+export interface RequestBodyPolicyConfig {
+  localOrigins: string[];
+}
+
 export interface RogatioRule {
   id: string;
   name: string;
@@ -121,6 +143,8 @@ export interface RogatioRule {
   mock?: MockAction;
   /** Required iff type === "response-body". */
   responseBody?: ResponseBodyAction;
+  /** Required iff type === "request-body". */
+  requestBody?: RequestBodyAction;
 }
 
 export interface RogatioGroup {
@@ -135,4 +159,5 @@ export interface RogatioProject {
   name: string;
   description?: string;
   groups: RogatioGroup[];
+  requestBodyPolicy?: RequestBodyPolicyConfig;
 }

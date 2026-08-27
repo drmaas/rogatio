@@ -1,12 +1,18 @@
-import { generateKeyPairSync, type KeyObject } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
+import {
+  createCertificate,
+  exportPrivateKey,
+  exportPublicKey,
+  generateCaKeyPair,
+} from "./f16-x509.js";
 
 /** Immutable F16 trust-limit profile (spec REQ-021). */
 export const F16_TRUST_LIMITS = {
   manifestMaxBytes: 4096,
   maxAllowedOrigins: 64,
   caKeyBits: 2048,
+  caValidityDays: 3650,
 } as const;
 
 export type TrustPlatform = "darwin" | "linux" | "win32" | string;
@@ -157,6 +163,7 @@ export interface RequestBodyTrustControllerOptions {
   readonly manifestDir?: string;
   readonly caKeyFileName?: string;
   readonly caPubFileName?: string;
+  readonly caCertFileName?: string;
   readonly detectCapabilities?: () =>
     | TrustCapabilities
     | Promise<TrustCapabilities>;
@@ -222,7 +229,7 @@ export function createRequestBodyTrustController(
 ) {
   const platform = options.platform ?? process.platform;
   const hostName = options.hostName ?? "com.rogatio.runtime";
-  const allowedOrigins = options.allowedOrigins ?? [];
+  const _allowedOrigins = options.allowedOrigins ?? [];
   const installRoot = options.installRoot ?? defaultTrustInstallRoot(platform);
   const hostPath = options.hostPath ?? join(installRoot, "runtime-host");
   const manifestDir = options.manifestDir ?? installRoot;
@@ -238,9 +245,22 @@ export function createRequestBodyTrustController(
   const caTrustInstaller = options.caTrustInstaller;
   const caTrustRemover = options.caTrustRemover;
 
+  const caCertFile = join(
+    installRoot,
+    options.caCertFileName ?? ".rogatio-ca.crt",
+  );
   const manifestPath = (): string => join(manifestDir, `${hostName}.json`);
+  let installerCalled = false;
 
-  async function install(): Promise<TrustResult> {
+  async function install(extensionId: string): Promise<TrustResult> {
+    if (!extensionId || !/^[a-p]{32}$/.test(extensionId)) {
+      return {
+        ok: false,
+        state: "unsupported",
+        reasons: ["invalid-extension-id"],
+      };
+    }
+    const allowedOrigins = [`chrome-extension://${extensionId}/`];
     let manifest: NativeMessagingManifest;
     try {
       manifest = generateNativeMessagingManifest(
@@ -295,25 +315,29 @@ export function createRequestBodyTrustController(
     const caps = await detect();
     if (!caps.caTrust) return unsupportedResult(caps);
     try {
-      if (!(await existsFile(caKeyFile))) {
-        const {
+      if (!(await existsFile(caKeyFile)) || !(await existsFile(caCertFile))) {
+        const { privateKey, publicKey } = generateCaKeyPair(
+          F16_TRUST_LIMITS.caKeyBits,
+        );
+        const _privateKeyPem = exportPrivateKey(privateKey);
+        const _pubPem = exportPublicKey(publicKey);
+
+        // Generate self-signed X.509 CA certificate
+        const certResult = createCertificate(
+          "CN=Rogatio Request-Body CA",
           privateKey,
-          publicKey,
-        }: { privateKey: KeyObject; publicKey: KeyObject } =
-          generateKeyPairSync("rsa", {
-            modulusLength: F16_TRUST_LIMITS.caKeyBits,
-          });
-        await writeFileAtomic(
-          caKeyFile,
-          privateKey.export({ type: "pkcs8", format: "pem" }) as string,
+          F16_TRUST_LIMITS.caValidityDays,
         );
-        await writeFileAtomic(
-          caPubFile,
-          publicKey.export({ type: "spki", format: "pem" }) as string,
-        );
+        const certPem = certResult.certPem;
+        const certKeyPem = certResult.keyPem;
+
+        await writeFileAtomic(caKeyFile, certKeyPem);
+        await writeFileAtomic(caPubFile, certPem); // Store cert as public key for compatibility
+        await writeFileAtomic(caCertFile, certPem);
       }
-      if (caTrustInstaller) {
-        await caTrustInstaller(await readFile(caPubFile, "utf8"));
+      if (caTrustInstaller && !installerCalled) {
+        await caTrustInstaller(await readFile(caCertFile, "utf8"));
+        installerCalled = true;
       }
     } catch (error) {
       return {
@@ -332,6 +356,8 @@ export function createRequestBodyTrustController(
       }
       await rm(caKeyFile, { force: true });
       await rm(caPubFile, { force: true });
+      await rm(caCertFile, { force: true });
+      installerCalled = false;
     } catch (error) {
       return {
         ok: false,
@@ -350,7 +376,9 @@ export function createRequestBodyTrustController(
     } catch {
       installed = false;
     }
-    const trusted = await existsFile(caKeyFile);
+    // Check actual trust: both CA key and certificate must exist
+    const trusted =
+      (await existsFile(caKeyFile)) && (await existsFile(caCertFile));
     const caps = await detect();
     return {
       installed,

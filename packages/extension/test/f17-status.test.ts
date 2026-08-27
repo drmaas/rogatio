@@ -2,27 +2,25 @@ import type { RogatioProject } from "@rogatio/schema";
 import { describe, expect, it, vi } from "vitest";
 import { createExtensionApplication } from "../src/service-worker.js";
 
-const responseProject: RogatioProject = {
+const requestBodyProject: RogatioProject = {
   version: 1,
-  name: "Response project",
+  name: "Request body project",
   groups: [
     {
-      id: "group-response",
-      name: "Response group",
+      id: "group-body",
+      name: "Body group",
       origins: ["https://example.com"],
       rules: [
         {
-          id: "rule-response",
-          name: "Rewrite response",
-          urlRegex: "^https://example\\.com/data$",
+          id: "rule-replace",
+          name: "Replace body",
+          urlRegex: "^https://example\\.com/api$",
           origins: [],
           resourceTypes: ["xmlhttprequest"],
-          priority: 100,
-          method: "GET",
-          type: "response-body",
-          responseBody: {
-            replacements: [{ pattern: "old", replacement: "new" }],
-          },
+          priority: 50,
+          method: "POST",
+          type: "request-body",
+          requestBody: { mode: "replace", body: '{"debug":false}' },
         },
       ],
     },
@@ -57,7 +55,7 @@ function harness() {
     },
     nativeRuntime,
     extensionId: "test-extension-id",
-    generateId: () => "response-project",
+    generateId: () => "request-body-project",
     now: () => 1,
   });
   return { app, nativeRuntime };
@@ -67,18 +65,18 @@ async function prepare(app: ReturnType<typeof createExtensionApplication>) {
   await app.handle({
     version: 1,
     command: "create-project",
-    data: responseProject,
+    data: requestBodyProject,
   });
   await app.handle({
     version: 1,
     command: "set-group-enabled",
-    projectId: "response-project",
-    groupId: "group-response",
+    projectId: "request-body-project",
+    groupId: "group-body",
     enabled: true,
   });
 }
 
-describe("F15 response-body extension status", () => {
+describe("F17 request-body extension status", () => {
   it("reports needs proxy before explicit start and active after start", async () => {
     const { app, nativeRuntime } = harness();
     await prepare(app);
@@ -104,7 +102,6 @@ describe("F15 response-body extension status", () => {
   });
 
   it("reports unsupported without a native runtime adapter", async () => {
-    const { app } = harness();
     let unsupportedStored: unknown;
     const noAdapter = createExtensionApplication({
       storage: {
@@ -130,13 +127,13 @@ describe("F15 response-body extension status", () => {
     await noAdapter.handle({
       version: 1,
       command: "create-project",
-      data: responseProject,
+      data: requestBodyProject,
     });
     await noAdapter.handle({
       version: 1,
       command: "set-group-enabled",
       projectId: "unsupported-project",
-      groupId: "group-response",
+      groupId: "group-body",
       enabled: true,
     });
     const state = await noAdapter.handle({ version: 1, command: "get-state" });
@@ -156,6 +153,5 @@ describe("F15 response-body extension status", () => {
       ok: false,
       diagnostic: { code: "extension.native-runtime-unavailable" },
     });
-    expect(app).toBeDefined();
   });
 });

@@ -113,6 +113,11 @@ export const LIMITS = Object.freeze({
   maxHeaderNameLength: 256,
   maxHeaderValueLength: 4096,
   maxHeadersPerRule: 1,
+  maxRequestBodyBytes: 4 * 1024 * 1024,
+  maxRequestBodyPatternLength: 2048,
+  maxRequestBodyReplacementLength: 4096,
+  maxRequestBodyOperations: 32,
+  maxLocalOrigins: 32,
 });
 
 type JsonRecord = Record<string, unknown>;
@@ -192,6 +197,22 @@ function snapshotOwnData(
   }
 }
 
+function hasLoneSurrogate(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      if (i + 1 >= value.length) return true;
+      const next = value.charCodeAt(i + 1);
+      if (next < 0xdc00 || next > 0xdfff) return true;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      if (i === 0) return true;
+      const prev = value.charCodeAt(i - 1);
+      if (prev < 0xd800 || prev > 0xdbff) return true;
+    }
+  }
+  return false;
+}
+
 function origin(value: unknown): string | null {
   if (typeof value !== "string" || value.length === 0 || value.trim() !== value)
     return null;
@@ -210,6 +231,7 @@ function origin(value: unknown): string | null {
     parsed.username ||
     parsed.password ||
     parsed.hostname.includes("*") ||
+    parsed.hostname.endsWith(".") ||
     parsed.pathname !== "/"
   )
     return null;
@@ -386,7 +408,13 @@ function hasOnlyKeys(value: JsonRecord, allowed: readonly string[]): boolean {
   return Object.keys(value).every((key) => keys.has(key));
 }
 
-const PROJECT_KEYS = ["version", "name", "description", "groups"] as const;
+const PROJECT_KEYS = [
+  "version",
+  "name",
+  "description",
+  "groups",
+  "requestBodyPolicy",
+] as const;
 const GROUP_KEYS = ["id", "name", "origins", "rules"] as const;
 const RULE_KEYS = [
   "id",
@@ -405,10 +433,13 @@ const RULE_KEYS = [
   "headerValue",
   "mock",
   "responseBody",
+  "requestBody",
 ] as const;
 
 const QUERY_ACTION_KEYS = ["type", "params"] as const;
 const QUERY_PARAM_KEYS = ["name", "value"] as const;
+const REQUEST_BODY_REPLACE_KEYS = ["mode", "body"] as const;
+const REQUEST_BODY_REGEX_KEYS = ["mode", "pattern", "replacement"] as const;
 
 function validateQueryParam(
   errors: ValidationIssue[],
@@ -608,7 +639,8 @@ export function validateProjectDetailed(
         rule.type !== "query" &&
         rule.type !== "header" &&
         rule.type !== "mock" &&
-        rule.type !== "response-body"
+        rule.type !== "response-body" &&
+        rule.type !== "request-body"
       )
         errors.push(issue(`${rulePath}/type`, "invalid-value"));
       if (rule.type === "redirect") {
@@ -678,6 +710,97 @@ export function validateProjectDetailed(
           errors.push(issue(`${rulePath}/headerValue`, "unexpected"));
         }
       }
+      if (rule.type === "request-body") {
+        const action = rule.requestBody as {
+          mode?: string;
+          body?: unknown;
+          pattern?: unknown;
+          replacement?: unknown;
+        };
+        const actionPath = `${rulePath}/requestBody`;
+        if (!action || typeof action !== "object") {
+          errors.push(issue(actionPath, "request-body-action"));
+        } else if (
+          !hasOnlyKeys(action as JsonRecord, REQUEST_BODY_REPLACE_KEYS) &&
+          !hasOnlyKeys(action as JsonRecord, REQUEST_BODY_REGEX_KEYS)
+        ) {
+          errors.push(issue(actionPath, "request-body-unknown-property"));
+        } else {
+          const mode = action.mode;
+          if (mode !== "replace" && mode !== "regex") {
+            errors.push(issue(`${actionPath}/mode`, "request-body-mode"));
+          }
+          if (mode === "replace") {
+            const body = action.body;
+            if (typeof body !== "string") {
+              errors.push(
+                issue(`${actionPath}/body`, "request-body-replace-body"),
+              );
+            } else if (body.length > LIMITS.maxRequestBodyBytes) {
+              errors.push(
+                issue(`${actionPath}/body`, "request-body-replace-body"),
+              );
+            } else if (hasLoneSurrogate(body)) {
+              errors.push(
+                issue(`${actionPath}/body`, "request-body-lone-surrogate"),
+              );
+            }
+          }
+          if (mode === "regex") {
+            const pattern = action.pattern;
+            const replacement = action.replacement;
+            if (typeof pattern !== "string" || pattern.length === 0) {
+              errors.push(
+                issue(`${actionPath}/pattern`, "request-body-pattern"),
+              );
+            } else if (pattern.length > LIMITS.maxRequestBodyPatternLength) {
+              errors.push(
+                issue(`${actionPath}/pattern`, "request-body-pattern"),
+              );
+            } else if (!isValidUrlRegex(pattern)) {
+              errors.push(
+                issue(`${actionPath}/pattern`, "request-body-pattern"),
+              );
+            } else if (hasLoneSurrogate(pattern)) {
+              errors.push(
+                issue(`${actionPath}/pattern`, "request-body-lone-surrogate"),
+              );
+            }
+            if (
+              typeof replacement !== "string" ||
+              replacement.length > LIMITS.maxRequestBodyReplacementLength
+            ) {
+              errors.push(
+                issue(`${actionPath}/replacement`, "request-body-replacement"),
+              );
+            } else if (hasLoneSurrogate(replacement)) {
+              errors.push(
+                issue(
+                  `${actionPath}/replacement`,
+                  "request-body-lone-surrogate",
+                ),
+              );
+            }
+          }
+        }
+        if (
+          rule.method !== "POST" &&
+          rule.method !== "PUT" &&
+          rule.method !== "PATCH"
+        ) {
+          errors.push(issue(`${rulePath}/method`, "request-body-method"));
+        }
+        const resourceTypes = rule.resourceTypes;
+        if (
+          !Array.isArray(resourceTypes) ||
+          resourceTypes.length !== 1 ||
+          resourceTypes[0] !== "xmlhttprequest"
+        ) {
+          errors.push(
+            issue(`${rulePath}/resourceTypes`, "request-body-resource-types"),
+          );
+        }
+      }
       const effective = [
         ...(Array.isArray(group.origins) ? group.origins : []),
         ...(Array.isArray(rule.origins) ? rule.origins : []),
@@ -686,6 +809,60 @@ export function validateProjectDetailed(
         errors.push(issue(`${rulePath}/origins`, "no-effective-origin"));
     }
   }
+  if (project.requestBodyPolicy != null) {
+    const rawPolicy = project.requestBodyPolicy as { localOrigins?: unknown };
+    if (typeof rawPolicy.localOrigins !== "undefined") {
+      if (!Array.isArray(rawPolicy.localOrigins)) {
+        errors.push(
+          issue(
+            "/requestBodyPolicy/localOrigins",
+            "request-body-policy-local-origins",
+          ),
+        );
+      } else {
+        const seen = new Set<string>();
+        for (let i = 0; i < rawPolicy.localOrigins.length; i += 1) {
+          const originValue = rawPolicy.localOrigins[i];
+          if (typeof originValue !== "string") {
+            errors.push(
+              issue(
+                `/requestBodyPolicy/localOrigins/${i}`,
+                "request-body-policy-local-origin",
+              ),
+            );
+            continue;
+          }
+          const normalized = origin(originValue);
+          if (normalized === null) {
+            errors.push(
+              issue(
+                `/requestBodyPolicy/localOrigins/${i}`,
+                "request-body-policy-local-origin",
+              ),
+            );
+          } else if (seen.has(normalized)) {
+            errors.push(
+              issue(
+                `/requestBodyPolicy/localOrigins/${i}`,
+                "request-body-policy-local-origin",
+              ),
+            );
+          } else {
+            seen.add(normalized);
+          }
+        }
+        if (rawPolicy.localOrigins.length > LIMITS.maxLocalOrigins) {
+          errors.push(
+            issue(
+              "/requestBodyPolicy/localOrigins",
+              "request-body-policy-local-origins",
+            ),
+          );
+        }
+      }
+    }
+  }
+
   if (ruleCount > LIMITS.maxRulesPerProject)
     errors.push(issue("/groups", "rule-limit"));
   return errors.length > 0
