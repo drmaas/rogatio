@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { editCommand } from "./commands/edit.js";
@@ -227,7 +228,8 @@ Exit codes:
 
 if (
   process.argv[1] !== undefined &&
-  fileURLToPath(import.meta.url) === resolve(process.argv[1])
+  realpathSync.native(fileURLToPath(import.meta.url)) ===
+    realpathSync.native(resolve(process.argv[1]))
 ) {
   cli().catch((err) => {
     console.error(err);
