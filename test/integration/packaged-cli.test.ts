@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(import.meta.dirname, "../..");
+const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const packages = ["schema", "compiler", "dry-run", "editor", "runtime", "cli"];
 
 async function run(command: string, args: string[], cwd: string) {
@@ -33,7 +34,7 @@ async function run(command: string, args: string[], cwd: string) {
 
 describe("F18 packaged CLI integration", () => {
   it("packs, installs offline, and executes the real CLI binary", async () => {
-    const build = await run("pnpm", ["build"], root);
+    const build = await run(pnpm, ["build"], root);
     expect(build.code, build.stderr).toBe(0);
     const temp = await mkdtemp(join(tmpdir(), "rogatio-f18-packaged-"));
     const tarballs = join(temp, "tarballs");
@@ -42,7 +43,7 @@ describe("F18 packaged CLI integration", () => {
       await mkdir(tarballs, { recursive: true });
       for (const packageName of packages) {
         const result = await run(
-          "pnpm",
+          pnpm,
           ["pack", "--pack-destination", tarballs],
           join(root, "packages", packageName),
         );
@@ -54,9 +55,24 @@ describe("F18 packaged CLI integration", () => {
       const tarballPaths = packages.map((packageName) =>
         join(tarballs, `rogatio-${packageName}-0.0.0.tgz`),
       );
+      const ajvPackage = join(
+        root,
+        "node_modules",
+        ".pnpm",
+        "ajv@8.17.1",
+        "node_modules",
+        "ajv",
+      );
       const install = await run(
         "npm",
-        ["install", "--offline", "--no-audit", "--no-fund", ...tarballPaths],
+        [
+          "install",
+          "--offline",
+          "--no-audit",
+          "--no-fund",
+          ...tarballPaths,
+          ajvPackage,
+        ],
         consumer,
       );
       expect(install.code, install.stderr).toBe(0);
