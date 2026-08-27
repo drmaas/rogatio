@@ -87,14 +87,15 @@ describe("F18 packaged CLI integration", () => {
         "node",
         "index.js",
       );
-      const version = await run(bin, ["--version"], consumer);
+      const node = process.execPath;
+      const version = await run(node, [bin, "--version"], consumer);
       expect(version.code, `${version.stdout}${version.stderr}`).toBe(0);
       expect(`${version.stdout}${version.stderr}`).toContain("0.0.0");
 
-      const verify = await run(bin, ["verify", projectPath], consumer);
+      const verify = await run(node, [bin, "verify", projectPath], consumer);
       expect(verify.code, verify.stderr).toBe(0);
 
-      const help = await run(bin, ["--help"], consumer);
+      const help = await run(node, [bin, "--help"], consumer);
       expect(help.code).toBe(0);
       expect(help.stdout).toContain("Rogatio CLI");
 
@@ -104,14 +105,14 @@ describe("F18 packaged CLI integration", () => {
         JSON.stringify([{ url: "https://example.com/" }]),
       );
       const dryRun = await run(
-        bin,
-        ["test", "--json", "--urls-file", casesPath, projectPath],
+        node,
+        [bin, "test", "--json", "--urls-file", casesPath, projectPath],
         consumer,
       );
       expect(dryRun.code).toBe(0);
       expect(dryRun.stdout).toContain('"summary"');
 
-      const status = await run(bin, ["runtime", "status"], consumer);
+      const status = await run(node, [bin, "runtime", "status"], consumer);
       expect([0, 1]).toContain(status.code);
     } finally {
       await rm(temp, { recursive: true, force: true });
