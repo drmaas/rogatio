@@ -168,6 +168,11 @@ validation workflow before you start.
 - [`docs/architecture.md`](docs/architecture.md) — package boundaries and decisions.
 - [`docs/specs/`](docs/specs) and [`docs/plans/`](docs/plans) — per-feature specs and plans.
 
+The published user documentation site is built from `packages/docs-site` (Astro + Starlight).
+Run it locally with `pnpm --filter @rogatio/docs-site dev`, or build static output with
+`pnpm --filter @rogatio/docs-site build` (emits `packages/docs-site/dist/`, gitignored).
+Hosting/deploy is owned by a later release pipeline (F20).
+
 ## License
 
 [MIT](LICENSE) © 2026 Dan Maas
