@@ -24,18 +24,27 @@ function apiFor(storage: {
 }
 
 describe("F7 Chrome adapters", () => {
-  it("passes exact origin arrays to permission APIs", async () => {
+  it("converts exact origins to Chrome match patterns", async () => {
+    const contains = vi.fn(async () => true);
     const request = vi.fn(async () => true);
+    const remove = vi.fn(async () => true);
     const api = {
       ...apiFor({ get: async () => ({}), set: async () => {} }),
-      permissions: {
-        contains: async () => false,
-        request,
-        remove: async () => true,
-      },
+      permissions: { contains, request, remove },
     };
-    await createPermissionAdapter(api).request(["https://example.com"]);
-    expect(request).toHaveBeenCalledWith({ origins: ["https://example.com"] });
+    const adapter = createPermissionAdapter(api);
+    await adapter.contains(["https://example.com", "https://example.org/"]);
+    await adapter.request(["https://example.com", "https://example.org/"]);
+    await adapter.remove(["https://example.com", "https://example.org/"]);
+    expect(contains).toHaveBeenCalledWith({
+      origins: ["https://example.com/*", "https://example.org/*"],
+    });
+    expect(request).toHaveBeenCalledWith({
+      origins: ["https://example.com/*", "https://example.org/*"],
+    });
+    expect(remove).toHaveBeenCalledWith({
+      origins: ["https://example.com/*", "https://example.org/*"],
+    });
   });
 
   it("uses compare-and-swap to protect stored state", async () => {

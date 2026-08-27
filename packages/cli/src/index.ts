@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { editCommand } from "./commands/edit.js";
@@ -7,7 +9,7 @@ import { verifyCommand } from "./commands/verify.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // Handle both source (packages/cli/src) and dist (packages/cli/dist/node) locations
-const isDist = __dirname.includes("/dist/");
+const isDist = __dirname.includes("/dist/") || __dirname.includes("\\dist\\");
 const packageJsonPath = resolve(
   __dirname,
   isDist ? "../../package.json" : "../package.json",
@@ -224,7 +226,11 @@ Exit codes:
   2  Usage error (invalid arguments, missing input)`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (
+  process.argv[1] !== undefined &&
+  realpathSync.native(fileURLToPath(import.meta.url)) ===
+    realpathSync.native(resolve(process.argv[1]))
+) {
   cli().catch((err) => {
     console.error(err);
     process.exit(1);

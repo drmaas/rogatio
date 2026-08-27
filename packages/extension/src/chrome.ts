@@ -102,16 +102,27 @@ export function createStorageAdapter(api: ChromeApi = chromeApi()) {
   };
 }
 
+function originMatchPattern(origin: string): string {
+  const normalized = origin.endsWith("/") ? origin.slice(0, -1) : origin;
+  return `${normalized}/*`;
+}
+
 export function createPermissionAdapter(api: ChromeApi = chromeApi()) {
   return {
     contains(origins: readonly string[]): Promise<boolean> {
-      return api.permissions.contains({ origins });
+      return api.permissions.contains({
+        origins: origins.map(originMatchPattern),
+      });
     },
     request(origins: readonly string[]): Promise<boolean> {
-      return api.permissions.request({ origins });
+      return api.permissions.request({
+        origins: origins.map(originMatchPattern),
+      });
     },
     remove(origins: readonly string[]): Promise<boolean> {
-      return api.permissions.remove({ origins });
+      return api.permissions.remove({
+        origins: origins.map(originMatchPattern),
+      });
     },
   };
 }

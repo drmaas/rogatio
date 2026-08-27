@@ -389,17 +389,27 @@ async function grantPermissions(): Promise<void> {
   if (!projectId) return;
   if (permissionOrigins.length === 0) await reviewPermissions();
   if (permissionOrigins.length === 0) return;
-  const response = await client.send({
-    version: 1,
-    command: "grant-permissions",
-    projectId,
-    origins: permissionOrigins,
-  });
-  if (response.ok === true) permissionGranted = true;
-  statusMessage =
-    response.ok === true
-      ? "Declared access granted."
-      : "Declared access was not granted.";
+  // chrome.permissions.request must run inside a user gesture, which is lost
+  // across the runtime message round trip to the service worker. The page
+  // therefore owns the exact-origin request and asks the worker to re-sync
+  // stored grants from the actual permission state afterwards.
+  const origins = permissionOrigins.map((origin) =>
+    origin.endsWith("/") ? origin : `${origin}/*`,
+  );
+  const granted = await chrome.permissions.request({ origins });
+  permissionGranted = granted;
+  statusMessage = granted
+    ? "Declared access granted."
+    : "Declared access was not granted.";
+  if (granted && projectId) {
+    await client.send({
+      version: 1,
+      command: "grant-permissions",
+      projectId,
+      origins: permissionOrigins,
+      granted: true,
+    });
+  }
   await refresh();
 }
 

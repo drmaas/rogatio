@@ -135,8 +135,8 @@ describe("F7 extension application", () => {
     });
   });
 
-  it("reports enabled query rules as error when not installed (F10)", async () => {
-    const { options } = harnessOptions();
+  it("installs enabled query rules after permissions are granted (F10/F18)", async () => {
+    const { options, install } = harnessOptions();
     const app = createExtensionApplication({
       ...options,
       permissions: {
@@ -171,7 +171,10 @@ describe("F7 extension application", () => {
     expect(ruleStatuses).toBeDefined();
     expect(Array.isArray(ruleStatuses)).toBe(true);
     expect(ruleStatuses.length).toBeGreaterThan(0);
-    expect((ruleStatuses[0] as { status: string }).status).toBe("error");
+    expect((ruleStatuses[0] as { status: string }).status).toBe("active");
+    expect(install).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ kind: "query" })]),
+    );
   });
 
   it("returns statuses and clears the badge when the last project is removed", async () => {

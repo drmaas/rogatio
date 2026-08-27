@@ -867,6 +867,7 @@ function normalizeExtensions(
       ),
     ]);
   }
+  const passedIds = new Set<string>();
   for (let index = 0; index < value.length; index += 1) {
     const extension = value[index];
     if (
@@ -878,7 +879,7 @@ function normalizeExtensions(
       typeof extension.matches !== "function" ||
       typeof extension.mount !== "function" ||
       typeof extension.validate !== "function" ||
-      ids.has(extension.id)
+      passedIds.has(extension.id)
     ) {
       throw new EditorInitializationError([
         diagnostic(
@@ -888,6 +889,7 @@ function normalizeExtensions(
         ),
       ]);
     }
+    passedIds.add(extension.id);
     const existing = merged.findIndex((e) => e.id === extension.id);
     if (existing >= 0) merged[existing] = extension;
     else merged.push(extension);
