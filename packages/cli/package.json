@@ -1,8 +1,24 @@
 {
   "name": "@rogatio/cli",
   "version": "0.0.0",
-  "private": true,
+  "private": false,
   "type": "module",
+  "description": "Local-first browser request and response rules — editor host, file verification, test runner, and runtime dispatch.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/drmaas/rogatio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/drmaas/rogatio/issues"
+  },
+  "homepage": "https://github.com/drmaas/rogatio#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "types": "./src/index.ts",
