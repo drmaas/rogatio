@@ -1,15 +1,31 @@
 import type { RuleInstallerAdapter } from "@rogatio/browser-core";
 import type {
   MockOperation,
+  QueryOperation,
   RedirectOperation,
   RogatioOperation,
 } from "@rogatio/compiler";
+import { queryParamsToDNR } from "@rogatio/compiler";
 import type { ChromeApi } from "./chrome.js";
 
 export interface DnrRedirectRule {
   id: number;
   priority: number;
   action: { type: "redirect"; redirect: { url: string } };
+  condition: {
+    regexFilter: string;
+    resourceTypes: readonly string[];
+    initiatorDomains: string[];
+  };
+}
+
+export interface DnrQueryRule {
+  id: number;
+  priority: number;
+  action: {
+    type: "redirect";
+    redirect: { transform: { query: { addOrReplaceParams: unknown[] } } };
+  };
   condition: {
     regexFilter: string;
     resourceTypes: readonly string[];
@@ -24,7 +40,7 @@ export interface DnrAllowRule {
   condition: { urlFilter: string };
 }
 
-export type DnrRule = DnrRedirectRule | DnrAllowRule;
+export type DnrRule = DnrRedirectRule | DnrQueryRule | DnrAllowRule;
 
 /** Stable high-priority id for the single loop-protection allow rule. */
 export const MOCK_ALLOW_RULE_ID = 3_000_001;
@@ -55,6 +71,29 @@ export function translateRedirectToDnr(
     action: {
       type: "redirect",
       redirect: { url: operation.redirect.destination },
+    },
+    condition: {
+      regexFilter: operation.matcher.urlRegex.source,
+      resourceTypes: operation.matcher.resourceTypes,
+      initiatorDomains: hostnamesFromOrigins(operation.matcher.origins),
+    },
+  };
+}
+
+export function translateQueryToDnr(
+  operation: QueryOperation,
+  id: number,
+): DnrQueryRule {
+  return {
+    id,
+    priority: operation.matcher.priority,
+    action: {
+      type: "redirect",
+      redirect: {
+        transform: {
+          query: { addOrReplaceParams: queryParamsToDNR(operation.action) },
+        },
+      },
     },
     condition: {
       regexFilter: operation.matcher.urlRegex.source,
@@ -158,6 +197,13 @@ export function createDnrInstaller(
           usedIds.add(id);
           addRules.push(translateRedirectToDnr(redirect, id));
           added.push({ ruleId: id, operation: redirect });
+        } else if (operation.kind === "query") {
+          const query = operation as QueryOperation;
+          let id = ruleIdHash(query.ruleId);
+          while (usedIds.has(id)) id = (id % 1_000_000) + 1;
+          usedIds.add(id);
+          addRules.push(translateQueryToDnr(query, id));
+          added.push({ ruleId: id, operation: query });
         } else if (operation.kind === "mock") {
           const mock = operation as MockOperation;
           const mockUrl = options.mockUrlResolver?.(mock);

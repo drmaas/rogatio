@@ -1,7 +1,25 @@
-import type { RedirectOperation } from "@rogatio/compiler";
+import type { QueryOperation, RedirectOperation } from "@rogatio/compiler";
+import { queryParamsToDNR } from "@rogatio/compiler";
 import { describe, expect, it, vi } from "vitest";
 import type { ChromeApi } from "../src/chrome.js";
-import { createDnrInstaller, translateRedirectToDnr } from "../src/dnr.js";
+import {
+  createDnrInstaller,
+  translateQueryToDnr,
+  translateRedirectToDnr,
+} from "../src/dnr.js";
+
+const queryOp: QueryOperation = {
+  kind: "query",
+  groupId: "g1",
+  ruleId: "query-1",
+  matcher: {
+    urlRegex: { source: "^https://example\\.com/", flags: "" },
+    origins: ["https://example.com"],
+    resourceTypes: ["main_frame"],
+    priority: 10,
+  },
+  action: { type: "query", params: [{ name: "a", value: "1" }] },
+};
 
 const redirectOp: RedirectOperation = {
   kind: "redirect",
@@ -58,6 +76,51 @@ describe("F9 DNR translation", () => {
     const current = await installer.current();
     expect(current).toHaveLength(1);
     expect(current[0]).toBe(redirectOp);
+  });
+
+  it("maps query operations to DNR redirect transforms", () => {
+    expect(translateQueryToDnr(queryOp, 7)).toEqual({
+      id: 7,
+      priority: 10,
+      action: {
+        type: "redirect",
+        redirect: {
+          transform: {
+            query: {
+              addOrReplaceParams: queryParamsToDNR(queryOp.action),
+            },
+          },
+        },
+      },
+      condition: {
+        regexFilter: "^https://example\\.com/",
+        resourceTypes: ["main_frame"],
+        initiatorDomains: ["example.com"],
+      },
+    });
+  });
+
+  it("installs query operations as DNR redirect transforms", async () => {
+    const updateDynamicRules = vi.fn(
+      async (_payload: { removeRuleIds: number[]; addRules: unknown[] }) => {},
+    );
+    const api = {
+      declarativeNetRequest: {
+        updateDynamicRules,
+        getDynamicRules: async () => [],
+      },
+    } as unknown as ChromeApi;
+    const installer = createDnrInstaller(api);
+
+    expect(await installer.install([queryOp])).toEqual({ ok: true });
+    const payload = updateDynamicRules.mock.calls[0][0] as {
+      addRules: Array<{
+        action: { redirect: { transform: { query: unknown } } };
+      }>;
+    };
+    expect(payload.addRules[0]?.action.redirect.transform.query).toEqual({
+      addOrReplaceParams: queryParamsToDNR(queryOp.action),
+    });
   });
 
   it("does nothing when the declarativeNetRequest API is unavailable", async () => {

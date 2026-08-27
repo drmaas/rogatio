@@ -149,7 +149,7 @@ Common scripts:
 | `pnpm lint` | Run Biome linting. |
 | `pnpm typecheck` | Run the pinned strict TypeScript compiler. |
 | `pnpm build` | Build and verify Node and browser ESM artifacts. |
-| `pnpm test` | Build and run the Vitest unit suite. |
+| `pnpm test` | Build and run the Vitest unit and real-process integration suites. |
 | `pnpm test:browser` | Build and run the Chromium Playwright smoke journey. |
 | `pnpm validate` | Run the complete fail-fast validation sequence (includes negative fixtures). |
 

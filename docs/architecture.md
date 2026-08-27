@@ -1105,3 +1105,125 @@ isolation rules hold.
   navigable user site; mixing them would confuse published content with internal process.
 - Building the site with the root esbuild pipeline: rejected because Astro/Starlight have
   their own build toolchain that the root script does not and should not drive.
+## F18: E2E and Integration Test Suite
+
+F18 is the full-product test suite that closes the gap between per-package unit tests and
+the shipped artifacts. It proves, with real processes and real browsers, that the CLI,
+editor, extension, runtime, and packaged artifacts work together the way a user consumes
+them. It deliberately does **not** re-test per-package logic that F2-F17 already cover; it
+exercises the seams those suites cannot reach: real HTTP servers, real Chromium, real
+packed tarballs, and the real extension service worker.
+
+### Test layers
+
+1. **Integration tests (`test/integration/`, Vitest, Node):** real-process journeys using
+   the built artifacts. The packaged CLI is produced with `pnpm pack` for every `@rogatio/*`
+   workspace package, installed with `npm install --offline` into a temp directory, and
+   executed as a real binary (`verify`, `test`, `runtime status`, `--version`). The CLI
+   `edit` server is driven over real HTTP (editor page, vendor bundle, CSRF-protected
+   validate/save/cancel, file writes, shutdown). The mock runtime (`rogatio runtime`) is
+   started as a real process and its pairing/authorization/mock-response journey is proven
+   over real loopback HTTP, including denial paths. These tests are cross-platform and run
+   in the `cross-platform` CI job.
+
+2. **Packaged-install tests:** the packed-tarball CLI test above is the packaged-install
+   proof for the CLI. The extension's "package" is its built `packages/extension/dist`
+   directory loaded as an unpacked extension in real Chromium (the extension is distributed
+   as a ZIP in F20; the unpacked-load journey is the same code path). The manifest contract
+   and MV3 artifact hygiene remain enforced by `scripts/validate.ts`.
+
+3. **Playwright headless browser journeys (`test/browser/`, real Chromium):**
+
+   - **CLI `edit` journey:** the real built CLI process serves the editor; a headless
+     Chromium page edits a project, validates, saves, and the file is verified on disk and
+     the server shuts down.
+   - **Extension lifecycle journey:** the real built extension is loaded into a persistent
+     headless Chromium context (`channel: "chromium"`, `--disable-extensions-except` +
+     `--load-extension`). The journey imports a project, reviews declared permissions
+     (real `chrome.permissions.contains`), activates groups, reads rule statuses and the
+     badge, switches/creates/exports/removes projects, and proves storage persistence
+     across service-worker restarts.
+   - **Extension DNR journey:** a redirect DNR rule in the extension's own rule shape is
+     installed through the real `chrome.declarativeNetRequest.updateDynamicRules` API and
+     accepted by Chrome, proving the translated rule shape is Chrome-valid (RE2, domains,
+     resource types).
+   - **Mock runtime journey:** the real `rogatio runtime` process is started; the real
+     extension's "Check and connect" flow pairs with it and reports `connected`.
+
+### The permission-prompt boundary (evidence-based)
+
+Chrome's optional-host-permission prompt cannot be automated: `chrome.permissions.request`
+never resolves in headless or headed Chromium when a prompt is required, profile
+pre-seeding of `granted_permissions` is rejected (Secure Preferences MAC), and Playwright
+has no API to answer the prompt (upstream microsoft/playwright#32755). The F18 suite
+therefore proves the permission flow at the integration seam (the extension's injected
+permission adapters and the exact-origin request), asserts the real-browser `needs
+permission` statuses, and documents the grant click as a manual check. No test hook,
+fake grant, or profile forging is added to the product; the browser grant stays a real
+user gesture. The granted-end-to-end redirect/mock interception remains covered by unit
+and integration tests plus the F17 live E2E on capable runners.
+
+### Product repairs surfaced by the suite (in scope)
+
+Building the real journeys exposed defects that the mocked unit tests could not:
+
+- **Permission origin patterns (`packages/extension/src/chrome.ts`):** `chrome.permissions`
+  rejects bare origins (`http://127.0.0.1:4173`) — the adapter now maps origins to match
+  patterns (`origin + "/*"`).
+- **User-gesture grant (`extension-page-entry.ts`, `service-worker.ts`):** a user gesture is
+  lost across the runtime message round trip, so the extension page performs
+  `chrome.permissions.request` directly in the click handler and the worker re-syncs stored
+  grants (a `granted` flag skips the worker-side request).
+- **Editor rule-type registration (`packages/editor/src/editor.ts`):** hosts pass
+  `mock`/`response-body` rule types that are already built in; `normalizeExtensions` threw
+  instead of replacing. Passed ids now replace built-ins; duplicates within the passed list
+  still fail closed.
+- **CLI packaged binary (`packages/cli/src/index.ts`):** the built entry lacked a shebang
+  so the installed `rogatio` bin could not execute, and the `isDist` check used a
+  POSIX-only separator, breaking packaged installs on Windows.
+- **DNR install wiring (`service-worker.ts`):** enabled+granted redirect/query rules were
+  never installed (only mock rules at check-and-connect), leaving them `error` forever.
+  `projectState` now installs enabled+granted installable operations through the real
+  installer.
+
+### Harness rules
+
+- No new dependencies; Node-only orchestration; cross-platform paths; no shell-only
+  scripts.
+- Real artifacts and real processes; a test that cannot reach its subject is a failure,
+  not a skip. The only skipped-by-default cases are the F17 live E2E and the manual
+  permission-grant check.
+- Deterministic diagnostics; assertions never depend on third-party wording or
+  incidental iteration order.
+- The extension E2E computes the unpacked extension id from the path
+  (`sha256(path)[0:16]` nibbles) so it can find the service worker and extension page
+  without hard-coded ids.
+- Browser contexts are per-spec and closed deterministically; spawned CLI/runtime
+  processes are killed in `finally` blocks.
+
+### Testing seams
+
+- CLI/runtime integration: real `node` children of the built CLI, real loopback HTTP.
+- Packaged install: real tarballs via `npm install --offline` into a temp dir.
+- Extension E2E: real Chromium (`channel: "chromium"`), real extension, real
+  `chrome.permissions`, `chrome.storage.local`, and `chrome.declarativeNetRequest`.
+- Grant flow: the extension's injected `PermissionAdapter` (existing seam) plus the
+  manual browser check.
+- DNR shape: `chrome.declarativeNetRequest.updateDynamicRules` acceptance in real
+  Chromium.
+
+### Rejected alternatives
+
+- Mocking `chrome` APIs in the browser journey: rejected — that is what the existing
+  fixture-based `extension.spec.ts` does and it cannot catch real Chrome boundary
+  failures (the bugs above).
+- Pre-seeding `granted_permissions` in the Chrome profile: rejected after empirical
+  failure (Secure Preferences MAC validation) and because committing a browser profile
+  would import machine-local state.
+- Test-only permission hooks in the extension: rejected — they would weaken the
+  permission boundary in the shipped artifact.
+- A synthetic DNR test page instead of the real extension: rejected — the journeys must
+  load the real built extension.
+- Committing a golden profile with manually granted permissions: rejected — machine-
+  and Chrome-version-specific, and it would carry browser state into the repository.
+
