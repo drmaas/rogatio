@@ -1047,3 +1047,61 @@ exception to a blanket block because the user selected unchanged forwarding for 
 case; marker-selected request-body operations still fail closed. Exact initiator
 correlation through `webRequestBlocking` was considered but rejected for ordinary MV3
 availability; policy-installed Chrome is not required for F17 live status.
+
+## F19: Documentation Site
+
+F19 adds a separate static documentation site built with **Astro 7** and the
+**Starlight** documentation theme. It is a new workspace package, `packages/docs-site`,
+and does not share runtime code with the product packages. The site documents the
+already-shipped product (`rogatio-overview.md`, `sequence.md`, and the per-feature specs)
+for end users and integrators; it is not a runtime or CLI artifact and is excluded from
+the npm/extension release pipeline (handled later by F20).
+
+### Package boundary and build
+
+- New private package `@rogatio/docs-site` under `packages/docs-site`, added to the
+  existing `packages/*` pnpm workspace. It introduces `astro` and `@astrojs/starlight`
+  as dependencies — the only new third-party dependencies the feature adds, and the ones
+  the F19 specification explicitly requires.
+- Content lives in `src/content/docs/**` as Markdown (`.md`); Starlight's built-in docs
+  collection is used, so no custom `src/content.config.ts` is required. This keeps the
+  package free of product `.ts` source that would otherwise be pulled into the root
+  `tsc --noEmit` and Biome passes.
+- Build produces a static site in `dist/` (gitignored). Scripts: `dev`, `build`
+  (`astro build`), `preview`, and `check` (`astro check`).
+- `astro.config.mjs` declares the Starlight integration, site title, sidebar, and a
+  deterministic, content-only build (no analytics, no telemetry, no external fonts/CDNs
+  beyond Starlight defaults).
+
+### Isolation from canonical validation
+
+The root `typecheck` (`tsc --noEmit` over `packages/**/*.ts`) and root `lint`/`format`
+(Biome over `**`) must stay green. The docs-site therefore:
+
+- Is added to the root `tsconfig.json` `exclude` list so Astro/Starlight type surface and
+  config are not checked by the product typecheck.
+- Is added to `.biomeignore` so Biome does not format/lint Astro component and Markdown
+  content files (these are owned by Astro/Starlight tooling).
+
+The root esbuild `build` script (`scripts/build.ts`) targets only product packages and
+does not include docs-site, so the canonical `pnpm build` is unaffected. `pnpm test`
+(vitest) does not pick up docs-site because it has no `test/**` suite.
+
+### Verification
+
+F19 verification is the site build itself: `pnpm --filter @rogatio/docs-site build` must
+succeed and emit `dist/`. The root canonical validation (`format:check`, `lint`,
+`typecheck`, `build`, `test`) must remain green after the package is added, proving the
+isolation rules hold.
+
+### Rejected alternatives
+
+- Docusaurus / VitePress / Nextra: rejected because the product overview and sequence
+  explicitly name Astro + Starlight, and Starlight's sidebar/i18n/accessibility fit the
+  multi-section docs (guides, rules reference, CLI/extension reference) without a custom
+  framework.
+- Embedding docs inside the README or the existing `docs/` internal directory: rejected
+  because `docs/` holds internal specs/plans/workflows for agents, not a published,
+  navigable user site; mixing them would confuse published content with internal process.
+- Building the site with the root esbuild pipeline: rejected because Astro/Starlight have
+  their own build toolchain that the root script does not and should not drive.
