@@ -1,6 +1,17 @@
 ---
 title: Introduction
-description: Rogatio is a local-first tool for creating, reviewing, and running browser request and response rules.
+description: Rogatio is a local-first tool for creating, reviewing, and running browser request and response rules from one version-controlled file.
+hero:
+  tagline: Local-first browser request & response rules — one version-controlled file, a CLI, and a Chrome extension. No accounts, no cloud, no telemetry.
+  actions:
+    - text: Get started
+      link: /getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/drmaas/rogatio
+      icon: external
+      variant: minimal
 ---
 
 Rogatio is a local-first tool for creating, reviewing, and running browser request and
@@ -31,4 +42,39 @@ history**.
 | Local runtime | macOS native-messaging process for response-body and request-body rules. |
 | `.rogatio.json` | The single source of truth, version-controlled in your repo. |
 
-Continue with [Installation](/getting-started/installation/).
+## Explore the docs
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <LinkCard
+    title="Install Rogatio"
+    description="Set up the CLI and load the Chrome extension in a few minutes."
+    href="/getting-started/installation/"
+  />
+  <LinkCard
+    title="Quick start"
+    description="Create your first project, write a rule, and dry-run it offline."
+    href="/getting-started/quick-start/"
+  />
+  <LinkCard
+    title="Projects & rules"
+    description="Understand groups, rules, origins, and how the editor works."
+    href="/guides/projects-rules/"
+  />
+  <LinkCard
+    title="Rule types"
+    description="Redirects, query params, headers, mocks, and body rewriting."
+    href="/rules/redirects/"
+  />
+  <LinkCard
+    title="CLI reference"
+    description="Every command, flag, and exit code for the rogatio CLI."
+    href="/reference/cli/"
+  />
+  <LinkCard
+    title="Security & privacy"
+    description="How Rogatio keeps your traffic local and your data yours."
+    href="/reference/security/"
+  />
+</CardGrid>
