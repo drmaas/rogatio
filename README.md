@@ -171,7 +171,17 @@ validation workflow before you start.
 The published user documentation site is built from `packages/docs-site` (Astro + Starlight).
 Run it locally with `pnpm --filter @rogatio/docs-site dev`, or build static output with
 `pnpm --filter @rogatio/docs-site build` (emits `packages/docs-site/dist/`, gitignored).
-Hosting/deploy is owned by a later release pipeline (F20).
+The static site is deployed to GitHub Pages on every merge to `main` by the
+`Deploy docs site` workflow (F20).
+
+## Release pipeline (F20)
+
+- `Release` runs on merge to `main`, using semantic-release to cut a version, publish
+  `@rogatio/cli` to the public npm registry, and attach the unsigned Chrome extension ZIP
+  to the GitHub Release. Configure `NPM_TOKEN` (and rely on the automatic `GITHUB_TOKEN`)
+  in repository secrets.
+- `Deploy docs site` builds `packages/docs-site` and publishes it to GitHub Pages on merge
+  to `main`. Enable Pages in repository settings with source **GitHub Actions**.
 
 ## License
 

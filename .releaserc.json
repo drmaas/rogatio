@@ -1,0 +1,21 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    ["@semantic-release/npm", { "pkgRoot": "packages/cli" }],
+    "./scripts/release-extension-plugin.mjs",
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "packages/extension/dist/rogatio-extension.zip",
+            "label": "Chrome extension (ZIP)"
+          }
+        ]
+      }
+    ]
+  ]
+}
