@@ -1,11 +1,13 @@
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
 const root = resolve(import.meta.dirname, "../..");
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const packages = ["schema", "compiler", "dry-run", "editor", "runtime", "cli"];
@@ -16,6 +18,7 @@ async function run(command: string, args: string[], cwd: string) {
       cwd,
       env: { ...process.env, npm_config_offline: "true" },
       maxBuffer: 2 * 1024 * 1024,
+      ...(process.platform === "win32" ? { shell: true } : {}),
     });
     return { code: 0, stdout: result.stdout, stderr: result.stderr };
   } catch (error) {
@@ -55,14 +58,7 @@ describe("F18 packaged CLI integration", () => {
       const tarballPaths = packages.map((packageName) =>
         join(tarballs, `rogatio-${packageName}-0.0.0.tgz`),
       );
-      const ajvPackage = join(
-        root,
-        "node_modules",
-        ".pnpm",
-        "ajv@8.17.1",
-        "node_modules",
-        "ajv",
-      );
+      const ajvPackage = dirname(require.resolve("ajv/package.json"));
       const install = await run(
         "npm",
         [
