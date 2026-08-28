@@ -44,6 +44,49 @@ a {
   font-weight: 600;
 }
 
+/* Hero illustration (splash landing) */
+.sl-markdown-content img {
+  display: block;
+  margin: 2rem auto;
+  max-width: 38rem;
+  width: 100%;
+  height: auto;
+  border-radius: 1rem;
+  box-shadow: 0 24px 60px -30px rgba(0, 0, 0, 0.55);
+}
+
+/* Splash landing: center the intro and give it air */
+.starlight-viewport-split .hero,
+.hero {
+  text-align: center;
+}
+
+.hero .sl-flex {
+  justify-content: center;
+}
+
+/* Landing badges row */
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-block: 2.5rem 1rem;
+}
+
+/* Feature cards read with comfortable rhythm */
+.card .title {
+  gap: 0.5rem;
+}
+
+.card .icon {
+  color: var(--sl-color-text-accent);
+}
+
+.card p:last-child {
+  margin-bottom: 0;
+}
+
 /* Cards */
 .card,
 .sl-link-card {

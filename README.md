@@ -174,10 +174,16 @@ validation workflow before you start.
 - [`docs/specs/`](docs/specs) and [`docs/plans/`](docs/plans) — per-area specs and plans.
 
 The published user documentation site is built from `packages/docs-site` (Astro + Starlight).
-Run it locally with `pnpm --filter @rogatio/docs-site dev`, or build static output with
-`pnpm --filter @rogatio/docs-site build` (emits `packages/docs-site/dist/`, gitignored).
+Run it locally from the repo root:
+
+- `pnpm site` — start the dev server with hot reload.
+- `pnpm site:build` — build the static site (emits `packages/docs-site/dist/`, gitignored).
+- `pnpm site:preview` — preview the production build locally.
+
+Equivalents scoped to the package also work, e.g. `pnpm --filter @rogatio/docs-site dev`.
 The static site is deployed to GitHub Pages on every merge to `main` by the
-`Deploy docs site` workflow.
+`Deploy docs site` workflow, and the docs build is validated on pull requests by the
+`Docs site` job in `checks.yml`.
 
 ## Release pipeline
 
