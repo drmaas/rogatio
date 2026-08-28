@@ -67,6 +67,7 @@ async function checkArtifacts(): Promise<void> {
     "packages/extension/dist/browser/index.js",
     "packages/extension/dist/background.js",
     "packages/extension/dist/extension-page.js",
+    "packages/extension/dist/popup.js",
   ];
   if (
     expected.length !== Object.keys(manifest).length ||
@@ -89,7 +90,7 @@ async function checkArtifacts(): Promise<void> {
   if (
     extensionManifest.manifest_version !== 3 ||
     extensionManifest.background?.service_worker !== "background.js" ||
-    extensionManifest.action?.default_popup !== "index.html" ||
+    extensionManifest.action?.default_popup !== "popup.html" ||
     !extensionManifest.permissions?.includes("storage") ||
     JSON.stringify(extensionManifest.optional_host_permissions) !==
       JSON.stringify(["http://*/*", "https://*/*"]) ||
@@ -100,6 +101,7 @@ async function checkArtifacts(): Promise<void> {
   for (const artifact of [
     "packages/extension/dist/background.js",
     "packages/extension/dist/extension-page.js",
+    "packages/extension/dist/popup.js",
   ]) {
     const contents = await readFile(resolve(root, artifact), "utf8");
     if (

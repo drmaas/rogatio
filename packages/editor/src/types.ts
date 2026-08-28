@@ -139,6 +139,8 @@ export interface EditorController {
   isDirty(): boolean;
   validate(): readonly EditorDiagnostic[];
   destroy(): void;
+  /** Deep-link the editor to a group's destination, falling back to Overview. */
+  navigateToGroup(groupId: string | null | undefined): void;
 }
 
 export type UrlConversionResult =
