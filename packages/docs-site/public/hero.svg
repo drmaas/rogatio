@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 470" fill="none" role="img" aria-label="Rogatio routes browser requests through rules defined in a single .rogatio.json file">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b7285"/>
+      <stop offset="1" stop-color="#1098ad"/>
+    </linearGradient>
+    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2733"/>
+      <stop offset="1" stop-color="#13202b"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0b7285"/>
+      <stop offset="1" stop-color="#3bc9db"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="640" height="470" rx="28" fill="url(#bg)" opacity="0.08"/>
+  <circle cx="540" cy="90" r="120" fill="url(#bg)" opacity="0.10"/>
+  <circle cx="90" cy="400" r="90" fill="url(#bg)" opacity="0.08"/>
+
+  <g transform="translate(120 60)">
+    <rect x="0" y="0" width="400" height="300" rx="18" fill="url(#win)" stroke="#2b3b49" stroke-width="1.5"/>
+    <rect x="0" y="0" width="400" height="44" rx="18" fill="#0f1a23"/>
+    <rect x="0" y="26" width="400" height="18" fill="#0f1a23"/>
+    <circle cx="26" cy="22" r="6" fill="#ff5f57"/>
+    <circle cx="48" cy="22" r="6" fill="#febc2e"/>
+    <circle cx="70" cy="22" r="6" fill="#28c840"/>
+    <rect x="120" y="13" width="200" height="18" rx="9" fill="#1f2c38"/>
+    <text x="132" y="26" font-family="monospace" font-size="11" fill="#7fa6b8">https://example.com/api/*</text>
+
+    <g transform="translate(24 70)">
+      <rect x="0" y="0" width="352" height="46" rx="10" fill="#16242f"/>
+      <circle cx="22" cy="23" r="7" fill="#3bc9db"/>
+      <text x="42" y="20" font-family="monospace" font-size="12" fill="#cfe8f0">GET  /api/users</text>
+      <text x="42" y="36" font-family="monospace" font-size="10" fill="#7fa6b8">→ redirect</text>
+      <path d="M300 23 h30" stroke="url(#arrow)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M324 16 l10 7 -10 7" stroke="url(#arrow)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </g>
+    <g transform="translate(24 126)">
+      <rect x="0" y="0" width="352" height="46" rx="10" fill="#16242f"/>
+      <circle cx="22" cy="23" r="7" fill="#ffd43b"/>
+      <text x="42" y="20" font-family="monospace" font-size="12" fill="#cfe8f0">POST /api/order</text>
+      <text x="42" y="36" font-family="monospace" font-size="10" fill="#7fa6b8">→ header + mock</text>
+      <path d="M300 23 h30" stroke="url(#arrow)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M324 16 l10 7 -10 7" stroke="url(#arrow)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </g>
+    <g transform="translate(24 182)">
+      <rect x="0" y="0" width="352" height="46" rx="10" fill="#16242f"/>
+      <circle cx="22" cy="23" r="7" fill="#69db7c"/>
+      <text x="42" y="20" font-family="monospace" font-size="12" fill="#cfe8f0">GET  /api/feed</text>
+      <text x="42" y="36" font-family="monospace" font-size="10" fill="#7fa6b8">→ query rewrite</text>
+      <path d="M300 23 h30" stroke="url(#arrow)" stroke-width="3" stroke-linecap="round"/>
+      <path d="M324 16 l10 7 -10 7" stroke="url(#arrow)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </g>
+  </g>
+
+  <g transform="translate(300 360)">
+    <rect x="0" y="0" width="240" height="64" rx="14" fill="#0f1a23" stroke="#2b3b49" stroke-width="1.5"/>
+    <rect x="18" y="20" width="24" height="24" rx="6" fill="url(#bg)"/>
+    <text x="54" y="30" font-family="monospace" font-size="14" fill="#e6f3f7">.rogatio.json</text>
+    <text x="54" y="48" font-family="monospace" font-size="11" fill="#7fa6b8">version-controlled source of truth</text>
+  </g>
+</svg>

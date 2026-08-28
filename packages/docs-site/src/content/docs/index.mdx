@@ -1,6 +1,16 @@
 ---
-title: Introduction
-description: Rogatio is a local-first tool for creating, reviewing, and running browser request and response rules from one version-controlled file.
+title: Rogatio
+description: Local-first browser request and response rules — one version-controlled file, a CLI, and a Chrome extension. No accounts, no cloud, no telemetry.
+template: splash
+head:
+  - tag: meta
+    attrs:
+      property: og:image
+      content: /og-image.svg
+  - tag: meta
+    attrs:
+      name: twitter:card
+      content: summary_large_image
 hero:
   tagline: Local-first browser request & response rules — one version-controlled file, a CLI, and a Chrome extension. No accounts, no cloud, no telemetry.
   actions:
@@ -14,37 +24,70 @@ hero:
       variant: minimal
 ---
 
+import { Card, CardGrid, LinkCard, Badge } from '@astrojs/starlight/components';
+
+<div class="badges">
+  <Badge text="Local-first" variant="note" size="large" />
+  <Badge text="Privacy-first" variant="tip" size="large" />
+  <Badge text="No telemetry" variant="caution" size="large" />
+</div>
+
+## What is Rogatio?
+
 Rogatio is a local-first tool for creating, reviewing, and running browser request and
 response rules. It replaces a handful of ad-hoc Requestly workflows with one
 version-controlled `.rogatio.json` file, a CLI, and a Chrome extension. The repository
 file is canonical — moving changes between it and the browser requires an explicit import
 or export.
 
-Rogatio has **no accounts, hosted runtime, cloud sync, telemetry, or retained traffic
-history**.
+![Rogatio routes browser requests through rules defined in a single .rogatio.json file](/hero.svg)
 
-## What you can do
+## Why teams choose Rogatio
 
-- **Redirect** matching requests to an absolute destination, with controlled capture substitution.
-- **Add or replace query parameters** while preserving unrelated ones.
-- **Set, append, or remove request and response headers**, subject to immutable forbidden-header lists.
-- **Mock** responses with a configured status, headers, delay, and inline or file-snapshot body.
-- **Rewrite response bodies** by fetching an authorized public GET and applying bounded replacement through a local runtime.
-- **Replace or modify request bodies** for eligible POST/PUT/PATCH XHR via the local runtime.
-- **Test** any rule against a bounded batch of URLs offline before saving.
+<CardGrid>
+  <Card title="One source of truth" icon="document">
+    A single version-controlled `.rogatio.json` describes every group and rule, so changes
+    are reviewable, diffable, and revertible like any other code.
+  </Card>
+  <Card title="Runs in the browser" icon="rocket">
+    Redirect, query, header, and mock rules execute entirely in Chrome — no proxy, no
+    server, no round trips to a third party.
+  </Card>
+  <Card title="Local runtime, on demand" icon="puzzle">
+    Response- and request-body rules use a device-local runtime that activates only when you
+    explicitly start and connect it.
+  </Card>
+  <Card title="Safe by default" icon="shield">
+    No accounts, hosted runtime, cloud sync, telemetry, or retained traffic history. Your
+    traffic stays on your machine.
+  </Card>
+  <Card title="Test before you save" icon="approve-check">
+    Dry-run any rule against a bounded batch of URLs offline to preview redirects and
+    rewritten queries before committing.
+  </Card>
+  <Card title="Auditable & diffable" icon="git-branch">
+    Because rules live in your repo, every change ships through the same pull request and
+    review flow as the rest of your code.
+  </Card>
+</CardGrid>
 
-## Components
+## See it in action
 
-| Component | Purpose |
-|-----------|---------|
-| CLI (`rogatio`) | `edit`, `verify`, and `runtime` commands. Published to GitHub Packages. |
-| Chrome extension | Imports/exports the project file, grants declared site access, and runs redirect/query/header/mock rules in-browser. |
-| Local runtime | macOS native-messaging process for response-body and request-body rules. |
-| `.rogatio.json` | The single source of truth, version-controlled in your repo. |
+```sh
+# Install the CLI (requires Node 24+)
+npm install -g @drmaas/rogatio
+
+# Open the visual editor and edit .rogatio.json
+rogatio edit
+
+# Validate the project file
+rogatio verify
+
+# Start the local runtime for body-rewriting rules
+rogatio runtime
+```
 
 ## Explore the docs
-
-import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 <CardGrid>
   <LinkCard

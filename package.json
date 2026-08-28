@@ -15,7 +15,10 @@
     "test": "pnpm build && vitest run",
     "test:browser": "pnpm build && playwright test",
     "validate": "node scripts/validate.ts",
-    "release": "semantic-release"
+    "release": "semantic-release",
+    "site": "pnpm --filter @rogatio/docs-site dev",
+    "site:build": "pnpm --filter @rogatio/docs-site build",
+    "site:preview": "pnpm --filter @rogatio/docs-site preview"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
