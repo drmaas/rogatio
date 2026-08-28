@@ -9,7 +9,7 @@
   },
   "action": {
     "default_title": "Rogatio",
-    "default_popup": "index.html"
+    "default_popup": "popup.html"
   },
   "permissions": ["storage", "declarativeNetRequest"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],

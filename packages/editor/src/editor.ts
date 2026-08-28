@@ -2034,6 +2034,23 @@ class EditorControllerImpl implements EditorController {
     this.render();
   }
 
+  navigateToGroup(groupId: string | null | undefined): void {
+    const groupIds = new Set(
+      this.draft.groups
+        .map((group) => (typeof group.id === "string" ? group.id : ""))
+        .filter((id) => id.length > 0),
+    );
+    const resolved = resolveGroupRoute(groupId, groupIds);
+    if (resolved.kind === "group") {
+      this.route = { kind: "group", groupId: resolved.groupId };
+    } else {
+      this.route = { kind: "project" };
+    }
+    this.testRequestId += 1;
+    this.statusMessage = "";
+    this.render();
+  }
+
   private navigateToSearchResult(path: string): void {
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
@@ -3277,6 +3294,25 @@ function saveFailureDiagnostic(value: unknown): EditorDiagnostic {
       ? value.message
       : "The host could not save the project.";
   return diagnostic(code, path, message);
+}
+
+export type ResolvedRoute =
+  | { readonly kind: "project" }
+  | { readonly kind: "group"; readonly groupId: string };
+
+/** Resolve a deep-link group id to a concrete editor route, falling back to Overview. */
+export function resolveGroupRoute(
+  groupId: string | null | undefined,
+  groupIds: ReadonlySet<string>,
+): ResolvedRoute {
+  if (
+    typeof groupId === "string" &&
+    groupId.length > 0 &&
+    groupIds.has(groupId)
+  ) {
+    return { kind: "group", groupId };
+  }
+  return { kind: "project" };
 }
 
 export function createEditor(options: EditorOptions): EditorController {

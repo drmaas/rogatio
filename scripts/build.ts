@@ -157,6 +157,25 @@ const targets: BuildTarget[] = [
     },
     requireExports: false,
   },
+  {
+    entry: "packages/extension/src/popup.ts",
+    output: "packages/extension/dist/popup.js",
+    platform: "browser",
+    target: "es2022",
+    alias: {
+      "@rogatio/schema": resolve(
+        root,
+        "packages/extension/src/browser-schema.ts",
+      ),
+      "@rogatio/compiler": resolve(root, "packages/compiler/src/index.ts"),
+      "@rogatio/browser-core": resolve(
+        root,
+        "packages/browser-core/src/index.ts",
+      ),
+      "@rogatio/editor": resolve(root, "packages/editor/src/index.ts"),
+    },
+    requireExports: false,
+  },
 ];
 const manifest: Record<string, { sha256: string; bytes: number }> = {};
 for (const target of targets) {
@@ -193,6 +212,10 @@ await copyFile(
 await copyFile(
   resolve(root, "packages/extension/public/index.html"),
   resolve(root, "packages/extension/dist/index.html"),
+);
+await copyFile(
+  resolve(root, "packages/extension/public/popup.html"),
+  resolve(root, "packages/extension/dist/popup.html"),
 );
 await writeFile(
   resolve(root, "build-manifest.json"),

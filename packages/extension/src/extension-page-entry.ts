@@ -315,6 +315,10 @@ function renderShell(): void {
         };
       },
     });
+    const deepLinkGroup = new URLSearchParams(window.location.search).get(
+      "group",
+    );
+    if (deepLinkGroup) editor.navigateToGroup(deepLinkGroup);
   }
 }
 
