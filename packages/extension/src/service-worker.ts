@@ -11,7 +11,6 @@ import {
 import {
   compileProject,
   type HeaderOperation,
-  type MatcherOperation,
   type MockOperation,
   type RogatioOperation,
 } from "@rogatio/compiler";
@@ -284,9 +283,6 @@ export function createExtensionApplication(
       await options.badge?.(badge);
       return { statuses: [], badge };
     }
-    const _matcherOps = compiled.operations.filter(
-      (op): op is MatcherOperation => op.kind === "matcher",
-    );
     const headerOps = compiled.operations.filter(
       (op): op is HeaderOperation => op.kind === "header",
     );
@@ -555,9 +551,6 @@ export function createExtensionApplication(
             enabledGroupIds: project.enabledGroupIds,
           }),
           getGrantedOrigins: async () => {
-            const _declared = declaredPermissionOrigins({
-              operations: compileResult.operations,
-            });
             return declaredPermissionOrigins({
               operations: compileResult.operations,
             });

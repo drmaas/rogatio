@@ -1,5 +1,6 @@
 import type { ErrorObject, ValidateFunction } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
+import { hasControl } from "./control.js";
 import { type HeaderDirection, isForbiddenHeader } from "./headers.js";
 import { LIMITS } from "./limits.js";
 import { isSiteOrigin, normalizeSiteOrigin } from "./origins.js";
@@ -170,14 +171,6 @@ const guardedProjectValidator = Object.assign(
 export const projectValidator: ValidateFunction<RogatioProject> =
   guardedProjectValidator;
 
-function hasControl(value: string): boolean {
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code <= 0x1f || code === 0x7f) return true;
-  }
-  return false;
-}
-
 function semanticIssues(project: RogatioProject): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const ids = new Map<string, string>();
@@ -299,10 +292,6 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
 
       const action = rule.action;
       if (action && "type" in action && action.type === "query") {
-        const _queryAction = action as {
-          type: "query";
-          params: { name: string; value: string }[];
-        };
         const seenNames = new Set<string>();
         for (let p = 0; p < action.params.length; p += 1) {
           const param = action.params[p];

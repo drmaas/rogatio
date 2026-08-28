@@ -20,22 +20,6 @@ export interface RouteContext {
   editorBundlePath: string;
 }
 
-interface ApiResponse {
-  status: number;
-  headers: Record<string, string>;
-  json(): Promise<unknown>;
-}
-
-function _jsonResponse(status: number, data: unknown): ApiResponse {
-  return {
-    status,
-    headers: { "Content-Type": "application/json" },
-    async json() {
-      return data;
-    },
-  };
-}
-
 export function generateCsrfToken(): string {
   return randomBytes(16).toString("hex");
 }

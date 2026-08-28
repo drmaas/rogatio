@@ -1,4 +1,5 @@
 import type { CompilerDiagnosticCode } from "@rogatio/compiler";
+import { diagnosticMessages } from "@rogatio/compiler";
 
 export type CoreDiagnosticCode =
   | CompilerDiagnosticCode
@@ -17,38 +18,10 @@ export type CoreDiagnosticCode =
   | "core.runtime-transition"
   | "core.invariant";
 
-export interface CoreDiagnostic {
-  readonly code: CoreDiagnosticCode;
-  readonly severity: "error";
-  readonly path: string;
-  readonly message: string;
-  readonly params: Readonly<Record<string, unknown>>;
-}
-
-const MESSAGES: Record<CoreDiagnosticCode, string> = {
-  "schema.required": "Required project data is missing.",
-  "schema.unknown-property": "The project contains an unknown property.",
-  "schema.invalid-type": "The project contains a value with an invalid type.",
-  "schema.invalid-format":
-    "The project contains a value with an invalid format.",
-  "schema.invalid-value": "The project contains an invalid value.",
-  "schema.out-of-range":
-    "The project contains a value outside its allowed bounds.",
-  "schema.invalid-structure": "The project contains invalid structure.",
-  "schema.duplicate-id": "Project and rule IDs must be unique.",
-  "schema.no-effective-origin":
-    "Each rule must have at least one effective origin.",
-  "schema.rule-limit": "The project contains too many rules.",
-  "compiler.invariant":
-    "The compiler could not normalize validated project data.",
-  "compiler.forbidden-header":
-    "The header name is forbidden for this direction.",
-  "compiler.header-value-required":
-    "Header value is required for set and append operations.",
-  "compiler.header-value-unexpected":
-    "Header value must not be provided for remove operation.",
-  "compiler.invalid-header-direction": "Invalid header direction.",
-  "compiler.invalid-header-operation": "Invalid header operation.",
+const CORE_MESSAGES: Record<
+  Exclude<CoreDiagnosticCode, CompilerDiagnosticCode>,
+  string
+> = {
   "core.storage-corrupt":
     "The stored project state is unreadable and must be repaired or reset.",
   "core.storage-conflict":
@@ -69,6 +42,19 @@ const MESSAGES: Record<CoreDiagnosticCode, string> = {
     "The rule is enabled with granted site access but is not installed.",
   "core.runtime-transition": "The runtime state transition is not allowed.",
   "core.invariant": "An internal invariant could not be maintained.",
+};
+
+export interface CoreDiagnostic {
+  readonly code: CoreDiagnosticCode;
+  readonly severity: "error";
+  readonly path: string;
+  readonly message: string;
+  readonly params: Readonly<Record<string, unknown>>;
+}
+
+const MESSAGES: Record<CoreDiagnosticCode, string> = {
+  ...diagnosticMessages,
+  ...CORE_MESSAGES,
 };
 
 export function coreDiagnostic(

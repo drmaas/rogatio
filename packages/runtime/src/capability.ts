@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { isSha256Digest } from "@rogatio/schema";
 import { failure, runtimeError } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import type {
@@ -66,8 +67,7 @@ function sameToken(value: string, expectedDigest: Buffer): boolean {
 }
 
 function sameDigest(value: string, expected: string): boolean {
-  if (!/^sha256:[0-9a-f]{64}$/.test(value) || value.length !== expected.length)
-    return false;
+  if (!isSha256Digest(value) || value.length !== expected.length) return false;
   const actual = Buffer.from(value, "ascii");
   const wanted = Buffer.from(expected, "ascii");
   return timingSafeEqual(actual, wanted);

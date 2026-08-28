@@ -1,6 +1,5 @@
 import { compileProject } from "@rogatio/compiler";
-import { validateProjectDetailed } from "@rogatio/schema";
-import { declaredPermissionOrigins } from "./permissions.js";
+import { formatSha256, validateProjectDetailed } from "@rogatio/schema";
 
 async function createHash(
   algorithm: string,
@@ -91,7 +90,6 @@ export async function startNativeSession(
   if (!project) return { ok: false, reason: "no-project" };
 
   const granted = await options.getGrantedOrigins();
-  const _declared = declaredPermissionOrigins({ operations: [] });
 
   const policyResult = await buildNativePolicy(
     project.data,
@@ -128,7 +126,7 @@ export async function startNativeSession(
 export async function stopNativeSession(
   options: NativeSessionOptions,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const _result = await options.nativeRuntime.stop();
+  await options.nativeRuntime.stop();
   return { ok: true };
 }
 
@@ -147,5 +145,5 @@ async function computeDigest(policy: unknown): Promise<string> {
   const json = JSON.stringify(policy);
   const bytes = new TextEncoder().encode(json);
   const hash = await createHash("sha256", bytes);
-  return `sha256:${hash}`;
+  return formatSha256(hash);
 }

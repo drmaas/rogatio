@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { MatcherOperation } from "@rogatio/compiler";
+import { formatSha256 } from "@rogatio/schema";
 import type {
   PresetDigest,
   RuntimeGrant,
@@ -117,7 +118,7 @@ export function canonicalPresetBytes(
 }
 
 export function digestBytes(bytes: Uint8Array): PresetDigest {
-  return `sha256:${createHash("sha256").update(bytes).digest("hex")}`;
+  return formatSha256(createHash("sha256").update(bytes).digest("hex"));
 }
 
 export function canonicalDescriptor(value: {

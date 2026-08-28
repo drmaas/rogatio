@@ -5,6 +5,70 @@ import type {
   RogatioProject,
 } from "@rogatio/schema";
 
+export function formatSha256(hex: string): `sha256:${string}` {
+  return `sha256:${hex}`;
+}
+
+export function hasControl(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
+
+const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/;
+
+export function isSha256Digest(value: unknown): value is `sha256:${string}` {
+  return typeof value === "string" && SHA256_DIGEST_PATTERN.test(value);
+}
+
+export function safeClone<T>(
+  value: T,
+  ancestors: WeakSet<object> = new WeakSet<object>(),
+): T {
+  if (value === null || typeof value !== "object") return value;
+  if (ancestors.has(value)) throw new Error("cycle");
+  ancestors.add(value);
+  try {
+    if (Object.getOwnPropertySymbols(value).length > 0)
+      throw new Error("symbol");
+    if (Array.isArray(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, "length");
+      if (
+        !descriptor ||
+        !("value" in descriptor) ||
+        !Number.isSafeInteger(descriptor.value) ||
+        descriptor.value < 0
+      )
+        throw new Error("array");
+      const result: unknown[] = [];
+      for (let index = 0; index < descriptor.value; index += 1) {
+        const entry = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!entry || !("value" in entry) || !entry.enumerable)
+          throw new Error("sparse");
+        result.push(safeClone(entry.value, ancestors));
+      }
+      return result as T;
+    }
+    const result = Object.create(null) as Record<string, unknown>;
+    for (const key of Object.getOwnPropertyNames(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !("value" in descriptor) || !descriptor.enumerable)
+        throw new Error("accessor");
+      Object.defineProperty(result, key, {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: safeClone(descriptor.value, ancestors),
+      });
+    }
+    return result as T;
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
 const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
   "accept-charset",
   "accept-encoding",
