@@ -4,6 +4,7 @@ import { defineConfig } from "astro/config";
 // https://starlight.astro.build/reference/configuration/
 export default defineConfig({
   site: "https://drmaas.github.io/rogatio",
+  base: "/rogatio",
   favicon: "/favicon.svg",
   titleDelimiter: "|",
   integrations: [
