@@ -5,6 +5,13 @@ import type {
   RogatioProject,
 } from "@rogatio/schema";
 
+// These helpers live canonically in @rogatio/schema (clone.ts/control.ts/digest.ts).
+// The extension build aliases the bare "@rogatio/schema" specifier to this file, so we
+// re-export the real implementations via relative imports (which bypass the alias).
+export { safeClone } from "../../schema/src/clone.js";
+export { hasControl } from "../../schema/src/control.js";
+export { formatSha256, isSha256Digest } from "../../schema/src/digest.js";
+
 const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
   "accept-charset",
   "accept-encoding",

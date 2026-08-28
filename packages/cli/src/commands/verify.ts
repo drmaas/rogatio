@@ -1,10 +1,7 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { compileProject } from "@rogatio/compiler";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { readProject } from "../utils/file.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function verifyCommandImpl(
   args: string[],

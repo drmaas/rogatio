@@ -1,4 +1,4 @@
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "../server/http.js";
 import {
@@ -8,8 +8,6 @@ import {
 } from "../server/routes.js";
 import { launchBrowser } from "../utils/browser.js";
 import { ProjectFileError, readProject, writeProject } from "../utils/file.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 interface EditCommandOptions {
   launchBrowser?: (url: string) => Promise<boolean>;

@@ -1,11 +1,6 @@
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
-import {
-  createCertificate,
-  exportPrivateKey,
-  exportPublicKey,
-  generateCaKeyPair,
-} from "./x509.js";
+import { createCertificate, generateCaKeyPair } from "./x509.js";
 
 /** Immutable  trust-limit profile (spec REQ-021). */
 export const TRUST_LIMITS = {
@@ -229,7 +224,6 @@ export function createRequestBodyTrustController(
 ) {
   const platform = options.platform ?? process.platform;
   const hostName = options.hostName ?? "com.rogatio.runtime";
-  const _allowedOrigins = options.allowedOrigins ?? [];
   const installRoot = options.installRoot ?? defaultTrustInstallRoot(platform);
   const hostPath = options.hostPath ?? join(installRoot, "runtime-host");
   const manifestDir = options.manifestDir ?? installRoot;
@@ -316,11 +310,7 @@ export function createRequestBodyTrustController(
     if (!caps.caTrust) return unsupportedResult(caps);
     try {
       if (!(await existsFile(caKeyFile)) || !(await existsFile(caCertFile))) {
-        const { privateKey, publicKey } = generateCaKeyPair(
-          TRUST_LIMITS.caKeyBits,
-        );
-        const _privateKeyPem = exportPrivateKey(privateKey);
-        const _pubPem = exportPublicKey(publicKey);
+        const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
 
         // Generate self-signed X.509 CA certificate
         const certResult = createCertificate(

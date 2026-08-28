@@ -1,4 +1,5 @@
 import type { HttpMethod, ResourceType } from "@rogatio/schema";
+import { hasControl } from "@rogatio/schema";
 import { builtInRuleTypes } from "./rule-types/index.js";
 import {
   type DryRunResult,
@@ -714,14 +715,6 @@ function safeText(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
 
-function hasControlCharacters(value: string): boolean {
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code <= 31 || code === 127) return true;
-  }
-  return false;
-}
-
 function diagnostic(
   code: string,
   path: string,
@@ -785,7 +778,7 @@ function isValidExtensionName(name: string): boolean {
     name.length > 0 &&
     !COMMON_RULE_FIELDS.has(name) &&
     !FORBIDDEN_EXTENSION_FIELDS.has(name) &&
-    !hasControlCharacters(name)
+    !hasControl(name)
   );
 }
 

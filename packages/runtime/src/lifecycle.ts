@@ -166,11 +166,6 @@ export function createNativeRuntimeController(
   };
 }
 
-function _hasActiveSession(): boolean {
-  // Import dynamically to avoid circular dependency
-  return false;
-}
-
 function getCurrentSession(): SessionProvider | null {
   return null;
 }

@@ -6,6 +6,8 @@ export type {
   RogatioQueryAction,
 } from "@rogatio/schema";
 export { compileProject } from "./compile.js";
+export { diagnosticMessages } from "./diagnostics.js";
+export { validateMatcherShape } from "./matcher.js";
 export { applyQueryTransform, queryParamsToDNR } from "./query.js";
 export {
   type RuleMatchContext,

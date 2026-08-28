@@ -8,14 +8,7 @@ import type {
   ResponseBodyOperation,
   RogatioOperation,
 } from "@rogatio/compiler";
-import { queryParamsToDNR } from "@rogatio/compiler";
-import {
-  compileUrlRegex,
-  HTTP_METHODS,
-  LIMITS,
-  normalizeSiteOrigin,
-  RESOURCE_TYPES,
-} from "./browser-schema.js";
+import { queryParamsToDNR, validateMatcherShape } from "@rogatio/compiler";
 import { extensionDiagnostic } from "./diagnostics.js";
 
 export interface DnrRule {
@@ -78,32 +71,7 @@ function isMatcherOperation(value: unknown): value is MatcherOperation {
   if (!isRecord(value) || value.kind !== "matcher") return false;
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
     return false;
-  const matcher = value.matcher;
-  if (!isRecord(matcher) || !isRecord(matcher.urlRegex)) return false;
-  if (
-    typeof matcher.urlRegex.source !== "string" ||
-    matcher.urlRegex.flags !== "" ||
-    compileUrlRegex(matcher.urlRegex.source) === null ||
-    !Array.isArray(matcher.origins) ||
-    !matcher.origins.every(
-      (origin) =>
-        typeof origin === "string" && normalizeSiteOrigin(origin) !== null,
-    ) ||
-    !Array.isArray(matcher.resourceTypes) ||
-    !matcher.resourceTypes.every((type) =>
-      RESOURCE_TYPES.includes(type as (typeof RESOURCE_TYPES)[number]),
-    ) ||
-    typeof matcher.priority !== "number" ||
-    !Number.isSafeInteger(matcher.priority) ||
-    matcher.priority < LIMITS.minPriority ||
-    matcher.priority > LIMITS.maxPriority
-  )
-    return false;
-  if (
-    matcher.method !== undefined &&
-    !HTTP_METHODS.includes(matcher.method as (typeof HTTP_METHODS)[number])
-  )
-    return false;
+  if (!validateMatcherShape(value.matcher)) return false;
   return true;
 }
 
@@ -111,32 +79,7 @@ function isRedirectOperation(value: unknown): value is RedirectOperation {
   if (!isRecord(value) || value.kind !== "redirect") return false;
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
     return false;
-  const matcher = value.matcher;
-  if (!isRecord(matcher) || !isRecord(matcher.urlRegex)) return false;
-  if (
-    typeof matcher.urlRegex.source !== "string" ||
-    matcher.urlRegex.flags !== "" ||
-    compileUrlRegex(matcher.urlRegex.source) === null ||
-    !Array.isArray(matcher.origins) ||
-    !matcher.origins.every(
-      (origin) =>
-        typeof origin === "string" && normalizeSiteOrigin(origin) !== null,
-    ) ||
-    !Array.isArray(matcher.resourceTypes) ||
-    !matcher.resourceTypes.every((type) =>
-      RESOURCE_TYPES.includes(type as (typeof RESOURCE_TYPES)[number]),
-    ) ||
-    typeof matcher.priority !== "number" ||
-    !Number.isSafeInteger(matcher.priority) ||
-    matcher.priority < LIMITS.minPriority ||
-    matcher.priority > LIMITS.maxPriority
-  )
-    return false;
-  if (
-    matcher.method !== undefined &&
-    !HTTP_METHODS.includes(matcher.method as (typeof HTTP_METHODS)[number])
-  )
-    return false;
+  if (!validateMatcherShape(value.matcher)) return false;
   const redirect = value.redirect;
   return isRecord(redirect) && typeof redirect.destination === "string";
 }
@@ -145,32 +88,7 @@ function isMockOperation(value: unknown): value is MockOperation {
   if (!isRecord(value) || value.kind !== "mock") return false;
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
     return false;
-  const matcher = value.matcher;
-  if (!isRecord(matcher) || !isRecord(matcher.urlRegex)) return false;
-  if (
-    typeof matcher.urlRegex.source !== "string" ||
-    matcher.urlRegex.flags !== "" ||
-    compileUrlRegex(matcher.urlRegex.source) === null ||
-    !Array.isArray(matcher.origins) ||
-    !matcher.origins.every(
-      (origin) =>
-        typeof origin === "string" && normalizeSiteOrigin(origin) !== null,
-    ) ||
-    !Array.isArray(matcher.resourceTypes) ||
-    !matcher.resourceTypes.every((type) =>
-      RESOURCE_TYPES.includes(type as (typeof RESOURCE_TYPES)[number]),
-    ) ||
-    typeof matcher.priority !== "number" ||
-    !Number.isSafeInteger(matcher.priority) ||
-    matcher.priority < LIMITS.minPriority ||
-    matcher.priority > LIMITS.maxPriority
-  )
-    return false;
-  if (
-    matcher.method !== undefined &&
-    !HTTP_METHODS.includes(matcher.method as (typeof HTTP_METHODS)[number])
-  )
-    return false;
+  if (!validateMatcherShape(value.matcher)) return false;
   return isRecord(value.mock) && typeof value.mock.status === "number";
 }
 
@@ -180,27 +98,7 @@ function isResponseBodyOperation(
   if (!isRecord(value) || value.kind !== "response-body") return false;
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
     return false;
-  const matcher = value.matcher;
-  if (!isRecord(matcher) || !isRecord(matcher.urlRegex)) return false;
-  if (
-    typeof matcher.urlRegex.source !== "string" ||
-    matcher.urlRegex.flags !== "" ||
-    compileUrlRegex(matcher.urlRegex.source) === null ||
-    !Array.isArray(matcher.origins) ||
-    !matcher.origins.every(
-      (origin) =>
-        typeof origin === "string" && normalizeSiteOrigin(origin) !== null,
-    ) ||
-    !Array.isArray(matcher.resourceTypes) ||
-    !matcher.resourceTypes.every((type) =>
-      RESOURCE_TYPES.includes(type as (typeof RESOURCE_TYPES)[number]),
-    ) ||
-    typeof matcher.priority !== "number" ||
-    !Number.isSafeInteger(matcher.priority) ||
-    matcher.priority < LIMITS.minPriority ||
-    matcher.priority > LIMITS.maxPriority
-  )
-    return false;
+  if (!validateMatcherShape(value.matcher)) return false;
   return (
     isRecord(value.responseBody) &&
     Array.isArray(value.responseBody.replacements)
@@ -211,32 +109,7 @@ function isQueryOperation(value: unknown): value is QueryOperation {
   if (!isRecord(value) || value.kind !== "query") return false;
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
     return false;
-  const matcher = value.matcher;
-  if (!isRecord(matcher) || !isRecord(matcher.urlRegex)) return false;
-  if (
-    typeof matcher.urlRegex.source !== "string" ||
-    matcher.urlRegex.flags !== "" ||
-    compileUrlRegex(matcher.urlRegex.source) === null ||
-    !Array.isArray(matcher.origins) ||
-    !matcher.origins.every(
-      (origin) =>
-        typeof origin === "string" && normalizeSiteOrigin(origin) !== null,
-    ) ||
-    !Array.isArray(matcher.resourceTypes) ||
-    !matcher.resourceTypes.every((type) =>
-      RESOURCE_TYPES.includes(type as (typeof RESOURCE_TYPES)[number]),
-    ) ||
-    typeof matcher.priority !== "number" ||
-    !Number.isSafeInteger(matcher.priority) ||
-    matcher.priority < LIMITS.minPriority ||
-    matcher.priority > LIMITS.maxPriority
-  )
-    return false;
-  if (
-    matcher.method !== undefined &&
-    !HTTP_METHODS.includes(matcher.method as (typeof HTTP_METHODS)[number])
-  )
-    return false;
+  if (!validateMatcherShape(value.matcher)) return false;
   const action = value.action;
   return (
     isRecord(action) &&
@@ -250,32 +123,7 @@ function isHeaderOperation(value: unknown): value is HeaderOperation {
   if (!isRecord(value) || value.kind !== "header") return false;
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
     return false;
-  const matcher = value.matcher;
-  if (!isRecord(matcher) || !isRecord(matcher.urlRegex)) return false;
-  if (
-    typeof matcher.urlRegex.source !== "string" ||
-    matcher.urlRegex.flags !== "" ||
-    compileUrlRegex(matcher.urlRegex.source) === null ||
-    !Array.isArray(matcher.origins) ||
-    !matcher.origins.every(
-      (origin) =>
-        typeof origin === "string" && normalizeSiteOrigin(origin) !== null,
-    ) ||
-    !Array.isArray(matcher.resourceTypes) ||
-    !matcher.resourceTypes.every((type) =>
-      RESOURCE_TYPES.includes(type as (typeof RESOURCE_TYPES)[number]),
-    ) ||
-    typeof matcher.priority !== "number" ||
-    !Number.isSafeInteger(matcher.priority) ||
-    matcher.priority < LIMITS.minPriority ||
-    matcher.priority > LIMITS.maxPriority
-  )
-    return false;
-  if (
-    matcher.method !== undefined &&
-    !HTTP_METHODS.includes(matcher.method as (typeof HTTP_METHODS)[number])
-  )
-    return false;
+  if (!validateMatcherShape(value.matcher)) return false;
   const header = value.header;
   if (!isRecord(header)) return false;
   if (header.direction !== "request" && header.direction !== "response")

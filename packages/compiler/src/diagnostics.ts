@@ -65,6 +65,8 @@ const MESSAGES: Record<CompilerDiagnosticCode, string> = {
   "compiler.invalid-header-operation": "Invalid header operation.",
 };
 
+export { MESSAGES as diagnosticMessages };
+
 function copySafeParams(
   params: Record<string, unknown>,
 ): Readonly<Record<string, unknown>> {

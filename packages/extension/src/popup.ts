@@ -27,10 +27,6 @@ const client = {
 
 let model: PopupModel | undefined;
 
-function text(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.length > 0 ? value : fallback;
-}
-
 function statusLabel(status: string): string {
   switch (status) {
     case "active":

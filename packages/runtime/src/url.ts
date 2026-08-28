@@ -1,15 +1,7 @@
 import { isIP } from "node:net";
-import { normalizeSiteOrigin } from "@rogatio/schema";
+import { hasControl, normalizeSiteOrigin } from "@rogatio/schema";
 
 const ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-
-function hasControl(value: string): boolean {
-  for (let index = 0; index < value.length; index += 1) {
-    const code = value.charCodeAt(index);
-    if (code <= 0x20 || code === 0x7f) return true;
-  }
-  return false;
-}
 
 function hasValidPercentEncoding(value: string): boolean {
   for (let index = 0; index < value.length; index += 1) {

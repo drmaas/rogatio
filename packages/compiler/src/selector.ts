@@ -48,19 +48,6 @@ function methodMatches(
   return method === undefined || method === requestMethod;
 }
 
-function _initiatorMatches(
-  matcher: NormalizedMatcher,
-  initiator: string,
-): boolean {
-  try {
-    const initiatorUrl = new URL(initiator);
-    const initiatorOrigin = initiatorUrl.origin;
-    return matcher.origins.includes(initiatorOrigin);
-  } catch {
-    return false;
-  }
-}
-
 function isCandidate(
   op: RogatioOperation,
   enabledGroupIds: readonly string[],
