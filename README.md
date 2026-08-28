@@ -2,6 +2,14 @@
 
 > Local-first browser request & response rules, version-controlled in a single `.rogatio.json` file.
 
+[![Deploy docs site](https://github.com/drmaas/rogatio/actions/workflows/deploy-site.yml/badge.svg)](https://github.com/drmaas/rogatio/actions/workflows/deploy-site.yml)
+[![Checks](https://github.com/drmaas/rogatio/actions/workflows/checks.yml/badge.svg)](https://github.com/drmaas/rogatio/actions/workflows/checks.yml)
+[![Site](https://img.shields.io/badge/site-drmaas.github.io%2Frogatio-blue)](https://drmaas.github.io/rogatio/)
+
+📖 **[Live docs site → https://drmaas.github.io/rogatio/](https://drmaas.github.io/rogatio/)**
+
+<img src="packages/docs-site/src/assets/logo.svg" alt="Rogatio logo" width="64" align="right" style="margin-left: 1rem; float: right;" />
+
 Rogatio is a local-first tool for creating, reviewing, and running browser request and
 response rules. It replaces scattered Requestly-style workflows with one
 version-controlled file, a CLI, and a Chrome extension. There are no accounts, no hosted
