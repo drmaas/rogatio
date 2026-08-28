@@ -6,8 +6,8 @@ import {
   createRequestBodyTrustController,
   defaultTrustInstallRoot,
   detectTrustCapabilities,
-  TRUST_LIMITS,
   generateNativeMessagingManifest,
+  TRUST_LIMITS,
   TrustError,
 } from "../src/index.js";
 

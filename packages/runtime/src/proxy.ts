@@ -1,8 +1,8 @@
 import { failure } from "./errors.js";
-import { resolveAndPin, validateTargetUrl } from "./target.js";
-import { buildForwardHeaders, validateRequestWire } from "./wire.js";
 import { RUNTIME_LIMITS } from "./limits.js";
+import { resolveAndPin, validateTargetUrl } from "./target.js";
 import type { RuntimeResult } from "./types.js";
+import { buildForwardHeaders, validateRequestWire } from "./wire.js";
 
 const RESERVED_MARKER_PREFIX = "X-Rogatio-Dispatch-";
 const MARKER_SEPARATOR = "~";

@@ -1,9 +1,9 @@
 import {
   ENVELOPE_MAX_BYTES,
-  PROTOCOL,
   type Envelope,
   type EnvelopeInput,
   type EnvelopeMessageType,
+  PROTOCOL,
 } from "./types.js";
 
 const FORBIDDEN_BODY_KEYS = new Set(["body", "requestBody", "responseBody"]);

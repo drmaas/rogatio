@@ -4,12 +4,12 @@ import {
   normalizeSiteOrigin,
   type ResourceType,
 } from "@rogatio/schema";
+import { snapshotOwnData } from "./snapshot.js";
 import type {
   AuthorityDecision,
   RevalidationRequest,
   RogatioProject,
 } from "./types.js";
-import { snapshotOwnData } from "./snapshot.js";
 
 function originOf(value: string): string | null {
   const direct = normalizeSiteOrigin(value);
