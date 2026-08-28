@@ -41,7 +41,7 @@ export function verifyMarker(
   if (markerEntries.length > 1) {
     return failure("runtime.request-body-marker-duplicate");
   }
-  const [markerHeader, markerValue] = markerEntries[0];
+  const [markerHeader, _markerValue] = markerEntries[0];
   const afterPrefix = markerHeader.slice(RESERVED_MARKER_PREFIX.length);
   const sepIndex = afterPrefix.indexOf(MARKER_SEPARATOR);
   if (sepIndex <= 0) {
@@ -109,13 +109,6 @@ export async function proxyRequest(
 
   const wireValidation = validateRequestWire(method, headers, body);
   if (!wireValidation.ok) return wireValidation;
-  const {
-    contentType,
-    contentEncoding,
-    contentLength,
-    body: validatedBody,
-  } = wireValidation.value;
-
   const targetValidation = validateTargetUrl(
     targetUrl,
     context.allowedOrigins,
@@ -126,7 +119,6 @@ export async function proxyRequest(
   const pinResult = await resolveAndPin(targetUrl);
   if (!pinResult.ok) return pinResult;
 
-  const { promises: dns } = await import("node:dns");
   const pinnedAddress = pinResult.value;
 
   const urlObj = new URL(targetUrl);
@@ -139,7 +131,6 @@ export async function proxyRequest(
     targetHost,
   );
 
-  const { createServer } = await import("node:http");
   const { connect } = await import("node:net");
   const { TLSSocket } = await import("node:tls");
 
@@ -155,7 +146,7 @@ export async function proxyRequest(
 
     socket.setTimeout(RUNTIME_LIMITS.connectTimeoutMs);
 
-    socket.on("error", (err) => {
+    socket.on("error", (_err) => {
       resolve(failure("runtime.request-body-upstream-failed"));
     });
 
@@ -169,7 +160,7 @@ export async function proxyRequest(
       const headerLines = Object.entries(forwardHeaders)
         .map(([k, v]) => `${k}: ${v}`)
         .join("\r\n");
-      const request = requestLine + headerLines + "\r\n\r\n";
+      const request = `${requestLine + headerLines}\r\n\r\n`;
 
       socket.write(request, "utf-8");
       socket.write(body);

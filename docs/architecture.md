@@ -1,18 +1,18 @@
 # Rogatio Architecture
 
-**Status:** F1 bootstrap, F2 schema, F3 compiler, F4 browser-core, F5 editor, F6 runtime foundation, F7 extension shell, F8 CLI, F9 redirect rules, F10 query rules, F11 header rules, and F12 offline dry-run are released through Stage 10. **F13 mock rules** is in progress in the `feature/f13-mock-rules` worktree (implementation rebased onto current main). **F14 macOS native-messaging runtime** is implemented on current main; its native runtime controls remain integrated with the shared `rogatio runtime` command.
+**Status:** Monorepo bootstrap, schema, compiler, browser-core, editor, runtime foundation, extension shell, CLI, redirect rules, query rules, header rules, and offline dry-run are released through Stage 10. **Mock rules** is in progress in the `feature/f13-mock-rules` worktree (implementation rebased onto current main). **The macOS native-messaging runtime** is implemented on current main; its native runtime controls remain integrated with the shared `rogatio runtime` command.
 
 ## Package Boundaries
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        @rogatio/schema (F2)                      │
+│                        @rogatio/schema                            │
 │  JSON Schema v1, AJV validation, origins, bounds, forbidden hdrs │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      @rogatio/compiler (F3)                      │
+│                      @rogatio/compiler                            │
 │  Validated source → browser-neutral operations + diagnostics    │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
@@ -20,7 +20,7 @@
            ▼               ▼               ▼
 ┌──────────────────┐ ┌──────────────┐ ┌────────────────────┐
 │ @rogatio/        │ │ @rogatio/    │ │ @rogatio/          │
-│ browser-core (F4)│ │ editor (F5)  │ │ runtime (F6)       │
+│ browser-core     │ │ editor        │ │ runtime            │
 │ Storage, perms,  │ │ Framework-   │ │ Mock/response      │
 │ enablement, CAS  │ │ free DOM     │ │ server foundation  │
 └────────┬─────────┘ └──────┬───────┘ └────────┬───────────┘
@@ -28,7 +28,7 @@
          └──────────────────┼───────────────────┘
                             ▼
                  ┌──────────────────────┐
-                 │ @rogatio/cli (F8)    │ ◄── NEW
+                 │ @rogatio/cli        │ ◄── NEW
                  │ edit, verify, runtime│
                  └──────────┬───────────┘
                             │
@@ -36,7 +36,7 @@
               ▼                           ▼
      ┌─────────────────┐           ┌───────────────┐
      │ Chrome MV3 Ext  │           │ Native Runtime │
-     │ (F7, F9-F13)    │           │ (F14-F17)      │
+     │                 │           │                │
      └─────────────────┘           └───────────────┘
 ```
 
@@ -44,49 +44,49 @@
 
 The project introduces only development and validation tooling plus the local-first product packages described below. It must not add credentials, telemetry, hosted endpoints, traffic capture, native messaging, proxies, TLS handling, or persistent user data beyond the version-controlled `.rogatio.json` project file. Dependencies are controlled by the committed pnpm lockfile, exact or explicitly governed tool versions, separated development dependencies, and a reviewed install-script policy. Generated files and secrets must not enter version control.
 
-## F2 Schema Architecture
+## Schema Architecture
 
-F2 introduces `@rogatio/schema` as the authoritative validation boundary for the common version-1 `.rogatio.json` envelope. The package owns the root project metadata, named groups, explicit HTTP(S) origins, and common rule matcher fields: stable IDs, labels, case-sensitive URL regular expressions, resource types, priority, and optional method. It does not implement action payloads or any consumer behavior; later rule slices extend the version-1 schema with their own action fields.
+The schema package introduces `@rogatio/schema` as the authoritative validation boundary for the common version-1 `.rogatio.json` envelope. The package owns the root project metadata, named groups, explicit HTTP(S) origins, and common rule matcher fields: stable IDs, labels, case-sensitive URL regular expressions, resource types, priority, and optional method. It does not implement action payloads or any consumer behavior; later rule slices extend the version-1 schema with their own action fields.
 
 The schema is draft 2020-12 with strict additional-property rejection. Ajv compiles it with all-errors reporting and with coercion, defaults, and property removal disabled. A small semantic validation layer supplements JSON Schema for globally unique IDs, non-empty effective origins, and the total rule bound. All errors use stable JSON-pointer paths and no rejected document is persisted or sent over the network.
 
 Origin validation accepts only explicit `http` and `https` origins with a hostname and optional valid port. Credentials, paths, query strings, fragments, wildcard hosts, and other schemes are rejected. Bounds and browser-neutral resource/method enumerations are exported from the package. Request and response forbidden-header lists are frozen and matched case-insensitively for later header-rule slices.
 
-The verified F2 distribution target is a Node ESM artifact because Ajv compiles its validator at module initialization. Browser and MV3 consumers must receive a later approved standalone/browser packaging strategy rather than loading this runtime-compiled entry under an extension CSP.
+The verified schema distribution target is a Node ESM artifact because Ajv compiles its validator at module initialization. Browser and MV3 consumers must receive a later approved standalone/browser packaging strategy rather than loading this runtime-compiled entry under an extension CSP.
 
-## F3 Compiler Architecture
+## Compiler Architecture
 
-F3 adds `@rogatio/compiler` as a pure, Node ESM transformation boundary from validated F2 projects to browser-neutral matcher operations. Because the F2 envelope intentionally contains no action fields, F3 emits one data-only matcher operation per source rule. Later rule slices add action-specific compiler operations; F3 does not invent a no-op action or a browser-specific representation.
+The compiler package adds `@rogatio/compiler` as a pure, Node ESM transformation boundary from validated schema projects to browser-neutral matcher operations. Because the schema envelope intentionally contains no action fields, the compiler emits one data-only matcher operation per source rule. Later rule slices add action-specific compiler operations; the compiler does not invent a no-op action or a browser-specific representation.
 
-The public `compileProject(value: unknown)` entry point invokes the complete F2 structural and semantic validation boundary before compiling. Invalid input returns a discriminated failure with stable compiler diagnostics and an empty operation list. A valid project produces fresh, serializable output: group and rule traversal order is preserved, group and rule origins are normalized, unioned, deduplicated, and sorted deterministically, resource types use the shared canonical order, the exact regex source is retained with empty flags, and method and priority values pass through unchanged. The compiler does not sort by priority or expand a rule into an origin/resource-type Cartesian product.
+The public `compileProject(value: unknown)` entry point invokes the complete schema structural and semantic validation boundary before compiling. Invalid input returns a discriminated failure with stable compiler diagnostics and an empty operation list. A valid project produces fresh, serializable output: group and rule traversal order is preserved, group and rule origins are normalized, unioned, deduplicated, and sorted deterministically, resource types use the shared canonical order, the exact regex source is retained with empty flags, and method and priority values pass through unchanged. The compiler does not sort by priority or expand a rule into an origin/resource-type Cartesian product.
 
 Compiler diagnostics use stable codes, severity, JSON-pointer paths, and structured parameters rather than exposing Ajv message text as an API contract. The package depends only on `@rogatio/schema`, has no browser or downstream-package dependency, and inherits the verified Node ESM distribution target. It performs no matching, action transformation, browser permission/DNR translation, filesystem, network, persistence, runtime, telemetry, or traffic-capture work.
 
-## F4 Browser-Core Architecture
+## Browser-Core Architecture
 
-F4 adds `@rogatio/browser-core` as the browser-neutral core platform layer between `compiler` and the future extension/CLI surfaces. It owns versioned project storage, migrations, per-project permissions and enablement, compare-and-swap lifecycle, atomic rule installation with recovery, the in-memory runtime state model, rule status and badge computation, and stable core diagnostics. Every platform-specific capability enters through narrow injected adapters, so the same logic runs under Vitest and inside the future Chrome MV3 service worker. The verified distribution target remains Node ESM with `@rogatio/schema` and `@rogatio/compiler` externalized; MV3 packaging stays a later extension-boundary decision.
+The browser-core package adds `@rogatio/browser-core` as the browser-neutral core platform layer between `compiler` and the future extension/CLI surfaces. It owns versioned project storage, migrations, per-project permissions and enablement, compare-and-swap lifecycle, atomic rule installation with recovery, the in-memory runtime state model, rule status and badge computation, and stable core diagnostics. Every platform-specific capability enters through narrow injected adapters, so the same logic runs under Vitest and inside the future Chrome MV3 service worker. The verified distribution target remains Node ESM with `@rogatio/schema` and `@rogatio/compiler` externalized; MV3 packaging stays a later extension-boundary decision.
 
-## F7 Chrome MV3 Extension Architecture
+## Chrome MV3 Extension Architecture
 
-F7 adds a private `@rogatio/extension` package as the first downstream browser boundary. The extension owns Chrome MV3 adapters, the service-worker message protocol, the extension-page project-management shell, and the translation from F4 matcher operations to deterministic Chrome Declarative Net Request rules. It depends on `browser-core`, `compiler`, `editor`, and `schema`; upstream packages remain browser-neutral and do not import Chrome APIs.
+The extension package adds a private `@rogatio/extension` package as the first downstream browser boundary. The extension owns Chrome MV3 adapters, the service-worker message protocol, the extension-page project-management shell, and the translation from browser-core matcher operations to deterministic Chrome Declarative Net Request rules. It depends on `browser-core`, `compiler`, `editor`, and `schema`; upstream packages remain browser-neutral and do not import Chrome APIs.
 
-The service worker is the authority for `storage.local` persistence, permissions, project lifecycle commands, group enablement, actionless matcher projection, rule statuses, and the action badge; DNR installation remains deferred until action-bearing slices exist. It injects narrow adapters into the F4 `ProjectRepository` and `InstallService`, so CAS, conflict preservation, single-active-project, 64-project, enablement, status, and rollback invariants remain implemented once. The extension page sends versioned, validated messages and mounts the shared F5 editor for the active project's canonical source. Selecting a project is local UI state; only an explicit Switch command invokes the repository switch operation.
+The service worker is the authority for `storage.local` persistence, permissions, project lifecycle commands, group enablement, actionless matcher projection, rule statuses, and the action badge; DNR installation remains deferred until action-bearing slices exist. It injects narrow adapters into the browser-core `ProjectRepository` and `InstallService`, so CAS, conflict preservation, single-active-project, 64-project, enablement, status, and rollback invariants remain implemented once. The extension page sends versioned, validated messages and mounts the shared editor for the active project's canonical source. Selecting a project is local UI state; only an explicit Switch command invokes the repository switch operation.
 
-MV3 output is browser-bundled from the approved browser-safe source graph. The extension must not load the Node-oriented Ajv artifact or any Node global at runtime. Chrome API failures, malformed messages, hostile imported/storage values, and unknown protocol versions fail closed with stable extension diagnostics. Permission requests are projected from F4's sorted effective origins and never include undeclared origins or broad host patterns. Group activation remains separate from permission grant, and project creation/import/save never grants or enables anything automatically.
+MV3 output is browser-bundled from the approved browser-safe source graph. The extension must not load the Node-oriented Ajv artifact or any Node global at runtime. Chrome API failures, malformed messages, hostile imported/storage values, and unknown protocol versions fail closed with stable extension diagnostics. Permission requests are projected from browser-core's sorted effective origins and never include undeclared origins or broad host patterns. Group activation remains separate from permission grant, and project creation/import/save never grants or enables anything automatically.
 
-The common F7 translator emits only a deterministic browser-neutral matcher projection. It preserves regex source, resource types, method, priority, and effective origins, assigns deterministic numeric ids for future action translation, and rejects unsupported operation kinds without installation. Because the F3 matcher operation has no action, F7 reports actionless rules as `unsupported` and never sends them to DNR; it must not invent an allow or no-op action that changes browser behavior. `InstallService` remains the atomicity/recovery seam for later action-bearing DNR adapters. Action-specific operation kinds and their UI/editor extensions are deferred to F9-F17.
+The common extension translator emits only a deterministic browser-neutral matcher projection. It preserves regex source, resource types, method, priority, and effective origins, assigns deterministic numeric ids for future action translation, and rejects unsupported operation kinds without installation. Because the compiler's matcher operation has no action, the extension reports actionless rules as `unsupported` and never sends them to DNR; it must not invent an allow or no-op action that changes browser behavior. `InstallService` remains the atomicity/recovery seam for later action-bearing DNR adapters. Action-specific operation kinds and their UI/editor extensions are deferred to later rule slices.
 
-F7 emits no traffic or console diagnostics. The `[Rogatio]` DevTools Console record from the broader product overview is deferred to a later explicitly specified feature so its Chrome event source and redaction contract are not guessed inside the extension shell. F7 does not add network, runtime, native messaging, proxy, TLS, telemetry, or traffic persistence behavior.
+The extension emits no traffic or console diagnostics. The `[Rogatio]` DevTools Console record from the broader product overview is deferred to a later explicitly specified feature so its Chrome event source and redaction contract are not guessed inside the extension shell. The extension does not add network, runtime, native messaging, proxy, TLS, telemetry, or traffic persistence behavior.
 
-Storage is a single versioned envelope (`version`, a project record keyed by stable id, and `activeProjectId`) persisted through a `StorageAdapter` whose `compareAndSwap` is the atomicity authority. Reads defensively snapshot raw storage and validate envelope structure; unknown versions, structural violations, cycles, symbols, accessors, and proxies fail closed with `core.storage-corrupt` and no writes. Project data is fully validated through the F2/F3 boundary at write time. Repository operations are read-modify-compare-and-swap: non-explicit operations retry on transient CAS failure, while editor-style saves and strict imports carry an expected revision and return a `conflict` result preserving the committed project for an explicit refresh path.
+Storage is a single versioned envelope (`version`, a project record keyed by stable id, and `activeProjectId`) persisted through a `StorageAdapter` whose `compareAndSwap` is the atomicity authority. Reads defensively snapshot raw storage and validate envelope structure; unknown versions, structural violations, cycles, symbols, accessors, and proxies fail closed with `core.storage-corrupt` and no writes. Project data is fully validated through the schema/compiler boundary at write time. Repository operations are read-modify-compare-and-swap: non-explicit operations retry on transient CAS failure, while editor-style saves and strict imports carry an expected revision and return a `conflict` result preserving the committed project for an explicit refresh path.
 
 The repository maintains the documented product invariants: at most 64 uniquely named projects, exactly one active project whenever any exist (the first created/imported project activates; removing the active project activates the most recently updated remaining project, tie-broken by id), creation/import/update and browser save reset group enablement to all-disabled, and grants are restricted to declared effective origins and pruned when data changes. Switching restores the destination project's saved enablement without touching permission or runtime state.
 
 Rule statuses derive from compiled operations, saved enablement, granted origins, and the installed rule ids reported by the installer adapter: disabled groups are `disabled`, enabled rules with un-granted origins are `needs permission`, enabled and granted rules missing from the installed set are `error` with `core.rule-not-installed`, and installed rules are `active`. The `needs proxy` and `unsupported` statuses are part of the defined model and populate only when runtime-dependent rule kinds land in later slices. The badge is a pure function of statuses: the active rule count plus an attention flag. `InstallService` atomically replaces the installed set through the `RuleInstallerAdapter`, treats identical sets as a no-op, rolls back to the previous set on failure with `core.install-failed` / `core.recovery-failed`, and serializes concurrent applies. Mock (`disconnected/checking/connected/failed` with last-check) and native (`stopped/starting/started/failed`) runtime phases are modeled in memory with a guarded transition table; runtime state is not persisted until the runtime slices define their semantics.
 
-## F5 Editor Architecture
+## Editor Architecture
 
-F5 introduces a private `@rogatio/editor` package as the shared browser-facing editor boundary. It is a framework-free ESM package that owns a project editor's DOM view, draft state, common matcher editing, navigation, and accessible interaction model. It does not own persistence, browser-core lifecycle, permissions, extension APIs, CLI process behavior, runtime behavior, or rule actions.
+The editor package introduces a private `@rogatio/editor` package as the shared browser-facing editor boundary. It is a framework-free ESM package that owns a project editor's DOM view, draft state, common matcher editing, navigation, and accessible interaction model. It does not own persistence, browser-core lifecycle, permissions, extension APIs, CLI process behavior, runtime behavior, or rule actions.
 
 ### Package and Host Boundary
 
@@ -96,7 +96,7 @@ The dependency direction remains:
 schema -> compiler -> editor
 ```
 
-F5 uses F2 types and the F3 diagnostic/validation contract. The editor's public browser entry point does not import the current runtime-compiled Node ESM artifacts from F2 or F3. Instead, the host supplies a synchronous validation adapter and an asynchronous save adapter. A Node host can implement the validation adapter with `compileProject`; a later browser host must supply an explicitly approved browser-safe F2/F3 adapter. This prevents Ajv or Node-only modules from leaking into the editor browser bundle while keeping F2/F3 authoritative.
+The editor uses schema types and the compiler's diagnostic/validation contract. The editor's public browser entry point does not import the current runtime-compiled Node ESM artifacts from the schema or compiler packages. Instead, the host supplies a synchronous validation adapter and an asynchronous save adapter. A Node host can implement the validation adapter with `compileProject`; a later browser host must supply an explicitly approved browser-safe schema/compiler adapter. This prevents Ajv or Node-only modules from leaking into the editor browser bundle while keeping the schema and compiler packages authoritative.
 
 The initial value must be a valid, parsed JSON project accepted by the supplied validator. The editor takes a defensive JSON snapshot and refuses to mount an invalid or hostile initial value rather than coercing, dropping, or silently repairing data. Repairing an invalid file remains a host or later workflow concern.
 
@@ -126,9 +126,9 @@ interface EditorController {
 
 ### Controller, View, and State
 
-One controller owns the committed snapshot, draft snapshot, monotonic draft revision, route, search query, focused entity, validation state, and save state. The view is a semantic DOM projection and emits intents; it does not call F2/F3, serialize projects, or mutate shared state. DOM event delegation and keyed group/rule identities keep repeated controls from capturing stale array indexes.
+One controller owns the committed snapshot, draft snapshot, monotonic draft revision, route, search query, focused entity, validation state, and save state. The view is a semantic DOM projection and emits intents; it does not call the schema or compiler packages, serialize projects, or mutate shared state. DOM event delegation and keyed group/rule identities keep repeated controls from capturing stale array indexes.
 
-The common F2 fields remain the editor's complete F5 data surface: project name and description; group ID, name, origins, and rules; and rule ID, name, URL regular expression, origins, resource types, priority, and optional method. Existing source spellings and array order are preserved unless the user edits them; F3 normalization is not written back by F5. New IDs are deterministic collision-free values selected from the current project. Array order is source order and is never inferred from priority.
+The common schema fields remain the editor's complete data surface: project name and description; group ID, name, origins, and rules; and rule ID, name, URL regular expression, origins, resource types, priority, and optional method. Existing source spellings and array order are preserved unless the user edits them; Compiler normalization is not written back by the editor. New IDs are deterministic collision-free values selected from the current project. Array order is source order and is never inferred from priority.
 
 Draft transitions are explicit:
 
@@ -148,38 +148,38 @@ Search is project-wide, literal, case-insensitive, and NFKC-normalized for match
 
 ### Validation and Extension Boundary
 
-The host validation adapter returns F3-compatible stable diagnostics with an error code, JSON-pointer path, and safe message. F5 sorts them deterministically, maps current paths to stable entity identities and controls, renders a summary with links, sets `aria-invalid`, and associates each error with its field. F5 never exposes raw Ajv wording or rejected input values. Extension diagnostics use the same path contract. A validator throw becomes a generic editor validation error and never permits saving.
+The host validation adapter returns compiler-compatible stable diagnostics with an error code, JSON-pointer path, and safe message. The editor sorts them deterministically, maps current paths to stable entity identities and controls, renders a summary with links, sets `aria-invalid`, and associates each error with its field. The editor never exposes raw Ajv wording or rejected input values. Extension diagnostics use the same path contract. A validator throw becomes a generic editor validation error and never permits saving.
 
-The rule-type extension point is an empty registry in F5. Each future extension has a stable ID and label, a pure matcher, synchronous mount/cleanup, controlled field access, control registration, and synchronous validation. It receives defensive snapshots and can set only extension-owned fields through a controlled store; it never receives the live project or common-field mutators. Duplicate registrations, multiple matches, callback throws, cyclic values, malformed values, and unregistered controls fail closed with stable editor diagnostics. Unknown action data is not silently discarded or passed through: it is saveable only when a future extension and its host validator explicitly own it. F5 defines no action discriminant or action payload.
+The rule-type extension point is an empty registry in the editor package. Each future extension has a stable ID and label, a pure matcher, synchronous mount/cleanup, controlled field access, control registration, and synchronous validation. It receives defensive snapshots and can set only extension-owned fields through a controlled store; it never receives the live project or common-field mutators. Duplicate registrations, multiple matches, callback throws, cyclic values, malformed values, and unregistered controls fail closed with stable editor diagnostics. Unknown action data is not silently discarded or passed through: it is saveable only when a future extension and its host validator explicitly own it. The editor defines no action discriminant or action payload.
 
 ### URL Conversion
 
-The common editor exposes `urlToExactRegex` as a pure utility. It accepts an absolute HTTP(S) URL with no surrounding whitespace, controls, credentials, or fragment. WHATWG URL serialization supplies deterministic normalization for scheme, hostname, default ports, empty paths, and percent encoding while preserving query order and duplicates. The serialized URL is escaped as a literal and wrapped in `^` and `$`; no flags, wildcard, capture, or matching execution is added. Conversion fails without changing the rule when the URL is malformed or the generated source exceeds the F2 regex limit. Fragments are rejected because browser request targets do not include them.
+The common editor exposes `urlToExactRegex` as a pure utility. It accepts an absolute HTTP(S) URL with no surrounding whitespace, controls, credentials, or fragment. WHATWG URL serialization supplies deterministic normalization for scheme, hostname, default ports, empty paths, and percent encoding while preserving query order and duplicates. The serialized URL is escaped as a literal and wrapped in `^` and `$`; no flags, wildcard, capture, or matching execution is added. Conversion fails without changing the rule when the URL is malformed or the generated source exceeds the schema regex limit. Fragments are rejected because browser request targets do not include them.
 
 ### Accessibility, Security, and Build Constraints
 
-All user-controlled values are inserted as text or DOM properties, never as HTML. The editor does not evaluate user regular expressions or JavaScript, contact a network, access a filesystem, request permissions, use storage, emit telemetry, or invoke runtime/browser-core APIs. F2/F3 remain responsible for authoritative bounds and validation. Defensive snapshots reject accessors, proxies, inherited/sparse properties, symbols, cycles, and unsupported non-JSON objects without invoking hostile getters.
+All user-controlled values are inserted as text or DOM properties, never as HTML. The editor does not evaluate user regular expressions or JavaScript, contact a network, access a filesystem, request permissions, use storage, emit telemetry, or invoke runtime/browser-core APIs. The schema and compiler packages remain responsible for authoritative bounds and validation. Defensive snapshots reject accessors, proxies, inherited/sparse properties, symbols, cycles, and unsupported non-JSON objects without invoking hostile getters.
 
 The view must remain keyboard complete without drag-and-drop or pointer-only commands. Error controls use stable generated IDs, labels, descriptions, focus restoration, and live announcements. Focus indicators and state must remain visible in forced colors; the layout must reflow at narrow widths and 200% zoom without clipping or requiring horizontal scrolling for core controls. CSS uses native/system colors in forced-colors mode and respects reduced-motion preferences.
 
-The editor browser artifact must contain no `node:` imports, Node globals, filesystem code, or runtime-compiled F2/F3 imports. Build and browser checks must import the shipped browser artifact, not only source or a test double. Pure state/conversion tests belong in Vitest; controller/DOM interaction, keyboard, error association, responsive, forced-colors, zoom, and browser-package checks belong in Playwright. No DOM emulation dependency is introduced solely for F5.
+The editor browser artifact must contain no `node:` imports, Node globals, filesystem code, or runtime-compiled schema/compiler imports. Build and browser checks must import the shipped browser artifact, not only source or a test double. Pure state/conversion tests belong in Vitest; controller/DOM interaction, keyboard, error association, responsive, forced-colors, zoom, and browser-package checks belong in Playwright. No DOM emulation dependency is introduced solely for the editor package.
 
 ### Rejected Alternatives
 
 - A framework UI was rejected because it violates the shared framework-free boundary and adds CLI/extension packaging cost.
-- Direct browser imports of current F2/F3 runtime artifacts were rejected because their Node ESM/Ajv initialization is not an approved MV3-safe boundary.
-- Browser storage or browser-core callbacks inside F5 were rejected because persistence, lifecycle, permissions, and conflicts belong to later hosts.
+- Direct browser imports of current schema/compiler runtime artifacts were rejected because their Node ESM/Ajv initialization is not an approved MV3-safe boundary.
+- Browser storage or browser-core callbacks inside the editor package were rejected because persistence, lifecycle, permissions, and conflicts belong to later hosts.
 - Full string-template rendering was rejected because it increases XSS and focus-loss risk; the view uses safe DOM construction.
 - Drag-and-drop and visible-index reorder were rejected because they exclude keyboard users and become unsafe under filtering.
-- An arbitrary `action: unknown` passthrough was rejected because it bypasses strict F2 validation and can lose or persist unsupported data.
+- An arbitrary `action: unknown` passthrough was rejected because it bypasses strict schema validation and can lose or persist unsupported data.
 
-## F6 Runtime Foundation
+## Runtime Foundation
 
-F6 adds a private Node ESM `@rogatio/runtime` package depending on `@rogatio/schema` and `@rogatio/compiler`, with no HTTP framework, proxy framework, native-messaging, TLS, browser, or additional product dependency. The package is implemented and verified through Stage 10.
+The runtime-foundation package adds a private Node ESM `@rogatio/runtime` package depending on `@rogatio/schema` and `@rogatio/compiler`, with no HTTP framework, proxy framework, native-messaging, TLS, browser, or additional product dependency. The package is implemented and verified through Stage 10.
 
 ### Ownership and data flow
 
-F2 remains authoritative for HTTP method names and common validation policy. F3 provides the detached matcher operations that identify the source group and rule. Runtime-specific grants are a separate F6 authorization record: each grant names one source rule, one opaque operation ID, one primitive kind, one canonical target, and one exact method. Outbound grants are restricted to public HTTP(S) GET or HEAD targets whose origin belongs to the corresponding F3 matcher; file grants carry an exact logical path. F6 does not execute the F3 regular expression, select a matching rule, resolve priority, or interpret a future action payload. The trusted controller supplies the already-selected grant; the runtime verifies that the grant is bound to the corresponding F3 matcher operation and to the immutable preset digest.
+The schema package remains authoritative for HTTP method names and common validation policy. The compiler provides the detached matcher operations that identify the source group and rule. Runtime-specific grants are a separate runtime-foundation authorization record: each grant names one source rule, one opaque operation ID, one primitive kind, one canonical target, and one exact method. Outbound grants are restricted to public HTTP(S) GET or HEAD targets whose origin belongs to the corresponding compiler matcher; file grants carry an exact logical path. The runtime foundation does not execute the compiler's regular expression, select a matching rule, resolve priority, or interpret a future action payload. The trusted controller supplies the already-selected grant; the runtime verifies that the grant is bound to the corresponding compiler matcher operation and to the immutable preset digest.
 
 The package has four owned layers:
 
@@ -188,21 +188,21 @@ The package has four owned layers:
 - **Outbound connector:** accepts only an authorized `outbound-http` grant, resolves A and AAAA records, rejects any unsafe result, connects once to a selected numeric address without proxy or re-resolution, strips credentials, and rejects redirects.
 - **Confined reader:** accepts only an authorized `confined-file` grant under the configured root, reads from a verified descriptor with no-follow guarantees, and denies the operation when the host platform cannot prove confinement.
 
-The protocol adapter returns an authorization decision, not a mock response. The outbound connector and confined reader are explicit primitives for later consumers. F13 owns mock status, headers, bodies, delays, file-snapshot semantics, and browser integration. F14 owns native messaging, TLS/PAC, request-body handling, and its separate process. Neither later feature is implemented or specified as an F6 action here.
+The protocol adapter returns an authorization decision, not a mock response. The outbound connector and confined reader are explicit primitives for later consumers. The mock-rules package owns mock status, headers, bodies, delays, file-snapshot semantics, and browser integration. The macOS native-messaging runtime owns native messaging, TLS/PAC, request-body handling, and its separate process. Neither later feature is implemented or specified as a runtime-foundation action here.
 
 ### Preset, digest, and capability boundary
 
-The F6 preset is an internal, independently versioned data contract. Its canonical form contains F3 matcher data, F6 grants, and fixed resource limits; it excludes the random capability, session values, timestamps, and the local filesystem root. Objects use a fixed key order, grants use a deterministic tuple order, values are limited to strings, booleans, integers, arrays, and null, and canonical bytes are whitespace-free UTF-8 JSON. The format is a versioned closed F6 profile rather than an assumption that ordinary `JSON.stringify` is canonical. The digest is `sha256:<64 lowercase hexadecimal characters>` over those bytes.
+The runtime preset is an internal, independently versioned data contract. Its canonical form contains compiler matcher data, runtime grants, and fixed resource limits; it excludes the random capability, session values, timestamps, and the local filesystem root. Objects use a fixed key order, grants use a deterministic tuple order, values are limited to strings, booleans, integers, arrays, and null, and canonical bytes are whitespace-free UTF-8 JSON. The format is a versioned closed runtime profile rather than an assumption that ordinary `JSON.stringify` is canonical. The digest is `sha256:<64 lowercase hexadecimal characters>` over those bytes.
 
 Starting a server creates a fresh 32-byte random bootstrap capability and an ephemeral port. The controller receives the bootstrap material in-process; the server never places it in a URL, log, or error. `POST /v1/pair` requires the capability and preset digest in dedicated headers, consumes the bootstrap capability once, and returns a short-lived random session capability. Every authorization request requires the session capability and the same digest. Capabilities are compared with fixed-length timing-safe comparison, are memory-only, and expire with the server session. Stopping the server invalidates all capabilities and aborts active work. There is no hot policy reload; changing a preset requires a new server, so no partial policy can be observed.
 
 ### Exact authorization and failure behavior
 
-Authorization is an AND of transport admission, active session, capability, preset digest, grant identity, primitive kind, canonical target, and exact method. A failure in one condition cannot be broadened by another grant, priority, wildcard, fallback, or source order. Authorization completes before DNS, socket, filesystem, or response-body work. Unknown routes, malformed control data, missing credentials, mismatches, unsafe addresses, redirect responses, file confinement failures, timeouts, and size violations map to a closed set of stable F6 error codes. Responses never contain raw URLs, credentials, headers, bodies, local paths, DNS answers, addresses, stack traces, or third-party error text.
+Authorization is an AND of transport admission, active session, capability, preset digest, grant identity, primitive kind, canonical target, and exact method. A failure in one condition cannot be broadened by another grant, priority, wildcard, fallback, or source order. Authorization completes before DNS, socket, filesystem, or response-body work. Unknown routes, malformed control data, missing credentials, mismatches, unsafe addresses, redirect responses, file confinement failures, timeouts, and size violations map to a closed set of stable runtime error codes. Responses never contain raw URLs, credentials, headers, bodies, local paths, DNS answers, addresses, stack traces, or third-party error text.
 
 ### Network and file security
 
-Outbound targets use one strict WHATWG URL policy: HTTP(S) only, no userinfo, fragment, controls, backslashes, ambiguous invalid encoding, raw non-ASCII authority text, trailing-dot hostname, or unsupported port. F6-v1 allows only ports 80 and 443 and outbound GET or HEAD. All resolver results are classified, including IPv4-mapped IPv6. Any loopback, unspecified, private, link-local, multicast, carrier-grade, documentation, benchmarking, reserved, or otherwise non-public result denies the complete operation. The connector selects one allowed numeric address, disables address racing and proxy configuration, preserves the authorized hostname for HTTP Host and HTTPS SNI, and never retries or follows a redirect.
+Outbound targets use one strict WHATWG URL policy: HTTP(S) only, no userinfo, fragment, controls, backslashes, ambiguous invalid encoding, raw non-ASCII authority text, trailing-dot hostname, or unsupported port. The runtime v1 allows only ports 80 and 443 and outbound GET or HEAD. All resolver results are classified, including IPv4-mapped IPv6. Any loopback, unspecified, private, link-local, multicast, carrier-grade, documentation, benchmarking, reserved, or otherwise non-public result denies the complete operation. The connector selects one allowed numeric address, disables address racing and proxy configuration, preserves the authorized hostname for HTTP Host and HTTPS SNI, and never retries or follows a redirect.
 
 File grants contain a relative logical path, never an arbitrary server path. Absolute, traversal, encoded traversal, alternate-separator, drive, UNC, NUL, control, symlink, non-regular, and over-limit paths are denied. `realpath` is used only as part of validation; it is not treated as a race-free primitive. The reader anchors the configured root, uses no-follow descriptor operations, checks the opened object, and reads only from that descriptor. A platform without the required guarantees reports an unsupported operation instead of falling back to a path-only check.
 
@@ -210,25 +210,25 @@ File grants contain a relative logical path, never an arbitrary server path. Abs
 
 - A general forward proxy or catch-all file route is rejected because it would turn loopback reachability into unrestricted SSRF or filesystem authority.
 - A single mutable policy or watcher is rejected; stop-and-recreate gives atomic policy identity and a simple rollback story.
-- Redirect following is rejected in F6; a second authorization and DNS decision would expand the trust boundary without being needed by the foundation.
+- Redirect following is rejected in the runtime foundation; a second authorization and DNS decision would expand the trust boundary without being needed by the foundation.
 - Per-operation browser-visible capabilities are deferred; one-use bootstrap pairing plus a short-lived session supports repeated read-only operations without adding a capability-minting round trip. Side-effecting operations require a later specification.
 - `realpath`-only confinement and the default fetch/proxy client are rejected because neither proves descriptor or address pinning.
-- A full RFC 8785 dependency is not required for the closed internal preset; F6 instead defines and versions a narrow canonical JSON profile and does not add a dependency solely for serialization.
+- A full RFC 8785 dependency is not required for the closed internal preset; the runtime foundation instead defines and versions a narrow canonical JSON profile and does not add a dependency solely for serialization.
 
 The complete proposed contract and acceptance criteria are in `docs/specs/f6-runtime-foundation.md`; the staged workflow record is in `docs/f6-workflow.md`.
 
-## F14: macOS Native-Messaging Runtime
+## macOS Native-Messaging Runtime
 
-F14 adds the separately installed macOS runtime that response-body and request-body rules reach through Chrome native messaging. It is a distinct process and protocol (`f14-v1`) from the F6 mock/response server, and adds no F6 action, proxy, TLS, or native-messaging behavior to that package.
+The macOS native-messaging runtime adds the separately installed macOS runtime that response-body and request-body rules reach through Chrome native messaging. It is a distinct process and protocol (`f14-v1`) from the runtime mock/response server, and adds no runtime-foundation action, proxy, TLS, or native-messaging behavior to that package.
 
 ### Ownership and data flow
 
-`@rogatio/runtime` gains F14 control, lifecycle, revalidation, envelope, and interception-gate modules. `@rogatio/cli` gains a real `rogatio runtime` command (`start` / `stop` / `status` / `--help`). F2 remains authoritative for the project shape and origins; F3 remains authoritative for matcher operations used in revalidation. F14 does not add F15/F16/F17 rule behavior, only the runtime those slices depend on.
+`@rogatio/runtime` gains the macOS native-messaging control, lifecycle, revalidation, envelope, and interception-gate modules. `@rogatio/cli` gains a real `rogatio runtime` command (`start` / `stop` / `status` / `--help`). The schema package remains authoritative for the project shape and origins; the compiler remains authoritative for matcher operations used in revalidation. The macOS runtime does not add response-body, request-body-trust, or request-body rule behavior, only the runtime those slices depend on.
 
 Four owned layers:
 
 - **Lifecycle controller:** explicit `start` / `stop` / `status` with guarded states `stopped → starting → started → stopping → stopped`, idempotent `stop()`, and a capability-based activation gate that reports `unsupported` only when a trusted device-local CA cannot be provisioned or Chrome PAC routing would collide with an existing controlling proxy/PAC/extension/enterprise policy.
-- **Revalidation core:** `revalidateAuthority(context)` independently re-derives authority from the validated F2 project and compiled F3 operation for an incoming request. It does not trust the browser's grant; the AND of rule existence, urlRegex match, effective-origin membership, method match, resource-type match, initiator scope, and target-origin membership must all hold.
+- **Revalidation core:** `revalidateAuthority(context)` independently re-derives authority from the validated schema project and compiled compiler operation for an incoming request. It does not trust the browser's grant; the AND of rule existence, urlRegex match, effective-origin membership, method match, resource-type match, initiator scope, and target-origin membership must all hold.
 - **Control envelope:** a versioned `f14-v1` JSON channel (`start`, `stop`, `status`, `authorize`, `transform-request-meta`, `transform-response-meta`) carrying metadata only. Bodies never cross the envelope; a structural test proves it.
 - **Interception gate (capability-based):** scoped Chrome PAC generation as a deterministic pure function, plus an ephemeral TLS proxy / device-local CA module reachable only after a successful capability-based activation. When the required capabilities are absent, it returns `runtime.unsupported` and performs no socket or certificate work, regardless of OS.
 
@@ -244,14 +244,14 @@ Observed request/response bodies are processed in-process only. The native-messa
 
 - Trusting the browser grant as authority is rejected; revalidation re-derives from the canonical project.
 - A general forward proxy is rejected; only explicitly granted origins are routed through the scoped PAC.
-- Persisting interception, capability, or traffic state is rejected; F14 keeps no history.
-- Live TLS interception and CA trust installation require a platform where a trusted device-local CA can be provisioned and Chrome PAC routing does not collide with an existing controlling proxy/PAC/enterprise policy. macOS is the reference supported platform; Linux/Windows may also activate when those capabilities are present. F14 ships the capability-gated module and deterministic PAC generation; the live interception is completed by F15/F17 where the capabilities exist.
+- Persisting interception, capability, or traffic state is rejected; the macOS runtime keeps no history.
+- Live TLS interception and CA trust installation require a platform where a trusted device-local CA can be provisioned and Chrome PAC routing does not collide with an existing controlling proxy/PAC/enterprise policy. macOS is the reference supported platform; Linux/Windows may also activate when those capabilities are present. The macOS runtime ships the capability-gated module and deterministic PAC generation; the live interception is completed by the response-body and request-body rules where the capabilities exist.
 
 The complete proposed contract and acceptance criteria are in `docs/specs/f14-macos-runtime.md`; the staged workflow record is in `docs/f14-workflow.md`.
 
-## F16: Request-Body Trust Lifecycle
+## Request-Body Trust Lifecycle
 
-F16 adds the **trust lifecycle** that request-body interception (F17) requires before any network interception can happen: it manages the native-messaging host registration and the device-local CA trust that F14's interception gate depends on. It is a distinct concern from F14's `start`/`stop`/`status` (which govern a running runtime *process*); F16 governs the *installed/trusted* standing of the host on the device. It depends only on F14 (REP-001) and adds no F15/F17 rule behavior, only the trust surface those slices pre-condition.
+The **request-body trust lifecycle** that request-body interception (the request-body rules) requires before any network interception can happen: it manages the native-messaging host registration and the device-local CA trust that the macOS runtime's interception gate depends on. It is a distinct concern from the macOS runtime's `start`/`stop`/`status` (which govern a running runtime *process*); the request-body trust lifecycle governs the *installed/trusted* standing of the host on the device. It depends only on the macOS runtime (REP-001) and adds no response-body or request-body rule behavior, only the trust surface those slices pre-condition.
 
 ### Ownership and data flow
 
@@ -266,22 +266,22 @@ F16 adds the **trust lifecycle** that request-body interception (F17) requires b
 Three owned layers:
 
 - **Manifest generation (pure):** `generateNativeMessagingManifest(hostPath, name)` returns a fixed-shape JSON `{ name, description, path, type: "stdio", allowed_origins: [...] }`, deterministic for the same inputs. The manifest carries no secrets; `path` must be absolute and confined to an expected install root before emission.
-- **Capability gate:** `detectTrustCapabilities()` reports whether host-manifest install and CA trust install are possible on the current platform/config. Capability-based, not OS-name-based, mirroring F14 REQ-008: a non-macOS platform with the required tooling may still install/trust; a macOS platform missing the tooling reports `trust.unsupported`.
+- **Capability gate:** `detectTrustCapabilities()` reports whether host-manifest install and CA trust install are possible on the current platform/config. Capability-based, not OS-name-based, mirroring the macOS runtime REQ-008: a non-macOS platform with the required tooling may still install/trust; a macOS platform missing the tooling reports `trust.unsupported`.
 - **Trust controller:** `install`/`uninstall`/`trust`/`untrust`/`status` with explicit idempotency and a single stable error set. No telemetry, no retained state beyond the manifest file and the OS trust store; nothing is persisted to the project, the runtime, or disk outside the manifest path.
 
 ### Authority and confidentiality boundary
 
-F16 touches only device-local trust material: the manifest (which names the host) and a device-local CA. It never reads, writes, logs, or transmits request/response bodies; it does not contact upstream and does not implement F17 transformation. The CA is device-local and self-signed; its private key stays confined to the install root and is never placed on the native-messaging envelope. `status` echoes only booleans and the platform/capability reasons — never the manifest path, the host path, CA material, or third-party tooling text.
+The request-body trust lifecycle touches only device-local trust material: the manifest (which names the host) and a device-local CA. It never reads, writes, logs, or transmits request/response bodies; it does not contact upstream and does not implement the request-body-rules transformation. The CA is device-local and self-signed; its private key stays confined to the install root and is never placed on the native-messaging envelope. `status` echoes only booleans and the platform/capability reasons — never the manifest path, the host path, CA material, or third-party tooling text.
 
 ### Alternatives rejected
 
-- Bundling host manifest + CA trust into F14 `start`: rejected because install/trust are device-level, persistent, and intentionally separate from the per-session runtime lifecycle; conflating them would force re-trust on every start.
+- Bundling host manifest + CA trust into the macOS runtime `start`: rejected because install/trust are device-level, persistent, and intentionally separate from the per-session runtime lifecycle; conflating them would force re-trust on every start.
 - Persisting trust state in the project file: rejected; trust is device-local, not project state, and must not travel with `.rogatio.json`.
-- Auto-install/auto-trust on `runtime start`: rejected; explicit, capability-gated user actions only, per F14's no-auto-start stance.
+- Auto-install/auto-trust on `runtime start`: rejected; explicit, capability-gated user actions only, per the macOS runtime's no-auto-start stance.
 
 The complete proposed contract and acceptance criteria are in `docs/specs/f16-request-body-trust.md`; the staged workflow record is in `docs/f16-workflow.md`.
 
-## F8: CLI Package Architecture
+## CLI Package Architecture
 
 ### Components
 
@@ -416,11 +416,11 @@ rogatio edit [path]
 | Fixed port | Conflicts common; random + open browser is UX standard |
 | Long-lived server | Edit is single-session; no need for daemon |
 
-## F12: Offline Dry-Run / Test Feature
+## Offline Dry-Run / Test Feature
 
 ### Overview
 
-F12 adds a pure-offline, bounded URL-batch dry-run capability that evaluates matcher operations (from F3) against a list of test cases without contacting the network, requesting permissions, changing installed rules, connecting to runtime, or saving test data. It is usable from both the CLI (`rogatio test`) and the Editor (`Test rules` route/panel).
+The offline dry-run package adds a pure-offline, bounded URL-batch dry-run capability that evaluates matcher operations (from the compiler) against a list of test cases without contacting the network, requesting permissions, changing installed rules, connecting to runtime, or saving test data. It is usable from both the CLI (`rogatio test`) and the Editor (`Test rules` route/panel).
 
 ### Components
 
@@ -478,17 +478,17 @@ CLI / Editor
           │
           ▼
 ┌──────────────────────┐
-│ validateProjectDetailed (F2) │
+│ validateProjectDetailed (schema) │
 └─────────┬────────────┘
           │
           ▼
 ┌──────────────────────┐
-│ compileProject (F3)  │ → MatcherOperation[]
+│ compileProject (compiler)  │ → MatcherOperation[]
 └─────────┬────────────┘
           │
           ▼
 ┌──────────────────────┐
-│ dryRunProject (F12)  │
+│ dryRunProject (dry-run)  │
 │ - parse/validate cases
 │ - cache regex
 │ - 4-dim match per rule
@@ -522,10 +522,10 @@ CLI / Editor
 ### Dependencies
 
 ```
-@rogatio/schema (F2) ──► @rogatio/compiler (F3) ──► @rogatio/dry-run (F12)
+@rogatio/schema ──► @rogatio/compiler ──► @rogatio/dry-run
                                           │              │
                                           ▼              ▼
-                                   @rogatio/editor (F5) @rogatio/cli (F8)
+                                    @rogatio/editor @rogatio/cli
 ```
 
 ### Acceptance Criteria Coverage
@@ -543,13 +543,13 @@ CLI / Editor
 
 ### Open Questions Resolved
 
-- **Option A approved** — matcher-level dry-run now + `previewAction` seam; redirect/query previews deferred to F9/F10.
+- **Option A approved** — matcher-level dry-run now + `previewAction` seam; redirect/query previews deferred to the redirect and query rules.
 - **maxCases default 256** — accepted per user gate.
-- **Editor dry-run via host adapter** — no Node import in browser bundle, consistent with F5.
+- **Editor dry-run via host adapter** — no Node import in browser bundle, consistent with the editor package.
 
-## F9: Redirect Rules (action slice)
+## Redirect Rules (action slice)
 
-F9 is the first *action* slice introducing a browser-side effect. It adds the rule-type
+Redirect rules are the first *action* slice introducing a browser-side effect. It adds the rule-type
 discriminant `type: "redirect"`, the redirect payload, and translates it to Chrome DNR
 `redirect` rules.
 
@@ -633,42 +633,42 @@ discriminant `type: "redirect"`, the redirect payload, and translates it to Chro
   cases mirroring node validation.
 - `editor/test/redirect.test.ts`: `createRedirectRuleType` matches/validate.
 
-## F10 Query Parameter Rules (first rule-action slice)
+## Query Parameter Rules (first rule-action slice)
 
-F10 adds the shared rule `action` discriminator to the version-1 schema and implements the first browser-only action: **query parameter rules**. It spans `@rogatio/schema`, `@rogatio/compiler`, `@rogatio/extension`, and `@rogatio/editor`. F7's actionless `unsupported` rule model is replaced by action-bearing installable rules for the `query` type; later browser-only slices (F9 redirect, F11 header, F13 mock) extend the same `action` union.
+Query-parameter rules add the shared rule `action` discriminator to the version-1 schema and implement the first browser-only action: **query parameter rules**. It spans `@rogatio/schema`, `@rogatio/compiler`, `@rogatio/extension`, and `@rogatio/editor`. The extension's actionless `unsupported` rule model is replaced by action-bearing installable rules for the `query` type; later browser-only slices (redirect, header, and mock rules) extend the same `action` union.
 
-### Schema (F2 boundary change)
+### Schema (schema-package boundary change)
 
-`RogatioRule` gains an `action` object with a `type` discriminant. F10 defines `QueryAction = { type: "query"; params: { name: string; value: string }[] }`. The schema `rule` `$defs` adds `action` (additionalProperties still false) and a `queryAction`/`action` subschema. New bounds: `maxQueryParamsPerRule`, `maxQueryNameLength`, `maxQueryValueLength`. Semantic validation adds a duplicate-param-name check and the non-empty/length bounds. `browser-schema.ts` mirrors the same `action` validation and bounds because the MV3 bundle cannot load Ajv. `action` is optional to preserve backward compatibility with F7 actionless projects.
+`RogatioRule` gains an `action` object with a `type` discriminant. Query-parameter rules define `QueryAction = { type: "query"; params: { name: string; value: string }[] }`. The schema `rule` `$defs` adds `action` (additionalProperties still false) and a `queryAction`/`action` subschema. New bounds: `maxQueryParamsPerRule`, `maxQueryNameLength`, `maxQueryValueLength`. Semantic validation adds a duplicate-param-name check and the non-empty/length bounds. `browser-schema.ts` mirrors the same `action` validation and bounds because the MV3 bundle cannot load Ajv. `action` is optional to preserve backward compatibility with the extension's actionless projects.
 
-### Compiler (F3 boundary change)
+### Compiler (compiler boundary change)
 
-Compiler emits distinct operation types: `MatcherOperation` (actionless), `RedirectOperation` (F9), and `QueryOperation` (F10). `compileProject` emits the appropriate operation type based on `rule.type`. A pure helper `queryParamsToDNR(action)` produces the DNR `addOrReplaceParams` array (`replaceOnly: false`) for unit testing without a browser. This is the durable foundation F11/F13 extend by adding new operation types.
+Compiler emits distinct operation types: `MatcherOperation` (actionless), `RedirectOperation` (redirect rules), and `QueryOperation` (query rules). `compileProject` emits the appropriate operation type based on `rule.type`. A pure helper `queryParamsToDNR(action)` produces the DNR `addOrReplaceParams` array (`replaceOnly: false`) for unit testing without a browser. This is the durable foundation header and mock rules extend by adding new operation types.
 
-### Extension (F7 boundary change)
+### Extension (extension boundary change)
 
 `projection.ts` `projectMatchers` dispatches on operation kind. For `QueryOperation` it builds a DNR rule with `redirect.transform.query`; for `RedirectOperation` it builds a DNR `redirect` rule; for `MatcherOperation` it returns `installable: false`. `service-worker.ts` `operationStatuses` reports redirect and query rules as `active` when compiled, enabled, and granted; actionless matchers remain `unsupported`. Permission domains derive from origin hostnames (requestDomains/initiatorDomains). The `[Rogatio]` DevTools record stays deferred.
 
-### Editor (F5 boundary change)
+### Editor (editor boundary change)
 
-The `RuleTypeFieldExtension` registry gains a `query` extension whose `matches(rule)` returns `rule.action?.type === "query"`. The editor adds a `Rule type` selector listing registered extension labels; selecting `query` initializes `action = { type: "query", params: [] }` and mounts the extension's param name/value form (add/remove rows). The extension `validate` enforces field-level diagnostics. Unknown action data with no owning extension is not persisted (preserves the F5 rejection of arbitrary `action` passthrough).
+The `RuleTypeFieldExtension` registry gains a `query` extension whose `matches(rule)` returns `rule.action?.type === "query"`. The editor adds a `Rule type` selector listing registered extension labels; selecting `query` initializes `action = { type: "query", params: [] }` and mounts the extension's param name/value form (add/remove rows). The extension `validate` enforces field-level diagnostics. Unknown action data with no owning extension is not persisted (preserves the editor's rejection of arbitrary `action` passthrough).
 
 ### Migration / compatibility
 
-The version-1 schema keeps `action` optional to preserve backward compatibility with F7 actionless projects. Rules without `type`/`action` remain valid actionless matchers (reported `unsupported`). F10 is browser-only and supported on Linux/Windows/macOS; activation is in-browser, no native runtime.
+The version-1 schema keeps `action` optional to preserve backward compatibility with the extension's actionless projects. Rules without `type`/`action` remain valid actionless matchers (reported `unsupported`). Query-parameter rules are browser-only and supported on Linux/Windows/macOS; activation is in-browser, no native runtime.
 
 ### Rejected alternatives
 
-- Keep `action` optional to preserve F7 actionless projects: accepted for backward compatibility; actionless rules remain valid but `unsupported`.
+- Keep `action` optional to preserve the extension's actionless projects: accepted for backward compatibility; actionless rules remain valid but `unsupported`.
 - Add-or-replace via separate `addParams`/`removeParams`/`replaceParams` DNR fields: rejected; `addOrReplaceParams` with `replaceOnly: false` is exactly the required add-or-replace semantics in one field.
-- Implement query rewriting in the extension service worker rather than DNR `transform.query`: rejected; DNR is browser-native, declarative, and offline, matching F7's design.
+- Implement query rewriting in the extension service worker rather than DNR `transform.query`: rejected; DNR is browser-native, declarative, and offline, matching the extension's design.
 
-## F13: Mock Rules
+## Mock Rules
 
-F13 adds the `mock` rule type as a vertical slice: a configured HTTP status, optional
+The mock-rules package adds the `mock` rule type as a vertical slice: a configured HTTP status, optional
 response headers, an optional delay, and either an inline body or a live UTF-8 snapshot
 of one approved local file, served to matched browser requests without ever contacting
-upstream. It integrates the rule slice with the F6 runtime server, the editor, the CLI,
+upstream. It integrates the rule slice with the runtime server, the editor, the CLI,
 and the extension, including the single user-clicked Check-and-connect request.
 
 ### Rule payload and compiler
@@ -676,8 +676,8 @@ and the extension, including the single user-clicked Check-and-connect request.
 - `schema/src/types.ts`: `RuleType` gains `"mock"`; new `MockHeader { name; value }` and
   `MockAction { status: number; headers?: MockHeader[]; delayMs?: number; body?: string;
   file?: string }`; `RogatioRule.mock?: MockAction` required iff `type === "mock"`.
-  Exactly one of `body`/`file` is set. The `mock` sub-object follows the F9 `redirect`
-  pattern (a type-specific payload field), not the F10 `action` field.
+  Exactly one of `body`/`file` is set. The `mock` sub-object follows the redirect-rules
+  `redirect` pattern (a type-specific payload field), not the query-rules `action` field.
 - `schema/src/limits.ts`: `maxMockStatus 599`/`minMockStatus 200`, `maxMockHeadersPerRule
   32`, `maxMockHeaderNameLength 256`, `maxMockHeaderValueLength 4096`,
   `maxMockInlineBodyLength 65536`, `maxMockDelayMs 30000`, `maxMockFilePathLength 2048`.
@@ -692,13 +692,13 @@ and the extension, including the single user-clicked Check-and-connect request.
   mock: MockAction }`; `RogatioOperation` union widened.
 - `compiler/src/compile.ts`: emits `MockOperation` when `rule.type === "mock"`.
 
-### Runtime mock serving (F6 boundary change, same `@rogatio/runtime` package)
+### Runtime mock serving (runtime-foundation boundary change, same `@rogatio/runtime` package)
 
-F6 remains the mock/response server process; F13 extends it with mock response
-semantics. F6's control protocol (`POST /v1/pair`, `POST /v1/authorize`) is unchanged
+The runtime foundation remains the mock/response server process; the mock-rules package extends it with mock response
+semantics. The runtime foundation's control protocol (`POST /v1/pair`, `POST /v1/authorize`) is unchanged
 and still returns authorization decisions only.
 
-- **Preset extension:** the internal F6 preset gains an optional `mocks` array
+- **Preset extension:** the internal runtime preset gains an optional `mocks` array
   (`{ ruleId, status, headers, delayMs, body?, file? }` where `file` is a relative
   logical path). Presets without `mocks` behave exactly as before. Canonical bytes and
   the SHA-256 digest cover the mock *config*; per-rule mock *tokens* are capability-like
@@ -706,7 +706,7 @@ and still returns authorization decisions only.
   canonical profile are preserved.
 - **Per-rule mock tokens:** server startup mints a fresh 32-byte cryptographically
   random token per mock rule, stored only in memory and bound to the ruleId and server
-  instance. Tokens are designed to appear in browser redirect URLs (unlike the F6
+  instance. Tokens are designed to appear in browser redirect URLs (unlike the runtime-foundation
   bootstrap/session capabilities, which never do); they are never logged or echoed in
   error responses.
 - **Mock route:** `GET /mock/<token>` serves the configured response: optional bounded
@@ -714,7 +714,7 @@ and still returns authorization decisions only.
   (default `Content-Type: text/plain; charset=UTF-8` when the user configures none), and
   a body from the inline string or a live confined-file read of the approved file.
   Permissive CORS headers are emitted **only on this route** (needed for cross-origin
-  XHR/fetch from web pages to the loopback mock server); the F6 control protocol never
+  XHR/fetch from web pages to the loopback mock server); the runtime-foundation control protocol never
   emits CORS. `GET`/`HEAD`/`OPTIONS` are accepted; other methods return a stable `405`.
   The route never uses the outbound connector (mocks never contact upstream).
 - **File snapshots:** a file-based mock is served through the existing confined-file
@@ -733,14 +733,14 @@ and still returns authorization decisions only.
 ### CLI (`rogatio runtime`)
 
 - `packages/cli/src/commands/runtime.ts` becomes real: reads `.rogatio.json` (path arg,
-  default cwd, `-` for stdin), validates + compiles via F2/F3, builds the runtime preset
+  default cwd, `-` for stdin), validates + compiles via the schema and compiler packages, builds the runtime preset
   with the project's mock rules (resolving file rules against the configured root,
   default the project directory; paths outside the root are rejected), starts
   `createRuntimeServer` on the fixed default port, prints connection info and
   instructions, and stops cleanly on SIGINT/SIGTERM. `--root` configures the confined-
   file root; `--port` overrides the default. Invalid projects exit `1` with the same
   diagnostics style as `verify`; port/startup failures exit `2`.
-- `rogatio test` and the `edit` server gain a mock `previewAction` (via the existing F12
+- `rogatio test` and the `edit` server gain a mock `previewAction` (via the existing dry-run
   `previewAction` seam) producing e.g. `{ kind: "mock", summary: "Mock 200 (inline
   body, 42 bytes)" }` or `"Mock 200 (file snapshot: <basename>)"`. The dry-run engine
   itself is unchanged.
@@ -749,7 +749,7 @@ and still returns authorization decisions only.
 
 - **Manifest:** add `"declarativeNetRequest"` to `permissions` (required for DNR
   dynamic rules; grants implicit redirect access without host permissions). This also
-  unblocks F9/F11 DNR installs in real browsers.
+  unblocks redirect and header DNR installs in real browsers.
 - **Projection:** `projectMatchers` handles `MockOperation` (installable, matcher
   preserved). The final DNR redirect URL depends on the runtime connection info, so the
   service worker builds mock DNR rules after Check-and-connect, translating each mock
@@ -770,9 +770,9 @@ and still returns authorization decisions only.
   `active` when connected and installed; a stable `error` diagnostic when connected but
   the runtime has no token for the rule (project changed after start — directs
   restarting `rogatio runtime`). In-memory mock runtime state resets to `disconnected`
-  on service-worker restart (per F4; the status represents the last check).
+  on service-worker restart (per browser-core; the status represents the last check).
 
-### Editor (F5)
+### Editor (editor package)
 
 A `mock` `RuleTypeFieldExtension` renders status (number), optional delay (number),
 header name/value rows (add/remove), and a body-source selector (inline textarea vs.
@@ -781,7 +781,7 @@ string; existence is validated by the CLI at runtime start). Validation enforces
 schema bounds and the exactly-one-body-source invariant with stable field diagnostics.
 `createMockRuleType` is added to `builtInRuleTypes` and exported.
 
-### browser-core (F4)
+### browser-core (browser-core package)
 
 No core status change: `computeRuleStatuses` already operates on `operation.matcher`.
 The `needs proxy` / `error` rewrites for mock ops are service-worker logic (like the
@@ -791,28 +791,28 @@ state and is wired in the extension service worker.
 ### Rejected alternatives
 
 - Ephemeral port + connection file for runtime discovery: rejected (MV3 cannot read
-  arbitrary local files without native messaging, which is F14).
-- Extension pairing via the F6 control protocol for the connect UX: rejected (requires
+  arbitrary local files without native messaging, which is provided by the macOS runtime).
+- Extension pairing via the runtime-foundation control protocol for the connect UX: rejected (requires
   conveying the bootstrap capability into the extension; contradicts the one-click
   Check-and-connect).
-- A generic mock proxy or arbitrary file route: rejected (would break the F6 confined-
+- A generic mock proxy or arbitrary file route: rejected (would break the runtime-foundation confined-
   file and exact-grant model; mocks serve exactly the one approved file per rule).
 - Mock path-based routing (serve different content per request URL): rejected; a mock
   rule returns one configured response regardless of the matched URL, matching the
   product description.
 
-## F17: Request-Body Rules
+## Request-Body Rules
 
-F17 adds bounded request-body replacement and modification for explicitly authorized
+The request-body rules add bounded request-body replacement and modification for explicitly authorized
 browser XHR requests. This section records the Stage 2 architecture. The specification
 and this decision remain pending the Stage 4 human approval gate; no implementation
 plan or code may rely on them until that gate passes.
 
 ### Boundary and ownership
 
-F17 extends the existing package boundaries without turning F6 into a forward proxy:
+The request-body rules extend the existing package boundaries without turning the runtime foundation into a forward proxy:
 
-| Package | F17 responsibility | F17 does not own |
+| Package | Request-body-rule responsibility | Request-body rules do not own |
 | --- | --- | --- |
 | `@rogatio/schema` | Version-1 rule and exact-local-origin validation | Network, proxy, credentials |
 | `@rogatio/compiler` | Detached ordered `RequestBodyOperation` values | Chrome, TLS, persistence |
@@ -820,11 +820,11 @@ F17 extends the existing package boundaries without turning F6 into a forward pr
 | `@rogatio/editor` | Request-body fields and project local-origin fields | Runtime or filesystem access |
 | `@rogatio/extension` | Chrome metadata, policy session, PAC, markers, lifecycle | Request bodies, TLS, upstream forwarding |
 | `@rogatio/runtime` | Policy validation, authority, proxy, TLS, transform, forwarding | Browser storage and editor state |
-| F16 trust layer | Native-host manifest and X.509 CA trust lifecycle | Request transformation |
+| The request-body-trust layer | Native-host manifest and X.509 CA trust lifecycle | Request transformation |
 | `@rogatio/cli` | Offline validation/edit/test and explicit trust/install diagnostics | Ownership of live browser sessions |
 
-F6 GET/HEAD authorization, F13 mocks, and F15 response-body semantics remain separate.
-F15 may use the shared live provider seam, but F17 must not widen F6 transport to carry
+The runtime-foundation GET/HEAD authorization, the mock rules, and the response-body rules remain separate.
+The response-body rules may use the shared live provider seam, but the request-body rules must not widen the runtime-foundation transport to carry
 POST bodies or credentials.
 
 ### Rule and operation model
@@ -892,7 +892,7 @@ malformed, or digest-mismatched staging never becomes active.
 ### Browser-to-proxy correlation
 
 The supported browser path uses ordinary MV3 APIs. Chrome does not generally grant
-`webRequestBlocking` to ordinary extensions, so F17 does not make exact per-request
+`webRequestBlocking` to ordinary extensions, so the request-body rules do not make exact per-request
 initiator scheme/port or request-ID correlation a live prerequisite. The extension instead
 installs one ephemeral, session-bound DNR marker per request-body operation. The marker
 condition contains the operation URL matcher, method, `xmlhttprequest` resource type,
@@ -908,7 +908,7 @@ and are removed before upstream forwarding. A request with a valid body marker t
 fails framing, authority, or transformation is blocked before upstream; it never falls
 back to its original body.
 
-Markers are static session rules, one per request-body operation. F17 does not use
+Markers are static session rules, one per request-body operation. The request-body rules do not use
 request-ID keyed dynamic rules or a native pending-authorization map. The ordinary MV3
 boundary therefore cannot prove exact initiator scheme, port, or browser context at the
 proxy; the marker's initiator condition is limited to DNR's host-domain projection.
@@ -938,7 +938,7 @@ stopped -> starting -> started -> stopping -> stopped
 started ------------> failed
 ```
 
-Start validates policy, explicit extension identity, F16 trust, platform capabilities,
+Start validates policy, explicit extension identity, the request-body-trust, platform capabilities,
 and proxy-control ownership before accepting traffic. It starts a non-accepting
 provider, verifies Chrome proxy control, installs exact-origin PAC and markers
 atomically, then activates the provider. Any failure stops acceptance, removes owned
@@ -983,15 +983,15 @@ Cookie and Authorization headers are preserved unchanged when the request otherw
 passes. Host/authority and Content-Length are reconstructed. Hop-by-hop, proxy,
 transfer, trailer, and conflicting framing headers are removed or rejected. Standard
 body-integrity/signature headers (`Content-MD5`, `Digest`, `Content-Digest`, `Signature`,
-`Signature-Input`) are rejected. F17 does not recompute unknown application signatures.
+`Signature-Input`) are rejected. The request-body rules do not recompute unknown application signatures.
 Credential values never enter native messages, logs, diagnostics, persisted state, or
 error responses.
 
 ### Trust and target boundaries
 
-F16 must provide actual X.509 CA certificate plus private key material, atomic confined
+The request-body-trust layer must provide actual X.509 CA certificate plus private key material, atomic confined
 storage, actual trust standing, exact native-messaging origin, host confinement, and
-rollback. An SPKI public key is not a CA certificate. F17 consumes an injectable,
+rollback. An SPKI public key is not a CA certificate. The request-body rules consume an injectable,
 capability-based platform CA adapter; adapters use reviewed fixed executable paths and
 argument arrays, never shell interpolation. No unreviewed certificate or proxy
 dependency is introduced. macOS is the reference live platform; Linux and Windows are
@@ -1017,7 +1017,7 @@ Service-worker restart does not restore live state.
 The editor adds a request-body rule type, replace/regex controls, fixed method/resource
 constraints, and exact local-origin project controls. It keeps detached drafts and host
 supplied validation/save ports, remains keyboard/screen-reader/forced-colors safe, and
-does not import Node or runtime validation artifacts. Existing F15 editor/browser-schema
+does not import Node or runtime validation artifacts. Existing response-body editor/browser-schema
 payload parity is repaired in the same boundary work so stale action fields cannot leak
 between rule types.
 
@@ -1032,37 +1032,37 @@ order, global arbitration, editor fields, policy canonicalization/digest, native
 staging, and bounded transformation. Integration tests use raw HTTP/1.1 and fake Chrome
 adapters to prove framing rejection, zero upstream calls on failed transforms, marker
 stripping, credential preservation, policy races, PAC collisions, and stop rollback.
-F16 and F15 regressions cover X.509 trust and shared-provider behavior. A capable macOS
+The request-body-trust and response-body regressions cover X.509 trust and shared-provider behavior. A capable macOS
 runner must prove real Chrome native messaging, PAC, trusted TLS, HTTPS POST/XHR,
 credential preservation, winner selection, failure blocking, and stop teardown. Linux
 and Windows provide offline/capability-negative evidence unless equivalent adapters are
 injected and explicitly tested.
 
 Rejected designs: browser-only DNR body rewriting; service-worker fetch forwarding;
-sending observed bodies through native messaging; widening F6; generic forward proxying;
+sending observed bodies through native messaging; widening the runtime foundation; generic forward proxying;
 trusting browser-selected rule IDs or grants; relying on DNR ordering; composing rules;
 auto-start/trust; persisted policy or traffic; SPKI-as-CA; ad-hoc ASN.1; and unreviewed
 third-party proxy/TLS dependencies. Same-origin unmatched PAC traffic is the explicit
 exception to a blanket block because the user selected unchanged forwarding for that
 case; marker-selected request-body operations still fail closed. Exact initiator
 correlation through `webRequestBlocking` was considered but rejected for ordinary MV3
-availability; policy-installed Chrome is not required for F17 live status.
+availability; policy-installed Chrome is not required for the request-body rules' live status.
 
-## F19: Documentation Site
+## Documentation Site
 
-F19 adds a separate static documentation site built with **Astro 7** and the
+The documentation-site package adds a separate static documentation site built with **Astro 7** and the
 **Starlight** documentation theme. It is a new workspace package, `packages/docs-site`,
 and does not share runtime code with the product packages. The site documents the
 already-shipped product (`rogatio-overview.md`, `sequence.md`, and the per-feature specs)
 for end users and integrators; it is not a runtime or CLI artifact and is excluded from
-the npm/extension release pipeline (handled later by F20).
+the npm/extension release pipeline (handled later by the release pipeline).
 
 ### Package boundary and build
 
 - New private package `@rogatio/docs-site` under `packages/docs-site`, added to the
   existing `packages/*` pnpm workspace. It introduces `astro` and `@astrojs/starlight`
   as dependencies — the only new third-party dependencies the feature adds, and the ones
-  the F19 specification explicitly requires.
+  the documentation-site specification explicitly requires.
 - Content lives in `src/content/docs/**` as Markdown (`.md`); Starlight's built-in docs
   collection is used, so no custom `src/content.config.ts` is required. This keeps the
   package free of product `.ts` source that would otherwise be pulled into the root
@@ -1089,7 +1089,7 @@ does not include docs-site, so the canonical `pnpm build` is unaffected. `pnpm t
 
 ### Verification
 
-F19 verification is the site build itself: `pnpm --filter @rogatio/docs-site build` must
+Documentation-site verification is the site build itself: `pnpm --filter @rogatio/docs-site build` must
 succeed and emit `dist/`. The root canonical validation (`format:check`, `lint`,
 `typecheck`, `build`, `test`) must remain green after the package is added, proving the
 isolation rules hold.
@@ -1105,12 +1105,12 @@ isolation rules hold.
   navigable user site; mixing them would confuse published content with internal process.
 - Building the site with the root esbuild pipeline: rejected because Astro/Starlight have
   their own build toolchain that the root script does not and should not drive.
-## F18: E2E and Integration Test Suite
+## E2E and Integration Test Suite
 
-F18 is the full-product test suite that closes the gap between per-package unit tests and
+The E2E and integration test suite is the full-product test suite that closes the gap between per-package unit tests and
 the shipped artifacts. It proves, with real processes and real browsers, that the CLI,
 editor, extension, runtime, and packaged artifacts work together the way a user consumes
-them. It deliberately does **not** re-test per-package logic that F2-F17 already cover; it
+them. It deliberately does **not** re-test per-package logic that the individual feature specs already cover; it
 exercises the seams those suites cannot reach: real HTTP servers, real Chromium, real
 packed tarballs, and the real extension service worker.
 
@@ -1129,7 +1129,7 @@ packed tarballs, and the real extension service worker.
 2. **Packaged-install tests:** the packed-tarball CLI test above is the packaged-install
    proof for the CLI. The extension's "package" is its built `packages/extension/dist`
    directory loaded as an unpacked extension in real Chromium (the extension is distributed
-   as a ZIP in F20; the unpacked-load journey is the same code path). The manifest contract
+   as a ZIP in the release pipeline; the unpacked-load journey is the same code path). The manifest contract
    and MV3 artifact hygiene remain enforced by `scripts/validate.ts`.
 
 3. **Playwright headless browser journeys (`test/browser/`, real Chromium):**
@@ -1155,13 +1155,13 @@ packed tarballs, and the real extension service worker.
 Chrome's optional-host-permission prompt cannot be automated: `chrome.permissions.request`
 never resolves in headless or headed Chromium when a prompt is required, profile
 pre-seeding of `granted_permissions` is rejected (Secure Preferences MAC), and Playwright
-has no API to answer the prompt (upstream microsoft/playwright#32755). The F18 suite
+has no API to answer the prompt (upstream microsoft/playwright#32755). The E2E suite
 therefore proves the permission flow at the integration seam (the extension's injected
 permission adapters and the exact-origin request), asserts the real-browser `needs
 permission` statuses, and documents the grant click as a manual check. No test hook,
 fake grant, or profile forging is added to the product; the browser grant stays a real
 user gesture. The granted-end-to-end redirect/mock interception remains covered by unit
-and integration tests plus the F17 live E2E on capable runners.
+and integration tests plus the request-body-rules live E2E on capable runners.
 
 ### Product repairs surfaced by the suite (in scope)
 
@@ -1191,7 +1191,7 @@ Building the real journeys exposed defects that the mocked unit tests could not:
 - No new dependencies; Node-only orchestration; cross-platform paths; no shell-only
   scripts.
 - Real artifacts and real processes; a test that cannot reach its subject is a failure,
-  not a skip. The only skipped-by-default cases are the F17 live E2E and the manual
+  not a skip. The only skipped-by-default cases are the request-body-rules live E2E and the manual
   permission-grant check.
 - Deterministic diagnostics; assertions never depend on third-party wording or
   incidental iteration order.

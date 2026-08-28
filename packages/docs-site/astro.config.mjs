@@ -3,12 +3,31 @@ import { defineConfig } from "astro/config";
 
 // https://starlight.astro.build/reference/configuration/
 export default defineConfig({
+  site: "https://drmaas.github.io/rogatio",
   integrations: [
     starlight({
       title: "Rogatio",
       description:
         "Local-first browser request and response rules — CLI, Chrome extension, and a version-controlled .rogatio.json project file.",
       lastUpdated: true,
+      pagination: true,
+      tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 3 },
+      logo: {
+        src: "./src/assets/logo.svg",
+        alt: "Rogatio",
+      },
+      social: [
+        {
+          icon: "github",
+          label: "GitHub",
+          href: "https://github.com/drmaas/rogatio",
+        },
+      ],
+      editLink: {
+        baseUrl:
+          "https://github.com/drmaas/rogatio/edit/main/packages/docs-site/src/content/docs/",
+      },
+      customCss: ["./src/styles/custom.css"],
       sidebar: [
         {
           label: "Overview",

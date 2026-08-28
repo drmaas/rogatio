@@ -164,17 +164,16 @@ validation workflow before you start.
 ## Documentation
 
 - [`rogatio-overview.md`](rogatio-overview.md) — product and technical overview.
-- [`sequence.md`](sequence.md) — ordered feature sequence and dependencies.
 - [`docs/architecture.md`](docs/architecture.md) — package boundaries and decisions.
-- [`docs/specs/`](docs/specs) and [`docs/plans/`](docs/plans) — per-feature specs and plans.
+- [`docs/specs/`](docs/specs) and [`docs/plans/`](docs/plans) — per-area specs and plans.
 
 The published user documentation site is built from `packages/docs-site` (Astro + Starlight).
 Run it locally with `pnpm --filter @rogatio/docs-site dev`, or build static output with
 `pnpm --filter @rogatio/docs-site build` (emits `packages/docs-site/dist/`, gitignored).
 The static site is deployed to GitHub Pages on every merge to `main` by the
-`Deploy docs site` workflow (F20).
+`Deploy docs site` workflow.
 
-## Release pipeline (F20)
+## Release pipeline
 
 - `Release` runs on merge to `main`, using semantic-release to cut a version, publish
   `@rogatio/cli` to the public npm registry, and attach the unsigned Chrome extension ZIP

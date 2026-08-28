@@ -1,0 +1,99 @@
+/* Rogatio docs — readability & layout polish */
+
+/* More comfortable content column and rhythm */
+:root {
+  --sl-content-width: 52rem;
+  --sl-line-height: 1.72;
+}
+
+/* Friendlier links */
+a {
+  text-underline-offset: 2px;
+}
+
+.page > article {
+  line-height: var(--sl-line-height);
+}
+
+.page > article p,
+.page > article li {
+  line-height: var(--sl-line-height);
+}
+
+/* Headings read tighter than body copy */
+.page h1,
+.page h2,
+.page h3,
+.page h4 {
+  line-height: 1.25;
+}
+
+/* Landing hero */
+.hero {
+  padding-block: 1.5rem 2.5rem;
+}
+
+.hero h1 {
+  background: linear-gradient(95deg, var(--sl-color-text-accent), #0b7285);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero .actions a {
+  font-weight: 600;
+}
+
+/* Cards */
+.card,
+.sl-link-card {
+  border-radius: 0.75rem;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.card:hover,
+.sl-link-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--sl-color-text-accent);
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.35);
+}
+
+/* Inline + block code */
+.page :not(pre) > code {
+  font-size: 0.9em;
+}
+
+.expressive-code .frame,
+:not(.expressive-code) > pre {
+  border-radius: 0.6rem;
+}
+
+/* Tables */
+.page table {
+  font-size: 0.95rem;
+}
+
+.page table th {
+  font-weight: 650;
+}
+
+/* Table of contents */
+.table-of-contents {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Steps read with more breathing room */
+.steps > li + li {
+  margin-top: 1.25rem;
+}
+
+/* Slightly larger mobile nav hit targets */
+@media (max-width: 50rem) {
+  .sidebar {
+    font-size: 1rem;
+  }
+}
