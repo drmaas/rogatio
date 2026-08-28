@@ -63,8 +63,7 @@ export function validateRequestWire(
   }
   const contentLength = parseInt(contentLengthHeader, 10);
   if (
-    Number.
-    isNaN(contentLength) ||
+    Number.isNaN(contentLength) ||
     contentLength < 0 ||
     contentLength > RUNTIME_LIMITS.maxRequestBodyBytes
   ) {
