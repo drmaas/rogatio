@@ -83,7 +83,7 @@ async function prepare(app: ReturnType<typeof createExtensionApplication>) {
   });
 }
 
-describe("F17 request-body metadata integration (future API)", () => {
+describe(" request-body metadata integration (future API)", () => {
   it("copies only explicit safe fields for best-effort diagnostics", async () => {
     const { app, nativeRuntime } = harness();
     await prepare(app);

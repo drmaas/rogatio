@@ -113,7 +113,7 @@ async function connectionInfo(server: RuntimeServer) {
   };
 }
 
-describe("F13 mock serving", () => {
+describe(" mock serving", () => {
   it("serves a configured inline-body response with status, headers, and CORS", async () => {
     const server = await startServer({
       overrides: {
@@ -130,7 +130,7 @@ describe("F13 mock serving", () => {
     const token = info.mocks[0]?.token;
     expect(token).toBeDefined();
     expect(info.mocks[0]?.ruleId).toBe("rule-mock");
-    expect(info.protocol).toBe("f13-v1");
+    expect(info.protocol).toBe("v1");
     expect(info.port).toBe(server.bootstrap.port);
 
     const response = await httpCall(server, `/mock/${token}`);
@@ -142,7 +142,7 @@ describe("F13 mock serving", () => {
   });
 
   it("serves a live UTF-8 file snapshot re-read per request on every platform", async () => {
-    const root = await mkdtemp(join(tmpdir(), "rogatio-f13-"));
+    const root = await mkdtemp(join(tmpdir(), "rogatio-"));
     temporaryRoots.push(root);
     await writeFile(join(root, "data.json"), '{"v":1}', "utf8");
     const server = await startServer({
@@ -168,7 +168,7 @@ describe("F13 mock serving", () => {
   });
 
   it("returns a stable redacted error for an invalid UTF-8 file snapshot", async () => {
-    const root = await mkdtemp(join(tmpdir(), "rogatio-f13-"));
+    const root = await mkdtemp(join(tmpdir(), "rogatio-"));
     temporaryRoots.push(root);
     await writeFile(join(root, "bad.bin"), new Uint8Array([0xff, 0xfe, 0x00]));
     const server = await startServer({

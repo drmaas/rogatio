@@ -10,7 +10,7 @@ function silence(): void {
   vi.spyOn(console, "error").mockImplementation(() => {});
 }
 
-describe("rogatio runtime command (F17)", () => {
+describe("rogatio runtime command ()", () => {
   it("requires explicit extension ID for install", async () => {
     silence();
     const err = vi.spyOn(console, "error");

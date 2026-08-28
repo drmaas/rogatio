@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-describe("F17 scoped proxy integration (future API)", () => {
+describe(" scoped proxy integration (future API)", () => {
   // These tests document the expected proxy behavior with markers, target policy, DNS pinning
 
   it("binds only to 127.0.0.1", () => {
@@ -40,7 +40,7 @@ describe("F17 scoped proxy integration (future API)", () => {
     expect(true).toBe(true);
   });
 
-  it("implements TLS interception via F16 X.509 CA material and injected leaf adapter", () => {
+  it("implements TLS interception via  X.509 CA material and injected leaf adapter", () => {
     // Expect: leaf cert for exact host, CA basic constraints correct
     expect(true).toBe(true);
   });

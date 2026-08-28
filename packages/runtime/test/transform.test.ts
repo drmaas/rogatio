@@ -15,7 +15,7 @@ function input(
   };
 }
 
-describe("F17 request-body transform", () => {
+describe(" request-body transform", () => {
   it("replace mode substitutes the configured UTF-8 body and preserves media type", async () => {
     const result = await rewriteRequestBody(input('{"a":1}'), {
       mode: "replace",

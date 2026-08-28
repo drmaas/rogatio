@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { generatePacScript } from "../src/f14-pac.js";
-import { F14_MAX_PAC_ORIGINS } from "../src/f14-types.js";
+import { generatePacScript } from "../src/pac.js";
+import { MAX_PAC_ORIGINS } from "../src/types.js";
 
 describe("generatePacScript", () => {
   it("is deterministic and sorts origins", () => {
@@ -34,7 +34,7 @@ describe("generatePacScript", () => {
 
   it("throws when origin count exceeds the maximum", () => {
     const origins = Array.from(
-      { length: F14_MAX_PAC_ORIGINS + 1 },
+      { length: MAX_PAC_ORIGINS + 1 },
       (_, index) => `https://origin-${index}.example`,
     );
     expect(() =>

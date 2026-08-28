@@ -41,7 +41,7 @@ const project = {
   ],
 };
 
-describe("F17 request-body compiler", () => {
+describe(" request-body compiler", () => {
   it("emits detached RequestBodyOperation with source order", () => {
     const result = compileProject(project);
     expect(result.ok).toBe(true);

@@ -1,7 +1,7 @@
 import { compileProject } from "@rogatio/compiler";
 import type { RogatioProject } from "@rogatio/schema";
 import { describe, expect, it } from "vitest";
-import { revalidateAuthority } from "../src/f14-revalidate.js";
+import { revalidateAuthority } from "../src/revalidate.js";
 
 function buildProject(overrides: Partial<RogatioProject> = {}): RogatioProject {
   return {

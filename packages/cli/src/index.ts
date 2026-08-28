@@ -115,7 +115,7 @@ Commands:
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
   runtime <start|stop|status|install|trust|untrust|uninstall>  Native messaging runtime and request-body trust control
-  runtime [path]  Start the mock runtime server (F13)
+  runtime [path]  Start the mock runtime server ()
 
 Global Options:
   --help, -h      Show help
@@ -165,7 +165,7 @@ function showRuntimeHelp(): void {
        rogatio runtime [options] [path]
 
 Native messaging runtime control for response-body and request-body rules, or
-start the local mock runtime for F13 mock rules.
+start the local mock runtime for  mock rules.
 
 Native runtime commands:
   start     Start the runtime (capability-gated; explicit, no auto-start)

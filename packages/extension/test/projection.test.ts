@@ -83,7 +83,7 @@ describe("F7 matcher projection", () => {
     ).toThrowError("extension.invalid-operation");
   });
 
-  it("builds an installable DNR rule for a query action (F10)", () => {
+  it("builds an installable DNR rule for a query action ()", () => {
     const result = projectMatchers([queryOperation]);
 
     expect(result).toHaveLength(1);

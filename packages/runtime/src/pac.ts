@@ -1,5 +1,5 @@
 import { normalizeSiteOrigin } from "@rogatio/schema";
-import { F14_MAX_PAC_ORIGINS } from "./f14-types.js";
+import { MAX_PAC_ORIGINS } from "./types.js";
 
 export interface PacEndpoint {
   readonly host: string;
@@ -14,7 +14,7 @@ export interface PacOptions {
  * Generate a deterministic Chrome PAC script for the given site origins.
  * Origins are validated, deduplicated, and sorted so output is stable
  * (spec REQ-025..REQ-027). Invalid origins are dropped; more than
- * F14_MAX_PAC_ORIGINS distinct origins throws.
+ * MAX_PAC_ORIGINS distinct origins throws.
  */
 export function generatePacScript(
   origins: readonly string[],
@@ -32,7 +32,7 @@ export function generatePacScript(
   }
 
   const unique = Array.from(new Set(valid)).sort();
-  if (unique.length > F14_MAX_PAC_ORIGINS) {
+  if (unique.length > MAX_PAC_ORIGINS) {
     throw new Error("pac origin count exceeds maximum");
   }
 

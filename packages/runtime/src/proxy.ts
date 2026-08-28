@@ -1,6 +1,6 @@
 import { failure } from "./errors.js";
-import { resolveAndPin, validateTargetUrl } from "./f17-target.js";
-import { buildForwardHeaders, validateRequestWire } from "./f17-wire.js";
+import { resolveAndPin, validateTargetUrl } from "./target.js";
+import { buildForwardHeaders, validateRequestWire } from "./wire.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import type { RuntimeResult } from "./types.js";
 

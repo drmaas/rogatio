@@ -7,11 +7,11 @@ import { readProject } from "../../packages/cli/src/utils/file.js";
 
 const validProject = {
   version: 1,
-  name: "F18 edit project",
+  name: " edit project",
   groups: [],
 };
 
-describe("F18 real CLI edit server", () => {
+describe(" real CLI edit server", () => {
   let temp: string | undefined;
 
   afterEach(async () => {
@@ -20,7 +20,7 @@ describe("F18 real CLI edit server", () => {
   });
 
   it("serves, validates, saves, and cancels over real HTTP", async () => {
-    temp = await mkdtemp(join(tmpdir(), "rogatio-f18-edit-"));
+    temp = await mkdtemp(join(tmpdir(), "rogatio-edit-"));
     const projectPath = join(temp, ".rogatio.json");
     await writeFile(projectPath, JSON.stringify(validProject));
 
@@ -56,7 +56,7 @@ describe("F18 real CLI edit server", () => {
       });
       expect(denied.status).toBe(403);
 
-      const changed = { ...validProject, name: "Saved by F18" };
+      const changed = { ...validProject, name: "Saved by" };
       const validation = await fetch(`${serverUrl}/api/validate`, {
         method: "POST",
         headers: { "content-type": "application/json", "x-csrf-token": csrf },
@@ -80,7 +80,7 @@ describe("F18 real CLI edit server", () => {
       });
       expect(cancelled.status).toBe(200);
       await expect(result.exitCode).resolves.toBe(0);
-      expect(await readFile(projectPath, "utf8")).toContain("Saved by F18");
+      expect(await readFile(projectPath, "utf8")).toContain("Saved by");
     } finally {
       result.shutdown();
       await result.exitCode;

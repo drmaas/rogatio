@@ -44,7 +44,7 @@ const project = {
   ],
 };
 
-describe("F17 extension policy construction (future API)", () => {
+describe(" extension policy construction (future API)", () => {
   it("builds policy from committed project state, enabled groups, granted origins, exact local origins, explicit extension ID", async () => {
     const result = compileProject(project);
     expect(result.ok).toBe(true);
@@ -80,7 +80,7 @@ describe("F17 extension policy construction (future API)", () => {
     // Canonical policy bytes must use fixed key ordering, deterministic set ordering, compact UTF-8 JSON
     // Digest must be sha256:<64 lowercase hex>
     // Must cover: extension ID, project identity/revision, enabled groups, grants, local origins,
-    // operations, action data, matchers, source order, F17 limits
+    // operations, action data, matchers, source order,  limits
     // Session nonce, timestamps, capabilities, native frame segmentation must not affect digest
     const result = compileProject(project);
     expect(result.ok).toBe(true);

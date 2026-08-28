@@ -18,7 +18,7 @@ export enum NativeFrameType {
 }
 
 export interface NativeFrame {
-  readonly protocol: "f17-v1";
+  readonly protocol: "v1";
   readonly type: NativeFrameType;
   readonly requestId?: string;
   readonly extensionId?: string;
@@ -62,7 +62,7 @@ export function decodeNativeFrame(
       buffer.slice(4),
     );
     const frame = JSON.parse(json) as NativeFrame;
-    if (frame.protocol !== "f17-v1") {
+    if (frame.protocol !== "v1") {
       return failure("runtime.native-frame-invalid-protocol");
     }
     return { ok: true, value: frame };

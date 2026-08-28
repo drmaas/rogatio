@@ -24,7 +24,7 @@ export interface RequestBodyPolicyOperation {
 }
 
 export interface RequestBodyPolicyV1 {
-  readonly protocol: "f17-v1";
+  readonly protocol: "v1";
   readonly version: 1;
   readonly extensionId: string;
   readonly projectId: string;
@@ -134,7 +134,7 @@ export function validateRequestBodyPolicy(
   }
   const p = policy as Record<string, unknown>;
 
-  if (p.protocol !== "f17-v1") {
+  if (p.protocol !== "v1") {
     return failure("runtime.request-body-policy-invalid");
   }
   if (p.version !== 1) {

@@ -135,7 +135,7 @@ describe("F7 extension application", () => {
     });
   });
 
-  it("installs enabled query rules after permissions are granted (F10/F18)", async () => {
+  it("installs enabled query rules after permissions are granted (/)", async () => {
     const { options, install } = harnessOptions();
     const app = createExtensionApplication({
       ...options,

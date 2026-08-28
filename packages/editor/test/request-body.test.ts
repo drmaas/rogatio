@@ -1,7 +1,7 @@
 import { createRequestBodyRuleType } from "@rogatio/editor";
 import { describe, expect, it } from "vitest";
 
-describe("F17 request-body editor extension", () => {
+describe(" request-body editor extension", () => {
   it("is selectable and validates replace mode", () => {
     const extension = createRequestBodyRuleType();
     expect(extension.id).toBe("request-body");

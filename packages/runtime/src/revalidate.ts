@@ -6,9 +6,9 @@ import {
 } from "@rogatio/schema";
 import type {
   AuthorityDecision,
-  F14RevalidationRequest,
+  RevalidationRequest,
   RogatioProject,
-} from "./f14-types.js";
+} from "./types.js";
 import { snapshotOwnData } from "./snapshot.js";
 
 function originOf(value: string): string | null {
@@ -39,7 +39,7 @@ function projectHasRule(
 export function revalidateAuthority(
   project: unknown,
   operations: readonly RogatioOperation[],
-  request: F14RevalidationRequest,
+  request: RevalidationRequest,
 ): AuthorityDecision {
   const projectSnap = snapshotOwnData(project);
   if (!projectSnap.valid) return { allowed: false, reason: "project-invalid" };

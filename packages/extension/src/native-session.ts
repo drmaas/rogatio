@@ -69,7 +69,7 @@ export async function buildNativePolicy(
       op.kind === "mock",
   );
   const policy = {
-    protocol: "f17-v1",
+    protocol: "v1",
     version: 1,
     extensionId,
     project: schemaResult.data,

@@ -8,7 +8,7 @@ import {
 } from "../src/index.js";
 import { makeGrant, makePresetInput } from "./helpers.js";
 
-describe("F15 response-body transformation", () => {
+describe(" response-body transformation", () => {
   it("applies replacements globally and in order", async () => {
     const result = await rewriteResponseBody(
       {

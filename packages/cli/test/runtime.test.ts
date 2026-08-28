@@ -40,7 +40,7 @@ async function httpJson(
   return { status: response.status, body: await response.text() };
 }
 
-describe("rogatio runtime command (F13)", () => {
+describe("rogatio runtime command ()", () => {
   let testDir: string;
 
   beforeEach(async () => {
@@ -72,7 +72,7 @@ describe("rogatio runtime command (F13)", () => {
       protocol: string;
       mocks: Array<{ ruleId: string; token: string }>;
     };
-    expect(info.protocol).toBe("f13-v1");
+    expect(info.protocol).toBe("v1");
     const token = info.mocks[0]?.token;
     expect(token).toBeDefined();
 

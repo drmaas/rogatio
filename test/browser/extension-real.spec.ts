@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { chromium, expect, test } from "@playwright/test";
 
 async function extensionContext() {
-  const profile = await mkdtemp(join(tmpdir(), "rogatio-f18-browser-"));
+  const profile = await mkdtemp(join(tmpdir(), "rogatio-browser-"));
   const extensionPath = join(process.cwd(), "packages/extension/dist");
   const digest = createHash("sha256").update(extensionPath).digest();
   let extensionId = "";

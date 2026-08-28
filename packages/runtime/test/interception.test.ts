@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  createF15InterceptionProvider,
-  createUnsupportedF15Provider,
-  type F15InterceptionAdapter,
-} from "../src/f15-interception.js";
+  createPlatformInterceptionProvider,
+  createUnsupportedPlatformProvider,
+  type PlatformInterceptionAdapter,
+} from "../src/interception.js";
 
-function adapter(overrides: Partial<F15InterceptionAdapter> = {}) {
+function adapter(overrides: Partial<PlatformInterceptionAdapter> = {}) {
   return {
     platform: "test",
     detect: () => ({
@@ -23,7 +23,7 @@ function adapter(overrides: Partial<F15InterceptionAdapter> = {}) {
     startTlsProxy: vi.fn(async () => undefined),
     stopTlsProxy: vi.fn(async () => undefined),
     ...overrides,
-  } satisfies F15InterceptionAdapter;
+  } satisfies PlatformInterceptionAdapter;
 }
 
 const activation = {
@@ -33,10 +33,10 @@ const activation = {
   proxy: { host: "127.0.0.1", port: 8443 },
 };
 
-describe("F15 interception provider", () => {
+describe(" interception provider", () => {
   it("requires capability and explicit start, then removes PAC on stop", async () => {
     const platform = adapter();
-    const provider = createF15InterceptionProvider(platform);
+    const provider = createPlatformInterceptionProvider(platform);
 
     expect(provider.status()).toBe("stopped");
     expect(provider.detect()).toEqual({ supported: true, reasons: [] });
@@ -58,7 +58,7 @@ describe("F15 interception provider", () => {
         throw new Error("platform failure");
       }),
     });
-    const provider = createF15InterceptionProvider(platform);
+    const provider = createPlatformInterceptionProvider(platform);
 
     await expect(
       provider.start(activation, ["https://example.com"]),
@@ -79,7 +79,7 @@ describe("F15 interception provider", () => {
         enterprisePolicy: false,
       }),
     });
-    const provider = createF15InterceptionProvider(platform);
+    const provider = createPlatformInterceptionProvider(platform);
 
     expect(provider.detect()).toEqual({
       supported: false,
@@ -94,7 +94,7 @@ describe("F15 interception provider", () => {
   });
 
   it("provides an unsupported default provider", () => {
-    const provider = createUnsupportedF15Provider();
+    const provider = createUnsupportedPlatformProvider();
     expect(provider.detect()).toEqual({
       supported: false,
       reasons: ["device-local-ca-untrusted", "no-platform-adapter"],
