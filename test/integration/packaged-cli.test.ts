@@ -35,11 +35,11 @@ async function run(command: string, args: string[], cwd: string) {
   }
 }
 
-describe("F18 packaged CLI integration", () => {
+describe(" packaged CLI integration", () => {
   it("packs, installs offline, and executes the real CLI binary", async () => {
     const build = await run(pnpm, ["build"], root);
     expect(build.code, build.stderr).toBe(0);
-    const temp = await mkdtemp(join(tmpdir(), "rogatio-f18-packaged-"));
+    const temp = await mkdtemp(join(tmpdir(), "rogatio-packaged-"));
     const tarballs = join(temp, "tarballs");
     const consumer = join(temp, "consumer");
     try {

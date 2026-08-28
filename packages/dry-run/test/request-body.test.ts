@@ -53,7 +53,7 @@ function getOperations(): readonly RogatioOperation[] {
   return compiled.operations;
 }
 
-describe("F17 request-body dry-run behavior (future API)", () => {
+describe(" request-body dry-run behavior (future API)", () => {
   const operations = getOperations();
 
   it("compiles request-body operations with correct structure", () => {
@@ -89,8 +89,8 @@ describe("F17 request-body dry-run behavior (future API)", () => {
   });
 
   // Note: Current dryRunProject only accepts MatcherOperation[].
-  // F17 requires shared arbitration in dry-run which will need either:
+  //  requires shared arbitration in dry-run which will need either:
   // 1. An additive dry-run contract accepting RogatioOperation[]
-  // 2. Or explicit limitation of F17 dry-run evidence to compiler/CLI selector checks
+  // 2. Or explicit limitation of  dry-run evidence to compiler/CLI selector checks
   // This test documents the expected behavior for when the contract is extended.
 });

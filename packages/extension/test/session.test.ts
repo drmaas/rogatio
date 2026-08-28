@@ -75,7 +75,7 @@ async function prepare(app: ReturnType<typeof createExtensionApplication>) {
   });
 }
 
-describe("F17 request-body extension session (future API)", () => {
+describe(" request-body extension session (future API)", () => {
   it("serializes start, stop, policy replacement, permission changes, PAC changes, marker installation", async () => {
     const { app } = harness();
     await prepare(app);

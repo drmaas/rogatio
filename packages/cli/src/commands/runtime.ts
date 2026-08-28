@@ -28,7 +28,7 @@ function showRuntimeHelp(): void {
        rogatio runtime [options] [path]
 
 Native messaging runtime control for response-body and request-body rules, or
-start the local mock runtime for F13 mock rules.
+start the local mock runtime for  mock rules.
 
 Native runtime commands:
   start     Start the runtime (capability-gated; explicit, no auto-start)

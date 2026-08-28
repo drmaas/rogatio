@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   containsBodyKey,
-  F14EnvelopeError,
+  EnvelopeError,
   parseEnvelope,
   serializeEnvelope,
-} from "../src/f14-envelope.js";
-import { F14_ENVELOPE_MAX_BYTES, F14_PROTOCOL } from "../src/f14-types.js";
+} from "../src/envelope.js";
+import { ENVELOPE_MAX_BYTES, PROTOCOL } from "../src/types.js";
 
-describe("f14 envelope body exclusion", () => {
+describe("envelope body exclusion", () => {
   it("rejects a top-level body key", () => {
     expect(() =>
       serializeEnvelope({ type: "transform.request", metadata: { body: "x" } }),
-    ).toThrow(F14EnvelopeError);
+    ).toThrow(EnvelopeError);
   });
 
   it("rejects a nested requestBody key at any depth", () => {
@@ -20,7 +20,7 @@ describe("f14 envelope body exclusion", () => {
         type: "transform.request",
         metadata: { a: { b: { requestBody: "x" } } },
       }),
-    ).toThrow(F14EnvelopeError);
+    ).toThrow(EnvelopeError);
   });
 
   it("rejects a nested responseBody key", () => {
@@ -30,7 +30,7 @@ describe("f14 envelope body exclusion", () => {
         type: "transform.request",
         metadata: { responseBody: 1 },
       }),
-    ).toThrow(F14EnvelopeError);
+    ).toThrow(EnvelopeError);
   });
 
   it("allows metadata without body content", () => {
@@ -40,7 +40,7 @@ describe("f14 envelope body exclusion", () => {
   });
 });
 
-describe("f14 envelope round-trip and determinism", () => {
+describe("envelope round-trip and determinism", () => {
   it("round-trips a parsed envelope", () => {
     const json = serializeEnvelope({
       type: "runtime.start",
@@ -49,7 +49,7 @@ describe("f14 envelope round-trip and determinism", () => {
       metadata: { groupId: "g1" },
     });
     const parsed = parseEnvelope(json);
-    expect(parsed.protocol).toBe(F14_PROTOCOL);
+    expect(parsed.protocol).toBe(PROTOCOL);
     expect(parsed.type).toBe("runtime.start");
     expect(parsed.requestId).toBe("abc");
     expect(parsed.timestamp).toBe(123);
@@ -65,14 +65,14 @@ describe("f14 envelope round-trip and determinism", () => {
   });
 
   it("rejects envelopes over the size limit", () => {
-    const big = "x".repeat(F14_ENVELOPE_MAX_BYTES + 10);
+    const big = "x".repeat(ENVELOPE_MAX_BYTES + 10);
     expect(() =>
       serializeEnvelope({ type: "transform.result", metadata: { data: big } }),
-    ).toThrow(F14EnvelopeError);
+    ).toThrow(EnvelopeError);
   });
 
   it("rejects malformed JSON", () => {
-    expect(() => parseEnvelope("{not json")).toThrow(F14EnvelopeError);
+    expect(() => parseEnvelope("{not json")).toThrow(EnvelopeError);
   });
 
   it("rejects an unknown protocol", () => {
@@ -80,6 +80,6 @@ describe("f14 envelope round-trip and determinism", () => {
       parseEnvelope(
         '{"protocol":"wrong","type":"runtime.status","metadata":{}}',
       ),
-    ).toThrow(F14EnvelopeError);
+    ).toThrow(EnvelopeError);
   });
 });

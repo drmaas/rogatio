@@ -25,13 +25,13 @@ declare global {
 // - No controlling proxy/PAC/extension/enterprise collision
 // - Non-incognito Chrome
 //
-// Run with: F17_LIVE_E2E=1 pnpm test:browser
+// Run with: LIVE_E2E=1 pnpm test:browser
 
-const LIVE_E2E = process.env.F17_LIVE_E2E === "1";
+const LIVE_E2E = process.env.LIVE_E2E === "1";
 
-(LIVE_E2E ? test : test.skip)("F17 request-body live E2E", async ({ page }) => {
+(LIVE_E2E ? test : test.skip)(" request-body live E2E", async ({ page }) => {
   // 1. Navigate to test page
-  await page.goto("https://example.test/f17-test-page");
+  await page.goto("https://example.test/test-page");
 
   // 2. Verify native messaging connection
   const nativeConnected = await page.evaluate(() => {
@@ -88,7 +88,7 @@ const LIVE_E2E = process.env.F17_LIVE_E2E === "1";
 });
 
 (LIVE_E2E ? test : test.skip)(
-  "F17 ordinary MV3 manifest and session path",
+  " ordinary MV3 manifest and session path",
   async ({ page }) => {
     // Verify manifest requests no webRequestBlocking
     const manifest = await page.evaluate(() => {
@@ -116,7 +116,7 @@ const LIVE_E2E = process.env.F17_LIVE_E2E === "1";
 );
 
 (LIVE_E2E ? test : test.skip)(
-  "F17 missing-marker pass-through and malformed-reserved-marker blocking",
+  " missing-marker pass-through and malformed-reserved-marker blocking",
   async ({ page }) => {
     // Make a routed-origin request without a body marker
     // Should forward unchanged (ordinary MV3 compromise)

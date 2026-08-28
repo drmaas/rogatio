@@ -64,7 +64,7 @@ function makeProject(): RogatioOperation[] {
   return [...result.operations];
 }
 
-describe("F17 global selector (compiler helper)", () => {
+describe(" global selector (compiler helper)", () => {
   let operations: RogatioOperation[];
 
   beforeAll(() => {

@@ -1,7 +1,7 @@
-import type { MatcherOperation } from "@rogatio/compiler";
-import type { HttpMethod } from "@rogatio/schema";
+import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
+import type { HttpMethod, ResourceType, RogatioProject } from "@rogatio/schema";
 
-export const RUNTIME_PROTOCOL = "f6-v1" as const;
+export const RUNTIME_PROTOCOL = "v1" as const;
 
 export type RuntimeOperationKind = "outbound-http" | "confined-file";
 export type PresetDigest = `sha256:${string}`;
@@ -65,7 +65,7 @@ export interface RuntimePresetV1 {
 }
 
 export interface MockConnectionInfo {
-  readonly protocol: "f13-v1";
+  readonly protocol: "v1";
   readonly port: number;
   readonly presetDigest: PresetDigest;
   readonly mocks: readonly {
@@ -252,3 +252,87 @@ export interface RuntimeError {
 export type RuntimeResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: RuntimeError };
+
+export const PROTOCOL = "v1" as const;
+
+/** Maximum serialized envelope size in bytes (spec REQ-009). */
+export const ENVELOPE_MAX_BYTES = 64 * 1024;
+
+/** Maximum distinct PAC origins per generated script (spec REQ-027). */
+export const MAX_PAC_ORIGINS = 256;
+
+/** Maximum concurrent body transforms (spec REQ-013). */
+export const MAX_CONCURRENT_TRANSFORMS = 32;
+
+/** Revalidation interval in milliseconds (spec REQ-024). */
+export const REVALIDATION_INTERVAL_MS = 5_000;
+
+export type NativeRuntimeState =
+  | "idle"
+  | "starting"
+  | "running"
+  | "stopping"
+  | "stopped"
+  | "unsupported";
+
+export type AuthorityDenyReason =
+  | "project-invalid"
+  | "operation-unknown"
+  | "project-inconsistent"
+  | "url-mismatch"
+  | "target-unauthorized"
+  | "initiator-unauthorized"
+  | "method-mismatch"
+  | "resource-type-unauthorized";
+
+export interface RevalidationRequest {
+  readonly groupId: string;
+  readonly ruleId: string;
+  readonly url: string;
+  readonly method?: string;
+  readonly resourceType?: string;
+  readonly initiator?: string;
+  readonly target?: string;
+}
+
+export interface AuthorityDecisionAllowed {
+  readonly allowed: true;
+  readonly groupId: string;
+  readonly ruleId: string;
+  readonly operation: RogatioOperation;
+}
+
+export interface AuthorityDecisionDenied {
+  readonly allowed: false;
+  readonly reason: AuthorityDenyReason;
+}
+
+export type AuthorityDecision =
+  | AuthorityDecisionAllowed
+  | AuthorityDecisionDenied;
+
+export type EnvelopeMessageType =
+  | "runtime.start"
+  | "runtime.stop"
+  | "runtime.status"
+  | "authority.grant"
+  | "authority.revoke"
+  | "transform.request"
+  | "transform.result";
+
+export interface Envelope {
+  readonly protocol: typeof PROTOCOL;
+  readonly type: EnvelopeMessageType;
+  readonly requestId?: string;
+  readonly timestamp?: number;
+  readonly metadata: Readonly<Record<string, unknown>>;
+}
+
+export interface EnvelopeInput {
+  readonly type: EnvelopeMessageType;
+  readonly requestId?: string;
+  readonly timestamp?: number;
+  readonly metadata: Record<string, unknown>;
+}
+
+export type { HttpMethod, ResourceType, RogatioOperation, RogatioProject };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createNativeRuntimeController } from "../src/f14-lifecycle.js";
+import { createNativeRuntimeController } from "../src/lifecycle.js";
 
 describe("createNativeRuntimeController", () => {
   it("does not auto-start; begins idle", () => {

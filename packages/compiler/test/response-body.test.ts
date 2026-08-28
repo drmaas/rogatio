@@ -30,7 +30,7 @@ const project = {
   ],
 };
 
-describe("F15 response-body compiler", () => {
+describe(" response-body compiler", () => {
   it("emits a deterministic ResponseBodyOperation", () => {
     const result = compileProject(project);
     expect(result.ok).toBe(true);

@@ -6,8 +6,8 @@ import {
   createRequestBodyTrustController,
   defaultTrustInstallRoot,
   detectTrustCapabilities,
-  F16_TRUST_LIMITS,
   generateNativeMessagingManifest,
+  TRUST_LIMITS,
   TrustError,
 } from "../src/index.js";
 
@@ -17,7 +17,7 @@ const ORIGIN_B = "chrome-extension://abcdefghijklmnopponmlkjihgfedcba/";
 let root: string;
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "rogatio-f16-"));
+  root = await mkdtemp(join(tmpdir(), "rogatio-"));
 });
 
 afterEach(async () => {
@@ -28,7 +28,7 @@ function capable(): { manifest: true; caTrust: true; reasons: string[] } {
   return { manifest: true, caTrust: true, reasons: [] };
 }
 
-describe("F16 manifest generation", () => {
+describe(" manifest generation", () => {
   it("returns the fixed shape with sorted, de-duplicated origins", () => {
     const manifest = generateNativeMessagingManifest(
       join(root, "runtime-host"),
@@ -89,7 +89,7 @@ describe("F16 manifest generation", () => {
   });
 });
 
-describe("F16 capability detection", () => {
+describe(" capability detection", () => {
   it("is pure and returns a negative default", () => {
     const caps = detectTrustCapabilities();
     expect(caps).toEqual({
@@ -105,7 +105,7 @@ describe("F16 capability detection", () => {
   });
 });
 
-describe("F16 trust controller lifecycle", () => {
+describe(" trust controller lifecycle", () => {
   it("installs the manifest only where capable and is idempotent", async () => {
     const controller = createRequestBodyTrustController({
       installRoot: root,
@@ -232,11 +232,11 @@ describe("F16 trust controller lifecycle", () => {
   });
 });
 
-describe("F16 scope and limits", () => {
+describe(" scope and limits", () => {
   it("exposes an immutable limit profile", () => {
-    expect(F16_TRUST_LIMITS.manifestMaxBytes).toBe(4096);
-    expect(F16_TRUST_LIMITS.maxAllowedOrigins).toBe(64);
-    expect(F16_TRUST_LIMITS.caKeyBits).toBeGreaterThanOrEqual(2048);
+    expect(TRUST_LIMITS.manifestMaxBytes).toBe(4096);
+    expect(TRUST_LIMITS.maxAllowedOrigins).toBe(64);
+    expect(TRUST_LIMITS.caKeyBits).toBeGreaterThanOrEqual(2048);
   });
 
   it("rejects more than the maximum allowed origins", () => {

@@ -27,7 +27,7 @@ const base = {
   responseBody: { replacements: [{ pattern: "old", replacement: "new" }] },
 };
 
-describe("F15 response-body schema", () => {
+describe(" response-body schema", () => {
   it("accepts an ordered replacement list", () =>
     expect(validateProjectDetailed(project(base)).valid).toBe(true));
   it.each([

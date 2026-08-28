@@ -60,7 +60,7 @@ describe("@rogatio/editor URL conversion", () => {
   });
 });
 
-describe("@rogatio/editor query rule type (F10)", () => {
+describe("@rogatio/editor query rule type ()", () => {
   const rulePath = "/groups/0/rules/0";
 
   it("registers the query rule type as a built-in extension", () => {

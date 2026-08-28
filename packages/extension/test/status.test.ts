@@ -76,7 +76,7 @@ async function prepare(app: ReturnType<typeof createExtensionApplication>) {
   });
 }
 
-describe("F17 request-body extension status", () => {
+describe(" request-body extension status", () => {
   it("reports needs proxy before explicit start and active after start", async () => {
     const { app, nativeRuntime } = harness();
     await prepare(app);

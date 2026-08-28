@@ -44,7 +44,7 @@ const baseRegex = {
   },
 };
 
-describe("F17 request-body browser schema", () => {
+describe(" request-body browser schema", () => {
   it("accepts a valid replace action", () =>
     expect(validateProjectDetailed(project(baseReplace)).valid).toBe(true));
 

@@ -3,8 +3,8 @@ import {
   type SessionProvider,
   startInterception,
   stopInterception,
-} from "./f14-interception.js";
-import type { NativeRuntimeState } from "./f14-types.js";
+} from "./interception.js";
+import type { NativeRuntimeState } from "./types.js";
 
 export interface CapabilityProfile {
   readonly supported: boolean;

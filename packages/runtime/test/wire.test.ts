@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-describe("F17 raw HTTP/1.1 wire validation (future API)", () => {
+describe(" raw HTTP/1.1 wire validation (future API)", () => {
   // These tests document the expected wire-level validation behavior
 
   it("requires HTTP/1.1 and ALPN http/1.1 only", () => {

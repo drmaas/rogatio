@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-describe("F17 request-body policy (future API)", () => {
+describe(" request-body policy (future API)", () => {
   // These tests document the expected policy validation behavior
-  // The actual policy validation functions will be added in f17-policy.ts
+  // The actual policy validation functions will be added in policy.ts
 
   it("will validate policy structure including extension ID", () => {
     // Expect: validatePolicy(policy) -> RuntimeResult<ValidatedPolicy>
@@ -66,7 +66,7 @@ describe("F17 request-body policy (future API)", () => {
   });
 });
 
-describe("F17 native protocol framing (future API)", () => {
+describe(" native protocol framing (future API)", () => {
   // These tests document the expected native messaging framing behavior
 
   it("will use Chrome framing: 4-byte little-endian payload length + UTF-8 JSON", () => {

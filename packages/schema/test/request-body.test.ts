@@ -44,7 +44,7 @@ const baseRegex = {
   },
 };
 
-describe("F17 request-body schema", () => {
+describe(" request-body schema", () => {
   it("accepts a valid replace action", () =>
     expect(validateProjectDetailed(project(baseReplace)).valid).toBe(true));
 
@@ -225,7 +225,7 @@ describe("F17 request-body schema", () => {
     expect(validateProjectDetailed(p).valid).toBe(false);
   });
 
-  it("preserves existing project validity without F17 fields", () => {
+  it("preserves existing project validity without  fields", () => {
     const legacy = {
       version: 1,
       name: "Legacy",

@@ -19,7 +19,7 @@ function asRecord(rule: Record<string, unknown>): Record<string, unknown> {
   return rule;
 }
 
-describe("@rogatio/editor mock rule type (F13)", () => {
+describe("@rogatio/editor mock rule type ()", () => {
   it("registers the mock rule type as a built-in extension", () => {
     expect(builtInRuleTypes.map((e) => e.id)).toContain("mock");
   });

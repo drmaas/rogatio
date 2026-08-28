@@ -5,10 +5,10 @@ import {
   exportPrivateKey,
   exportPublicKey,
   generateCaKeyPair,
-} from "./f16-x509.js";
+} from "./x509.js";
 
-/** Immutable F16 trust-limit profile (spec REQ-021). */
-export const F16_TRUST_LIMITS = {
+/** Immutable  trust-limit profile (spec REQ-021). */
+export const TRUST_LIMITS = {
   manifestMaxBytes: 4096,
   maxAllowedOrigins: 64,
   caKeyBits: 2048,
@@ -52,7 +52,7 @@ export interface TrustStatus {
   readonly capabilityReasons: readonly string[];
 }
 
-export type F16ErrorCode =
+export type ErrorCode =
   | "trust.unsupported"
   | "trust.invalid-manifest"
   | "trust.invalid-host-path"
@@ -62,10 +62,10 @@ export type F16ErrorCode =
   | "trust.internal";
 
 export class TrustError extends Error {
-  readonly code: F16ErrorCode;
+  readonly code: ErrorCode;
   readonly reasons: readonly string[];
   constructor(
-    code: F16ErrorCode,
+    code: ErrorCode,
     message: string,
     reasons: readonly string[] = [],
   ) {
@@ -117,7 +117,7 @@ export function generateNativeMessagingManifest(
       "allowed_origins must be an array",
     );
   }
-  if (allowedOrigins.length > F16_TRUST_LIMITS.maxAllowedOrigins) {
+  if (allowedOrigins.length > TRUST_LIMITS.maxAllowedOrigins) {
     throw new TrustError(
       "trust.invalid-manifest",
       "allowed_origins exceeds the configured maximum",
@@ -210,7 +210,7 @@ async function existsFile(path: string): Promise<boolean> {
   }
 }
 
-function codeOf(error: unknown, fallback: F16ErrorCode): F16ErrorCode {
+function codeOf(error: unknown, fallback: ErrorCode): ErrorCode {
   return error instanceof TrustError ? error.code : fallback;
 }
 
@@ -277,7 +277,7 @@ export function createRequestBodyTrustController(
       };
     }
     const data = JSON.stringify(manifest, null, 2);
-    if (data.length > F16_TRUST_LIMITS.manifestMaxBytes) {
+    if (data.length > TRUST_LIMITS.manifestMaxBytes) {
       return {
         ok: false,
         state: "unsupported",
@@ -317,7 +317,7 @@ export function createRequestBodyTrustController(
     try {
       if (!(await existsFile(caKeyFile)) || !(await existsFile(caCertFile))) {
         const { privateKey, publicKey } = generateCaKeyPair(
-          F16_TRUST_LIMITS.caKeyBits,
+          TRUST_LIMITS.caKeyBits,
         );
         const _privateKeyPem = exportPrivateKey(privateKey);
         const _pubPem = exportPublicKey(publicKey);
@@ -326,7 +326,7 @@ export function createRequestBodyTrustController(
         const certResult = createCertificate(
           "CN=Rogatio Request-Body CA",
           privateKey,
-          F16_TRUST_LIMITS.caValidityDays,
+          TRUST_LIMITS.caValidityDays,
         );
         const certPem = certResult.certPem;
         const certKeyPem = certResult.keyPem;

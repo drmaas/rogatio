@@ -123,7 +123,7 @@ async function prepareMockProject(app: {
   });
 }
 
-describe("F13 mock projection", () => {
+describe(" mock projection", () => {
   it("projects a mock operation as installable with the matcher preserved", () => {
     const result = projectMatchers([mockOp]);
     expect(result).toHaveLength(1);
@@ -138,7 +138,7 @@ describe("F13 mock projection", () => {
   });
 });
 
-describe("F13 mock DNR translation", () => {
+describe(" mock DNR translation", () => {
   it("translates a mock operation to a DNR redirect rule at the mock URL", () => {
     const rule = translateMockToDnr(
       mockOp,
@@ -210,7 +210,7 @@ describe("F13 mock DNR translation", () => {
   });
 });
 
-describe("F13 extension mock runtime status and check-and-connect", () => {
+describe(" extension mock runtime status and check-and-connect", () => {
   it("reports enabled mock rules as needs proxy while the runtime is not connected", async () => {
     const { app } = harness(null);
     await prepareMockProject(app);
@@ -226,7 +226,7 @@ describe("F13 extension mock runtime status and check-and-connect", () => {
 
   it("connects on check-mock-runtime and reports mock rules active", async () => {
     const connection: MockConnection = {
-      protocol: "f13-v1",
+      protocol: "v1",
       port: 8890,
       presetDigest: "sha256:abc",
       mocks: [{ ruleId: "rule-mock", token: "tok1" }],
@@ -285,7 +285,7 @@ describe("F13 extension mock runtime status and check-and-connect", () => {
 
   it("reports a stable error when connected but the runtime lacks a token for the rule", async () => {
     const connection: MockConnection = {
-      protocol: "f13-v1",
+      protocol: "v1",
       port: 8890,
       presetDigest: "sha256:abc",
       mocks: [],

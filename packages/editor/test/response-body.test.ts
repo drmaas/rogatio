@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createResponseBodyRuleType } from "../src/index.js";
 
-describe("F15 response-body editor extension", () => {
+describe(" response-body editor extension", () => {
   it("is selectable and validates ordered replacements", () => {
     const extension = createResponseBodyRuleType();
     expect(extension.id).toBe("response-body");

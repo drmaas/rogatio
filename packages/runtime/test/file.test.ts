@@ -26,7 +26,7 @@ afterEach(async () => {
 });
 
 async function makeRoot() {
-  const root = await mkdtemp(join(tmpdir(), "rogatio-f6-"));
+  const root = await mkdtemp(join(tmpdir(), "rogatio-"));
   temporaryRoots.push(root);
   return root;
 }

@@ -4,12 +4,12 @@ import {
   normalizeSiteOrigin,
   type ResourceType,
 } from "@rogatio/schema";
+import { snapshotOwnData } from "./snapshot.js";
 import type {
   AuthorityDecision,
-  F14RevalidationRequest,
+  RevalidationRequest,
   RogatioProject,
-} from "./f14-types.js";
-import { snapshotOwnData } from "./snapshot.js";
+} from "./types.js";
 
 function originOf(value: string): string | null {
   const direct = normalizeSiteOrigin(value);
@@ -39,7 +39,7 @@ function projectHasRule(
 export function revalidateAuthority(
   project: unknown,
   operations: readonly RogatioOperation[],
-  request: F14RevalidationRequest,
+  request: RevalidationRequest,
 ): AuthorityDecision {
   const projectSnap = snapshotOwnData(project);
   if (!projectSnap.valid) return { allowed: false, reason: "project-invalid" };

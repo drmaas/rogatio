@@ -36,7 +36,7 @@ import type {
 const PAIR_PATH = "/v1/pair";
 const AUTHORIZE_PATH = "/v1/authorize";
 const CONNECTION_PATH = "/v1/connection";
-const MOCK_PROTOCOL = "f13-v1";
+const MOCK_PROTOCOL = "v1";
 
 function isTrustedRoot(value: unknown): value is string {
   if (typeof value !== "string" || !isAbsolute(value)) return false;
@@ -230,7 +230,7 @@ export async function createRuntimeServer(
         }
         sendJson(response, 200, {
           ok: true,
-          protocol: "f6-v1",
+          protocol: "v1",
           sessionCapability: result.value.sessionCapability,
           expiresInMs: result.value.expiresInMs,
         });
