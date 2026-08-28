@@ -63,6 +63,7 @@ export function validateRequestWire(
   }
   const contentLength = parseInt(contentLengthHeader, 10);
   if (
+    Number.
     isNaN(contentLength) ||
     contentLength < 0 ||
     contentLength > RUNTIME_LIMITS.maxRequestBodyBytes
@@ -142,7 +143,7 @@ export function buildForwardHeaders(
     if (lower === "host") continue;
     result[key] = value;
   }
-  result["host"] = targetHost;
+  result.host = targetHost;
   result["content-length"] = String(newContentLength);
   if (newContentType) {
     result["content-type"] = newContentType;

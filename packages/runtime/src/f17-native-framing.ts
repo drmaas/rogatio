@@ -1,5 +1,4 @@
 import { failure } from "./errors.js";
-import { RUNTIME_LIMITS } from "./limits.js";
 import type { RuntimeResult } from "./types.js";
 
 export const NATIVE_FRAME_MAX_BYTES = 64 * 1024;
@@ -132,7 +131,10 @@ export function commitPolicyStage(
   const assembled = new Uint8Array(totalReceived);
   let offset = 0;
   for (let i = 0; i < state.partCount; i += 1) {
-    const part = state.receivedParts.get(i)!;
+    const part = state.receivedParts.get(i);
+    if (!part) {
+      return failure("runtime.request-body-policy-missing-part");
+    }
     assembled.set(part, offset);
     offset += part.byteLength;
   }

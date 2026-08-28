@@ -1,5 +1,4 @@
 import { failure } from "./errors.js";
-import { RUNTIME_LIMITS } from "./limits.js";
 import type { RuntimeResult } from "./types.js";
 
 const PRIVATE_RANGES = [

@@ -6,6 +6,11 @@
   --sl-line-height: 1.72;
 }
 
+/* Friendlier links */
+a {
+  text-underline-offset: 2px;
+}
+
 .page > article {
   line-height: var(--sl-line-height);
 }
@@ -79,11 +84,6 @@
 .table-of-contents {
   font-size: 0.9rem;
   line-height: 1.5;
-}
-
-/* Friendlier links */
-a {
-  text-underline-offset: 2px;
 }
 
 /* Steps read with more breathing room */

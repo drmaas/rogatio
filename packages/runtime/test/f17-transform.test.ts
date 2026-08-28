@@ -108,7 +108,7 @@ describe("F17 request-body transform", () => {
   });
 
   it("enforces the 250ms regex deadline on catastrophic input", async () => {
-    const big = "a".repeat(40) + "!";
+    const big = `${"a".repeat(40)}!`;
     const start = Date.now();
     const result = await rewriteRequestBody(input(big), {
       mode: "regex",
