@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  readdir,
+  readFile,
+  writeFile,
+} from "node:fs/promises";
 import { resolve } from "node:path";
 import { build } from "esbuild";
 
@@ -13,6 +19,7 @@ type BuildTarget = {
   external?: string[];
   alias?: Record<string, string>;
   requireExports?: boolean;
+  kind?: "css";
 };
 
 const targets: BuildTarget[] = [
@@ -176,6 +183,30 @@ const targets: BuildTarget[] = [
     },
     requireExports: false,
   },
+  {
+    entry: "packages/editor/src/editor.css",
+    output: "packages/editor/dist/browser/index.css",
+    platform: "browser",
+    target: "es2022",
+    kind: "css",
+    external: ["*.woff2"],
+  },
+  {
+    entry: "packages/extension/src/extension.css",
+    output: "packages/extension/dist/extension-page.css",
+    platform: "browser",
+    target: "es2022",
+    kind: "css",
+    external: ["*.woff2"],
+  },
+  {
+    entry: "packages/extension/src/popup.css",
+    output: "packages/extension/dist/popup.css",
+    platform: "browser",
+    target: "es2022",
+    kind: "css",
+    external: ["*.woff2"],
+  },
 ];
 const manifest: Record<string, { sha256: string; bytes: number }> = {};
 for (const target of targets) {
@@ -192,9 +223,13 @@ for (const target of targets) {
     target: target.target,
     sourcemap: false,
     logLevel: "silent",
+    loader: target.kind === "css" ? { ".css": "css" } : undefined,
   });
   const contents = await readFile(output);
-  if (
+  if (target.kind === "css") {
+    if (contents.length === 0)
+      throw new Error(`Build artifact is empty: ${target.output}`);
+  } else if (
     contents.length === 0 ||
     (target.requireExports !== false &&
       !/\bexport\s*\{/.test(contents.toString()))
@@ -220,6 +255,29 @@ await copyFile(
 await writeFile(
   resolve(root, "build-manifest.json"),
   `${JSON.stringify(manifest, null, 2)}\n`,
+);
+
+// Copy bundled fonts into the editor and extension browser dists so
+// @font-face url("fonts/...") references resolve offline next to the stylesheets.
+// Copy the editor stylesheet into the extension dist so index.html can link
+// it alongside the shell and popup stylesheets.
+await copyFile(
+  resolve(root, "packages/editor/dist/browser/index.css"),
+  resolve(root, "packages/extension/dist/editor.css"),
+);
+const fontSource = resolve(root, "packages/editor/assets/fonts");
+const fontTargets = [
+  resolve(root, "packages/editor/dist/browser/fonts"),
+  resolve(root, "packages/extension/dist/fonts"),
+];
+const fontFiles = await readdir(fontSource);
+await Promise.all(
+  fontTargets.flatMap((target) =>
+    fontFiles.map(async (file) => {
+      await mkdir(target, { recursive: true });
+      await copyFile(resolve(fontSource, file), resolve(target, file));
+    }),
+  ),
 );
 console.log(
   `Built ${targets.length} ESM artifact(s); manifest: build-manifest.json`,

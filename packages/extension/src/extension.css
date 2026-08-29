@@ -1,0 +1,435 @@
+/* Rogatio extension management page design system (F22).
+ * Linked by index.html; ships as dist/extension-page.css.
+ */
+
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/hanken-grotesk-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/hanken-grotesk-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/hanken-grotesk-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-700.woff2") format("woff2");
+}
+
+:root {
+  --rogatio-bg: #121417;
+  --rogatio-surface: #161b22;
+  --rogatio-surface-raised: #1c222c;
+  --rogatio-surface-inset: #10131a;
+  --rogatio-primary: #007aff;
+  --rogatio-primary-strong: #0066d6;
+  --rogatio-secondary: #64748b;
+  --rogatio-tertiary: #0f172a;
+  --rogatio-neutral: #1e293b;
+  --rogatio-text: #f8fafc;
+  --rogatio-muted: #94a3b8;
+  --rogatio-faint: #64748b;
+  --rogatio-border: rgba(148, 163, 184, 0.16);
+  --rogatio-danger: #f87171;
+  --rogatio-danger-bg: rgba(248, 113, 113, 0.12);
+  --rogatio-success: #4ade80;
+  --rogatio-success-bg: rgba(74, 222, 128, 0.12);
+  --rogatio-warning: #fbbf24;
+  --rogatio-radius: 0.75rem;
+  --rogatio-radius-sm: 0.5rem;
+  --rogatio-font-body:
+    "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rogatio-font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas,
+    monospace;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background-color: var(--rogatio-bg);
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.05) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+  color: var(--rogatio-text);
+  font-family: var(--rogatio-font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.rogatio-shell,
+.rogatio-shell *,
+.rogatio-shell *::before,
+.rogatio-shell *::after {
+  box-sizing: border-box;
+}
+.rogatio-shell button,
+.rogatio-shell input,
+.rogatio-shell select,
+.rogatio-shell textarea {
+  color: inherit;
+  font: inherit;
+}
+.rogatio-shell button {
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-neutral);
+  color: var(--rogatio-text);
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.rogatio-shell button:hover:not(:disabled) {
+  background: var(--rogatio-surface-raised);
+  border-color: rgba(148, 163, 184, 0.28);
+}
+.rogatio-shell button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.rogatio-shell :focus-visible {
+  outline: 3px solid var(--rogatio-primary);
+  outline-offset: 2px;
+}
+.rogatio-shell input:not([type="checkbox"]),
+.rogatio-shell select,
+.rogatio-shell textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-inset);
+  color: var(--rogatio-text);
+  padding: 0.45rem 0.55rem;
+}
+.rogatio-shell input::placeholder,
+.rogatio-shell textarea::placeholder {
+  color: var(--rogatio-faint);
+}
+
+/* Top app bar */
+.rogatio-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--rogatio-border);
+  background: var(--rogatio-tertiary);
+  padding: 0.7rem 1rem;
+}
+.rogatio-topbar h1 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.rogatio-tabs {
+  display: flex;
+  gap: 0.35rem;
+}
+.rogatio-tabs button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0.35rem 0.8rem;
+  color: var(--rogatio-muted);
+}
+.rogatio-tabs button[aria-current="true"] {
+  border-color: rgba(0, 122, 255, 0.45);
+  background: rgba(0, 122, 255, 0.14);
+  color: var(--rogatio-text);
+  font-weight: 700;
+}
+.rogatio-topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.rogatio-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: 999px;
+  background: var(--rogatio-neutral);
+  color: var(--rogatio-muted);
+  padding: 0.25rem 0.6rem;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.75rem;
+}
+
+/* Layout: sidebar + main */
+.rogatio-layout {
+  display: grid;
+  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+  gap: 0;
+  min-height: calc(100vh - 3.4rem);
+}
+.rogatio-sidebar {
+  display: grid;
+  align-content: start;
+  gap: 0.85rem;
+  border-right: 1px solid var(--rogatio-border);
+  background: var(--rogatio-surface);
+  padding: 1rem;
+}
+.rogatio-sidebar fieldset {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  padding: 0.75rem;
+}
+.rogatio-sidebar legend {
+  padding-inline: 0.4rem;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rogatio-muted);
+}
+.rogatio-sidebar label {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-weight: 500;
+  color: var(--rogatio-muted);
+}
+.rogatio-sidebar ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--rogatio-muted);
+  font-size: 0.85rem;
+}
+.rogatio-sidebar p {
+  margin: 0;
+  color: var(--rogatio-muted);
+  font-size: 0.85rem;
+}
+.rogatio-sidebar .rogatio-sidebar-actions {
+  display: grid;
+  gap: 0.5rem;
+}
+.rogatio-main {
+  min-width: 0;
+  padding: 1rem clamp(1rem, 3vw, 2rem) 3rem;
+}
+.rogatio-status {
+  margin: 0 0 1rem;
+  color: var(--rogatio-muted);
+  font-size: 0.875rem;
+  min-height: 1.25rem;
+}
+
+/* Project cards (Overview / Dashboard) */
+.rogatio-overview h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.rogatio-overview-subtitle {
+  margin: 0 0 1rem;
+  color: var(--rogatio-muted);
+}
+.rogatio-project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 1rem;
+}
+.rogatio-project-card {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  background: var(--rogatio-surface);
+  padding: 1rem;
+  text-align: left;
+  cursor: pointer;
+}
+.rogatio-project-card:hover:not(:disabled) {
+  border-color: rgba(0, 122, 255, 0.45);
+  background: var(--rogatio-surface-raised);
+}
+.rogatio-project-card-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.rogatio-project-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--rogatio-muted);
+  font-size: 0.85rem;
+}
+.rogatio-project-status::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--rogatio-faint);
+}
+.rogatio-project-card[data-active="true"] .rogatio-project-status {
+  color: var(--rogatio-success);
+}
+.rogatio-project-card[data-active="true"] .rogatio-project-status::before {
+  background: var(--rogatio-primary);
+}
+.rogatio-project-stats {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-inset);
+  padding: 0.6rem 0.75rem;
+  color: var(--rogatio-muted);
+  font-size: 0.85rem;
+}
+.rogatio-project-stats [data-project-groups],
+.rogatio-project-stats [data-project-rules],
+.rogatio-project-stats [data-project-enabled] {
+  color: var(--rogatio-text);
+  font-family: var(--rogatio-font-mono);
+}
+.rogatio-project-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--rogatio-faint);
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.72rem;
+}
+.rogatio-project-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.rogatio-project-actions button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+}
+.rogatio-create-project {
+  display: grid;
+  place-items: center;
+  gap: 0.5rem;
+  min-height: 11rem;
+  border: 1px dashed var(--rogatio-faint);
+  border-radius: var(--rogatio-radius);
+  background: transparent;
+  color: var(--rogatio-muted);
+  padding: 1rem;
+  cursor: pointer;
+  text-align: center;
+}
+.rogatio-create-project:hover:not(:disabled) {
+  border-color: var(--rogatio-primary);
+  background: rgba(0, 122, 255, 0.08);
+  color: var(--rogatio-text);
+}
+.rogatio-create-project .rogatio-create-icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.6rem;
+  background: var(--rogatio-primary);
+  color: var(--rogatio-text);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+.rogatio-create-project .rogatio-create-title {
+  color: var(--rogatio-text);
+  font-weight: 700;
+}
+.rogatio-create-project .rogatio-create-hint {
+  max-width: 16rem;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 48rem) {
+  .rogatio-layout {
+    display: block;
+  }
+  .rogatio-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--rogatio-border);
+  }
+  .rogatio-topbar-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+@media (forced-colors: active) {
+  .rogatio-shell {
+    --rogatio-border: ButtonText;
+    --rogatio-muted: ButtonText;
+    --rogatio-primary: Highlight;
+    --rogatio-text: CanvasText;
+    color: CanvasText;
+    background: Canvas;
+  }
+  .rogatio-topbar,
+  .rogatio-sidebar,
+  .rogatio-project-card,
+  .rogatio-project-stats,
+  .rogatio-sidebar fieldset {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+  .rogatio-shell button,
+  .rogatio-shell input:not([type="checkbox"]),
+  .rogatio-shell select,
+  .rogatio-shell textarea {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+  .rogatio-shell :focus-visible {
+    outline-color: Highlight;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rogatio-shell *,
+  .rogatio-shell *::before,
+  .rogatio-shell *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

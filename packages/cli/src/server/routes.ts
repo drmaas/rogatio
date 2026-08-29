@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { resolve } from "node:path";
 import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
@@ -18,6 +19,10 @@ export interface RouteContext {
   editorHtml: string;
   /** Absolute path to the @rogatio/editor browser bundle served at GET /vendor/editor.js. */
   editorBundlePath: string;
+  /** Absolute path to the @rogatio/editor browser stylesheet served at GET /vendor/editor.css. */
+  editorCssPath: string;
+  /** Absolute path to the directory of bundled editor fonts served at GET /vendor/fonts/<file>. */
+  editorFontsPath: string;
 }
 
 export function generateCsrfToken(): string {
@@ -207,6 +212,57 @@ export function createRoutes(context: RouteContext) {
               e instanceof Error ? e.message : "Failed to load editor bundle",
           }),
         );
+      }
+      return;
+    }
+
+    // GET /vendor/editor.css — the @rogatio/editor browser stylesheet
+    if (pathname === "/vendor/editor.css" && method === "GET") {
+      try {
+        const css = await readFile(context.editorCssPath, "utf-8");
+        res.writeHead(200, {
+          "Content-Type": "text/css; charset=utf-8",
+          ...corsHeaders,
+        });
+        res.end(css);
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "css-load-failed",
+            message:
+              e instanceof Error
+                ? e.message
+                : "Failed to load editor stylesheet",
+          }),
+        );
+      }
+      return;
+    }
+
+    // GET /vendor/fonts/<file> — bundled editor fonts (confined to the font dir)
+    if (pathname.startsWith("/vendor/fonts/") && method === "GET") {
+      const fileName = pathname.slice("/vendor/fonts/".length);
+      if (
+        !fileName ||
+        fileName.includes("..") ||
+        fileName.includes("/") ||
+        fileName.includes("\\")
+      ) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ code: "not-found", message: "Not found" }));
+        return;
+      }
+      try {
+        const font = await readFile(resolve(context.editorFontsPath, fileName));
+        res.writeHead(200, {
+          "Content-Type": "font/woff2",
+          ...corsHeaders,
+        });
+        res.end(font);
+      } catch {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ code: "not-found", message: "Not found" }));
       }
       return;
     }

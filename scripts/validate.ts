@@ -58,6 +58,7 @@ async function checkArtifacts(): Promise<void> {
     "packages/schema/dist/node/index.js",
     "packages/schema/dist/browser/index.js",
     "packages/editor/dist/browser/index.js",
+    "packages/editor/dist/browser/index.css",
     "packages/sanity/dist/node/index.js",
     "packages/compiler/dist/node/index.js",
     "packages/browser-core/dist/node/index.js",
@@ -67,7 +68,9 @@ async function checkArtifacts(): Promise<void> {
     "packages/extension/dist/browser/index.js",
     "packages/extension/dist/background.js",
     "packages/extension/dist/extension-page.js",
+    "packages/extension/dist/extension-page.css",
     "packages/extension/dist/popup.js",
+    "packages/extension/dist/popup.css",
   ];
   if (
     expected.length !== Object.keys(manifest).length ||
@@ -117,6 +120,32 @@ async function checkArtifacts(): Promise<void> {
     if (metadata.bytes <= 0)
       throw new Error(`Empty artifact in manifest: ${artifact}`);
     await access(resolve(root, artifact));
+  }
+  const fontFiles = [
+    "hanken-grotesk-400.woff2",
+    "hanken-grotesk-500.woff2",
+    "hanken-grotesk-700.woff2",
+    "jetbrains-mono-400.woff2",
+    "jetbrains-mono-700.woff2",
+    "OFL-HankenGrotesk.txt",
+    "OFL-JetBrainsMono.txt",
+  ];
+  for (const dir of [
+    "packages/editor/dist/browser/fonts",
+    "packages/extension/dist/fonts",
+  ]) {
+    for (const file of fontFiles) {
+      await access(resolve(root, dir, file));
+    }
+  }
+  for (const css of [
+    "packages/editor/dist/browser/index.css",
+    "packages/extension/dist/extension-page.css",
+    "packages/extension/dist/popup.css",
+  ]) {
+    const contents = await readFile(resolve(root, css), "utf8");
+    if (!contents.includes("@font-face"))
+      throw new Error(`Stylesheet missing @font-face: ${css}`);
   }
 }
 async function checkEmittedModules(): Promise<void> {

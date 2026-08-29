@@ -2,7 +2,7 @@
 
 ## Problem statement and goals
 
-Toggling an active project's groups currently requires opening the full Requestify
+Toggling an active project's groups currently requires opening the full Rogatio
 management page. There is no compact toolbar surface that can Activate or Deactivate a
 single saved group. Group enablement is a distinct, browser-local lifecycle action
 (`set-group-enabled`) scoped to one saved, runtime-eligible active-project group; the
@@ -53,7 +53,7 @@ Out of scope (explicit non-goals):
 
 - **REQ-001** The manifest `action.default_popup` points at `popup.html`. The management
   page `index.html` remains loadable in a tab and is no longer the popup.
-- **REQ-002** The popup header identifies Requestify and the active project name, and
+- **REQ-002** The popup header identifies Rogatio and the active project name, and
   contains exactly one "Open app" button.
 - **REQ-003** The popup lists the active project's persisted groups in the source order
   stored in `data.groups`.

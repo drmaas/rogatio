@@ -69,6 +69,8 @@ test("drives the real extension page lifecycle and mounts the editor", async () 
     await expect(page.locator("[data-rule-statuses] li")).toContainText(
       "needs permission",
     );
+    // The editor lives on the Workspace view (Dashboard is the landing page).
+    await page.getByRole("button", { name: "Workspace" }).click();
     await expect(
       page.locator("[data-editor-root] [data-rogatio-editor]"),
     ).toBeVisible();

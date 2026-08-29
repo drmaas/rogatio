@@ -66,6 +66,7 @@ const client: MessageClient = {
 
 let state: Envelope = { projects: {}, activeProjectId: null };
 let pendingProjectId: string | null = null;
+let activeTab: "dashboard" | "workspace" = "dashboard";
 let editor: EditorController | undefined;
 let statusMessage = "";
 let permissionOrigins: readonly string[] = [];
@@ -95,19 +96,82 @@ function button(label: string, command: string): HTMLButtonElement {
   return result;
 }
 
-function renderShell(): void {
-  editor?.destroy();
-  editor = undefined;
-  root.replaceChildren();
-  const shell = document.createElement("section");
-  shell.setAttribute("aria-labelledby", "rogatio-title");
+function countGroups(value: unknown): number {
+  return isProjectRecord(value) && Array.isArray(value.groups)
+    ? value.groups.length
+    : 0;
+}
+
+function countRules(value: unknown): number {
+  if (!isProjectRecord(value) || !Array.isArray(value.groups)) return 0;
+  let total = 0;
+  for (const group of value.groups) {
+    if (isProjectRecord(group) && Array.isArray(group.rules)) {
+      total += group.rules.length;
+    }
+  }
+  return total;
+}
+
+function renderTopbar(shell: HTMLElement): void {
+  const topbar = document.createElement("header");
+  topbar.className = "rogatio-topbar";
   const heading = document.createElement("h1");
   heading.id = "rogatio-title";
   heading.textContent = "Rogatio";
-  shell.append(heading);
+  topbar.append(heading);
 
-  const controls = document.createElement("div");
-  controls.setAttribute("role", "toolbar");
+  const tabs = document.createElement("div");
+  tabs.className = "rogatio-tabs";
+  for (const tab of ["dashboard", "workspace"] as const) {
+    const tabButton = document.createElement("button");
+    tabButton.type = "button";
+    tabButton.textContent = tab === "dashboard" ? "Dashboard" : "Workspace";
+    tabButton.dataset.tab = tab;
+    if (activeTab === tab) tabButton.setAttribute("aria-current", "true");
+    tabs.append(tabButton);
+  }
+  topbar.append(tabs);
+
+  const actions = document.createElement("div");
+  actions.className = "rogatio-topbar-actions";
+  actions.append(
+    button("Refresh", "refresh"),
+    button("Export project", "export"),
+    button("Remove project", "remove"),
+  );
+  const badge = document.createElement("span");
+  badge.dataset.badgeState = "true";
+  badge.className = "rogatio-badge-pill";
+  badge.textContent = state.badge
+    ? `Active rules: ${state.badge.text}${state.badge.attention ? " (attention needed)" : ""}`
+    : "Active rules: 0";
+  actions.append(badge);
+  topbar.append(actions);
+  shell.append(topbar);
+}
+
+function renderSidebar(shell: HTMLElement): void {
+  const sidebar = document.createElement("aside");
+  sidebar.className = "rogatio-sidebar";
+
+  const activeProject = state.activeProjectId
+    ? state.projects[state.activeProjectId]
+    : undefined;
+  if (activeProject && isProjectRecord(activeProject.data)) {
+    const projectCard = document.createElement("div");
+    projectCard.className = "rogatio-project-card";
+    projectCard.dataset.activeProjectCard = "true";
+    const title = document.createElement("p");
+    title.className = "rogatio-project-card-title";
+    title.textContent = text(activeProject.data.name, activeProject.id);
+    const status = document.createElement("p");
+    status.className = "rogatio-project-status";
+    status.textContent = "Active project";
+    projectCard.append(title, status);
+    sidebar.append(projectCard);
+  }
+
   const selectorLabel = document.createElement("label");
   selectorLabel.textContent = "Project to switch";
   const selector = document.createElement("select");
@@ -123,8 +187,11 @@ function renderShell(): void {
     selector.value = pendingProjectId ?? state.activeProjectId ?? ids[0];
   }
   selectorLabel.append(selector);
-  controls.append(
-    selectorLabel,
+  sidebar.append(selectorLabel);
+
+  const actions = document.createElement("div");
+  actions.className = "rogatio-sidebar-actions";
+  actions.append(
     button("Switch project", "switch"),
     button("Create project", "create"),
     button("Import project", "import"),
@@ -136,17 +203,15 @@ function renderShell(): void {
     button("Start response runtime", "start-native-runtime"),
     button("Stop response runtime", "stop-native-runtime"),
     button("Check and connect", "check-mock-runtime"),
-    button("Refresh", "refresh"),
-    button("Export project", "export"),
-    button("Remove project", "remove"),
   );
+  sidebar.append(actions);
+
   const importInput = document.createElement("input");
   importInput.type = "file";
   importInput.accept = ".json,.rogatio.json,application/json";
   importInput.hidden = true;
   importInput.dataset.importInput = "true";
-  controls.append(importInput);
-  shell.append(controls);
+  sidebar.append(importInput);
 
   if (permissionOrigins.length > 0) {
     const permissionSummary = document.createElement("p");
@@ -154,12 +219,9 @@ function renderShell(): void {
     permissionSummary.textContent = permissionGranted
       ? `Declared access granted: ${permissionOrigins.join(", ")}`
       : `Declared access needed: ${permissionOrigins.join(", ")}`;
-    shell.append(permissionSummary);
+    sidebar.append(permissionSummary);
   }
 
-  const activeProject = state.activeProjectId
-    ? state.projects[state.activeProjectId]
-    : undefined;
   if (activeProject && isProjectRecord(activeProject.data)) {
     const groups = document.createElement("fieldset");
     const legend = document.createElement("legend");
@@ -183,25 +245,13 @@ function renderShell(): void {
       );
       groups.append(label);
     }
-    shell.append(groups);
+    sidebar.append(groups);
   }
-
-  const status = document.createElement("p");
-  status.setAttribute("role", "status");
-  status.textContent = statusMessage;
-  shell.append(status);
-
-  const badge = document.createElement("p");
-  badge.dataset.badgeState = "true";
-  badge.textContent = state.badge
-    ? `Active rules: ${state.badge.text}${state.badge.attention ? " (attention needed)" : ""}`
-    : "Active rules: 0";
-  shell.append(badge);
 
   const nativeRuntime = document.createElement("p");
   nativeRuntime.dataset.nativeRuntimeState = "true";
   nativeRuntime.textContent = `Response runtime: ${state.nativeRuntimeState?.phase ?? "stopped"}.`;
-  shell.append(nativeRuntime);
+  sidebar.append(nativeRuntime);
 
   const mockRuntime = document.createElement("p");
   mockRuntime.dataset.mockRuntimeState = "true";
@@ -210,16 +260,16 @@ function renderShell(): void {
   if (mockPhase === "checking") {
     mockRuntime.textContent = "Mock runtime: checking…";
   } else if (mockPhase === "connected") {
-    mockRuntime.textContent = lastCheck?.ok
-      ? "Mock runtime: connected."
-      : "Mock runtime: connected.";
+    mockRuntime.textContent = "Mock runtime: connected.";
   } else if (mockPhase === "failed") {
-    mockRuntime.textContent = `Mock runtime: unreachable${lastCheck?.message ? ` (${lastCheck.message})` : ""}. Start rogatio runtime and check again.`;
+    mockRuntime.textContent = `Mock runtime: unreachable${
+      lastCheck?.message ? ` (${lastCheck.message})` : ""
+    }. Start rogatio runtime and check again.`;
   } else {
     mockRuntime.textContent =
       "Mock runtime: not connected. Start rogatio runtime, then choose Check and connect.";
   }
-  shell.append(mockRuntime);
+  sidebar.append(mockRuntime);
 
   const ruleStatuses = document.createElement("ul");
   ruleStatuses.dataset.ruleStatuses = "true";
@@ -231,26 +281,165 @@ function renderShell(): void {
     item.textContent = `${groupId}/${ruleId}: ${statusValue}`;
     ruleStatuses.append(item);
   }
-  shell.append(ruleStatuses);
+  sidebar.append(ruleStatuses);
 
-  const editorRoot = document.createElement("div");
-  editorRoot.dataset.editorRoot = "true";
-  shell.append(editorRoot);
+  shell.append(sidebar);
+}
+
+function renderOverview(shell: HTMLElement): void {
+  const overview = document.createElement("section");
+  overview.dataset.overview = "true";
+  overview.className = "rogatio-overview";
+
+  const heading = document.createElement("h2");
+  heading.textContent = "Projects";
+  const subtitle = document.createElement("p");
+  subtitle.className = "rogatio-overview-subtitle";
+  subtitle.textContent =
+    "Manage your active modification rules and mock environments.";
+  overview.append(heading, subtitle);
+
+  const grid = document.createElement("div");
+  grid.className = "rogatio-project-grid";
+  const ids = Object.keys(state.projects).sort();
+  for (const id of ids) {
+    const project = state.projects[id];
+    if (!project) continue;
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "rogatio-project-card";
+    card.dataset.projectCard = "true";
+    card.dataset.projectId = id;
+    if (state.activeProjectId === id) card.dataset.active = "true";
+
+    const title = document.createElement("p");
+    title.className = "rogatio-project-card-title";
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = text(project.name, id);
+    title.append(nameSpan);
+    card.append(title);
+
+    const status = document.createElement("span");
+    status.dataset.projectStatus = "true";
+    status.className = "rogatio-project-status";
+    status.textContent =
+      state.activeProjectId === id ? "Active Runtime" : "Idle";
+    card.append(status);
+
+    const stats = document.createElement("div");
+    stats.className = "rogatio-project-stats";
+    const groups = countGroups(project.data);
+    const rules = countRules(project.data);
+    const enabled = project.enabledGroupIds.length;
+    const statRow = (label: string, selector: string, value: string) => {
+      const row = document.createElement("div");
+      const name = document.createElement("span");
+      name.textContent = label;
+      const count = document.createElement("span");
+      count.dataset[selector] = "true";
+      count.textContent = value;
+      row.append(name, count);
+      return row;
+    };
+    stats.append(
+      statRow("Groups", "projectGroups", String(groups)),
+      statRow("Rules", "projectRules", String(rules)),
+      statRow("Enabled", "projectEnabled", `${enabled} of ${groups}`),
+    );
+    card.append(stats);
+
+    const footer = document.createElement("div");
+    footer.className = "rogatio-project-footer";
+    const projectId = document.createElement("span");
+    projectId.dataset.projectIdLabel = "true";
+    projectId.textContent = `ID: ${id}`;
+    footer.append(projectId);
+    const actions = document.createElement("span");
+    actions.className = "rogatio-project-actions";
+    const exportAction = document.createElement("button");
+    exportAction.type = "button";
+    exportAction.textContent = "Export";
+    exportAction.dataset.command = "export";
+    exportAction.dataset.projectAction = id;
+    const removeAction = document.createElement("button");
+    removeAction.type = "button";
+    removeAction.textContent = "Remove";
+    removeAction.dataset.command = "remove";
+    removeAction.dataset.projectAction = id;
+    actions.append(exportAction, removeAction);
+    footer.append(actions);
+    card.append(footer);
+    grid.append(card);
+  }
+
+  const createCard = document.createElement("button");
+  createCard.type = "button";
+  createCard.className = "rogatio-create-project";
+  createCard.dataset.createProject = "true";
+  const icon = document.createElement("span");
+  icon.className = "rogatio-create-icon";
+  icon.textContent = "+";
+  const createTitle = document.createElement("span");
+  createTitle.className = "rogatio-create-title";
+  createTitle.textContent = "Create New Project";
+  const hint = document.createElement("span");
+  hint.className = "rogatio-create-hint";
+  hint.textContent = "Setup a new environment for rules and mocks.";
+  createCard.append(icon, createTitle, hint);
+  grid.append(createCard);
+
+  overview.append(grid);
+  shell.append(overview);
+}
+
+function renderShell(): void {
+  editor?.destroy();
+  editor = undefined;
+  root.replaceChildren();
+  const shell = document.createElement("section");
+  shell.className = "rogatio-shell";
+  shell.setAttribute("aria-labelledby", "rogatio-title");
+
+  renderTopbar(shell);
+
+  const layout = document.createElement("div");
+  layout.className = "rogatio-layout";
+  renderSidebar(layout);
+
+  const main = document.createElement("main");
+  main.className = "rogatio-main";
+  const status = document.createElement("p");
+  status.className = "rogatio-status";
+  status.setAttribute("role", "status");
+  status.textContent = statusMessage;
+  main.append(status);
+
+  if (activeTab === "dashboard") {
+    renderOverview(main);
+  } else {
+    const editorRoot = document.createElement("div");
+    editorRoot.dataset.editorRoot = "true";
+    main.append(editorRoot);
+  }
+  layout.append(main);
+  shell.append(layout);
   root.append(shell);
 
-  selector.addEventListener("change", () => {
-    pendingProjectId = selector.value;
-    statusMessage = `Selected ${text(state.projects[pendingProjectId]?.name, pendingProjectId)}. Choose Switch project to activate it.`;
-    renderShell();
-  });
-  controls.addEventListener("click", (event) => {
+  // Tab switching
+  shell.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    const tab = target.dataset.tab;
+    if (tab === "dashboard" || tab === "workspace") {
+      activeTab = tab;
+      renderShell();
+      return;
+    }
     const command = target.dataset.command;
     if (command === "refresh") void refresh();
     if (command === "switch") void switchProject();
     if (command === "create") void createProject();
-    if (command === "import") importInput.click();
+    if (command === "import") importInput().click();
     if (command === "review-permissions") void reviewPermissions();
     if (command === "grant-permissions") void grantPermissions();
     if (command === "start-native-runtime")
@@ -258,11 +447,54 @@ function renderShell(): void {
     if (command === "stop-native-runtime")
       void nativeRuntimeCommand("stop-native-runtime");
     if (command === "check-mock-runtime") void checkMockRuntime();
-    if (command === "export") void exportProject();
-    if (command === "remove") void removeProject();
+    if (command === "export") {
+      const projectId = target.dataset.projectAction ?? pendingProjectId;
+      if (projectId) pendingProjectId = projectId;
+      void exportProject();
+    }
+    if (command === "remove") {
+      const projectId = target.dataset.projectAction ?? pendingProjectId;
+      if (projectId) pendingProjectId = projectId;
+      void removeProject();
+    }
   });
-  importInput.addEventListener("change", () => void importProject(importInput));
-  root.addEventListener("change", (event) => {
+
+  const selector = shell.querySelector<HTMLSelectElement>(
+    "[data-project-selector]",
+  );
+  selector?.addEventListener("change", () => {
+    pendingProjectId = selector.value;
+    statusMessage = `Selected ${text(
+      state.projects[pendingProjectId]?.name,
+      pendingProjectId ?? "",
+    )}. Choose Switch project to activate it.`;
+    renderShell();
+  });
+
+  const overview = shell.querySelector<HTMLElement>("[data-overview]");
+  overview?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.dataset.command) return; // action buttons handled at shell level
+    const card = target.closest<HTMLElement>("[data-project-card]");
+    if (!card?.dataset.projectId) return;
+    if (card.dataset.projectId === state.activeProjectId) return;
+    pendingProjectId = card.dataset.projectId;
+    statusMessage = `Selected ${text(
+      state.projects[pendingProjectId]?.name,
+      pendingProjectId,
+    )}. Choose Switch project to activate it.`;
+    renderShell();
+  });
+
+  const importControl = shell.querySelector<HTMLInputElement>(
+    "[data-import-input]",
+  );
+  importControl?.addEventListener(
+    "change",
+    () => void importProject(importControl),
+  );
+  shell.addEventListener("change", (event) => {
     const target = event.target;
     if (
       !(target instanceof HTMLInputElement) ||
@@ -272,54 +504,71 @@ function renderShell(): void {
     void setGroupEnabled(target.dataset.groupId ?? "", target.checked);
   });
 
-  if (ids.length > 0) {
-    editor = createEditor({
-      root: editorRoot,
-      ruleTypes: [
-        createRedirectRuleType(),
-        createMockRuleType(),
-        createResponseBodyRuleType(),
-      ],
-      initialProject: safeProjectData(),
-      validate(value) {
-        const result = validateProjectDetailed(value);
-        if (result.valid) return [];
-        return result.errors.map((error) => ({
-          code: `schema.${error.keyword}`,
-          severity: "error" as const,
-          path: error.instancePath,
-          message: "The project contains invalid data.",
-        }));
-      },
-      save: async (draft) => {
-        if (!state.activeProjectId)
-          return { ok: false, code: "extension.not-found" };
-        const response = await client.send({
-          version: 1,
-          command: "save-project",
-          projectId: state.activeProjectId,
-          expectedRevision: state.projects[state.activeProjectId]?.revision,
-          data: draft,
-        });
-        if (response?.ok === true) {
-          await refresh();
-          return { ok: true };
-        }
-        return {
-          ok: false,
-          code: response?.diagnostic?.code ?? "extension.storage-failed",
-          message:
-            response?.diagnostic?.code === "extension.conflict"
-              ? "The committed project changed. Refresh before saving."
-              : "The project could not be saved.",
-        };
-      },
-    });
-    const deepLinkGroup = new URLSearchParams(window.location.search).get(
-      "group",
-    );
-    if (deepLinkGroup) editor.navigateToGroup(deepLinkGroup);
+  if (activeTab === "workspace" && ids().length > 0) {
+    const editorRoot = shell.querySelector<HTMLElement>("[data-editor-root]");
+    if (editorRoot) {
+      editor = createEditor({
+        root: editorRoot,
+        ruleTypes: [
+          createRedirectRuleType(),
+          createMockRuleType(),
+          createResponseBodyRuleType(),
+        ],
+        initialProject: safeProjectData(),
+        validate(value) {
+          const result = validateProjectDetailed(value);
+          if (result.valid) return [];
+          return result.errors.map((error) => ({
+            code: `schema.${error.keyword}`,
+            severity: "error" as const,
+            path: error.instancePath,
+            message: "The project contains invalid data.",
+          }));
+        },
+        save: async (draft) => {
+          if (!state.activeProjectId)
+            return { ok: false, code: "extension.not-found" };
+          const response = await client.send({
+            version: 1,
+            command: "save-project",
+            projectId: state.activeProjectId,
+            expectedRevision: state.projects[state.activeProjectId]?.revision,
+            data: draft,
+          });
+          if (response?.ok === true) {
+            await refresh();
+            return { ok: true };
+          }
+          return {
+            ok: false,
+            code: response?.diagnostic?.code ?? "extension.storage-failed",
+            message:
+              response?.diagnostic?.code === "extension.conflict"
+                ? "The committed project changed. Refresh before saving."
+                : "The project could not be saved.",
+          };
+        },
+      });
+      if (deepLinkGroup) editor.navigateToGroup(deepLinkGroup);
+    }
   }
+}
+
+function importInput(): HTMLInputElement {
+  const input = root.querySelector<HTMLInputElement>("[data-import-input]");
+  if (input) return input;
+  const created = document.createElement("input");
+  created.type = "file";
+  created.accept = ".json,.rogatio.json,application/json";
+  created.hidden = true;
+  created.dataset.importInput = "true";
+  created.addEventListener("change", () => void importProject(created));
+  root.append(created);
+  return created;
+}
+
+function ids(): readonly string[] {
+  return Object.keys(state.projects).sort();
 }
 
 function isProjectRecord(value: unknown): value is Record<string, unknown> {
@@ -545,4 +794,7 @@ async function removeProject(): Promise<void> {
   await refresh();
 }
 
+// Deep links from the popup open the workspace editor at the group.
+const deepLinkGroup = new URLSearchParams(window.location.search).get("group");
+if (deepLinkGroup) activeTab = "workspace";
 void refresh();

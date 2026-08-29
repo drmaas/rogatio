@@ -55,11 +55,16 @@ const server = createServer(async (request, response) => {
   try {
     const file = await stat(filePath);
     if (!file.isFile()) throw new Error("Not a file");
-    response.writeHead(200, {
-      "content-type": filePath.endsWith(".html")
-        ? "text/html"
-        : "text/javascript",
-    });
+    const contentType = filePath.endsWith(".html")
+      ? "text/html"
+      : filePath.endsWith(".css")
+        ? "text/css"
+        : filePath.endsWith(".woff2")
+          ? "font/woff2"
+          : filePath.endsWith(".txt")
+            ? "text/plain"
+            : "text/javascript";
+    response.writeHead(200, { "content-type": contentType });
     createReadStream(filePath).pipe(response);
   } catch {
     response.writeHead(404);

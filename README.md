@@ -62,6 +62,11 @@ The Chrome extension is built as an unsigned MV3 package and loaded manually fro
 release ZIP (no browser-store install or auto-update). See
 [`docs/architecture.md`](docs/architecture.md) for packaging details.
 
+The editor, extension management page, and toolbar popup share a dark design
+system (Hanken Grotesk + JetBrains Mono bundled offline, dot-grid page background,
+surface cards, top navigation). Styling ships as standalone CSS artifacts inside the
+editor and extension distributions; no fonts or assets are fetched at runtime.
+
 The toolbar button opens a compact popup that lists the active project's saved groups with
 one enable/disable switch each, a truthful runtime status, an **Open app** button (the full
 management page at Overview), and a pencil that opens the management page on that group. The

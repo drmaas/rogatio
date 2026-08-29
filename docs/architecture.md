@@ -90,6 +90,71 @@ The extension adds a compact Chrome toolbar popup (`popup.html` + `popup.ts`) as
 
 The popup reuses the existing `set-group-enabled` lifecycle unchanged: toggling a group sends the same command the management page sends, and the service worker performs the identical enablement, permission-preserving, and DNR-install path. Per-group status is aggregated from the envelope's per-rule `ruleStatuses` with the precedence `error > needs proxy > needs permission > unsupported > active` (a disabled group is `disabled`; an enabled group with no rules is `active`). Because the popup reads only persisted state, unsaved editor drafts never appear, so every listed group is runtime-eligible and gets a toggle. "Open app" opens `index.html` (Overview); the pencil opens `index.html?group=<id>`, and the management page deep-links to that group via the additive `EditorController.navigateToGroup`. The popup adds no second editor and no popup-only persisted navigation state.
 
+## Design System (F22)
+
+The design system is the shared dark visual language for the editor, the CLI editor
+host, the extension management page, and the toolbar popup. It is pure presentational
+surface work: no product behavior, routes, persistence, or public API changes.
+
+### Tokens, type, and assets
+
+- Palette: page background `#121417` with a white dot-grid pattern, surfaces `#161B22`
+  (raised `#1C222C`, inset `#10131A`), primary `#007AFF` (accent, links, active
+  states), primary-strong `#0066D6` (filled button background so white button text
+  meets WCAG AA), secondary `#64748B`, tertiary `#0F172A`, neutral `#1E293B`, text
+  `#F8FAFC`, muted `#94A3B8`, danger `#F87171`, success `#4ADE80`, warning `#FBBF24`,
+  borders `rgba(148, 163, 184, 0.16)`.
+- Type: Hanken Grotesk for headlines and body; JetBrains Mono for labels, code,
+  regex, and badges. Both are OFL-licensed and bundled as woff2 (400/500/700 and
+  400/700) — never fetched at runtime. The editor package owns the font files under
+  `packages/editor/assets/fonts/` together with their OFL license texts; the build
+  copies them into the editor browser dist and the extension dist.
+
+### Standalone stylesheet boundary
+
+The editor no longer embeds a CSS string in its controller; it ships
+`src/editor.css` as a real artifact (`dist/browser/index.css`) and the host supplies
+it, mirroring the existing host-supplied validation and save ports. Hosts that mount
+`createEditor` must link the stylesheet:
+
+- CLI editor page links `/vendor/editor.css` and fonts at `/vendor/fonts/*` (new
+  confined routes on the edit server).
+- Extension `index.html` links `index.css` (editor) + `extension-page.css` (shell)
+  and fonts at `/fonts/*`; `popup.html` links `popup.css`.
+- The browser test fixture links `/editor/index.css`.
+
+The extension package owns its shell stylesheet (`src/extension.css` →
+`dist/extension-page.css`) and the popup stylesheet (`src/popup.css` →
+`dist/popup.css`). All three stylesheets are esbuild outputs recorded in
+`build-manifest.json`; the canonical validator asserts their presence, the MV3
+forbidden-dependency guard continues to scan only JS artifacts, and
+`scripts/serve-smoke.ts` serves `text/css` and `font/woff2` correctly. Each
+stylesheet is scoped to its own root (`.rogatio-editor`, the management shell,
+`.rogatio-popup`) so the three never bleed into each other.
+
+### Layout and surfaces
+
+The editor's desktop route rail becomes a top navigation bar (sticky, horizontal,
+active route accented) while keeping its `data-desktop-route-rail` identity and
+accessibility semantics; it stays hidden at narrow widths where the existing mobile
+select navigation takes over. Cards, fieldsets, rule cards, test-result cards,
+badges (pills in JetBrains Mono), buttons (primary/secondary/inverted/outlined/
+danger/ghost), search, alerts, and dialogs follow the token system. The extension
+management page reorganizes into a top app bar (brand, Dashboard/Workspace tabs,
+Refresh/Export/Remove, badge pill) and a workspace sidebar (active-project card,
+switch/create/import controls, runtime controls, group activation switches); the
+Overview becomes a project-cards home while keeping the existing explicit-switch
+invariant and every `data-*` attribute, role, label, and command name asserted by
+browser tests. The popup is restyled as a dark card and uses the "Rogatio" brand. All
+Rogatio documents use the "Rogatio" brand; no other product name appears.
+
+### Accessibility and offline constraints
+
+The theme keeps forced-colors token mapping, reduced-motion handling, visible focus
+rings, keyboard completeness, and reflow at 200% zoom and narrow widths. Nothing in
+the design system adds network access, telemetry, storage, or runtime dependencies;
+the MV3 CSP is unchanged and all assets (CSS, fonts) ship inside the extension dist.
+
 ## Editor Architecture
 
 The editor package introduces a private `@rogatio/editor` package as the shared browser-facing editor boundary. It is a framework-free ESM package that owns a project editor's DOM view, draft state, common matcher editing, navigation, and accessible interaction model. It does not own persistence, browser-core lifecycle, permissions, extension APIs, CLI process behavior, runtime behavior, or rule actions.
