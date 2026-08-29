@@ -16,6 +16,8 @@
     "test:browser": "pnpm build && playwright test",
     "validate": "node scripts/validate.ts",
     "release": "semantic-release",
+    "check": "biome check .",
+    "prepare": "husky",
     "site": "pnpm --filter @rogatio/docs-site dev",
     "site:build": "pnpm --filter @rogatio/docs-site build",
     "site:preview": "pnpm --filter @rogatio/docs-site preview"
@@ -29,6 +31,7 @@
     "playwright": "1.62.1",
     "semantic-release": "24.2.5",
     "typescript": "7.0.2",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "husky": "^9.1.7"
   }
 }

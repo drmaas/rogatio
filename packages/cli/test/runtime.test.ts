@@ -149,7 +149,7 @@ describe("rogatio runtime command ()", () => {
         metadata: { presetDigest: preset.digest },
       }),
     );
-    const connectMeta = parseFrame(connectResp!)["metadata"] as {
+    const connectMeta = parseFrame(connectResp!).metadata as {
       mocks: Array<{ ruleId: string; token: string }>;
     };
     expect(connectMeta.mocks[0]?.ruleId).toBe("rule-mock");
@@ -164,7 +164,7 @@ describe("rogatio runtime command ()", () => {
     );
     await host.stop();
 
-    const meta = parseFrame(served!)["metadata"] as {
+    const meta = parseFrame(served!).metadata as {
       status: number;
       headers: Array<[string, string]>;
       mockBody: string;

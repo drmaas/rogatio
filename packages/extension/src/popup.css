@@ -190,6 +190,6 @@ body {
   .rogatio-popup *,
   .rogatio-popup *::before,
   .rogatio-popup *::after {
-    transition: none !important;
+    transition: none;
   }
 }

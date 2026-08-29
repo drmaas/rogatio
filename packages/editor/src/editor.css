@@ -425,8 +425,8 @@
   .rogatio-editor *,
   .rogatio-editor *::before,
   .rogatio-editor *::after {
-    scroll-behavior: auto !important;
-    transition: none !important;
+    scroll-behavior: auto;
+    transition: none;
   }
 }
 .rogatio-editor [data-test-description] {

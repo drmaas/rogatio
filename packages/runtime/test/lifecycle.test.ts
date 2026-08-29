@@ -220,7 +220,7 @@ describe("pairing and authorization success (spec REQ-005)", () => {
     await controller.start();
     const bootstrap = controller.getBootstrapCapability();
     expect(typeof bootstrap).toBe("string");
-    expect(bootstrap!.length).toBeGreaterThan(0);
+    expect(bootstrap?.length).toBeGreaterThan(0);
   });
 
   it("pair.request with the bootstrap capability yields a session capability", async () => {
