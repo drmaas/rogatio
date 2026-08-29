@@ -13,6 +13,10 @@ Rogatio is a strict TypeScript 7, ESM/NodeNext monorepo using pnpm 10.32.1.
 | `@rogatio/compiler` | Validated source → browser-neutral operations + stable diagnostics. |
 | `@rogatio/browser-core` | Versioned storage, migrations, permissions, enablement, CAS lifecycle, atomic install/recovery, runtime state, diagnostics, badge state. |
 | `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
+| `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (4-dim matching, preview seam). |
+| `@rogatio/docs-site` | Astro + Starlight static documentation site (this site). |
+| `@rogatio/sanity` | Additional validation and sanity checks. |
+| `@rogatio/smoke` | Browser smoke tests and end-to-end journey fixtures. |
 | Chrome MV3 extension | Translates neutral rules to WebExtensions/DNR. Designed to support more browsers later. |
 | `@rogatio/cli` | Editor host, file verification, runtime dispatch, macOS runtime lifecycle. |
 | `@rogatio/runtime` | Reusable bounded mock, response-body, and request-body transformation/runtime components. |

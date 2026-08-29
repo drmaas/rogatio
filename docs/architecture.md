@@ -1,6 +1,6 @@
 # Rogatio Architecture
 
-**Status:** Monorepo bootstrap, schema, compiler, browser-core, editor, runtime foundation, extension shell, CLI, redirect rules, query rules, header rules, and offline dry-run are released through Stage 10. **Mock rules** is in progress in the `feature/f13-mock-rules` worktree (implementation rebased onto current main). **The macOS native-messaging runtime** is implemented on current main; its native runtime controls remain integrated with the shared `rogatio runtime` command.
+**Status:** All features through F22 (design system) are released on `main`. The macOS native-messaging runtime controls remain integrated with the shared `rogatio runtime` command. Mock rules (F13) and response-body/request-body rule implementations remain out of scope for the current main sequence; their specs and plans are preserved under `docs/specs/` and `docs/plans/` but not edited by this sync.
 
 ## Package Boundaries
 

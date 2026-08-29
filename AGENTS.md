@@ -2,7 +2,7 @@
 
 ## Repository State
 
-Read `rogatio-overview.md` and `sequence.md` before changing scope. Respect the documented feature sequence, package boundaries, and non-goals; do not implement work assigned to a later sequence item without an explicit scope change.
+Read `rogatio-overview.md` and `docs/architecture.md` before changing scope. Respect the documented package boundaries and non-goals; do not expand scope beyond the current feature without an explicit change.
 
 ## Durable Documentation
 
