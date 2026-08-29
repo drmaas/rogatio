@@ -40,6 +40,37 @@ describe("envelope body exclusion", () => {
   });
 });
 
+describe("mockBody confinement (spec REQ-006)", () => {
+  it("allows mockBody only on the mock.response envelope", () => {
+    expect(() =>
+      serializeEnvelope({
+        type: "mock.response",
+        metadata: { status: 200, mockBody: "eA==" },
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects mockBody on any other envelope type", () => {
+    expect(() =>
+      serializeEnvelope({
+        type: "runtime.status",
+        metadata: { mockBody: "eA==" },
+      }),
+    ).toThrow(EnvelopeError);
+  });
+
+  it("round-trips a mock.response with base64 mockBody", () => {
+    const json = serializeEnvelope({
+      type: "mock.response",
+      requestId: "r1",
+      metadata: { status: 201, mockBody: "aGVsbG8=" },
+    });
+    const parsed = parseEnvelope(json);
+    expect(parsed.type).toBe("mock.response");
+    expect((parsed.metadata as { mockBody: string }).mockBody).toBe("aGVsbG8=");
+  });
+});
+
 describe("envelope round-trip and determinism", () => {
   it("round-trips a parsed envelope", () => {
     const json = serializeEnvelope({

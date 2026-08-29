@@ -1,6 +1,12 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  createNativeHost,
+  type NormalizedRuntimePreset,
+  type PresetDigest,
+  RUNTIME_LIMITS,
+} from "@rogatio/runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runtimeCommand } from "../src/commands/runtime.js";
 import { writeProject } from "../src/utils/file.js";
@@ -32,12 +38,34 @@ function mockProject(overrides: Record<string, unknown> = {}): unknown {
   };
 }
 
-async function httpJson(
-  port: number,
-  path: string,
-): Promise<{ status: number; body: string }> {
-  const response = await fetch(`http://127.0.0.1:${port}${path}`);
-  return { status: response.status, body: await response.text() };
+function frame(obj: unknown): Uint8Array {
+  const json = new TextEncoder().encode(JSON.stringify(obj));
+  const out = new Uint8Array(4 + json.byteLength);
+  new DataView(out.buffer).setUint32(0, json.byteLength, true);
+  out.set(json, 4);
+  return out;
+}
+
+function parseFrame(buffer: Uint8Array): Record<string, unknown> {
+  const length = new DataView(buffer.buffer, buffer.byteOffset, 4).getUint32(
+    0,
+    true,
+  );
+  const json = new TextDecoder("utf-8").decode(buffer.subarray(4, 4 + length));
+  return JSON.parse(json) as Record<string, unknown>;
+}
+
+function normalizeMockPreset(): NormalizedRuntimePreset {
+  return {
+    version: 1,
+    limits: RUNTIME_LIMITS,
+    matchers: [],
+    grants: [],
+    canonicalBytes: new Uint8Array([1, 2, 3]),
+    digest:
+      "sha256:0000000000000000000000000000000000000000000000000000000000000000" as PresetDigest,
+    mocks: [{ ruleId: "rule-mock", status: 200, body: "hello" }],
+  };
 }
 
 describe("rogatio runtime command ()", () => {
@@ -51,104 +79,28 @@ describe("rogatio runtime command ()", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  it("starts the mock runtime, serves a mock, prints connection info, and stops cleanly", async () => {
+  it("rejects starting an HTTP mock server via `rogatio runtime <path>`", async () => {
     const projectPath = join(testDir, ".rogatio.json");
     await writeProject(projectPath, mockProject());
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
-
-    const result = await runtimeCommand([projectPath, "--port", "0"]);
-    if (typeof result === "number") throw new Error("expected mock runtime");
-    const { exitCode, shutdown } = result;
-
-    const output = log.mock.calls.map((call) => String(call[0])).join("\n");
-    const portMatch = /http:\/\/127\.0\.0\.1:(\d+)/.exec(output);
-    expect(portMatch).not.toBeNull();
-    const port = Number(portMatch?.[1]);
-    expect(output).toContain("mock");
-
-    const connection = await httpJson(port, "/v1/connection");
-    expect(connection.status).toBe(200);
-    const info = JSON.parse(connection.body) as {
-      protocol: string;
-      mocks: Array<{ ruleId: string; token: string }>;
-    };
-    expect(info.protocol).toBe("v1");
-    const token = info.mocks[0]?.token;
-    expect(token).toBeDefined();
-
-    const served = await httpJson(port, `/mock/${token}`);
-    expect(served.status).toBe(200);
-    expect(served.body).toBe("hello");
-
-    shutdown();
-    const code = await exitCode;
-    expect(code).toBe(0);
-    log.mockRestore();
+    const error = (console as unknown as { error: (m: string) => void }).error;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const code = await runtimeCommand([projectPath]);
+    expect(code).toBe(2);
+    expect(spy.mock.calls.join("\n")).toContain("HTTP mock server");
+    spy.mockRestore();
+    void error;
   });
 
-  it("exits 1 for an invalid project with diagnostics-style output", async () => {
+  it("exits 1 for a schema-invalid project via runtime-host", async () => {
     const projectPath = join(testDir, ".rogatio.json");
-    await writeProject(
-      projectPath,
-      mockProject({
-        groups: [
-          {
-            id: "group-main",
-            name: "Main",
-            origins: ["https://example.com"],
-            rules: [
-              {
-                id: "rule-mock",
-                name: "Mock rule",
-                urlRegex: "^https://example\\.com/",
-                origins: [],
-                resourceTypes: ["main_frame"],
-                priority: 100,
-                type: "mock",
-                mock: { status: 200, body: "x", file: "a.txt" },
-              },
-            ],
-          },
-        ],
-      }),
-    );
+    await writeFile(projectPath, JSON.stringify({ version: 1, name: "x" }));
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const result = await runtimeCommand([projectPath]);
-    if (typeof result === "number") throw new Error("expected mock runtime");
-    const { exitCode, shutdown } = result;
-    const code = await exitCode;
+    const code = await runtimeCommand(["runtime-host", projectPath]);
     expect(code).toBe(1);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining("mock"));
-    shutdown();
     error.mockRestore();
   });
 
-  it("exits 2 when the fixed port is already occupied", async () => {
-    const projectPath = join(testDir, ".rogatio.json");
-    await writeProject(projectPath, mockProject());
-    const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const first = await runtimeCommand([projectPath, "--port", "0"]);
-    if (typeof first === "number") throw new Error("expected mock runtime");
-    const output = log.mock.calls.map((call) => String(call[0])).join("\n");
-    const port = Number(/http:\/\/127\.0\.0\.1:(\d+)/.exec(output)?.[1]);
-
-    const second = await runtimeCommand([projectPath, "--port", String(port)]);
-    if (typeof second === "number") throw new Error("expected mock runtime");
-    const secondCode = await second.exitCode;
-    expect(secondCode).toBe(2);
-    expect(error).toHaveBeenCalled();
-
-    first.shutdown();
-    const firstCode = await first.exitCode;
-    expect(firstCode).toBe(0);
-    log.mockRestore();
-    error.mockRestore();
-  });
-
-  it("rejects a file mock resolved outside the configured root", async () => {
+  it("rejects a file mock resolved outside the configured root via runtime-host", async () => {
     const projectPath = join(testDir, ".rogatio.json");
     await writeProject(
       projectPath,
@@ -175,13 +127,50 @@ describe("rogatio runtime command ()", () => {
       }),
     );
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const result = await runtimeCommand([projectPath, "--root", testDir]);
-    if (typeof result === "number") throw new Error("expected mock runtime");
-    const { exitCode, shutdown } = result;
-    const code = await exitCode;
+    const code = await runtimeCommand([
+      "runtime-host",
+      "--root",
+      testDir,
+      projectPath,
+    ]);
     expect(code).toBe(1);
-    shutdown();
     error.mockRestore();
+  });
+
+  it("serves a mock end-to-end through the native host envelope loop", async () => {
+    const preset = normalizeMockPreset();
+    const host = createNativeHost({ preset });
+    await host.start();
+
+    const connectResp = await host.processFrame(
+      frame({
+        protocol: "v1",
+        type: "mock.connect",
+        metadata: { presetDigest: preset.digest },
+      }),
+    );
+    const connectMeta = parseFrame(connectResp!)["metadata"] as {
+      mocks: Array<{ ruleId: string; token: string }>;
+    };
+    expect(connectMeta.mocks[0]?.ruleId).toBe("rule-mock");
+    const token = connectMeta.mocks[0]?.token;
+
+    const served = await host.processFrame(
+      frame({
+        protocol: "v1",
+        type: "mock.request",
+        metadata: { token },
+      }),
+    );
+    await host.stop();
+
+    const meta = parseFrame(served!)["metadata"] as {
+      status: number;
+      headers: Array<[string, string]>;
+      mockBody: string;
+    };
+    expect(meta.status).toBe(200);
+    const body = Buffer.from(meta.mockBody, "base64").toString("utf8");
+    expect(body).toBe("hello");
   });
 });

@@ -91,9 +91,9 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port. |
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
-| `rogatio runtime <start\|stop\|status>` | Native-messaging runtime control. Capability-gated: `start` reports `unsupported` on platforms that cannot provision a trusted device-local CA or where Chrome PAC routing would collide with an existing controlling proxy/PAC/extension/enterprise policy. |
-| `rogatio runtime <install\|trust\|untrust\|uninstall>` | Request-body trust lifecycle. `install` writes the native-messaging host manifest; `trust` provisions and trusts the device-local CA; `untrust`/`uninstall` remove CA trust and the manifest (idempotent). All are capability-gated and report `unsupported` without error on incapable platforms. `rogatio runtime status` reports both runtime and trust state. |
-| `rogatio runtime [path]` | Starts the local mock runtime on `127.0.0.1:8890` (override with `--port <n>`; `--root <dir>` confines mock file reads). Print "Check and connect" in the extension to install mock rules. Press Ctrl+C to stop. |
+| `rogatio runtime <start\|stop\|status>` | Native-messaging runtime control. The native host starts unconditionally (no capability gate); it serves pairing, authorization, and mock delivery over stdio native-messaging. `status` reports runtime and trust state. |
+| `rogatio runtime <install\|trust\|untrust\|uninstall>` | Request-body trust lifecycle. `install` writes the native-messaging host manifest; `trust` provisions and trusts the device-local CA; `untrust`/`uninstall` remove CA trust and the manifest (idempotent). The CA/trust provisioning remains capability-gated at the OS level and reports `unsupported` without error on incapable platforms. `rogatio runtime status` reports both runtime and trust state. |
+| `rogatio runtime-host <path>` | Starts the consolidated native-messaging host for the project on stdio (used by the browser extension). Mock delivery, pairing, and authorization all flow through this single host; no separate HTTP mock server exists. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome, grant only declared site access, and activate the groups you need.
@@ -115,15 +115,15 @@ cat test-cases.json | rogatio test .rogatio.json --urls-file -
 
 A `mock` rule returns a configured status, optional headers, optional delay, and
 an inline body or a live UTF-8 snapshot of one approved local file — without
-contacting upstream. Mocks are served by the local runtime and installed into
-the browser via a single Check-and-connect request.
+contacting upstream. Mocks are delivered by the consolidated native-messaging
+host and installed into the browser via a single Check-and-connect request.
 
 ```sh
-# Start the mock runtime (default port 8890)
-rogatio runtime .rogatio.json
+# Start the native-messaging host for the project (launched by the extension)
+rogatio runtime-host .rogatio.json
 
-# Override the port and file root
-rogatio runtime .rogatio.json --port 9000 --root ~/projects/demo
+# Override the confined file root
+rogatio runtime-host .rogatio.json --root ~/projects/demo
 ```
 
 Then open the extension, click **Check and connect**, and matched requests

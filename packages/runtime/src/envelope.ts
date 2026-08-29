@@ -8,6 +8,9 @@ import {
 
 const FORBIDDEN_BODY_KEYS = new Set(["body", "requestBody", "responseBody"]);
 
+const MOCK_BODY_KEY = "mockBody";
+const MOCK_BODY_ALLOWED_TYPES = new Set(["mock.response"]);
+
 const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "runtime.start",
   "runtime.stop",
@@ -16,6 +19,13 @@ const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "authority.revoke",
   "transform.request",
   "transform.result",
+  "pair.request",
+  "pair.response",
+  "authorize.request",
+  "authorize.response",
+  "mock.connect",
+  "mock.request",
+  "mock.response",
 ]);
 
 export class EnvelopeError extends Error {
@@ -44,10 +54,23 @@ export function containsBodyKey(value: unknown): boolean {
   return false;
 }
 
-function assertNoBodyContent(metadata: Record<string, unknown>): void {
+/**
+ * Body confidentiality (spec REQ-006): request/response body keys are forbidden
+ * on every envelope; the base64 `mockBody` field is permitted only on the
+ * `mock.response` envelope.
+ */
+function assertNoBodyContent(
+  type: string,
+  metadata: Record<string, unknown>,
+): void {
   if (containsBodyKey(metadata)) {
     throw new EnvelopeError(
       "envelope must not carry request or response body content",
+    );
+  }
+  if (MOCK_BODY_KEY in metadata && !MOCK_BODY_ALLOWED_TYPES.has(type)) {
+    throw new EnvelopeError(
+      "mockBody is only permitted on the mock.response envelope",
     );
   }
 }
@@ -63,7 +86,7 @@ export function serializeEnvelope(input: EnvelopeInput): string {
   if (input.metadata === undefined || typeof input.metadata !== "object") {
     throw new EnvelopeError("envelope metadata is required");
   }
-  assertNoBodyContent(input.metadata);
+  assertNoBodyContent(input.type, input.metadata);
 
   const envelope: Envelope = {
     protocol: PROTOCOL,
@@ -103,7 +126,10 @@ export function parseEnvelope(json: string): Envelope {
   if (typeof record.metadata !== "object" || record.metadata === null) {
     throw new EnvelopeError("envelope metadata missing");
   }
-  assertNoBodyContent(record.metadata as Record<string, unknown>);
+  assertNoBodyContent(
+    record.type as string,
+    record.metadata as Record<string, unknown>,
+  );
 
   const envelope: Envelope = {
     protocol: PROTOCOL,

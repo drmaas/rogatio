@@ -1298,3 +1298,61 @@ Building the real journeys exposed defects that the mocked unit tests could not:
 - Committing a golden profile with manually granted permissions: rejected — machine-
   and Chrome-version-specific, and it would carry browser state into the repository.
 
+## Native runtime consolidation (feature/consolidated-native-runtime)
+
+All F6 runtime behavior (pairing, authorization, mock delivery) now runs inside the F14
+native-messaging host instead of a separate CLI HTTP server. One process serves every
+runtime need (spec REQ-001).
+
+### Components affected (this pass)
+- `packages/runtime/src/`: removed `server.ts` (F6 HTTP mock/pair server); `mock.ts` now
+  renders bytes for envelope transport; `envelope.ts` allows base64 `mockBody` only on
+  `mock.response`; `lifecycle.ts` integrates pair/authorize/mock dispatch and starts
+  unconditionally; new `host.ts` is the stdio native-messaging loop plus a loopback
+  mock-body faucet (`--mock-port`); `proxy.ts` retained (request-body markers).
+- `packages/cli/src/commands/runtime.ts`: removed the `rogatio runtime [path]` HTTP
+  mock-server path; added `rogatio runtime-host <path>` (with `--mock-port`); kept native
+  start/stop/status and trust lifecycle. The CLI `rogatio` binary also routes a
+  `runtime-host` argv[1] basename to the host entry point so the native-messaging
+  manifest's `runtime-host` executable works.
+- `packages/extension/src/background.ts`: production `nativeRuntime` adapter built over
+  `chrome.runtime.connectNative` (envelope `send` + thin start/stop/status/sendPolicy
+  shims). Mocks are discovered via `connectNativeMock` (`mock.connect`) and delivered
+  through the single native host.
+- `packages/extension/src/native-session.ts`: `connectNativeMock`/`requestNativeMock`
+  envelope methods (REQ-013); `mock.connect` returns the loopback faucet `port` + per-rule
+  tokens.
+- `packages/extension/src/service-worker.ts`: `check-mock-runtime` prefers the native-host
+  envelope path, storing the connection (port + tokens) for the DNR `mockUrlResolver`
+  (REQ-007). The two phase *states* (MockRuntimePhase for mock-connection status,
+  NativeRuntimePhase for control) remain for status reporting, but both are now driven by
+  the single consolidated native host; the standalone HTTP mock server is gone.
+
+### Components affected (follow-up, NOT in this pass)
+- `packages/extension/src/mock-runtime.ts`: the HTTP `fetchMockConnection`/`DEFAULT_MOCK_PORT`
+  path is now dead (legacy fallback only); `createMockConnectionHolder` is retained as the
+  connection holder.
+- Replacement of the F6/F13/F14 specs by the consolidated spec (the consolidated spec
+  supersedes them by scope).
+
+### Protocol design
+Only stdio native-messaging (`f14-v1` extended). New envelope message types:
+`pair.request`, `pair.response`, `authorize.request`, `authorize.response`,
+`mock.connect`, `mock.request`, `mock.response`. Pair/auth reuse the F6 capability (random
+token) + preset digest authorization within the envelope handshake. Mock responses use the
+base64 `mockBody` field (max 64KB, `ENVELOPE_MAX_BYTES`).
+
+### Security boundaries (unified)
+- Pairing capability + preset digest authorizes the session.
+- Authority revalidation (`revalidateAuthority`) applies to all transforms (mock + body +
+  header).
+- Body confidentiality: for non-mock transforms the envelope never carries body bytes (as in
+  F14); for mock responses the body is delivered via `mockBody` base64 and never
+  persisted/logged/exported outside the process.
+- The native host starts unconditionally (no `unsupported` state from adapter absence).
+
+### State transitions
+- Native host: `idle` → `running` (start) → `stopped` (stop). No `unsupported` state.
+- Extension service-worker: mock discovery and control both run through the single native
+  host (the HTTP mock server is removed); phase states remain for status reporting.
+

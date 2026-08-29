@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { editCommand } from "./commands/edit.js";
-import { runtimeCommand } from "./commands/runtime.js";
+import { runRuntimeHostEntry, runtimeCommand } from "./commands/runtime.js";
 import { testCommand, testCommandNeedsStdin } from "./commands/test.js";
 import { verifyCommand } from "./commands/verify.js";
 
@@ -115,7 +115,7 @@ Commands:
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
   runtime <start|stop|status|install|trust|untrust|uninstall>  Native messaging runtime and request-body trust control
-  runtime [path]  Start the mock runtime server ()
+  runtime-host [path]  Run the consolidated native-messaging runtime host
 
 Global Options:
   --help, -h      Show help
@@ -162,35 +162,42 @@ Exit codes:
 
 function showRuntimeHelp(): void {
   console.log(`Usage: rogatio runtime <command> [options]
-       rogatio runtime [options] [path]
+       rogatio runtime-host [path]
 
-Native messaging runtime control for response-body and request-body rules, or
-start the local mock runtime for  mock rules.
+Native messaging runtime control for response-body and request-body rules. The
+runtime no longer serves an HTTP mock server; mock delivery happens in the
+consolidated native-messaging host (spec REQ-001..REQ-005).
 
 Native runtime commands:
-  start     Start the runtime (capability-gated; explicit, no auto-start)
+  start     Start the runtime (explicit, no auto-start)
   stop      Stop the runtime (idempotent)
-  status    Show the current runtime state
+  status    Show the current runtime and trust state
 
-Mock runtime arguments:
-  path      Path to .rogatio.json (default: .rogatio.json in current directory)
-            Use '-' to read project JSON from stdin
+Request-body trust commands:
+  install   Install the native-messaging host manifest (requires --extension-id)
+  trust     Provision and trust the device-local CA
+  untrust   Remove the device-local CA trust (idempotent)
+  uninstall Uninstall the native-messaging host manifest (idempotent)
+
+Native host command:
+  runtime-host [path]  Run the consolidated native-messaging runtime host. The
+                      browser launches this process via the native-messaging
+                      manifest; it reads pairing/authorization/mock envelopes from
+                      stdin and writes responses to stdout.
 
 Options:
-  --port <n>      Port for the mock runtime (default: 8890; use 0 for ephemeral)
   --root <dir>    Root for confined file mocks (default: project directory)
+  --extension-id  Extension ID for native messaging manifest (required for install)
   --help, -h      Show this help
 
-The native runtime activates only where a trusted device-local CA can be provisioned
-and Chrome PAC routing does not collide with an existing controlling proxy/PAC/extension
-or enterprise policy. On incapable platforms 'start' reports 'unsupported'.
-The mock runtime prints connection instructions; open the extension and click
-"Check and connect" to install mock rules.
+The native runtime activates unconditionally once started; the device-local CA /
+PAC routing capability only affects request-body interception, not the host
+control plane.
 
 Exit codes:
-  0  Stopped cleanly
+  0  Stopped cleanly / success
   1  Invalid project (diagnostics present) or file outside the root
-  2  Error (IO, startup, port conflict)`);
+  2  Error (IO or usage)`);
 }
 
 function showTestHelp(): void {
@@ -231,8 +238,15 @@ if (
   realpathSync.native(fileURLToPath(import.meta.url)) ===
     realpathSync.native(resolve(process.argv[1]))
 ) {
-  cli().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  if (basename(process.argv[1]) === "runtime-host") {
+    runRuntimeHostEntry().catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+  } else {
+    cli().catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+  }
 }

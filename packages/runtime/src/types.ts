@@ -79,25 +79,6 @@ export interface NormalizedRuntimePreset extends RuntimePresetV1 {
   readonly digest: PresetDigest;
 }
 
-export interface RuntimeBootstrap {
-  readonly host: "127.0.0.1";
-  readonly port: number;
-  readonly presetDigest: PresetDigest;
-  readonly bootstrapCapability: string;
-}
-
-export interface RuntimeServer {
-  readonly bootstrap: RuntimeBootstrap;
-  stop(): Promise<void>;
-}
-
-export interface RuntimeServerOptions {
-  readonly preset: NormalizedRuntimePreset;
-  readonly fileRoot?: string;
-  readonly clock?: () => number;
-  readonly port?: number;
-}
-
 export interface AuthorizedOperation {
   readonly groupId: string;
   readonly ruleId: string;
@@ -243,7 +224,8 @@ export type RuntimeErrorCode =
   | "runtime.request-body-upstream-failed"
   | "runtime.request-body-timeout"
   | "runtime.tls-ca-not-loaded"
-  | "runtime.tls-leaf-generation-failed";
+  | "runtime.tls-leaf-generation-failed"
+  | "runtime.mock-unknown";
 
 export interface RuntimeError {
   readonly code: RuntimeErrorCode;
@@ -318,7 +300,75 @@ export type EnvelopeMessageType =
   | "authority.grant"
   | "authority.revoke"
   | "transform.request"
-  | "transform.result";
+  | "transform.result"
+  | "pair.request"
+  | "pair.response"
+  | "authorize.request"
+  | "authorize.response"
+  | "mock.connect"
+  | "mock.request"
+  | "mock.response";
+
+export interface PairRequest {
+  readonly capability: string;
+  readonly presetDigest: string;
+}
+
+export interface PairResponse {
+  readonly sessionCapability: string;
+  readonly expiresInMs: number;
+  readonly error?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface AuthorizeRequest {
+  readonly sessionCapability: string;
+  readonly presetDigest: string;
+  readonly descriptor: unknown;
+}
+
+export interface AuthorizeResponse {
+  readonly authorized: boolean;
+  readonly groupId?: string;
+  readonly ruleId?: string;
+  readonly operationId?: string;
+  readonly kind?: RuntimeOperationKind;
+  readonly target?: string;
+  readonly method?: HttpMethod;
+  readonly error?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface MockConnectRequest {
+  readonly presetDigest: string;
+}
+
+export interface MockConnectResponse {
+  readonly protocol: "v1";
+  readonly presetDigest: PresetDigest;
+  readonly mocks: readonly {
+    readonly ruleId: string;
+    readonly token: string;
+  }[];
+  /** Loopback faucet port the browser redirects mock requests to (spec REQ-003). */
+  readonly port?: number;
+  readonly error?: string;
+  readonly [key: string]: unknown;
+}
+
+export interface MockRequest {
+  readonly token: string;
+  readonly method?: string;
+}
+
+export interface MockResponse {
+  readonly status: number;
+  readonly headers?: readonly (readonly [string, string])[];
+  readonly mockBody: string;
+  readonly [key: string]: unknown;
+}
+
+export interface MockConnectInfo extends MockConnectResponse {}
 
 export interface Envelope {
   readonly protocol: typeof PROTOCOL;

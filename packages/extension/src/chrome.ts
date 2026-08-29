@@ -14,9 +14,21 @@ export interface ChromeAction {
   setBadgeBackgroundColor(details: { color: string }): Promise<void>;
 }
 
+export interface ChromePort {
+  postMessage(message: unknown): void;
+  onMessage: {
+    addListener(listener: (message: unknown) => void): void;
+  };
+  onDisconnect: {
+    addListener(listener: () => void): void;
+  };
+}
+
 export interface ChromeRuntime {
   lastError?: { readonly message?: string };
+  id?: string;
   sendMessage(message: unknown, callback: (response: unknown) => void): void;
+  connectNative?(name: string): ChromePort;
   onMessage: {
     addListener(
       listener: (

@@ -29,6 +29,7 @@ function adapter(overrides: Partial<PlatformInterceptionAdapter> = {}) {
 const activation = {
   state: "running" as const,
   startedAt: 1,
+  presetDigest: "sha256:example" as const,
   pacOrigins: ["https://example.com"],
   proxy: { host: "127.0.0.1", port: 8443 },
 };
