@@ -31,7 +31,7 @@ After `pnpm build`, validate `.rogatio.json` against the schema package:
 node -e "
 import { validateProjectDetailed } from './packages/schema/dist/node/index.js';
 import { readFileSync } from 'fs';
-const data = JSON.parse(readFileSync('samples/sample-rules/.rogatio.json', 'utf8'));
+const data = JSON.parse(readFileSync('samples/basic/.rogatio.json', 'utf8'));
 const r = validateProjectDetailed(data);
 console.log('valid?', r.valid);
 if (!r.valid) console.error(r.errors);
@@ -55,7 +55,7 @@ pnpm --filter @rogatio/schema test
 ## File layout
 
 ```
-samples/sample-rules/
+samples/basic/
 ├── .rogatio.json
 └── README.md
 ```
