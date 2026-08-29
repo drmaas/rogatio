@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "name": "Sample Rules Project",
+  "description": "Exercises every Rogatio rule type: redirect, query, header, mock, response-body, and request-body.",
+  "groups": [
+    {
+      "id": "grp-sample",
+      "name": "Sample Rules Group",
+      "origins": ["https://example.com"],
+      "rules": [
+        {
+          "id": "rule-redirect",
+          "name": "Redirect to docs",
+          "urlRegex": "^https://example\\.com/old/",
+          "origins": [],
+          "resourceTypes": ["main_frame"],
+          "priority": 100,
+          "type": "redirect",
+          "redirect": {
+            "destination": "https://example.com/new/"
+          }
+        },
+        {
+          "id": "rule-query",
+          "name": "Add tracking param",
+          "urlRegex": "^https://example\\.com/page\\?",
+          "origins": [],
+          "resourceTypes": ["main_frame"],
+          "priority": 200,
+          "type": "query",
+          "action": {
+            "type": "query",
+            "params": [{ "name": "ref", "value": "rogatio" }]
+          }
+        },
+        {
+          "id": "rule-header-set",
+          "name": "Set request header",
+          "urlRegex": "^https://example\\.com/api/",
+          "origins": [],
+          "resourceTypes": ["xmlhttprequest"],
+          "priority": 300,
+          "method": "GET",
+          "type": "header",
+          "headerDirection": "request",
+          "headerOperation": "set",
+          "headerName": "X-Rogatio-Sample",
+          "headerValue": "enabled"
+        },
+        {
+          "id": "rule-header-remove",
+          "name": "Remove response header",
+          "urlRegex": "^https://example\\.com/api/",
+          "origins": [],
+          "resourceTypes": ["main_frame"],
+          "priority": 310,
+          "type": "header",
+          "headerDirection": "response",
+          "headerOperation": "remove",
+          "headerName": "X-Test-Header"
+        },
+        {
+          "id": "rule-mock",
+          "name": "Mock API response",
+          "urlRegex": "^https://example\\.com/mock/",
+          "origins": [],
+          "resourceTypes": ["xmlhttprequest"],
+          "priority": 400,
+          "type": "mock",
+          "mock": {
+            "status": 200,
+            "headers": [
+              { "name": "Content-Type", "value": "application/json" }
+            ],
+            "delayMs": 100,
+            "body": "{\"mocked\":true}"
+          }
+        },
+        {
+          "id": "rule-response-body",
+          "name": "Rewrite response body",
+          "urlRegex": "^https://example\\.com/data\\.json",
+          "origins": [],
+          "resourceTypes": ["main_frame"],
+          "priority": 500,
+          "type": "response-body",
+          "responseBody": {
+            "replacements": [
+              { "pattern": "oldValue", "replacement": "newValue" }
+            ]
+          }
+        },
+        {
+          "id": "rule-request-body",
+          "name": "Replace request body",
+          "urlRegex": "^https://example\\.com/submit",
+          "origins": [],
+          "resourceTypes": ["xmlhttprequest"],
+          "priority": 600,
+          "method": "POST",
+          "type": "request-body",
+          "requestBody": {
+            "mode": "replace",
+            "body": "{\"replaced\":true}"
+          }
+        }
+      ]
+    }
+  ]
+}
