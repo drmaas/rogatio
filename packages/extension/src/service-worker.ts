@@ -24,7 +24,9 @@ import {
   DEFAULT_MOCK_PORT,
   type MockRuntimeConnection,
 } from "./mock-runtime.js";
+import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
+  connectNativeMock,
   type NativeRuntimeConfig,
   startNativeSession,
   stopNativeSession,
@@ -58,6 +60,8 @@ export interface ExtensionApplicationOptions {
     stop(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
     status(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
     sendPolicy(frames: Uint8Array[]): Promise<void>;
+    /** Envelope protocol to the consolidated native host (spec REQ-001). */
+    send?(envelope: NativeEnvelopeInput): Promise<NativeEnvelope>;
   };
   readonly mockRuntime?: {
     readonly fetchConnection: (
@@ -618,6 +622,50 @@ export function createExtensionApplication(
       const begin = mockRuntimeState.beginMockCheck();
       if (!begin.ok) return failure("extension.mock-check-in-progress");
 
+      // Prefer the consolidated native host envelope protocol (spec REQ-003).
+      if (options.nativeRuntime?.send) {
+        const connection = await connectNativeMock(
+          {
+            extensionId: options.extensionId ?? "",
+            nativeRuntime: options.nativeRuntime,
+            getProject: async () => ({
+              data: project.data,
+              enabledGroupIds: project.enabledGroupIds,
+            }),
+            getGrantedOrigins: async () => [],
+          },
+          "",
+        );
+        if (connection !== null) {
+          mockTokens = new Map(
+            connection.mocks.map((mock) => [mock.ruleId, mock.token]),
+          );
+          mockRuntimeState.completeMockCheck(true);
+          options.mockRuntime?.setConnection?.({
+            protocol: "v1",
+            port: connection.port ?? DEFAULT_MOCK_PORT,
+            presetDigest: "",
+            mocks: connection.mocks,
+          });
+          const declared = declaredPermissionOrigins({
+            operations: compiled.operations,
+          });
+          const granted = await grantedOriginsFor(declared);
+          const grantedSet = new Set(granted);
+          const installOps = enabledMockOps.filter(
+            (op) =>
+              op.matcher.origins.every((origin) => grantedSet.has(origin)) &&
+              mockTokens.has(op.ruleId),
+          );
+          if (installOps.length > 0) {
+            await options.installer.install(installOps);
+          }
+          return state();
+        }
+      }
+
+      // Fallback to the legacy HTTP mock adapter (deprecated; retained until
+      // browser-side native-host fulfillment replaces DNR redirects to :8890).
       const connection = options.mockRuntime
         ? await options.mockRuntime.fetchConnection(port)
         : null;

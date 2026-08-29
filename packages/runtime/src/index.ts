@@ -2,6 +2,7 @@ export { classifyAddress, isPublicAddress } from "./address-policy.js";
 export { authorizeExact } from "./authorization.js";
 export { isConfinedFileSupported, readConfinedFile } from "./confined-file.js";
 export * from "./envelope.js";
+export * from "./host.js";
 export * from "./interception.js";
 export * from "./lifecycle.js";
 export { RUNTIME_LIMITS } from "./limits.js";
@@ -17,7 +18,6 @@ export {
   rewriteResponseBody,
 } from "./response-body.js";
 export * from "./revalidate.js";
-export { createRuntimeServer } from "./server.js";
 export * from "./target.js";
 export * from "./tls.js";
 export * from "./trust.js";
@@ -33,7 +33,6 @@ export type {
   OutboundTransport,
   PresetDigest,
   ResolvedAddress,
-  RuntimeBootstrap,
   RuntimeError,
   RuntimeErrorCode,
   RuntimeGrant,
@@ -42,8 +41,6 @@ export type {
   RuntimeOperationKind,
   RuntimePresetV1,
   RuntimeResult,
-  RuntimeServer,
-  RuntimeServerOptions,
 } from "./types.js";
 export * from "./types.js";
 export * from "./wire.js";

@@ -19,12 +19,12 @@ describe("rogatio runtime command", () => {
     expect(log.mock.calls.join("\n")).toContain("rogatio runtime");
   });
 
-  it("reports unsupported with default capabilities on start", async () => {
+  it("starts the runtime without capability gating", async () => {
     silence();
-    const err = vi.spyOn(console, "error");
+    const log = vi.spyOn(console, "log");
     const code = await runtimeCommand(["start"]);
     expect(code).toBe(0);
-    expect(err.mock.calls.join("\n")).toContain("unsupported");
+    expect(log.mock.calls.join("\n")).toContain("runtime started");
   });
 
   it("prints a state on status", async () => {

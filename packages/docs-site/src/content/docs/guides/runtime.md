@@ -1,26 +1,28 @@
 ---
 title: Local runtime
-description: The macOS native-messaging runtime for response-body and request-body rules.
+description: The consolidated native-messaging runtime for mock, response-body, and request-body rules.
 ---
 
-Response-body and request-body rules need a separately installed local runtime reached
-through Chrome native messaging. The ordinary mock/body server (used for mocks) and the
-runtime-owned request-body TLS proxy are separate processes.
+Response-body, request-body, and mock rules all run through a single native-messaging host
+process. There is no separate HTTP mock server: pairing, authorization, and mock delivery
+all flow over the `v1` native-messaging envelope (spec REQ-001..REQ-005).
 
 ## `rogatio runtime` lifecycle
 
-- `rogatio runtime start` / `stop` / `status` control the running runtime process.
+- `rogatio runtime start` / `stop` / `status` control the running native host.
 - `rogatio runtime install | status | trust | untrust | uninstall` manage the device-local
   native-messaging host registration and the device-local CA trust that request-body
   interception requires.
+- `rogatio runtime-host <path>` launches the consolidated native-messaging host for a project
+  on stdio. The browser extension connects to it for pairing, authorization, and mock delivery.
 
-## Activation is capability-based
+## Activation is unconditional for the host
 
-The runtime activates only where a trusted device-local CA can be provisioned and Chrome PAC
-routing does not collide with an existing controlling proxy/PAC/extension/enterprise policy.
-Where the required capabilities are absent, activation reports `unsupported`. macOS is the
-reference supported platform; Linux and Windows may also activate when those capabilities
-are present.
+The native host starts whenever launched; it does **not** require a device-local CA or PAC
+routing capability (spec REQ-004). Only the device-local CA trust provisioning used by
+request-body interception remains capability-gated at the OS level and reports `unsupported`
+without error on incapable platforms. macOS is the reference platform for live request-body
+interception; the native host itself runs everywhere the browser can start it.
 
 ## Authority revalidation
 
@@ -32,7 +34,9 @@ initiator origin must be within granted scope. A denied request triggers no inte
 
 ## Body confidentiality
 
-Observed request/response bodies are processed in-process only. The native-messaging
-envelope carries bounded metadata and transform instructions, never body bytes, credentials,
-sensitive header values, or file contents. Observed bodies are never persisted, logged,
-exported, or transferred through native messaging.
+Observed request/response bodies are processed in-process only. The native-messaging envelope
+carries bounded metadata and transform instructions, never request or response body bytes,
+credentials, sensitive header values, or file contents — with one deliberate exception: mock
+response bodies cross the envelope as base64 `mockBody` on the `mock.response` message only
+(spec REQ-006). Observed live bodies are never persisted, logged, exported, or transferred
+through native messaging.
