@@ -1,0 +1,518 @@
+/* Rogatio editor design system (F22).
+ * Host pages that mount the editor must link this stylesheet
+ * (e.g. <link rel="stylesheet" href="/vendor/editor.css" />).
+ */
+
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/hanken-grotesk-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/hanken-grotesk-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/hanken-grotesk-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-700.woff2") format("woff2");
+}
+
+.rogatio-editor {
+  --rogatio-bg: #121417;
+  --rogatio-surface: #161b22;
+  --rogatio-surface-raised: #1c222c;
+  --rogatio-surface-inset: #10131a;
+  --rogatio-primary: #007aff;
+  --rogatio-primary-strong: #0066d6;
+  --rogatio-secondary: #64748b;
+  --rogatio-tertiary: #0f172a;
+  --rogatio-neutral: #1e293b;
+  --rogatio-text: #f8fafc;
+  --rogatio-muted: #94a3b8;
+  --rogatio-faint: #64748b;
+  --rogatio-border: rgba(148, 163, 184, 0.16);
+  --rogatio-danger: #f87171;
+  --rogatio-danger-bg: rgba(248, 113, 113, 0.12);
+  --rogatio-success: #4ade80;
+  --rogatio-success-bg: rgba(74, 222, 128, 0.12);
+  --rogatio-warning: #fbbf24;
+  --rogatio-warning-bg: rgba(251, 191, 36, 0.12);
+  --rogatio-radius: 0.75rem;
+  --rogatio-radius-sm: 0.5rem;
+  --rogatio-font-body:
+    "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rogatio-font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas,
+    monospace;
+
+  box-sizing: border-box;
+  color: var(--rogatio-text);
+  background: var(--rogatio-surface);
+  font-family: var(--rogatio-font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.rogatio-editor *,
+.rogatio-editor *::before,
+.rogatio-editor *::after {
+  box-sizing: border-box;
+}
+.rogatio-editor button,
+.rogatio-editor input,
+.rogatio-editor select,
+.rogatio-editor textarea {
+  color: inherit;
+  font: inherit;
+}
+.rogatio-editor button {
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-neutral);
+  color: var(--rogatio-text);
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+.rogatio-editor button:hover:not(:disabled) {
+  background: var(--rogatio-surface-raised);
+  border-color: rgba(148, 163, 184, 0.28);
+}
+.rogatio-editor button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.rogatio-editor :focus-visible {
+  outline: 3px solid var(--rogatio-primary);
+  outline-offset: 2px;
+}
+.rogatio-editor [data-editor-layout] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+}
+.rogatio-editor [data-desktop-route-rail] {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--rogatio-border);
+  background: var(--rogatio-surface);
+  padding: 0.6rem 1rem;
+}
+.rogatio-editor [data-desktop-route-rail] button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0.35rem 0.8rem;
+  color: var(--rogatio-muted);
+}
+.rogatio-editor [data-desktop-route-rail] button:hover:not(:disabled) {
+  background: var(--rogatio-surface-raised);
+  color: var(--rogatio-text);
+}
+.rogatio-editor [data-desktop-route-rail] button[aria-current="page"] {
+  border-color: rgba(0, 122, 255, 0.45);
+  background: rgba(0, 122, 255, 0.14);
+  color: var(--rogatio-text);
+  font-weight: 700;
+}
+.rogatio-editor [data-editor-main] {
+  min-width: 0;
+  padding: 1rem clamp(1rem, 3vw, 3rem) 3rem;
+}
+.rogatio-editor [data-editor-header] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 24rem);
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+.rogatio-editor [data-editor-header] h1,
+.rogatio-editor [data-editor-form] h2,
+.rogatio-editor [data-editor-form] h3 {
+  overflow-wrap: anywhere;
+}
+.rogatio-editor [data-editor-header] h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.rogatio-editor [data-dirty-state] {
+  margin: 0.2rem 0 0;
+  color: var(--rogatio-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.rogatio-editor [data-editor-header] label,
+.rogatio-editor [data-editor-field] > label {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 600;
+  color: var(--rogatio-text);
+}
+.rogatio-editor input:not([type="checkbox"]),
+.rogatio-editor select,
+.rogatio-editor textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-inset);
+  color: var(--rogatio-text);
+  padding: 0.45rem 0.55rem;
+}
+.rogatio-editor input:not([type="checkbox"])::placeholder,
+.rogatio-editor textarea::placeholder {
+  color: var(--rogatio-faint);
+}
+.rogatio-editor textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+.rogatio-editor [data-mobile-route-nav] {
+  display: none;
+}
+.rogatio-editor [data-editor-status] {
+  min-height: 1.5rem;
+  margin-block: 0.5rem;
+  color: var(--rogatio-muted);
+  font-size: 0.875rem;
+}
+.rogatio-editor [data-editor-summary] {
+  margin-block: 1rem;
+  border: 1px solid var(--rogatio-danger);
+  border-radius: var(--rogatio-radius);
+  background: var(--rogatio-danger-bg);
+  padding: 0.8rem 1rem;
+}
+.rogatio-editor [data-editor-summary] h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+  color: var(--rogatio-danger);
+}
+.rogatio-editor [data-editor-summary] ul {
+  margin-bottom: 0;
+  color: var(--rogatio-text);
+}
+.rogatio-editor [data-editor-summary] button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+}
+.rogatio-editor [data-editor-command-bar] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 1rem;
+}
+.rogatio-editor [data-editor-form] {
+  display: grid;
+  gap: 1rem;
+}
+.rogatio-editor fieldset {
+  min-width: 0;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  background: var(--rogatio-surface);
+  padding: 1rem;
+}
+.rogatio-editor legend {
+  padding-inline: 0.5rem;
+  font-weight: 700;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rogatio-muted);
+}
+.rogatio-editor [data-editor-fields] {
+  display: grid;
+  gap: 0.85rem;
+}
+.rogatio-editor [data-editor-field] {
+  min-width: 0;
+}
+.rogatio-editor [data-editor-field] > small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--rogatio-muted);
+  font-size: 0.8125rem;
+}
+.rogatio-editor [data-editor-field-error] {
+  margin-top: 0.25rem;
+  color: var(--rogatio-danger);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+.rogatio-editor [data-editor-origin-row] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: end;
+  margin-bottom: 0.5rem;
+}
+.rogatio-editor [data-editor-url-row] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+.rogatio-editor [data-editor-checks] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.35rem 0.7rem;
+}
+.rogatio-editor [data-editor-checks] label {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-weight: 500;
+  color: var(--rogatio-muted);
+}
+.rogatio-editor [data-rule-card] {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  background: var(--rogatio-surface);
+  padding: 1rem;
+}
+.rogatio-editor [data-rule-card] h3 {
+  margin: 0;
+  font-weight: 700;
+}
+.rogatio-editor [data-rule-actions] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.rogatio-editor [data-search-results] {
+  margin-block: 1rem;
+  border-block: 1px solid var(--rogatio-border);
+  padding-block: 0.8rem;
+}
+.rogatio-editor [data-search-results] h2 {
+  margin-top: 0;
+}
+.rogatio-editor [data-search-results] ul {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0;
+  padding-left: 1.2rem;
+  color: var(--rogatio-muted);
+}
+.rogatio-editor [data-search-results] button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+  color: var(--rogatio-text);
+}
+.rogatio-editor [data-editor-confirmation] {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 60%);
+}
+.rogatio-editor [data-editor-dialog] {
+  width: min(32rem, 100%);
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  background: var(--rogatio-surface);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 45%);
+  padding: 1rem;
+}
+.rogatio-editor [data-editor-dialog] h2 {
+  margin-top: 0;
+}
+.rogatio-editor [data-editor-dialog-actions] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.rogatio-editor [data-editor-visually-hidden] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (max-width: 48rem) {
+  .rogatio-editor [data-editor-layout] {
+    display: block;
+  }
+  .rogatio-editor [data-desktop-route-rail] {
+    display: none;
+  }
+  .rogatio-editor [data-mobile-route-nav] {
+    display: grid;
+    gap: 0.3rem;
+    margin-block: 1rem;
+    color: var(--rogatio-muted);
+  }
+  .rogatio-editor [data-editor-header] {
+    grid-template-columns: 1fr;
+  }
+}
+@media (forced-colors: active) {
+  .rogatio-editor {
+    --rogatio-border: ButtonText;
+    --rogatio-muted: ButtonText;
+    --rogatio-primary: Highlight;
+    --rogatio-primary-strong: Highlight;
+    --rogatio-danger: Mark;
+    --rogatio-success: ButtonText;
+    --rogatio-warning: ButtonText;
+    color: CanvasText;
+    background: Canvas;
+  }
+  .rogatio-editor button,
+  .rogatio-editor input:not([type="checkbox"]),
+  .rogatio-editor select,
+  .rogatio-editor textarea,
+  .rogatio-editor fieldset,
+  .rogatio-editor [data-rule-card] {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+  .rogatio-editor :focus-visible {
+    outline-color: Highlight;
+  }
+  .rogatio-editor [data-desktop-route-rail] {
+    border-bottom-color: ButtonText;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rogatio-editor *,
+  .rogatio-editor *::before,
+  .rogatio-editor *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+.rogatio-editor [data-test-description] {
+  color: var(--rogatio-muted);
+  margin-block: 0 1rem;
+}
+.rogatio-editor [data-test-panel] {
+  display: grid;
+  gap: 1rem;
+}
+.rogatio-editor [data-test-defaults] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.rogatio-editor [data-test-result-card] {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  background: var(--rogatio-surface);
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.rogatio-editor [data-test-result-card][data-matched="false"] {
+  border-style: dashed;
+  border-color: var(--rogatio-faint);
+}
+.rogatio-editor [data-test-result-header] {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.rogatio-editor [data-test-rule] {
+  padding: 0.5rem;
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-inset);
+}
+.rogatio-editor [data-test-rule-header] {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.rogatio-editor [data-test-dimension] {
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+  color: var(--rogatio-muted);
+}
+.rogatio-editor [data-test-badge] {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+.rogatio-editor [data-test-badge][data-variant="matched"] {
+  background: var(--rogatio-success-bg);
+  color: var(--rogatio-success);
+}
+.rogatio-editor [data-test-badge][data-variant="unmatched"] {
+  background: var(--rogatio-danger-bg);
+  color: var(--rogatio-danger);
+}
+.rogatio-editor [data-test-badge][data-variant="na"] {
+  background: var(--rogatio-neutral);
+  color: var(--rogatio-muted);
+}
+.rogatio-editor [data-test-errors] {
+  margin-block: 0 1rem;
+  color: var(--rogatio-danger);
+}
+.rogatio-editor [data-test-action-preview] {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--rogatio-muted);
+}
+@media (forced-colors: active) {
+  .rogatio-editor [data-test-rule] {
+    border: 1px solid ButtonText;
+    background: Canvas;
+  }
+  .rogatio-editor [data-test-badge] {
+    border: 1px solid ButtonText;
+  }
+}

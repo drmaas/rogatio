@@ -36,10 +36,20 @@ describe(" real CLI edit server", () => {
       const html = await (await fetch(`${serverUrl}/editor.html`)).text();
       expect(html).toContain('id="editor-root"');
       expect(html).toContain("/vendor/editor.js");
+      expect(html).toContain('href="/vendor/editor.css"');
       const bundle = await (
         await fetch(`${serverUrl}/vendor/editor.js`)
       ).text();
       expect(bundle).toContain("createEditor");
+
+      const css = await (await fetch(`${serverUrl}/vendor/editor.css`)).text();
+      expect(css).toContain(".rogatio-editor");
+      expect(css).toContain("@font-face");
+      const font = await fetch(
+        `${serverUrl}/vendor/fonts/hanken-grotesk-400.woff2`,
+      );
+      expect(font.status).toBe(200);
+      expect(font.headers.get("content-type")).toContain("font/woff2");
 
       const projectResponse = await fetch(`${serverUrl}/api/project`);
       expect(projectResponse.status).toBe(200);

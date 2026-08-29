@@ -1,0 +1,195 @@
+/* Rogatio toolbar popup design system (F22). Linked by popup.html. */
+
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/hanken-grotesk-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/hanken-grotesk-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/hanken-grotesk-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/jetbrains-mono-700.woff2") format("woff2");
+}
+
+:root {
+  --rogatio-bg: #121417;
+  --rogatio-surface: #161b22;
+  --rogatio-surface-raised: #1c222c;
+  --rogatio-surface-inset: #10131a;
+  --rogatio-primary: #007aff;
+  --rogatio-primary-strong: #0066d6;
+  --rogatio-secondary: #64748b;
+  --rogatio-tertiary: #0f172a;
+  --rogatio-neutral: #1e293b;
+  --rogatio-text: #f8fafc;
+  --rogatio-muted: #94a3b8;
+  --rogatio-faint: #64748b;
+  --rogatio-border: rgba(148, 163, 184, 0.16);
+  --rogatio-danger: #f87171;
+  --rogatio-danger-bg: rgba(248, 113, 113, 0.12);
+  --rogatio-success: #4ade80;
+  --rogatio-success-bg: rgba(74, 222, 128, 0.12);
+  --rogatio-warning: #fbbf24;
+  --rogatio-radius: 0.75rem;
+  --rogatio-radius-sm: 0.5rem;
+  --rogatio-font-body:
+    "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --rogatio-font-mono:
+    "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas,
+    monospace;
+}
+
+html,
+body {
+  margin: 0;
+  min-width: 17rem;
+  background-color: var(--rogatio-bg);
+  background-image: radial-gradient(
+    rgba(255, 255, 255, 0.05) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+  color: var(--rogatio-text);
+  font-family: var(--rogatio-font-body);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.rogatio-popup,
+.rogatio-popup *,
+.rogatio-popup *::before,
+.rogatio-popup *::after {
+  box-sizing: border-box;
+}
+.rogatio-popup {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  background: var(--rogatio-surface);
+  margin: 0.5rem;
+  padding: 0.75rem;
+}
+.rogatio-popup header {
+  display: grid;
+  gap: 0.15rem;
+}
+.rogatio-popup h1 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.rogatio-popup [data-active-project] {
+  margin: 0;
+  color: var(--rogatio-muted);
+  font-size: 0.8rem;
+}
+.rogatio-popup ul {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rogatio-popup li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-inset);
+  padding: 0.5rem 0.6rem;
+}
+.rogatio-popup li > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.rogatio-popup [data-rule-count] {
+  color: var(--rogatio-faint);
+  font-size: 0.75rem;
+}
+.rogatio-popup [data-group-status] {
+  color: var(--rogatio-muted);
+  font-size: 0.75rem;
+}
+.rogatio-popup a {
+  color: var(--rogatio-primary);
+  text-decoration: none;
+}
+.rogatio-popup a:hover {
+  text-decoration: underline;
+}
+.rogatio-popup a[data-open-app],
+.rogatio-popup a[data-group-edit] {
+  border: 1px solid var(--rogatio-border);
+  border-radius: 999px;
+  background: var(--rogatio-neutral);
+  color: var(--rogatio-text);
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+.rogatio-popup a[data-group-edit] {
+  margin-left: auto;
+}
+.rogatio-popup :focus-visible {
+  outline: 3px solid var(--rogatio-primary);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  .rogatio-popup {
+    --rogatio-border: ButtonText;
+    --rogatio-muted: ButtonText;
+    --rogatio-primary: Highlight;
+    --rogatio-text: CanvasText;
+    color: CanvasText;
+    background: Canvas;
+  }
+  .rogatio-popup li,
+  .rogatio-popup a[data-open-app],
+  .rogatio-popup a[data-group-edit] {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+  .rogatio-popup :focus-visible {
+    outline-color: Highlight;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rogatio-popup *,
+  .rogatio-popup *::before,
+  .rogatio-popup *::after {
+    transition: none !important;
+  }
+}

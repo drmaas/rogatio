@@ -119,6 +119,8 @@ Options:
     },
     editorHtml: "",
     editorBundlePath: "",
+    editorCssPath: "",
+    editorFontsPath: "",
   };
 
   // Create and start server (optionally on a fixed port)
@@ -146,9 +148,13 @@ Options:
     await server.stop();
     return { exitCode: Promise.resolve(2), shutdown: () => {} };
   }
+  const editorCssPath = editorBundlePath.replace(/index\.js$/u, "index.css");
+  const editorFontsPath = resolve(editorBundlePath, "..", "fonts");
 
   context.editorHtml = generateEditorHtml(serverUrl, csrfToken, filePath);
   context.editorBundlePath = editorBundlePath;
+  context.editorCssPath = editorCssPath;
+  context.editorFontsPath = editorFontsPath;
 
   let shutdownCalled = false;
   function shutdown() {
@@ -208,9 +214,15 @@ function generateEditorHtml(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rogatio Editor</title>
+  <link rel="stylesheet" href="/vendor/editor.css" />
   <style>
-    body { margin: 0; font-family: system-ui, sans-serif; }
-    #editor-root { width: 100vw; height: 100vh; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      background-color: #121417;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    #editor-root { min-height: 100vh; }
   </style>
 </head>
 <body>

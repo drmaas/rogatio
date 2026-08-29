@@ -43,7 +43,7 @@ lifecycle; changes nothing about management-page controls, save/import defaults,
 - AC: `AC-001` (packaging), build emits `dist/popup.js` + `dist/popup.html`.
 
 ### T3 — Popup HTML  `packages/extension/public/popup.html`
-- Minimal accessible document: linked `popup.js` (module), `lang`, viewport, title "Requestify".
+- Minimal accessible document: linked `popup.js` (module), `lang`, viewport, title "Rogatio".
 - No editor markup; only a root container the controller populates.
 - AC: `AC-001`, `AC-002`.
 
@@ -57,7 +57,7 @@ lifecycle; changes nothing about management-page controls, save/import defaults,
 ### T5 — Popup controller  `packages/extension/src/popup.ts` (new)
 - Establish a message client to the service worker mirroring `extension-page-entry.ts`
   (`chrome.runtime.sendMessage` with the same envelope protocol).
-- On open: `get-state`; render header (Requestify + active project name) and "Open app" button.
+- On open: `get-state`; render header (Rogatio + active project name) and "Open app" button.
 - Render rows in source order from `projects[activeProjectId].data.groups`:
   - name, rule count (`group.rules.length`), aggregated status text, one enablement switch (checked when group id ∈ `enabledGroupIds`), one pencil button.
   - Switch `change` → `sendMessage({type:"set-group-enabled", groupId, enabled})`; optimistic UI update on response `ok`, revert on error.

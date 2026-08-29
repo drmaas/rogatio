@@ -52,6 +52,8 @@ describe("API routes", () => {
       shutdown: vi.fn(),
       editorHtml: "<!DOCTYPE html><html></html>",
       editorBundlePath: "/dev/null",
+      editorCssPath: "/dev/null",
+      editorFontsPath: "/dev/null",
     };
     handler = createRoutes(context);
   });

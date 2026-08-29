@@ -3,6 +3,7 @@ import { createPopupModel, type PopupModel } from "./popup-model.js";
 const rootElement = document.querySelector<HTMLElement>("#rogatio-popup-root");
 if (!rootElement) throw new Error("popup.invalid-root");
 const container: HTMLElement = rootElement;
+container.className = "rogatio-popup";
 
 interface ExtensionResponse {
   readonly ok?: boolean;
@@ -68,7 +69,7 @@ function render(): void {
 
   const header = document.createElement("header");
   const title = document.createElement("h1");
-  title.textContent = "Requestify";
+  title.textContent = "Rogatio";
   const project = document.createElement("p");
   project.dataset.activeProject = "true";
   project.textContent = current.activeProjectName
@@ -77,7 +78,7 @@ function render(): void {
   const openApp = managementAnchor(
     "Open app",
     current.openAppUrl(),
-    "Open the Requestify management page",
+    "Open the Rogatio management page",
   );
   openApp.dataset.openApp = "true";
   header.append(title, project, openApp);
