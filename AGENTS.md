@@ -67,6 +67,7 @@ The `sdd` and `doit` skills repeat the operational tier-selection rules and role
 - Preserve the documented pnpm `10.32.1`, Node 24 baseline, TypeScript 7, and ESM/NodeNext constraints unless the specification is explicitly revised.
 - Keep package boundaries and dependency direction explicit.
 - Do not commit generated build output, coverage, browser binaries, dependency directories, environment files, or secrets.
+- Every commit must reference an open issue (`#<NN>` or `Closes #<NN>`); the `.husky/commit-msg` hook enforces this. Before committing, reuse an existing issue or create one automatically, and confirm the issue number with the user rather than inventing one. See `CONTRIBUTING.md`.
 - Review new dependencies and install-script permissions before adding them.
 - Use cross-platform Node-based scripts instead of Bash-only orchestration.
 - Verify real test execution, emitted builds, and browser prerequisites; do not accept false-green checks.
