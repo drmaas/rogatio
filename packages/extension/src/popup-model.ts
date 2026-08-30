@@ -13,10 +13,20 @@ export interface PopupRuleStatus {
   readonly diagnostics?: readonly unknown[];
 }
 
+export interface PopupProjectRule {
+  readonly id?: unknown;
+  readonly name?: unknown;
+}
+
+export interface PopupProjectRule {
+  readonly id?: unknown;
+  readonly name?: unknown;
+}
+
 export interface PopupProjectGroup {
   readonly id: string;
   readonly name: string;
-  readonly rules: readonly unknown[];
+  readonly rules: readonly PopupProjectRule[];
 }
 
 export interface PopupProject {
@@ -114,15 +124,9 @@ export function createPopupModel(options: PopupModelOptions): PopupModel {
       return groups.flatMap((group) => {
         const enabled = enabledGroupIds.has(group.id);
         const rules = Array.isArray(group.rules) ? group.rules : [];
-        return rules.map((rule, index) => {
-          const candidate = rule as {
-            readonly id?: unknown;
-            readonly name?: unknown;
-          };
+        return rules.map((rule: PopupProjectRule, index: number) => {
           const ruleId =
-            typeof candidate.id === "string"
-              ? candidate.id
-              : `${group.id}-${index}`;
+            typeof rule.id === "string" ? rule.id : `${group.id}-${index}`;
           const ruleStatus = ruleStatuses.find(
             (status) => status.groupId === group.id && status.ruleId === ruleId,
           );
@@ -130,8 +134,8 @@ export function createPopupModel(options: PopupModelOptions): PopupModel {
             id: ruleId,
             groupId: group.id,
             name:
-              typeof candidate.name === "string" && candidate.name.length > 0
-                ? candidate.name
+              typeof rule.name === "string" && rule.name.length > 0
+                ? rule.name
                 : `Rule ${index + 1}`,
             status: aggregateGroupStatus(
               enabled,
