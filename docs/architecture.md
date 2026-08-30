@@ -1,5 +1,15 @@
 # Rogatio Architecture
 
+**Status:** F23 unified native-host runtime direction approved and implemented for the current start/stop-only extension control surface.
+
+## F23 Unified Native-Host Runtime Direction
+
+One extension-launched native host owns mock, response-body, request-body, internal proxy/TLS, and upstream forwarding. Native messaging carries lifecycle, policy, and metadata/control; observed traffic bodies remain in the host-owned interception path. Start is transactional and installs exact scoped PAC routing after policy, trust, capability, and collision checks. Stop removes only owned routing, aborts active operations, invalidates capabilities, clears transient body buffers, and restores prior proxy state.
+
+The extension exposes only Start runtime and Stop runtime during normal use. Separate Check and connect actions and mock connection state are removed. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. CLI functionality remains limited to one-time host installation, CA trust, and administrative diagnostics; it is not required to connect or operate a browser session.
+
+The internal proxy is narrowly scoped to authorized origins with bounded HTTP/1.1 handling, strict TLS/target/address validation, no redirects or proxy recursion, and no traffic persistence. See `docs/specs/f23-unified-native-host-runtime.md` and `docs/plans/f23-unified-native-host-runtime.md`.
+
 **Status:** All features through F22 (design system) are released on `main`. The macOS native-messaging runtime controls remain integrated with the shared `rogatio runtime` command. Mock rules (F13) and response-body/request-body rule implementations remain out of scope for the current main sequence; their specs and plans are preserved under `docs/specs/` and `docs/plans/` but not edited by this sync.
 
 ## Package Boundaries
