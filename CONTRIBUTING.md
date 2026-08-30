@@ -58,6 +58,28 @@ to review when split.
 - **Dependencies:** adding a dependency requires review. pnpm's default install-script
   blocking is intentional; any exception must be documented.
 
+## Commit messages
+
+Every commit must reference an open issue. This is enforced locally by the
+`.husky/commit-msg` hook, which rejects any message whose footer does not contain
+`#<NN>` or `Closes #<NN>`. Conventional Commits format is also required
+(`type(scope): description` or `type: description`).
+
+Before you commit:
+
+1. **Use an existing issue** when one already tracks the change. Reference it in the
+   footer, e.g. `Refs #42` or `Closes #42`.
+2. **Create one automatically** when no issue exists yet. Open the issue first (a short
+   title and one-line description is enough), then reference its number in the commit
+   footer. Do not skip the issue step — a commit without a linked issue will be rejected
+   by the hook.
+
+For agent-driven work, the agent must confirm an issue number with the user (reuse an
+existing issue or create one) before committing, rather than inventing a number.
+
+If a commit legitimately has no associated issue, open one first — there is no
+exception path in the hook.
+
 ## Documentation
 
 If your change affects behavior, boundaries, or the public contract, update the relevant
