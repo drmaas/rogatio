@@ -134,9 +134,10 @@ body {
   font-size: 0.8rem;
   font-weight: 600;
 }
-.rogatio-popup [data-rule-count] {
+.rogatio-popup [data-rule-group] {
   color: var(--rogatio-faint);
-  font-size: 0.75rem;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.7rem;
 }
 .rogatio-popup [data-group-status] {
   color: var(--rogatio-muted);

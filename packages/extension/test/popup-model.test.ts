@@ -70,7 +70,7 @@ describe("F21 popup group status aggregation", () => {
 });
 
 describe("F21 popup model", () => {
-  it("lists only the active project's persisted groups in source order with truthful status", () => {
+  it("lists each active project's persisted rule in source order with truthful status", () => {
     const model = createPopupModel({
       envelope: envelope({
         ruleStatuses: [
@@ -81,22 +81,23 @@ describe("F21 popup model", () => {
       send: vi.fn(async () => ({ ok: true })),
     });
     const rows = model.rows();
-    expect(rows.map((r) => r.id)).toEqual(["g1", "g2", "g3"]);
+    expect(rows.map((r) => r.id)).toEqual(["g1-0", "g1-1", "g3-0"]);
     expect(rows[0]).toMatchObject({
-      id: "g1",
-      name: "First",
-      ruleCount: 2,
+      id: "g1-0",
+      groupId: "g1",
+      name: "Rule 1",
       enabled: true,
       status: "active",
     });
     expect(rows[1]).toMatchObject({
-      id: "g2",
-      ruleCount: 0,
-      enabled: false,
-      status: "disabled",
+      id: "g1-1",
+      groupId: "g1",
+      enabled: true,
+      status: "active",
     });
     expect(rows[2]).toMatchObject({
-      id: "g3",
+      id: "g3-0",
+      groupId: "g3",
       enabled: true,
       status: "needs permission",
     });

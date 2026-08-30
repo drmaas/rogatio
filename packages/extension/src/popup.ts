@@ -93,14 +93,15 @@ function render(): void {
   }
   for (const row of rows) {
     const item = document.createElement("li");
-    item.dataset.groupId = row.id;
+    item.dataset.ruleId = row.id;
+    item.dataset.groupId = row.groupId;
 
     const name = document.createElement("span");
     name.textContent = row.name;
 
-    const count = document.createElement("span");
-    count.dataset.ruleCount = "true";
-    count.textContent = `${row.ruleCount} rule${row.ruleCount === 1 ? "" : "s"}`;
+    const group = document.createElement("span");
+    group.dataset.ruleGroup = "true";
+    group.textContent = row.groupId;
 
     const status = document.createElement("span");
     status.dataset.groupStatus = "true";
@@ -115,18 +116,18 @@ function render(): void {
       `${row.enabled ? "Deactivate" : "Activate"} group ${row.name}`,
     );
     toggle.addEventListener("change", async () => {
-      await current.toggle(row.id, toggle.checked);
+      await current.toggle(row.groupId, toggle.checked);
       await refresh();
     });
 
     const pencil = managementAnchor(
       "Edit group",
-      current.groupUrl(row.id),
+      current.groupUrl(row.groupId),
       `Open ${row.name} in the editor`,
     );
     pencil.dataset.groupEdit = "true";
 
-    item.append(name, count, status, toggle, pencil);
+    item.append(name, group, status, toggle, pencil);
     list.append(item);
   }
 
