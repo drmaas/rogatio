@@ -594,12 +594,16 @@ class EditorControllerImpl implements EditorController {
     this.form.dataset.editorForm = "true";
     this.form.noValidate = true;
     this.searchResults = this.document.createElement("section");
+    this.searchResults.id = "rogatio-search-results";
     this.searchResults.dataset.searchResults = "true";
-    this.searchResults.addEventListener("click", (event) => {
-      if (event.target === this.searchResults) {
-        this.searchQuery = "";
-        this.render();
-      }
+
+    this.host.addEventListener("click", (event) => {
+      if (!this.searchQuery) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-search-wrap]"))
+        return;
+      this.searchQuery = "";
+      this.render();
     });
 
     this.main.append(
@@ -608,7 +612,6 @@ class EditorControllerImpl implements EditorController {
       this.summary,
       this.commandBar,
       this.form,
-      this.searchResults,
     );
     layout.append(this.rail, this.main);
     this.host.append(layout);
@@ -678,11 +681,6 @@ class EditorControllerImpl implements EditorController {
     }
     if (element.dataset.searchResult !== undefined) {
       this.navigateToSearchResult(element.dataset.searchResult);
-      return;
-    }
-    if (element.dataset.searchClose !== undefined) {
-      this.searchQuery = "";
-      this.render();
       return;
     }
     if (element.dataset.errorPath !== undefined) {
@@ -1782,15 +1780,6 @@ class EditorControllerImpl implements EditorController {
       : "All changes saved";
     titleBlock.append(title, dirty);
 
-    const searchLabel = this.document.createElement("label");
-    searchLabel.textContent = "Search project";
-    const search = this.document.createElement("input");
-    search.type = "search";
-    search.value = this.searchQuery;
-    search.dataset.search = "true";
-    search.dataset.editorKey = "search";
-    searchLabel.append(search);
-
     const mobileNav = this.document.createElement("label");
     mobileNav.dataset.mobileRouteNav = "true";
     mobileNav.textContent = "Project section";
@@ -1823,7 +1812,7 @@ class EditorControllerImpl implements EditorController {
       if (option) select.value = "group";
     }
     mobileNav.append(select);
-    this.header.append(titleBlock, searchLabel, mobileNav);
+    this.header.append(titleBlock, mobileNav);
     this.status.textContent = this.statusMessage;
     this.status.setAttribute("aria-busy", this.saving ? "true" : "false");
   }
@@ -1858,6 +1847,26 @@ class EditorControllerImpl implements EditorController {
     if (this.route.kind === "test")
       testBtn.setAttribute("aria-current", "page");
     this.rail.append(testBtn);
+
+    const searchWrap = this.document.createElement("div");
+    searchWrap.dataset.searchWrap = "true";
+    const searchLabel = this.document.createElement("label");
+    searchLabel.dataset.searchLabel = "true";
+    searchLabel.textContent = "Search project";
+    const search = this.document.createElement("input");
+    search.type = "search";
+    search.value = this.searchQuery;
+    search.dataset.search = "true";
+    search.dataset.editorKey = "search";
+    search.setAttribute("aria-label", "Search rules by name");
+    search.setAttribute(
+      "aria-expanded",
+      this.searchQuery.trim().length > 0 ? "true" : "false",
+    );
+    search.setAttribute("aria-controls", "rogatio-search-results");
+    searchLabel.append(search);
+    searchWrap.append(searchLabel, this.searchResults);
+    this.rail.append(searchWrap);
   }
 
   private renderCommandBar(): void {
@@ -2657,22 +2666,18 @@ class EditorControllerImpl implements EditorController {
     root.replaceChildren();
     root.hidden = this.searchQuery.trim().length === 0;
     if (this.searchQuery.trim().length === 0) return;
-    root.dataset.searchModal = "true";
-    root.setAttribute("role", "dialog");
-    root.setAttribute("aria-modal", "true");
+    root.setAttribute("role", "listbox");
     root.setAttribute("aria-label", "Rule search results");
-    const panel = this.document.createElement("section");
-    panel.dataset.searchPanel = "true";
-    const heading = this.document.createElement("h2");
-    heading.textContent = "Jump to rule";
     const results = this.searchResultsFor(this.searchQuery);
     const count = this.document.createElement("p");
+    count.dataset.searchCount = "true";
     count.textContent = `${results.length} rule${
       results.length === 1 ? "" : "s"
     } matching “${this.searchQuery.trim()}”.`;
     const list = this.document.createElement("ul");
     for (const result of results) {
       const item = this.document.createElement("li");
+      item.setAttribute("role", "option");
       const button = this.document.createElement("button");
       button.type = "button";
       button.dataset.searchResult = result.path;
@@ -2680,18 +2685,12 @@ class EditorControllerImpl implements EditorController {
       item.append(button);
       list.append(item);
     }
-    panel.append(heading, count, list);
+    root.append(count, list);
     if (results.length === 0) {
       const empty = this.document.createElement("p");
       empty.textContent = "No rules match that name.";
-      panel.append(empty);
+      root.append(empty);
     }
-    const close = this.document.createElement("button");
-    close.type = "button";
-    close.dataset.searchClose = "true";
-    close.textContent = "Close";
-    panel.append(close);
-    root.append(panel);
   }
 
   private searchResultsFor(

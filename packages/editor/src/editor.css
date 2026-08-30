@@ -376,36 +376,47 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
-.rogatio-editor [data-search-modal] {
-  position: fixed;
-  inset: 0;
-  z-index: 3;
-  display: grid;
-  place-items: start center;
-  padding: 3rem 1rem;
-  background: rgb(0 0 0 / 60%);
+.rogatio-editor [data-search-wrap] {
+  position: relative;
+  margin-left: auto;
 }
-.rogatio-editor [data-search-panel] {
-  width: min(36rem, 100%);
-  max-height: 70vh;
+.rogatio-editor [data-search-label] {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--rogatio-muted);
+}
+.rogatio-editor [data-search-wrap] input[type="search"] {
+  width: min(18rem, 60vw);
+}
+.rogatio-editor [data-search-results] {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 4;
+  width: min(28rem, 90vw);
+  max-height: min(60vh, 24rem);
   overflow: auto;
   border: 1px solid var(--rogatio-border);
   border-radius: var(--rogatio-radius);
   background: var(--rogatio-surface);
   box-shadow: 0 20px 50px rgb(0 0 0 / 45%);
-  padding: 1rem;
+  padding: 0.6rem;
+  display: grid;
+  gap: 0.4rem;
 }
-.rogatio-editor [data-search-panel] h2 {
-  margin-top: 0;
+.rogatio-editor [data-search-results][hidden] {
+  display: none;
 }
-.rogatio-editor [data-search-panel] ul {
+.rogatio-editor [data-search-results] ul {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
-.rogatio-editor [data-search-panel] li button {
+.rogatio-editor [data-search-results] li button {
   width: 100%;
   text-align: left;
 }
