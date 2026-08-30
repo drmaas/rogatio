@@ -228,6 +228,14 @@ body {
   font-weight: 500;
   color: var(--rogatio-muted);
 }
+.rogatio-group-active {
+  color: var(--rogatio-success);
+  font-weight: 600;
+}
+.rogatio-group-inactive {
+  color: var(--rogatio-muted);
+  opacity: 0.75;
+}
 .rogatio-sidebar ul {
   margin: 0;
   padding-left: 1.1rem;
@@ -409,7 +417,38 @@ body {
   .rogatio-topbar,
   .rogatio-sidebar,
   .rogatio-project-card,
+  .rogatio-project-stats {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+}
+.rogatio-attention-note {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--rogatio-radius-sm);
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--rogatio-warning);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+@media (forced-colors: active) {
+  .rogatio-shell {
+    --rogatio-border: ButtonText;
+    --rogatio-muted: ButtonText;
+    --rogatio-primary: Highlight;
+    --rogatio-text: CanvasText;
+    color: CanvasText;
+    background: Canvas;
+  }
+  .rogatio-topbar,
+  .rogatio-sidebar,
+  .rogatio-project-card,
   .rogatio-project-stats,
+  .rogatio-attention-note {
+    border-color: ButtonText;
+    background: Canvas;
+  }
   .rogatio-sidebar fieldset {
     border-color: ButtonText;
     background: Canvas;
