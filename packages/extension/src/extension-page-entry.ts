@@ -21,14 +21,6 @@ interface Envelope {
   readonly activeProjectId: string | null;
   readonly ruleStatuses?: readonly Record<string, unknown>[];
   readonly badge?: { readonly text: string; readonly attention: boolean };
-  readonly mockRuntimeState?: {
-    readonly phase: "disconnected" | "checking" | "connected" | "failed";
-    readonly lastCheck?: {
-      readonly at?: number;
-      readonly ok?: boolean;
-      readonly message?: string;
-    } | null;
-  };
   readonly nativeRuntimeState?: { readonly phase: string };
 }
 
@@ -201,7 +193,6 @@ function renderSidebar(shell: HTMLElement): void {
     ),
     button("Start runtime", "start-native-runtime"),
     button("Stop runtime", "stop-native-runtime"),
-    button("Check and connect", "check-mock-runtime"),
   );
   sidebar.append(actions);
 
@@ -251,24 +242,6 @@ function renderSidebar(shell: HTMLElement): void {
   nativeRuntime.dataset.nativeRuntimeState = "true";
   nativeRuntime.textContent = `Runtime: ${state.nativeRuntimeState?.phase ?? "stopped"}.`;
   sidebar.append(nativeRuntime);
-
-  const mockRuntime = document.createElement("p");
-  mockRuntime.dataset.mockRuntimeState = "true";
-  const mockPhase = state.mockRuntimeState?.phase ?? "disconnected";
-  const lastCheck = state.mockRuntimeState?.lastCheck;
-  if (mockPhase === "checking") {
-    mockRuntime.textContent = "Mock connection: checking…";
-  } else if (mockPhase === "connected") {
-    mockRuntime.textContent = "Mock connection: connected.";
-  } else if (mockPhase === "failed") {
-    mockRuntime.textContent = `Mock connection: unreachable${
-      lastCheck?.message ? ` (${lastCheck.message})` : ""
-    }. Start the runtime and check again.`;
-  } else {
-    mockRuntime.textContent =
-      "Mock connection: not connected. Start the runtime, then choose Check and connect.";
-  }
-  sidebar.append(mockRuntime);
 
   const ruleStatuses = document.createElement("ul");
   ruleStatuses.dataset.ruleStatuses = "true";
@@ -445,7 +418,6 @@ function renderShell(): void {
       void nativeRuntimeCommand("start-native-runtime");
     if (command === "stop-native-runtime")
       void nativeRuntimeCommand("stop-native-runtime");
-    if (command === "check-mock-runtime") void checkMockRuntime();
     if (command === "export") {
       const projectId = target.dataset.projectAction ?? pendingProjectId;
       if (projectId) pendingProjectId = projectId;
@@ -705,18 +677,6 @@ async function nativeRuntimeCommand(
     response?.ok === true
       ? "Runtime state updated."
       : "Runtime action unavailable on this platform.";
-  await refresh();
-}
-
-async function checkMockRuntime(): Promise<void> {
-  const response = await client.send({
-    version: 1,
-    command: "check-mock-runtime",
-  });
-  statusMessage =
-    response?.ok === true
-      ? "Runtime check complete."
-      : "The runtime could not be checked. Start the runtime and try again.";
   await refresh();
 }
 

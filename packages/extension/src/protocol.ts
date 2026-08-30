@@ -18,7 +18,6 @@ export type ExtensionCommand =
   | "grant-permissions"
   | "revoke-permission"
   | "set-group-enabled"
-  | "check-mock-runtime"
   | "start-native-runtime"
   | "stop-native-runtime"
   | "get-native-runtime-status";
@@ -51,7 +50,6 @@ const COMMANDS = new Set<ExtensionCommand>([
   "grant-permissions",
   "revoke-permission",
   "set-group-enabled",
-  "check-mock-runtime",
   "start-native-runtime",
   "stop-native-runtime",
   "get-native-runtime-status",

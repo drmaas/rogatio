@@ -1,6 +1,13 @@
 # Rogatio Architecture
 
-**Status:** All features through F22 (design system) are released on `main`. The macOS native-messaging runtime controls remain integrated with the shared `rogatio runtime` command. Mock rules (F13) and response-body/request-body rule implementations remain out of scope for the current main sequence; their specs and plans are preserved under `docs/specs/` and `docs/plans/` but not edited by this sync.
+**Status:** F23 unified native-host runtime direction approved and implemented for the current start/stop-only extension control surface.
+
+## F23 Unified Native-Host Runtime Direction
+
+One extension-launched native host owns mock, response-body, request-body, internal proxy/TLS, and upstream forwarding. Native messaging carries lifecycle, policy, and metadata/control; observed traffic bodies remain in the host-owned interception path. Start is transactional and installs exact scoped PAC routing after policy, trust, capability, and collision checks. Stop removes only owned routing, aborts active operations, invalidates capabilities, clears transient body buffers, and restores prior proxy state.
+
+The extension exposes only Start runtime and Stop runtime during normal use. Separate Check and connect actions and mock connection state are removed. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. CLI functionality remains limited to one-time host installation, CA trust, and administrative diagnostics; it is not required to connect or operate a browser session.
+
 
 ## Package Boundaries
 
@@ -290,7 +297,7 @@ The complete proposed contract and acceptance criteria are in `docs/specs/f6-run
 
 ## macOS Native-Messaging Runtime
 
-The macOS native-messaging runtime adds the separately installed macOS runtime that response-body and request-body rules reach through Chrome native messaging. It is a distinct process and protocol (`f14-v1`) from the runtime mock/response server, and adds no runtime-foundation action, proxy, TLS, or native-messaging behavior to that package.
+The macOS native-messaging runtime is the single native host that response-body and request-body rules reach through Chrome native messaging. Under the approved F23 direction, mock, response-body, request-body, internal proxy/TLS, and upstream forwarding share this one process and one Start/Stop lifecycle; there is no separate user-facing proxy/connect server.
 
 ### Ownership and data flow
 
@@ -351,6 +358,14 @@ The request-body trust lifecycle touches only device-local trust material: the m
 - Auto-install/auto-trust on `runtime start`: rejected; explicit, capability-gated user actions only, per the macOS runtime's no-auto-start stance.
 
 The complete proposed contract and acceptance criteria are in `docs/specs/f16-request-body-trust.md`; the staged workflow record is in `docs/f16-workflow.md`.
+
+## F23 Unified Native-Host Runtime Direction
+
+F23 consolidates runtime-dependent behavior behind one extension-launched native host. The host owns the internal loopback proxy and TLS interception, while native messaging carries lifecycle, policy, and metadata/control only; observed traffic bodies remain in the host-owned interception path. Start is transactional: it validates the immutable active policy, opens the host/provider, and installs exact scoped PAC routing only after collision, trust, and capability checks. Failure rolls back all Rogatio-owned state. Stop removes only owned PAC/proxy state, aborts active operations, invalidates capabilities, clears transient body buffers, and restores the prior browser proxy configuration.
+
+The extension exposes only Start runtime and Stop runtime during normal use. A separate Check and connect action and separate mock-connection state are not part of the target model. Mock, response-body, and request-body rules share one runtime session. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. The CLI remains available for one-time native-host installation, CA trust, and administrative diagnostics, but it is not required to connect or operate a browser session.
+
+The internal proxy remains narrowly scoped: exact authorized origins, bounded HTTP/1.1 request handling, strict TLS/target/address validation, no redirects or proxy recursion, and no traffic persistence. Unsupported signed, compressed, multipart, binary, or otherwise unsafe transformations do not produce a partial request; they pass through untouched where protocol-safe. See `docs/specs/f23-unified-native-host-runtime.md` and `docs/plans/f23-unified-native-host-runtime.md` for the approved requirements and implementation sequence.
 
 ## CLI Package Architecture
 

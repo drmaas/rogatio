@@ -1,17 +1,14 @@
 import {
   computeBadge,
   computeRuleStatuses,
-  type MockRuntimePhase,
   type NativeRuntimePhase,
   ProjectRepository,
   type RuleInstallerAdapter,
-  RuntimeStateController,
   type StorageAdapter,
 } from "@rogatio/browser-core";
 import {
   compileProject,
   type HeaderOperation,
-  type MockOperation,
   type RogatioOperation,
 } from "@rogatio/compiler";
 import { normalizeSiteOrigin } from "@rogatio/schema";
@@ -20,10 +17,6 @@ import {
   extensionDiagnostic,
 } from "./diagnostics.js";
 import { installHeaderRules } from "./installer.js";
-import {
-  DEFAULT_MOCK_PORT,
-  type MockRuntimeConnection,
-} from "./mock-runtime.js";
 import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
   connectNativeMock,
@@ -62,12 +55,6 @@ export interface ExtensionApplicationOptions {
     sendPolicy(frames: Uint8Array[]): Promise<void>;
     /** Envelope protocol to the consolidated native host (spec REQ-001). */
     send?(envelope: NativeEnvelopeInput): Promise<NativeEnvelope>;
-  };
-  readonly mockRuntime?: {
-    readonly fetchConnection: (
-      port: number,
-    ) => Promise<MockRuntimeConnection | null>;
-    readonly setConnection?: (connection: MockRuntimeConnection | null) => void;
   };
 }
 
@@ -115,7 +102,6 @@ function operationStatuses(
   installedRuleIds: readonly string[],
   enabledGroupIds: readonly string[],
   grantedOrigins: readonly string[],
-  mockPhase: MockRuntimePhase,
   mockTokens: ReadonlyMap<string, string>,
   nativePhase: NativeRuntimePhase | "unsupported",
 ): readonly Record<string, unknown>[] {
@@ -185,7 +171,7 @@ function operationStatuses(
       return { ...status };
     }
     if (operation?.kind === "mock") {
-      if (mockPhase !== "connected") {
+      if (nativePhase !== "started") {
         return {
           groupId: status.groupId,
           ruleId: status.ruleId,
@@ -237,7 +223,6 @@ export function createExtensionApplication(
     generateId: options.generateId,
     now: options.now,
   });
-  const mockRuntimeState = new RuntimeStateController(undefined, options.now);
   let mockTokens = new Map<string, string>();
   let nativePhase: NativeRuntimePhase | "unsupported" = options.nativeRuntime
     ? "stopped"
@@ -267,7 +252,6 @@ export function createExtensionApplication(
         >
       >;
     },
-    mockPhase: MockRuntimePhase,
     mockTokens: ReadonlyMap<string, string>,
   ): Promise<StateProjection> {
     if (envelope.activeProjectId === null) {
@@ -311,7 +295,6 @@ export function createExtensionApplication(
       installedRuleIds,
       project.enabledGroupIds,
       granted,
-      mockPhase,
       mockTokens,
       nativePhase,
     );
@@ -352,15 +335,13 @@ export function createExtensionApplication(
   async function state(): Promise<ApplicationResponse> {
     const result = await repository.state();
     if (!result.ok) return failure("extension.storage-failed");
-    const mock = mockRuntimeState.snapshot().mock;
-    const projection = await projectState(result.value, mock.phase, mockTokens);
+    const projection = await projectState(result.value, mockTokens);
     return {
       ok: true,
       value: {
         ...result.value,
         ruleStatuses: projection.statuses,
         badge: projection.badge,
-        mockRuntimeState: mockRuntimeState.snapshot().mock,
         nativeRuntimeState: { phase: nativePhase },
       },
     };
@@ -399,19 +380,13 @@ export function createExtensionApplication(
           : failure("extension.not-found");
       }
       pendingProjectId = projectId;
-      const mock = mockRuntimeState.snapshot().mock;
-      const projection = await projectState(
-        result.value,
-        mock.phase,
-        mockTokens,
-      );
+      const projection = await projectState(result.value, mockTokens);
       return {
         ok: true,
         value: {
           ...result.value,
           ruleStatuses: projection.statuses,
           badge: projection.badge,
-          mockRuntimeState: mockRuntimeState.snapshot().mock,
           nativeRuntimeState: { phase: nativePhase },
         },
       };
@@ -535,18 +510,6 @@ export function createExtensionApplication(
 
         const compileResult = compileProject(project.data);
         if (!compileResult.ok) return failure("extension.storage-failed");
-
-        const hasRequestBody = compileResult.operations.some(
-          (op) => op.kind === "request-body",
-        );
-        const hasResponseBody = compileResult.operations.some(
-          (op) => op.kind === "response-body",
-        );
-
-        if (!hasRequestBody && !hasResponseBody) {
-          return failure("extension.native-runtime-unavailable");
-        }
-
         const sessionResult = await startNativeSession({
           extensionId: options.extensionId,
           nativeRuntime: options.nativeRuntime,
@@ -572,6 +535,25 @@ export function createExtensionApplication(
         }
 
         nativePhase = "started";
+        if (options.nativeRuntime.send) {
+          const connection = await connectNativeMock(
+            {
+              extensionId: options.extensionId,
+              nativeRuntime: options.nativeRuntime,
+              getProject: async () => ({
+                data: project.data,
+                enabledGroupIds: project.enabledGroupIds,
+              }),
+              getGrantedOrigins: async () => [],
+            },
+            "",
+          );
+          if (connection) {
+            mockTokens = new Map(
+              connection.mocks.map((mock) => [mock.ruleId, mock.token]),
+            );
+          }
+        }
         return state();
       }
       if (request.command === "stop-native-runtime") {
@@ -602,99 +584,6 @@ export function createExtensionApplication(
         value: { nativeRuntimeState: { phase: nativePhase } },
       };
     }
-    if (request.command === "check-mock-runtime") {
-      const port =
-        typeof data.port === "number" ? data.port : DEFAULT_MOCK_PORT;
-      const current = await repository.state();
-      if (!current.ok) return failure("extension.storage-failed");
-      const activeProjectId = current.value.activeProjectId;
-      if (activeProjectId === null) return failure("extension.not-found");
-      const project = current.value.projects[activeProjectId];
-      if (!project) return failure("extension.not-found");
-      const compiled = compileProject(project.data);
-      if (!compiled.ok) return failure("extension.storage-failed");
-      const enabledGroupIds = new Set(project.enabledGroupIds);
-      const enabledMockOps = compiled.operations.filter(
-        (op): op is MockOperation =>
-          op.kind === "mock" && enabledGroupIds.has(op.groupId),
-      );
-
-      const begin = mockRuntimeState.beginMockCheck();
-      if (!begin.ok) return failure("extension.mock-check-in-progress");
-
-      // Prefer the consolidated native host envelope protocol (spec REQ-003).
-      if (options.nativeRuntime?.send) {
-        const connection = await connectNativeMock(
-          {
-            extensionId: options.extensionId ?? "",
-            nativeRuntime: options.nativeRuntime,
-            getProject: async () => ({
-              data: project.data,
-              enabledGroupIds: project.enabledGroupIds,
-            }),
-            getGrantedOrigins: async () => [],
-          },
-          "",
-        );
-        if (connection !== null) {
-          mockTokens = new Map(
-            connection.mocks.map((mock) => [mock.ruleId, mock.token]),
-          );
-          mockRuntimeState.completeMockCheck(true);
-          options.mockRuntime?.setConnection?.({
-            protocol: "v1",
-            port: connection.port ?? DEFAULT_MOCK_PORT,
-            presetDigest: "",
-            mocks: connection.mocks,
-          });
-          const declared = declaredPermissionOrigins({
-            operations: compiled.operations,
-          });
-          const granted = await grantedOriginsFor(declared);
-          const grantedSet = new Set(granted);
-          const installOps = enabledMockOps.filter(
-            (op) =>
-              op.matcher.origins.every((origin) => grantedSet.has(origin)) &&
-              mockTokens.has(op.ruleId),
-          );
-          if (installOps.length > 0) {
-            await options.installer.install(installOps);
-          }
-          return state();
-        }
-      }
-
-      // Fallback to the legacy HTTP mock adapter (deprecated; retained until
-      // browser-side native-host fulfillment replaces DNR redirects to :8890).
-      const connection = options.mockRuntime
-        ? await options.mockRuntime.fetchConnection(port)
-        : null;
-      if (connection === null) {
-        mockRuntimeState.completeMockCheck(false, "Mock runtime not reachable");
-        mockTokens = new Map();
-        options.mockRuntime?.setConnection?.(null);
-      } else {
-        mockTokens = new Map(
-          connection.mocks.map((mock) => [mock.ruleId, mock.token]),
-        );
-        mockRuntimeState.completeMockCheck(true);
-        options.mockRuntime?.setConnection?.(connection);
-        const declared = declaredPermissionOrigins({
-          operations: compiled.operations,
-        });
-        const granted = await grantedOriginsFor(declared);
-        const grantedSet = new Set(granted);
-        const installOps = enabledMockOps.filter(
-          (op) =>
-            op.matcher.origins.every((origin) => grantedSet.has(origin)) &&
-            mockTokens.has(op.ruleId),
-        );
-        if (installOps.length > 0) {
-          await options.installer.install(installOps);
-        }
-      }
-      return state();
-    }
     if (
       request.command === "review-permissions" ||
       request.command === "grant-permissions" ||
@@ -719,12 +608,7 @@ export function createExtensionApplication(
         await syncStoredGrants(projectId, declared, grantedOrigins);
         const current = await repository.state();
         if (!current.ok) return failure("extension.storage-failed");
-        const mock = mockRuntimeState.snapshot().mock;
-        const projection = await projectState(
-          current.value,
-          mock.phase,
-          mockTokens,
-        );
+        const projection = await projectState(current.value, mockTokens);
         return {
           ok: true,
           value: {
@@ -734,7 +618,6 @@ export function createExtensionApplication(
               ...current.value,
               ruleStatuses: projection.statuses,
               badge: projection.badge,
-              mockRuntimeState: mockRuntimeState.snapshot().mock,
               nativeRuntimeState: { phase: nativePhase },
             },
           },

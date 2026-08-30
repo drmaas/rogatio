@@ -6,10 +6,7 @@ import {
   setBadge,
 } from "./chrome.js";
 import { createDnrInstaller } from "./dnr.js";
-import {
-  createMockConnectionHolder,
-  fetchMockConnection,
-} from "./mock-runtime.js";
+import { createMockConnectionHolder } from "./mock-runtime.js";
 import type {
   NativeEnvelope,
   NativeEnvelopeInput,
@@ -34,9 +31,8 @@ interface NativeRuntimeAdapter {
  * Production native-messaging adapter. Chrome launches the consolidated native
  * host (`rogatio runtime-host <path>`) via `connectNative`; the host's stdio
  * frame loop reads envelopes and returns response envelopes (spec REQ-001).
- * Control-plane methods (`start`/`stop`/`status`/`sendPolicy`) are thin shims:
- * the host is already running once connected, and it loads its preset from the
- * file argument rather than from pushed policy frames.
+ * Control-plane methods (`start`/`stop`/`status`/`sendPolicy`) are thin shims;
+ * the host is running once connected and receives lifecycle envelopes directly.
  */
 function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
   let port: ChromePort | null = null;
@@ -80,19 +76,35 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
 
   return {
     async start(): Promise<{ state: NativeRuntimePhase | "unsupported" }> {
-      ensurePort();
+      const active = ensurePort();
+      active.postMessage({
+        protocol: "v1",
+        type: "runtime.start",
+        metadata: {},
+      });
       return { state: "started" };
     },
     async stop(): Promise<{ state: NativeRuntimePhase | "unsupported" }> {
+      if (port) {
+        try {
+          port.postMessage({
+            protocol: "v1",
+            type: "runtime.stop",
+            metadata: {},
+          });
+          // Chrome closes the native port when the service worker releases it.
+        } catch {
+          // The browser may already have disconnected the host.
+        }
+      }
       connected = false;
+      port = null;
       return { state: "stopped" };
     },
     async status(): Promise<{ state: NativeRuntimePhase | "unsupported" }> {
       return { state: connected ? "started" : "stopped" };
     },
     async sendPolicy(): Promise<void> {
-      // The consolidated host loads its preset from the file argument; pushed
-      // policy frames are not required.
       return;
     },
     send(envelope: NativeEnvelopeInput): Promise<NativeEnvelope> {
@@ -129,10 +141,6 @@ const application = createExtensionApplication({
   badge: (value) => setBadge(value, api),
   extensionId: api.runtime.id,
   nativeRuntime: createNativeRuntimeAdapter(),
-  mockRuntime: {
-    fetchConnection: (port) => fetchMockConnection(port),
-    setConnection: (connection) => mockConnectionHolder.set(connection),
-  },
 });
 
 api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
