@@ -135,9 +135,15 @@ function renderTopbar(shell: HTMLElement): void {
   const badge = document.createElement("span");
   badge.dataset.badgeState = "true";
   badge.className = "rogatio-badge-pill";
+  const attentionText = state.badge?.attention ? " (attention needed)" : "";
+  const attentionReason = state.badge?.attention
+    ? state.ruleStatuses
+      ? " — needs permission: grant declared access"
+      : ""
+    : "";
   badge.textContent = state.badge
-    ? `Active rules: ${state.badge.text}${state.badge.attention ? " (attention needed)" : ""}`
-    : "Active rules: 0";
+    ? `Active rules: ${state.badge.text}${attentionText}${attentionReason}`
+    : `Active rules: 0${attentionText}${attentionReason}`;
   actions.append(badge);
   topbar.append(actions);
   shell.append(topbar);
@@ -224,6 +230,9 @@ function renderSidebar(shell: HTMLElement): void {
     for (const group of sourceGroups) {
       if (!isProjectRecord(group) || typeof group.id !== "string") continue;
       const label = document.createElement("label");
+      label.className = enabled.has(group.id)
+        ? "rogatio-group-label rogatio-group-active"
+        : "rogatio-group-label rogatio-group-inactive";
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.checked = enabled.has(group.id);
@@ -236,6 +245,14 @@ function renderSidebar(shell: HTMLElement): void {
       groups.append(label);
     }
     sidebar.append(groups);
+  }
+
+  if (state.badge?.attention) {
+    const attentionNote = document.createElement("p");
+    attentionNote.className = "rogatio-attention-note";
+    attentionNote.textContent =
+      "Attention needed: some rules need permission. Click 'Grant declared access' after reviewing origins.";
+    sidebar.append(attentionNote);
   }
 
   const nativeRuntime = document.createElement("p");
