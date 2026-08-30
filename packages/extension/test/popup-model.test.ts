@@ -16,9 +16,9 @@ function envelope(over: Partial<PopupEnvelope> = {}): PopupEnvelope {
         name: "Alpha",
         data: {
           groups: [
-            { id: "g1", name: "First", rules: [{}, {}] },
+            { id: "g1", name: "First", rules: [{ id: "r1" }, { id: "r2" }] },
             { id: "g2", name: "Second", rules: [] },
-            { id: "g3", name: "Third", rules: [{}] },
+            { id: "g3", name: "Third", rules: [{ id: "r3" }] },
           ],
         },
         enabledGroupIds: ["g1", "g3"],
@@ -32,7 +32,7 @@ function envelope(over: Partial<PopupEnvelope> = {}): PopupEnvelope {
 describe("F21 popup group status aggregation", () => {
   it("reports disabled for an unenabled group regardless of rule statuses", () => {
     const statuses: PopupRuleStatus[] = [
-      { groupId: "g", ruleId: "r", status: "active" },
+      { groupId: "g", ruleId: "r1", status: "active" },
       { groupId: "g", ruleId: "r2", status: "error" },
     ];
     expect(aggregateGroupStatus(false, statuses)).toBe("disabled");
@@ -70,33 +70,34 @@ describe("F21 popup group status aggregation", () => {
 });
 
 describe("F21 popup model", () => {
-  it("lists only the active project's persisted groups in source order with truthful status", () => {
+  it("lists each active project's persisted rule in source order with truthful status", () => {
     const model = createPopupModel({
       envelope: envelope({
         ruleStatuses: [
-          { groupId: "g1", ruleId: "r", status: "active" },
-          { groupId: "g3", ruleId: "r", status: "needs permission" },
+          { groupId: "g1", ruleId: "r1", status: "active" },
+          { groupId: "g3", ruleId: "r3", status: "needs permission" },
         ],
       }),
       send: vi.fn(async () => ({ ok: true })),
     });
     const rows = model.rows();
-    expect(rows.map((r) => r.id)).toEqual(["g1", "g2", "g3"]);
+    expect(rows.map((r) => r.id)).toEqual(["r1", "r2", "r3"]);
     expect(rows[0]).toMatchObject({
-      id: "g1",
-      name: "First",
-      ruleCount: 2,
+      id: "r1",
+      groupId: "g1",
+      name: "Rule 1",
       enabled: true,
       status: "active",
     });
     expect(rows[1]).toMatchObject({
-      id: "g2",
-      ruleCount: 0,
-      enabled: false,
-      status: "disabled",
+      id: "r2",
+      groupId: "g1",
+      enabled: true,
+      status: "active",
     });
     expect(rows[2]).toMatchObject({
-      id: "g3",
+      id: "r3",
+      groupId: "g3",
       enabled: true,
       status: "needs permission",
     });

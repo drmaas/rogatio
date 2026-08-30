@@ -13,10 +13,20 @@ export interface PopupRuleStatus {
   readonly diagnostics?: readonly unknown[];
 }
 
+export interface PopupProjectRule {
+  readonly id?: unknown;
+  readonly name?: unknown;
+}
+
+export interface PopupProjectRule {
+  readonly id?: unknown;
+  readonly name?: unknown;
+}
+
 export interface PopupProjectGroup {
   readonly id: string;
   readonly name: string;
-  readonly rules: readonly unknown[];
+  readonly rules: readonly PopupProjectRule[];
 }
 
 export interface PopupProject {
@@ -32,10 +42,10 @@ export interface PopupEnvelope {
   readonly badge?: { readonly text: string; readonly attention: boolean };
 }
 
-export interface PopupGroupRow {
+export interface PopupRuleRow {
   readonly id: string;
+  readonly groupId: string;
   readonly name: string;
-  readonly ruleCount: number;
   readonly status: GroupStatus;
   readonly enabled: boolean;
 }
@@ -84,7 +94,7 @@ export interface PopupModelOptions {
 export interface PopupModel {
   readonly activeProjectId: string | null;
   readonly activeProjectName: string | null;
-  readonly rows: () => readonly PopupGroupRow[];
+  readonly rows: () => readonly PopupRuleRow[];
   readonly toggle: (groupId: string, enabled: boolean) => Promise<void>;
   readonly openAppUrl: () => string;
   readonly groupUrl: (groupId: string) => string;
@@ -111,18 +121,29 @@ export function createPopupModel(options: PopupModelOptions): PopupModel {
       const groups = Array.isArray(activeProject.data.groups)
         ? activeProject.data.groups
         : [];
-      return groups.map((group) => {
+      return groups.flatMap((group) => {
         const enabled = enabledGroupIds.has(group.id);
-        const groupStatuses = ruleStatuses.filter(
-          (rule) => rule.groupId === group.id,
-        );
-        return {
-          id: group.id,
-          name: group.name,
-          ruleCount: Array.isArray(group.rules) ? group.rules.length : 0,
-          status: aggregateGroupStatus(enabled, groupStatuses),
-          enabled,
-        };
+        const rules = Array.isArray(group.rules) ? group.rules : [];
+        return rules.map((rule: PopupProjectRule, index: number) => {
+          const ruleId =
+            typeof rule.id === "string" ? rule.id : `${group.id}-${index}`;
+          const ruleStatus = ruleStatuses.find(
+            (status) => status.groupId === group.id && status.ruleId === ruleId,
+          );
+          return {
+            id: ruleId,
+            groupId: group.id,
+            name:
+              typeof rule.name === "string" && rule.name.length > 0
+                ? rule.name
+                : `Rule ${index + 1}`,
+            status: aggregateGroupStatus(
+              enabled,
+              ruleStatus ? [ruleStatus] : [],
+            ),
+            enabled,
+          };
+        });
       });
     },
     async toggle(groupId, enabled) {
