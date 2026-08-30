@@ -193,15 +193,14 @@ function renderSidebar(shell: HTMLElement): void {
   actions.className = "rogatio-sidebar-actions";
   actions.append(
     button("Switch project", "switch"),
-    button("Create project", "create"),
     button("Import project", "import"),
     button("Review permissions", "review-permissions"),
     button(
       permissionGranted ? "Access granted" : "Grant declared access",
       "grant-permissions",
     ),
-    button("Start response runtime", "start-native-runtime"),
-    button("Stop response runtime", "stop-native-runtime"),
+    button("Start runtime", "start-native-runtime"),
+    button("Stop runtime", "stop-native-runtime"),
     button("Check and connect", "check-mock-runtime"),
   );
   sidebar.append(actions);
@@ -250,7 +249,7 @@ function renderSidebar(shell: HTMLElement): void {
 
   const nativeRuntime = document.createElement("p");
   nativeRuntime.dataset.nativeRuntimeState = "true";
-  nativeRuntime.textContent = `Response runtime: ${state.nativeRuntimeState?.phase ?? "stopped"}.`;
+  nativeRuntime.textContent = `Runtime: ${state.nativeRuntimeState?.phase ?? "stopped"}.`;
   sidebar.append(nativeRuntime);
 
   const mockRuntime = document.createElement("p");
@@ -258,16 +257,16 @@ function renderSidebar(shell: HTMLElement): void {
   const mockPhase = state.mockRuntimeState?.phase ?? "disconnected";
   const lastCheck = state.mockRuntimeState?.lastCheck;
   if (mockPhase === "checking") {
-    mockRuntime.textContent = "Mock runtime: checking…";
+    mockRuntime.textContent = "Mock connection: checking…";
   } else if (mockPhase === "connected") {
-    mockRuntime.textContent = "Mock runtime: connected.";
+    mockRuntime.textContent = "Mock connection: connected.";
   } else if (mockPhase === "failed") {
-    mockRuntime.textContent = `Mock runtime: unreachable${
+    mockRuntime.textContent = `Mock connection: unreachable${
       lastCheck?.message ? ` (${lastCheck.message})` : ""
-    }. Start rogatio runtime and check again.`;
+    }. Start the runtime and check again.`;
   } else {
     mockRuntime.textContent =
-      "Mock runtime: not connected. Start rogatio runtime, then choose Check and connect.";
+      "Mock connection: not connected. Start the runtime, then choose Check and connect.";
   }
   sidebar.append(mockRuntime);
 
@@ -475,6 +474,11 @@ function renderShell(): void {
   overview?.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    const createCardEl = target.closest<HTMLElement>("[data-create-project]");
+    if (createCardEl) {
+      void createProject();
+      return;
+    }
     if (target.dataset.command) return; // action buttons handled at shell level
     const card = target.closest<HTMLElement>("[data-project-card]");
     if (!card?.dataset.projectId) return;
@@ -693,8 +697,8 @@ async function nativeRuntimeCommand(
   const response = await client.send({ version: 1, command });
   statusMessage =
     response?.ok === true
-      ? "Response runtime state updated."
-      : "Response runtime action unavailable on this platform.";
+      ? "Runtime state updated."
+      : "Runtime action unavailable on this platform.";
   await refresh();
 }
 
@@ -705,8 +709,8 @@ async function checkMockRuntime(): Promise<void> {
   });
   statusMessage =
     response?.ok === true
-      ? "Mock runtime check complete."
-      : "The mock runtime could not be checked. Start rogatio runtime and try again.";
+      ? "Runtime check complete."
+      : "The runtime could not be checked. Start the runtime and try again.";
   await refresh();
 }
 
