@@ -471,7 +471,7 @@ function renderShell(): void {
   });
 
   const overview = shell.querySelector<HTMLElement>("[data-overview]");
-  overview?.addEventListener("click", (event) => {
+  overview?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const createCardEl = target.closest<HTMLElement>("[data-create-project]");
@@ -482,12 +482,18 @@ function renderShell(): void {
     if (target.dataset.command) return; // action buttons handled at shell level
     const card = target.closest<HTMLElement>("[data-project-card]");
     if (!card?.dataset.projectId) return;
-    if (card.dataset.projectId === state.activeProjectId) return;
+    if (card.dataset.projectId === state.activeProjectId) {
+      activeTab = "workspace";
+      renderShell();
+      return;
+    }
     pendingProjectId = card.dataset.projectId;
-    statusMessage = `Selected ${text(
+    await switchProject();
+    activeTab = "workspace";
+    statusMessage = `Opened ${text(
       state.projects[pendingProjectId]?.name,
       pendingProjectId,
-    )}. Choose Switch project to activate it.`;
+    )}.`;
     renderShell();
   });
 
