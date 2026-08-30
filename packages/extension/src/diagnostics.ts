@@ -14,7 +14,8 @@ export type ExtensionDiagnosticCode =
   | "extension.mock-token-missing"
   | "extension.mock-check-in-progress"
   | "extension.native-runtime-unavailable"
-  | "extension.native-runtime-transition";
+  | "extension.native-runtime-transition"
+  | "extension.native-host-missing";
 
 export interface ExtensionDiagnostic {
   readonly code: ExtensionDiagnosticCode;
@@ -47,9 +48,10 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.mock-check-in-progress":
     "A mock runtime check is already in progress.",
   "extension.native-runtime-unavailable":
-    "The response-body runtime is unavailable on this platform.",
-  "extension.native-runtime-transition":
-    "The response-body runtime could not change state.",
+    "The runtime is unavailable on this platform.",
+  "extension.native-runtime-transition": "The runtime could not change state.",
+  "extension.native-host-missing":
+    "The native runtime host is not installed on this device. Run `rogatio runtime install --extension-id <extension ID>` once, then start the runtime again.",
 };
 
 export function extensionDiagnostic(

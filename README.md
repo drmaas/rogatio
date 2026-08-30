@@ -116,9 +116,13 @@ cat test-cases.json | rogatio test .rogatio.json --urls-file -
 A `mock` rule returns a configured status, optional headers, optional delay, and
 an inline body or a live UTF-8 snapshot of one approved local file — without
 contacting upstream. Mocks are delivered by the consolidated native-messaging
-host and installed into the browser via a single Check-and-connect request.
+host; the extension performs the one-time `mock.connect` handshake when you
+click **Start runtime**.
 
 ```sh
+# Register the native-messaging host once (required before Start runtime works)
+rogatio runtime install --extension-id <32-char extension ID>
+
 # Start the native-messaging host for the project (launched by the extension)
 rogatio runtime-host .rogatio.json
 
@@ -126,9 +130,12 @@ rogatio runtime-host .rogatio.json
 rogatio runtime-host .rogatio.json --root ~/projects/demo
 ```
 
-Then open the extension, click **Check and connect**, and matched requests
+Then open the extension, click **Start runtime**, and matched requests
 will be redirected to the configured mock response. Mock rules report
-`needs proxy` while the runtime is disconnected and `active` when connected.
+`needs proxy` while the runtime is stopped and `active` when connected; the
+sidebar runtime status line shows the current phase next to the Start/Stop
+controls. If the host manifest is not installed, starting reports an actionable
+error naming `rogatio runtime install --extension-id <extension ID>`.
 
 ## Project layout
 

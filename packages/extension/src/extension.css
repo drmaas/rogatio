@@ -251,6 +251,30 @@ body {
   display: grid;
   gap: 0.5rem;
 }
+.rogatio-runtime-status {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.8rem;
+}
+.rogatio-runtime-status::before {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--rogatio-muted);
+}
+.rogatio-runtime-running::before {
+  background: var(--rogatio-success);
+}
+.rogatio-runtime-failed::before {
+  background: var(--rogatio-danger);
+}
+.rogatio-runtime-starting::before {
+  background: var(--rogatio-warning);
+}
 .rogatio-main {
   min-width: 0;
   padding: 1rem clamp(1rem, 3vw, 2rem) 3rem;

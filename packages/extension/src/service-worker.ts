@@ -17,6 +17,7 @@ import {
   extensionDiagnostic,
 } from "./diagnostics.js";
 import { installHeaderRules } from "./installer.js";
+import type { MockRuntimeConnection } from "./mock-runtime.js";
 import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
   connectNativeMock,
@@ -45,6 +46,10 @@ export interface ExtensionApplicationOptions {
   readonly generateId?: () => string;
   readonly now?: () => number;
   readonly extensionId?: string;
+  /** Stores the native-host mock connection for the DNR mock-URL resolver. */
+  readonly mockConnection?: {
+    set(connection: MockRuntimeConnection | null): void;
+  };
   readonly nativeRuntime?: {
     start(config: NativeRuntimeConfig): Promise<{
       readonly state: NativeRuntimePhase | "unsupported";
@@ -104,6 +109,7 @@ function operationStatuses(
   grantedOrigins: readonly string[],
   mockTokens: ReadonlyMap<string, string>,
   nativePhase: NativeRuntimePhase | "unsupported",
+  mockConnected: boolean,
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -171,7 +177,7 @@ function operationStatuses(
       return { ...status };
     }
     if (operation?.kind === "mock") {
-      if (nativePhase !== "started") {
+      if (nativePhase !== "started" || !mockConnected) {
         return {
           groupId: status.groupId,
           ruleId: status.ruleId,
@@ -224,6 +230,7 @@ export function createExtensionApplication(
     now: options.now,
   });
   let mockTokens = new Map<string, string>();
+  let mockConnected = false;
   let nativePhase: NativeRuntimePhase | "unsupported" = options.nativeRuntime
     ? "stopped"
     : "unsupported";
@@ -237,6 +244,39 @@ export function createExtensionApplication(
       if (await options.permissions.contains([origin])) result.push(origin);
     }
     return result;
+  }
+
+  /**
+   * The DNR-managed operation set for the active project. Browser-side
+   * redirect/query rules stay installed across start and stop; mock redirects
+   * exist only while the native host is serving the mock faucet, so stopping
+   * the runtime removes them again.
+   */
+  function dnrManagedOps(
+    operations: readonly RogatioOperation[],
+    enabledGroupIds: readonly string[],
+    granted: readonly string[],
+    withMocks: boolean,
+  ): readonly RogatioOperation[] {
+    const enabled = new Set(enabledGroupIds);
+    const grantedSet = new Set(granted);
+    return operations.filter((operation) => {
+      if (operation.kind === "mock") {
+        return (
+          withMocks &&
+          enabled.has(operation.groupId) &&
+          operation.matcher.origins.length > 0
+        );
+      }
+      if (operation.kind === "redirect" || operation.kind === "query") {
+        return (
+          enabled.has(operation.groupId) &&
+          operation.matcher.origins.length > 0 &&
+          operation.matcher.origins.every((origin) => grantedSet.has(origin))
+        );
+      }
+      return false;
+    });
   }
 
   async function projectState(
@@ -297,6 +337,7 @@ export function createExtensionApplication(
       granted,
       mockTokens,
       nativePhase,
+      mockConnected,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),
@@ -525,16 +566,23 @@ export function createExtensionApplication(
         });
 
         if (!sessionResult.ok) {
-          return {
-            ok: true,
-            value: {
-              nativeRuntimeState: { phase: "error" },
-              message: sessionResult.reason,
-            },
-          };
+          // A failed start must leave truthful state behind: the session did
+          // not open, so the phase is `failed`, and the reason is surfaced as
+          // a distinct diagnostic so the UI can tell the user what to do
+          // (for example, installing the missing native host).
+          nativePhase = "failed";
+          return sessionResult.reason === "extension.native-host-missing"
+            ? failure("extension.native-host-missing")
+            : failure("extension.native-runtime-transition");
         }
 
         nativePhase = "started";
+        mockConnected = false;
+        mockTokens = new Map();
+        const declared = declaredPermissionOrigins({
+          operations: compileResult.operations,
+        });
+        const granted = await grantedOriginsFor(declared);
         if (options.nativeRuntime.send) {
           const connection = await connectNativeMock(
             {
@@ -548,12 +596,40 @@ export function createExtensionApplication(
             },
             "",
           );
-          if (connection) {
+          if (connection && connection.port !== null) {
             mockTokens = new Map(
               connection.mocks.map((mock) => [mock.ruleId, mock.token]),
             );
+            mockConnected = true;
+            // Store the connection so the DNR installer's mock-URL resolver
+            // can translate mock operations into faucet redirect rules.
+            options.mockConnection?.set({
+              protocol: "v1",
+              port: connection.port,
+              presetDigest: sessionResult.policyDigest,
+              mocks: connection.mocks,
+            });
+            await options.installer.install(
+              dnrManagedOps(
+                compileResult.operations,
+                project.enabledGroupIds,
+                granted,
+                true,
+              ),
+            );
+            return state();
           }
         }
+        // No usable mock connection: make sure no stale mock redirects from a
+        // previous session survive, keeping only browser-side rules.
+        await options.installer.install(
+          dnrManagedOps(
+            compileResult.operations,
+            project.enabledGroupIds,
+            granted,
+            false,
+          ),
+        );
         return state();
       }
       if (request.command === "stop-native-runtime") {
@@ -575,6 +651,37 @@ export function createExtensionApplication(
           getGrantedOrigins: async () => [],
         });
         nativePhase = "stopped";
+        mockConnected = false;
+        mockTokens = new Map();
+        options.mockConnection?.set(null);
+        // Remove mock faucet redirects that belong to the stopped session;
+        // browser-side redirect/query rules stay installed.
+        try {
+          const stopCurrent = await repository.state();
+          if (stopCurrent.ok && stopCurrent.value.activeProjectId) {
+            const stopProject =
+              stopCurrent.value.projects[stopCurrent.value.activeProjectId];
+            if (stopProject) {
+              const stopCompiled = compileProject(stopProject.data);
+              if (stopCompiled.ok) {
+                const stopDeclared = declaredPermissionOrigins({
+                  operations: stopCompiled.operations,
+                });
+                const stopGranted = await grantedOriginsFor(stopDeclared);
+                await options.installer.install(
+                  dnrManagedOps(
+                    stopCompiled.operations,
+                    stopProject.enabledGroupIds,
+                    stopGranted,
+                    false,
+                  ),
+                );
+              }
+            }
+          }
+        } catch {
+          // Best-effort cleanup: the runtime session is already stopped.
+        }
         return state();
       }
       const result = await options.nativeRuntime.status();

@@ -16,6 +16,23 @@ import { createExtensionApplication } from "./service-worker.js";
 
 const NATIVE_HOST_NAME = "com.rogatio.runtime";
 
+/**
+ * Raised when the native-messaging host manifest is not registered with
+ * Chrome. Chrome throws synchronously from `connectNative` when the host was
+ * never installed on this profile, which callers must not confuse with a
+ * storage or platform failure.
+ */
+class NativeHostMissingError extends Error {
+  constructor() {
+    super("extension.native-host-missing");
+    this.name = "NativeHostMissingError";
+  }
+}
+
+function isNativeHostMissingError(error: unknown): boolean {
+  return error instanceof NativeHostMissingError;
+}
+
 interface NativeRuntimeAdapter {
   start(config: NativeRuntimeConfig): Promise<{
     state: NativeRuntimePhase | "unsupported";
@@ -44,8 +61,15 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
   function ensurePort(): ChromePort {
     if (port) return port;
     const connect = api.runtime.connectNative;
-    if (!connect) throw new Error("extension.chrome-native-unavailable");
-    const next = connect(NATIVE_HOST_NAME);
+    if (!connect) throw new NativeHostMissingError();
+    let next: ChromePort;
+    try {
+      next = connect(NATIVE_HOST_NAME);
+    } catch {
+      // Chrome throws synchronously when the native-messaging host manifest is
+      // not registered (`rogatio runtime install` has not run on this device).
+      throw new NativeHostMissingError();
+    }
     next.onMessage.addListener((message: unknown) => {
       const envelope = message as { requestId?: unknown };
       const requestId =
@@ -75,14 +99,29 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
   }
 
   return {
-    async start(): Promise<{ state: NativeRuntimePhase | "unsupported" }> {
-      const active = ensurePort();
-      active.postMessage({
-        protocol: "v1",
-        type: "runtime.start",
-        metadata: {},
-      });
-      return { state: "started" };
+    async start(): Promise<{
+      state: NativeRuntimePhase | "unsupported";
+      message?: string;
+    }> {
+      try {
+        const active = ensurePort();
+        active.postMessage({
+          protocol: "v1",
+          type: "runtime.start",
+          metadata: {},
+        });
+        return { state: "started" };
+      } catch (error) {
+        if (isNativeHostMissingError(error))
+          return {
+            state: "unsupported",
+            message: "extension.native-host-missing",
+          };
+        return {
+          state: "failed",
+          message: "extension.native-runtime-transition",
+        };
+      }
     },
     async stop(): Promise<{ state: NativeRuntimePhase | "unsupported" }> {
       if (port) {
@@ -140,6 +179,7 @@ const application = createExtensionApplication({
   }),
   badge: (value) => setBadge(value, api),
   extensionId: api.runtime.id,
+  mockConnection: mockConnectionHolder,
   nativeRuntime: createNativeRuntimeAdapter(),
 });
 
