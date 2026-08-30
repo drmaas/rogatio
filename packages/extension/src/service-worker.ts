@@ -328,7 +328,16 @@ export function createExtensionApplication(
     if (headerOps.length > 0) {
       const headerProjections = projectHeaders(headerOps);
       const result = await installHeaderRules(headerProjections);
-      installedRuleIds.push(...result.installed.map(String));
+      // installHeaderRules reports numeric DNR rule ids, while the status
+      // computation matches project rule ids. Map each installed DNR id back
+      // to its header projection so installed header rules are recognized
+      // (REQ-009: active when enabled + granted + installed).
+      for (const installedId of result.installed) {
+        const projection = headerProjections.find(
+          (candidate) => candidate.id === installedId,
+        );
+        if (projection !== undefined) installedRuleIds.push(projection.ruleId);
+      }
     }
     const statuses = operationStatuses(
       compiled.operations,
@@ -745,6 +754,29 @@ export function createExtensionApplication(
       if (!changed) return failure("extension.permission-failed");
       const currentGranted = await grantedOriginsFor(declared);
       await syncStoredGrants(projectId, declared, currentGranted);
+      // A permission change must move the installed rules with it: rules that
+      // become permitted are installed immediately (covering the common
+      // activate-then-grant sequence), and revoked origins stop being served.
+      // Proxy-backed mock redirects only stay when the runtime session is
+      // actually serving the mock faucet.
+      const postGrantState = await repository.state();
+      if (
+        postGrantState.ok &&
+        postGrantState.value.activeProjectId === projectId
+      ) {
+        const activeProject = postGrantState.value.projects[projectId];
+        const postGrantCompiled = compileProject(activeProject?.data);
+        if (postGrantCompiled.ok) {
+          await options.installer.install(
+            dnrManagedOps(
+              postGrantCompiled.operations,
+              activeProject.enabledGroupIds,
+              currentGranted,
+              nativePhase === "started" && mockConnected,
+            ),
+          );
+        }
+      }
       await state();
       return {
         ok: true,

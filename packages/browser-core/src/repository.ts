@@ -512,23 +512,13 @@ export class ProjectRepository {
     let raw: unknown;
     try {
       raw = await this.storage.read();
-      console.log(
-        "[DEBUG] readEnvelope: storage.read() returned",
-        raw === undefined ? "undefined" : typeof raw,
-      );
-    } catch (e) {
-      console.log("[DEBUG] readEnvelope: storage.read() threw", e);
+    } catch {
       return {
         ok: false,
         diagnostics: [coreDiagnostic("core.storage-corrupt")],
       };
     }
     const migrated = migrateEnvelope(raw);
-    console.log(
-      "[DEBUG] readEnvelope: migrateEnvelope returned",
-      migrated.ok ? "ok" : "failed",
-      migrated.ok ? "" : migrated.diagnostic,
-    );
     if (!migrated.ok) {
       return { ok: false, diagnostics: [migrated.diagnostic] };
     }

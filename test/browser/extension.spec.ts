@@ -213,3 +213,157 @@ test("keeps the platform-unavailable wording and truthful unsupported status", a
     "Runtime status: unavailable on this platform",
   );
 });
+
+test("derives the attention reason from the actual rule statuses", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const state = {
+      version: 1,
+      projects: {
+        "project-a": {
+          id: "project-a",
+          name: "Project A",
+          data: { version: 1, name: "Project A", groups: [] },
+          revision: 1,
+          enabledGroupIds: [],
+          grantedOrigins: [],
+        },
+      },
+      activeProjectId: "project-a",
+      badge: { text: "0", attention: true },
+      ruleStatuses: [
+        {
+          groupId: "group-a",
+          ruleId: "rule-redirect",
+          status: "needs permission",
+        },
+      ],
+    };
+    let refreshes = 0;
+    const runtime = {
+      lastError: undefined,
+      sendMessage(
+        message: { command?: string },
+        callback: (value: unknown) => void,
+      ) {
+        if (message.command === "refresh") {
+          refreshes += 1;
+          if (refreshes > 1) {
+            // After granting access with the runtime stopped, the real blocker
+            // is the proxy runtime, not permissions.
+            state.ruleStatuses = [
+              {
+                groupId: "group-a",
+                ruleId: "rule-mock",
+                status: "needs proxy",
+              },
+            ];
+          }
+        }
+        callback({ ok: true, value: state });
+      },
+      onMessage: { addListener() {} },
+    };
+    Object.defineProperty(window, "chrome", {
+      configurable: true,
+      value: {
+        storage: {
+          local: { get: async () => ({ rogatio: state }), set: async () => {} },
+        },
+        permissions: {
+          contains: async () => false,
+          request: async () => true,
+          remove: async () => true,
+        },
+        action: {
+          setBadgeText: async () => {},
+          setBadgeBackgroundColor: async () => {},
+        },
+        runtime,
+      },
+    });
+  });
+  await page.goto("/extension/index.html");
+  const badge = page.locator("[data-badge-state]");
+  await expect(badge).toContainText("needs permission: grant declared access");
+  await expect(page.locator(".rogatio-attention-note")).toContainText(
+    "Grant declared access",
+  );
+
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(badge).toContainText("needs proxy: start runtime");
+  await expect(badge).not.toContainText("needs permission");
+  await expect(page.locator(".rogatio-attention-note")).toContainText(
+    "Start runtime",
+  );
+});
+
+test("reports the highest-precedence blocking status as the attention reason", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const state = {
+      version: 1,
+      projects: {
+        "project-a": {
+          id: "project-a",
+          name: "Project A",
+          data: { version: 1, name: "Project A", groups: [] },
+          revision: 1,
+          enabledGroupIds: [],
+          grantedOrigins: [],
+        },
+      },
+      activeProjectId: "project-a",
+      badge: { text: "0", attention: true },
+      ruleStatuses: [
+        {
+          groupId: "group-a",
+          ruleId: "rule-mock",
+          status: "needs proxy",
+        },
+        {
+          groupId: "group-a",
+          ruleId: "rule-redirect",
+          status: "error",
+        },
+      ],
+    };
+    const runtime = {
+      lastError: undefined,
+      sendMessage(
+        _message: { command?: string },
+        callback: (value: unknown) => void,
+      ) {
+        callback({ ok: true, value: state });
+      },
+      onMessage: { addListener() {} },
+    };
+    Object.defineProperty(window, "chrome", {
+      configurable: true,
+      value: {
+        storage: {
+          local: { get: async () => ({ rogatio: state }), set: async () => {} },
+        },
+        permissions: {
+          contains: async () => false,
+          request: async () => true,
+          remove: async () => true,
+        },
+        action: {
+          setBadgeText: async () => {},
+          setBadgeBackgroundColor: async () => {},
+        },
+        runtime,
+      },
+    });
+  });
+  await page.goto("/extension/index.html");
+  await expect(page.locator("[data-badge-state]")).toContainText(
+    "rules failed to install",
+  );
+  await expect(page.locator(".rogatio-attention-note")).toContainText(
+    "failed to install",
+  );
+});
