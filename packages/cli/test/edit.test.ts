@@ -64,6 +64,8 @@ describe("edit command", () => {
     const originalCwd = process.cwd();
     try {
       process.chdir(testDir);
+      // Ensure default .rogatio.json exists for default cwd behavior
+      await writeProject(join(testDir, ".rogatio.json"), validProject);
       const { exitCode, shutdown } = await editCommand([], {
         launchBrowser: vi.fn().mockResolvedValue(false),
       });
