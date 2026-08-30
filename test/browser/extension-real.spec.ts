@@ -82,7 +82,8 @@ test("drives the real extension page lifecycle and mounts the editor", async () 
     );
     expect(permissionState).toBe(false);
 
-    await page.getByRole("button", { name: "Create project" }).click();
+    await page.getByRole("button", { name: "Dashboard", exact: true }).click();
+    await page.locator("[data-create-project]").click();
     await page.waitForTimeout(100);
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Refresh" }).click();

@@ -228,7 +228,8 @@ describe("pairing and authorization success (spec REQ-005)", () => {
       preset: buildGrantedPreset(),
     });
     await controller.start();
-    const bootstrap = controller.getBootstrapCapability()!;
+    const bootstrap = controller.getBootstrapCapability();
+    if (!bootstrap) throw new Error("Expected bootstrap capability");
     const response = await controller.handleEnvelope({
       type: "pair.request",
       metadata: { capability: bootstrap, presetDigest: DIGEST },
@@ -249,7 +250,8 @@ describe("pairing and authorization success (spec REQ-005)", () => {
       preset: buildGrantedPreset(),
     });
     await controller.start();
-    const bootstrap = controller.getBootstrapCapability()!;
+    const bootstrap = controller.getBootstrapCapability();
+    if (!bootstrap) throw new Error("Expected bootstrap capability");
     await controller.handleEnvelope({
       type: "pair.request",
       metadata: { capability: bootstrap, presetDigest: DIGEST },
@@ -267,7 +269,8 @@ describe("pairing and authorization success (spec REQ-005)", () => {
       preset: buildGrantedPreset(),
     });
     await controller.start();
-    const bootstrap = controller.getBootstrapCapability()!;
+    const bootstrap = controller.getBootstrapCapability();
+    if (!bootstrap) throw new Error("Expected bootstrap capability");
     const paired = await controller.handleEnvelope({
       type: "pair.request",
       metadata: { capability: bootstrap, presetDigest: DIGEST },

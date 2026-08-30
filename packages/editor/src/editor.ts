@@ -594,7 +594,17 @@ class EditorControllerImpl implements EditorController {
     this.form.dataset.editorForm = "true";
     this.form.noValidate = true;
     this.searchResults = this.document.createElement("section");
+    this.searchResults.id = "rogatio-search-results";
     this.searchResults.dataset.searchResults = "true";
+
+    this.host.addEventListener("click", (event) => {
+      if (!this.searchQuery) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-search-wrap]"))
+        return;
+      this.searchQuery = "";
+      this.render();
+    });
 
     this.main.append(
       this.header,
@@ -602,7 +612,6 @@ class EditorControllerImpl implements EditorController {
       this.summary,
       this.commandBar,
       this.form,
-      this.searchResults,
     );
     layout.append(this.rail, this.main);
     this.host.append(layout);
@@ -1659,7 +1668,7 @@ class EditorControllerImpl implements EditorController {
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
       this.route = { kind: "project" };
-      this.focusRequest = path;
+      this.searchQuery = "";
       this.render();
       return;
     }
@@ -1667,10 +1676,20 @@ class EditorControllerImpl implements EditorController {
     const group =
       groupIndex === undefined ? undefined : this.draft.groups[groupIndex];
     if (!group || typeof group.id !== "string") return;
+    const ruleIndex = arrayIndex(segments[3] ?? "");
+    const rule = ruleIndex === undefined ? undefined : group.rules[ruleIndex];
     this.route = { kind: "group", groupId: group.id };
-    this.focusRequest = path;
-    this.statusMessage = "Search result opened.";
+    this.searchQuery = "";
+    this.statusMessage = "Jumped to rule.";
     this.render();
+    if (rule && typeof rule.id === "string") {
+      const anchor = `rogatio-rule-${safeText(group.id)}-${safeText(rule.id)}`;
+      const card = this.document.getElementById(anchor);
+      if (card) {
+        card.scrollIntoView({ block: "start", behavior: "smooth" });
+        card.focus({ preventScroll: true });
+      }
+    }
   }
 
   private navigateToPath(path: string): void {
@@ -1761,15 +1780,6 @@ class EditorControllerImpl implements EditorController {
       : "All changes saved";
     titleBlock.append(title, dirty);
 
-    const searchLabel = this.document.createElement("label");
-    searchLabel.textContent = "Search project";
-    const search = this.document.createElement("input");
-    search.type = "search";
-    search.value = this.searchQuery;
-    search.dataset.search = "true";
-    search.dataset.editorKey = "search";
-    searchLabel.append(search);
-
     const mobileNav = this.document.createElement("label");
     mobileNav.dataset.mobileRouteNav = "true";
     mobileNav.textContent = "Project section";
@@ -1802,7 +1812,7 @@ class EditorControllerImpl implements EditorController {
       if (option) select.value = "group";
     }
     mobileNav.append(select);
-    this.header.append(titleBlock, searchLabel, mobileNav);
+    this.header.append(titleBlock, mobileNav);
     this.status.textContent = this.statusMessage;
     this.status.setAttribute("aria-busy", this.saving ? "true" : "false");
   }
@@ -1837,6 +1847,26 @@ class EditorControllerImpl implements EditorController {
     if (this.route.kind === "test")
       testBtn.setAttribute("aria-current", "page");
     this.rail.append(testBtn);
+
+    const searchWrap = this.document.createElement("div");
+    searchWrap.dataset.searchWrap = "true";
+    const searchLabel = this.document.createElement("label");
+    searchLabel.dataset.searchLabel = "true";
+    searchLabel.textContent = "Search project";
+    const search = this.document.createElement("input");
+    search.type = "search";
+    search.value = this.searchQuery;
+    search.dataset.search = "true";
+    search.dataset.editorKey = "search";
+    search.setAttribute("aria-label", "Search rules by name");
+    search.setAttribute(
+      "aria-expanded",
+      this.searchQuery.trim().length > 0 ? "true" : "false",
+    );
+    search.setAttribute("aria-controls", "rogatio-search-results");
+    searchLabel.append(search);
+    searchWrap.append(searchLabel, this.searchResults);
+    this.rail.append(searchWrap);
   }
 
   private renderCommandBar(): void {
@@ -2145,6 +2175,8 @@ class EditorControllerImpl implements EditorController {
     const card = this.document.createElement("article");
     card.dataset.ruleCard = "true";
     card.dataset.ruleId = ruleId;
+    card.id = `rogatio-rule-${groupId}-${ruleId}`;
+    card.tabIndex = -1;
     const heading = this.document.createElement("h3");
     heading.textContent = ruleName;
     card.append(heading);
@@ -2630,17 +2662,22 @@ class EditorControllerImpl implements EditorController {
   }
 
   private renderSearchResults(): void {
-    this.searchResults.replaceChildren();
-    this.searchResults.hidden = this.searchQuery.length === 0;
-    if (this.searchQuery.length === 0) return;
-    const heading = this.document.createElement("h2");
-    heading.textContent = "Search results";
+    const root = this.searchResults;
+    root.replaceChildren();
+    root.hidden = this.searchQuery.trim().length === 0;
+    if (this.searchQuery.trim().length === 0) return;
+    root.setAttribute("role", "listbox");
+    root.setAttribute("aria-label", "Rule search results");
     const results = this.searchResultsFor(this.searchQuery);
     const count = this.document.createElement("p");
-    count.textContent = `${results.length} result${results.length === 1 ? "" : "s"}.`;
+    count.dataset.searchCount = "true";
+    count.textContent = `${results.length} rule${
+      results.length === 1 ? "" : "s"
+    } matching “${this.searchQuery.trim()}”.`;
     const list = this.document.createElement("ul");
     for (const result of results) {
       const item = this.document.createElement("li");
+      item.setAttribute("role", "option");
       const button = this.document.createElement("button");
       button.type = "button";
       button.dataset.searchResult = result.path;
@@ -2648,11 +2685,11 @@ class EditorControllerImpl implements EditorController {
       item.append(button);
       list.append(item);
     }
-    this.searchResults.append(heading, count, list);
+    root.append(count, list);
     if (results.length === 0) {
       const empty = this.document.createElement("p");
-      empty.textContent = "No matching project, group, or rule fields.";
-      this.searchResults.append(empty);
+      empty.textContent = "No rules match that name.";
+      root.append(empty);
     }
   }
 
@@ -2662,68 +2699,18 @@ class EditorControllerImpl implements EditorController {
     const needle = toSearchText(query);
     if (!needle) return [];
     const results: Array<{ path: string; label: string }> = [];
-    const matches = (values: readonly unknown[]): number => {
-      for (let index = 0; index < values.length; index += 1) {
-        if (toSearchText(values[index]).includes(needle)) return index;
-      }
-      return -1;
-    };
-    const projectMatch = matches([this.draft.name, this.draft.description]);
-    if (projectMatch !== -1) {
-      results.push({
-        path: projectMatch === 0 ? "/name" : "/description",
-        label: "Project details",
-      });
-    }
     for (
       let groupIndex = 0;
       groupIndex < this.draft.groups.length;
       groupIndex += 1
     ) {
       const group = this.draft.groups[groupIndex];
-      const groupMatch = matches([group.id, group.name, ...group.origins]);
-      if (groupMatch !== -1) {
-        results.push({
-          path: pointer(
-            "groups",
-            groupIndex,
-            groupMatch === 0 ? "id" : groupMatch === 1 ? "name" : "origins",
-            ...(groupMatch > 1 ? [groupMatch - 2] : []),
-          ),
-          label: `Group: ${displayName(group.name, "Unnamed group")}`,
-        });
-      }
       for (let ruleIndex = 0; ruleIndex < group.rules.length; ruleIndex += 1) {
         const rule = group.rules[ruleIndex];
-        const ruleMatch = matches([
-          rule.id,
-          rule.name,
-          rule.urlRegex,
-          ...rule.origins,
-          ...rule.resourceTypes,
-          rule.priority,
-          rule.method,
-        ]);
-        if (ruleMatch === -1) continue;
-        const field =
-          ruleMatch === 0
-            ? "id"
-            : ruleMatch === 1
-              ? "name"
-              : ruleMatch === 2
-                ? "urlRegex"
-                : ruleMatch < 3 + rule.origins.length
-                  ? "origins"
-                  : ruleMatch <
-                      3 + rule.origins.length + rule.resourceTypes.length
-                    ? "resourceTypes"
-                    : ruleMatch ===
-                        3 + rule.origins.length + rule.resourceTypes.length
-                      ? "priority"
-                      : "method";
+        if (!toSearchText(rule.name).includes(needle)) continue;
         results.push({
-          path: pointer("groups", groupIndex, "rules", ruleIndex, field),
-          label: `Rule: ${displayName(rule.name, "Unnamed rule")}`,
+          path: pointer("groups", groupIndex, "rules", ruleIndex),
+          label: `Rule: ${displayName(rule.name, "Unnamed rule")} · ${displayName(group.name, "Unnamed group")}`,
         });
       }
     }

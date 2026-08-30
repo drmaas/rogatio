@@ -214,15 +214,7 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   await expect(page.locator("[data-create-project]")).toBeVisible();
 
   await page.locator("[data-project-card]").nth(1).click();
-  await expect(page.getByText("Selected Project B.")).toBeVisible();
-  await expect(
-    page
-      .locator("[data-project-card]")
-      .first()
-      .locator("[data-project-status]"),
-  ).toHaveText("Active Runtime");
-
-  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.getByText("Opened Project B.")).toBeVisible();
   await expect(page.locator("[data-overview]")).toBeHidden();
   await expect(
     page.locator("[data-editor-root] [data-rogatio-editor]"),

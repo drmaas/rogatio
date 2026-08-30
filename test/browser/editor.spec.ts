@@ -62,7 +62,7 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
 
   await page.getByRole("button", { name: "Add rule" }).click();
   await expect(page.getByRole("heading", { name: "New rule" })).toBeVisible();
-  await page.getByLabel("Search project").fill("Second rule");
+  await page.getByLabel("Search rules by name").fill("Second rule");
   const result = page.locator("[data-search-results] button").filter({
     hasText: "Second rule",
   });
