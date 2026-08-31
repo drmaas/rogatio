@@ -69,9 +69,11 @@ editor and extension distributions; no fonts or assets are fetched at runtime.
 
 The toolbar button opens a compact popup that lists the active project's saved groups with
 one enable/disable switch each, a truthful runtime status, an **Open app** button (the full
-management page at Overview), and a pencil that opens the management page on that group. The
-popup reuses the existing group-enablement lifecycle; it contains no editor, search, proxy,
-permission, or rule-authoring controls.
+management page at Overview), and a pencil that opens the management page on that group. It
+also offers **New project** (an inline name form) and **Import project** (a file picker)
+actions that reuse the management page's create/import lifecycle. The popup reuses the
+existing group-enablement lifecycle; it contains no editor, search, proxy, permission, or
+rule-authoring controls.
 
 ## Quick start
 

@@ -1,4 +1,5 @@
-/* Rogatio toolbar popup design system (F22). Linked by popup.html. */
+/* Rogatio toolbar popup design system (F22). Linked by popup.html.
+   F25 adds the project entry actions and the fixed 420px popup width. */
 
 @font-face {
   font-family: "Hanken Grotesk";
@@ -67,7 +68,9 @@
 html,
 body {
   margin: 0;
-  min-width: 17rem;
+  /* Fixed width so the action popup is comfortably wide in every project;
+     Chrome clamps popups at 800x600, and the group list scrolls internally. */
+  width: 420px;
   background-color: var(--rogatio-bg);
   background-image: radial-gradient(
     rgba(255, 255, 255, 0.05) 1px,
@@ -76,7 +79,7 @@ body {
   background-size: 24px 24px;
   color: var(--rogatio-text);
   font-family: var(--rogatio-font-body);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   line-height: 1.45;
 }
 .rogatio-popup,
@@ -87,24 +90,92 @@ body {
 }
 .rogatio-popup {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.7rem;
   border: 1px solid var(--rogatio-border);
   border-radius: var(--rogatio-radius);
   background: var(--rogatio-surface);
   margin: 0.5rem;
-  padding: 0.75rem;
+  padding: 0.85rem;
 }
 .rogatio-popup header {
   display: grid;
-  gap: 0.15rem;
+  gap: 0.2rem;
 }
 .rogatio-popup h1 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 .rogatio-popup [data-active-project] {
+  margin: 0;
+  color: var(--rogatio-muted);
+  font-size: 0.82rem;
+}
+.rogatio-popup [data-project-actions] {
+  display: flex;
+  gap: 0.5rem;
+}
+.rogatio-popup [data-project-actions] button,
+.rogatio-popup [data-create-actions] button {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-neutral);
+  color: var(--rogatio-text);
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.rogatio-popup [data-project-actions] button:hover,
+.rogatio-popup [data-create-actions] button[data-create-cancel]:hover {
+  background: var(--rogatio-surface-raised);
+  border-color: rgba(148, 163, 184, 0.28);
+}
+.rogatio-popup [data-create-form] {
+  display: grid;
+  gap: 0.55rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-inset);
+  padding: 0.6rem;
+}
+.rogatio-popup [data-create-form] label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--rogatio-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.rogatio-popup [data-create-form] input[type="text"] {
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface);
+  color: var(--rogatio-text);
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+}
+.rogatio-popup [data-create-form] input[type="text"]::placeholder {
+  color: var(--rogatio-faint);
+}
+.rogatio-popup [data-create-actions] {
+  display: flex;
+  gap: 0.5rem;
+}
+.rogatio-popup [data-create-actions] button[data-create-submit] {
+  background: var(--rogatio-primary-strong);
+  border-color: transparent;
+}
+.rogatio-popup [data-create-actions] button[data-create-submit]:hover {
+  background: var(--rogatio-primary);
+}
+.rogatio-popup [data-popup-status] {
   margin: 0;
   color: var(--rogatio-muted);
   font-size: 0.8rem;
@@ -115,6 +186,10 @@ body {
   margin: 0;
   padding: 0;
   list-style: none;
+  /* Long projects scroll inside the list instead of exceeding Chrome's
+     600px popup height cap. */
+  max-height: 25rem;
+  overflow-y: auto;
 }
 .rogatio-popup li {
   display: flex;
@@ -123,7 +198,7 @@ body {
   border: 1px solid var(--rogatio-border);
   border-radius: var(--rogatio-radius-sm);
   background: var(--rogatio-surface-inset);
-  padding: 0.5rem 0.6rem;
+  padding: 0.55rem 0.65rem;
 }
 .rogatio-popup li > span:first-child {
   min-width: 0;
@@ -137,7 +212,7 @@ body {
 .rogatio-popup [data-rule-group] {
   color: var(--rogatio-faint);
   font-family: var(--rogatio-font-mono);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
 }
 .rogatio-popup [data-group-status] {
   color: var(--rogatio-muted);
@@ -156,10 +231,10 @@ body {
   border-radius: 999px;
   background: var(--rogatio-neutral);
   color: var(--rogatio-text);
-  padding: 0.3rem 0.6rem;
+  padding: 0.35rem 0.65rem;
   cursor: pointer;
   font-weight: 500;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 }
 .rogatio-popup a[data-group-edit] {
   margin-left: auto;
@@ -179,9 +254,17 @@ body {
   }
   .rogatio-popup li,
   .rogatio-popup a[data-open-app],
-  .rogatio-popup a[data-group-edit] {
+  .rogatio-popup a[data-group-edit],
+  .rogatio-popup [data-project-actions] button,
+  .rogatio-popup [data-create-form],
+  .rogatio-popup [data-create-actions] button,
+  .rogatio-popup [data-create-form] input[type="text"] {
     border-color: ButtonText;
     background: Canvas;
+  }
+  .rogatio-popup [data-create-actions] button[data-create-submit] {
+    background: Highlight;
+    color: HighlightText;
   }
   .rogatio-popup :focus-visible {
     outline-color: Highlight;

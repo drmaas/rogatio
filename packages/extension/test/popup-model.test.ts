@@ -142,6 +142,56 @@ describe("F21 popup model", () => {
   });
 });
 
+describe("F25 popup project actions", () => {
+  it("creates a project through the existing create-project lifecycle", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const model = createPopupModel({ envelope: envelope(), send });
+    expect(await model.createProject("Fresh")).toBe(true);
+    expect(send).toHaveBeenCalledWith({
+      version: 1,
+      command: "create-project",
+      data: { version: 1, name: "Fresh", groups: [] },
+    });
+  });
+
+  it("does not send create-project for an empty or whitespace-only name", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const model = createPopupModel({ envelope: envelope(), send });
+    expect(await model.createProject("   ")).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed create truthfully", async () => {
+    const send = vi.fn(async () => ({
+      ok: false,
+      diagnostic: { code: "extension.storage-failed" },
+    }));
+    const model = createPopupModel({ envelope: envelope(), send });
+    expect(await model.createProject("Fresh")).toBe(false);
+  });
+
+  it("imports a project through the existing import-project lifecycle", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const model = createPopupModel({ envelope: envelope(), send });
+    const data = { version: 1, name: "Imported", groups: [] };
+    expect(await model.importProject(data)).toBe(true);
+    expect(send).toHaveBeenCalledWith({
+      version: 1,
+      command: "import-project",
+      data,
+    });
+  });
+
+  it("reports a failed import truthfully", async () => {
+    const send = vi.fn(async () => ({
+      ok: false,
+      diagnostic: { code: "extension.storage-failed" },
+    }));
+    const model = createPopupModel({ envelope: envelope(), send });
+    expect(await model.importProject({ version: 1 })).toBe(false);
+  });
+});
+
 function model(): ReturnType<typeof createPopupModel> {
   return createPopupModel({
     envelope: envelope(),

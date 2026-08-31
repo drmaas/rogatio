@@ -240,4 +240,36 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
   await expect(page.getByText("One")).toBeVisible();
   await expect(page.locator("[data-open-app]")).toBeVisible();
   await expect(page.locator("[data-group-toggle]")).toHaveCount(1);
+
+  // F25: the popup is a fixed, comfortable width and exposes project entry
+  // actions next to the group list.
+  const popupCard = page.locator(".rogatio-popup");
+  const cardBox = await popupCard.boundingBox();
+  expect(cardBox?.width ?? 0).toBeGreaterThan(400);
+  await expect(page.locator("[data-project-actions]")).toBeVisible();
+  await expect(page.locator("[data-create-project]")).toBeVisible();
+  await expect(page.locator("[data-import-project]")).toBeVisible();
+
+  await page.locator("[data-create-project]").click();
+  const createForm = page.locator("[data-create-form]");
+  await expect(createForm).toBeVisible();
+  await expect(page.locator("[data-create-project]")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await page.locator("[data-project-name]").fill("Fresh project");
+  await page.locator("[data-create-submit]").click();
+  await expect(page.locator("[data-popup-status]")).toHaveText(
+    "Project created.",
+  );
+  await expect(createForm).toBeHidden();
+
+  await page.locator("[data-import-input]").setInputFiles({
+    name: "imported.rogatio.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('{"version":1,"name":"Imported","groups":[]}'),
+  });
+  await expect(page.locator("[data-popup-status]")).toHaveText(
+    "Project imported.",
+  );
 });
