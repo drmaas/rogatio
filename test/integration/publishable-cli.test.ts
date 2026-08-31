@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -45,22 +45,6 @@ async function get(url: string): Promise<{ status: number; body: string }> {
 }
 
 describe("publishable CLI tarball", () => {
-  let editServerPid: number | undefined;
-  let editServerTemp: string | undefined;
-
-  afterAll(async () => {
-    if (editServerPid !== undefined) {
-      try {
-        process.kill(editServerPid, "SIGTERM");
-      } catch {
-        // process already gone
-      }
-    }
-    if (editServerTemp !== undefined) {
-      await rm(editServerTemp, { recursive: true, force: true });
-    }
-  });
-
   it("packs a tarball free of workspace:* and @rogatio/* dependencies with bundled dist/editor", async () => {
     const build = await run(pnpm, ["build"], root);
     expect(build.code, build.stderr).toBe(0);
@@ -68,6 +52,7 @@ describe("publishable CLI tarball", () => {
     const temp = await mkdtemp(join(tmpdir(), "rogatio-publishable-"));
     const tarballDir = join(temp, "tarballs");
     const tarball = join(tarballDir, "rogatio-cli-0.0.0.tgz");
+    let editServer: ReturnType<typeof execFileAsync> | undefined;
     try {
       const pack = await run(
         pnpm,
@@ -163,15 +148,13 @@ describe("publishable CLI tarball", () => {
         recursive: true,
       });
 
-      editServerTemp = consumer;
       const bin = join(installedDir, "dist", "node", "index.js");
       const port = 18991;
-      const child = execFileAsync(
+      editServer = execFileAsync(
         process.execPath,
         [bin, "edit", project, "--port", String(port)],
         { cwd: consumer },
       );
-      editServerPid = child.child.pid;
 
       // Poll for the server to come up (max 5s).
       const deadline = Date.now() + 5000;
@@ -222,18 +205,23 @@ describe("publishable CLI tarball", () => {
         "editor font body must be non-empty",
       ).toBeGreaterThan(0);
 
-      // Clean up the edit server before the consumer is removed.
-      if (editServerPid !== undefined) {
+      // Tear down the edit server now (before the consumer is removed) and
+      // await the child promise so vitest doesn't catch it as an unhandled
+      // error and the OS releases the file handles before the rm runs.
+      if (editServer && editServer.child.pid !== undefined) {
         try {
-          process.kill(editServerPid, "SIGTERM");
+          process.kill(editServer.child.pid, "SIGTERM");
         } catch {
           // already gone
         }
-        editServerPid = undefined;
+        await Promise.race([
+          editServer.catch(() => undefined),
+          new Promise((r) => setTimeout(r, 2000)),
+        ]);
+        editServer = undefined;
       }
     } finally {
       await rm(temp, { recursive: true, force: true });
-      editServerTemp = undefined;
     }
   }, 90_000);
 });
