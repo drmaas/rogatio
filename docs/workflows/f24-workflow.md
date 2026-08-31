@@ -6,7 +6,7 @@
 - **Branch:** `feature/group-activation-visibility`
 - **Worktree:** `/home/drmaas/.local/share/opencode/worktree/rogatio/feature/group-activation-visibility`
 - **Base commit:** `main`
-- **Release authorization:** User confirmed release actions with "create issue" approval (`m0154`). Issue #24 created for commit hook reference.
+- **Release authorization:** User confirmed release actions with "create issue" approval (`m0154`). The hook-reference number recorded at the time (#24) is today the merged F18 e2e-tests PR; no F24-specific issue exists in the tracker. Release completed via PR #47 (see Release State).
 
 ## Stage Status
 
@@ -19,9 +19,9 @@
 - [x] Stage 6 — tests (contract mapped to AC; closest executable contract written before coding)
 - [x] Stage 7 — implementation complete: sidebar group activation visual distinction (`rogatio-group-active` / `rogatio-group-inactive` + CSS tokens), badge/status attention explanation (`attentionText` + `attentionReason` linking needs permission to grant action), sidebar attention note (`rogatio-attention-note` with warning token), design-system tokens only, group-level preserved (`b3`, `b4`)
 - [x] Stage 8 — verification: `pnpm format` PASS, `pnpm typecheck` PASS, `pnpm build` (18 artifacts) PASS, vitest (4 pre-existing unrelated `mock-status` failures fixed — `b8`), browser tests 19 passed / 3 skipped; audit clean (`m0134`)
-- [ ] Stage 9 — independent fresh-context review (pending; within 3-round limit)
+- [x] Stage 9 — no separate fresh-context review round was recorded for F24; closed at the 2026-08-31 post-merge reconciliation and documented as a residual process gap rather than a fabricated review record.
 - [x] Stage 10 — documentation updates (`docs/specs/`, `docs/plans/`, `docs/workflows/f24-workflow.md`, `docs/workflow-logs/`)
-- [ ] Stage 11 — release actions: branch pushed; commit blocked on `.husky/commit-msg` hook requiring `#NN`; user approved "create issue" (`m0154`). Issue #24 created for reference. Commit, push, PR pending issue confirmation.
+- [x] Stage 11 — release: shipped via PR #47 (merge commit `c44e3d2`, 2026-08-30T22:26:34Z); the first release containing the change is v1.8.0. The commit subjects' `#24` reference points at the F18 e2e PR (see Scope note), so it did not track F24.
 
 ## Model Roles
 
@@ -49,5 +49,16 @@
 
 - Worktree: `/home/drmaas/.local/share/opencode/worktree/rogatio/feature/group-activation-visibility`
 - Branch pushed: `feature/group-activation-visibility`
-- PR description: `docs/workflow-logs/pr-description.md`
-- Final audit: `docs/workflow-logs/final-evidence.md`
+- Post-merge reconciliation (2026-08-31): the superseded F24-era artifacts
+  `docs/workflow-log.md`, `docs/workflow-logs/pr-description.md`, and
+  `docs/workflow-logs/final-evidence.md` were removed; this file is the authoritative
+  F24 record.
+
+## Release State
+
+- Merged: PR #47 → `main` as commit `c44e3d2` (2026-08-30T22:26:34Z, single parent
+  `f62e69f`; the feature commit `f62e69f` is itself an ancestor of `main`).
+- Released: the first tag containing `c44e3d2` is `v1.8.0` (also contained in v1.8.1,
+  v1.8.2, and v1.9.0).
+- Tracking: no F24-specific issue exists; the `#24` used in the F24 commit subjects is
+  the merged F18 e2e-tests PR. Recorded here to keep the log truthful.
