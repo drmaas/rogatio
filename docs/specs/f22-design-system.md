@@ -165,10 +165,13 @@ transparent 1px); background-size: 24px 24px;` on host page bodies.
 - `F22-REQ-005d` Every existing `data-*` attribute, role, label, and command name is
   preserved: `projectSelector`, command buttons (`switch`, `create`, `import`,
   `review-permissions`, `grant-permissions`, `start-native-runtime`,
-  `stop-native-runtime`, `check-mock-runtime`, `refresh`, `export`, `remove`),
+  `stop-native-runtime`, `refresh`, `export`, `remove`),
   `importInput`, `permissionSummary`, `groupToggle`/`groupId` checkboxes,
-  `badgeState`, `nativeRuntimeState`, `mockRuntimeState`, `ruleStatuses`,
-  `editorRoot`, and the `#rogatio-title` heading with text `Rogatio`.
+  `badgeState`, `nativeRuntimeState`, `ruleStatuses`,
+  `editorRoot`, and the `#rogatio-title` heading with text `Rogatio`. The
+  `check-mock-runtime` command and `mockRuntimeState` attribute are removed by the
+  F23 unified runtime; the runtime status line (`nativeRuntimeState`) sits directly
+  beneath the Start/Stop controls.
 
 ### F22-REQ-006 — Popup
 

@@ -7,6 +7,7 @@ import {
   translateMockToDnr,
 } from "../src/dnr.js";
 import { projectMatchers } from "../src/projection.js";
+import { createExtensionApplication } from "../src/service-worker.js";
 
 const mockOp: MockOperation = {
   kind: "mock",
@@ -20,6 +21,114 @@ const mockOp: MockOperation = {
   },
   mock: { status: 200, body: "hello" },
 };
+
+const mockProject = {
+  version: 1,
+  name: "Mock project",
+  groups: [
+    {
+      id: "group-a",
+      name: "Group A",
+      origins: ["https://example.com"],
+      rules: [
+        {
+          id: "rule-mock",
+          name: "Mock rule",
+          urlRegex: "^https://example\\.com/",
+          origins: [],
+          resourceTypes: ["main_frame"],
+          priority: 100,
+          type: "mock",
+          mock: { status: 200, body: "hello" },
+        },
+      ],
+    },
+  ],
+};
+
+type MockConnectMetadata = {
+  port?: number;
+  mocks?: readonly { ruleId: string; token: string }[];
+  error?: string;
+};
+
+function harnessOptions(
+  mockConnect: (() => Promise<MockConnectMetadata>) | null,
+) {
+  let stored: unknown;
+  let installedOps: RogatioOperation[] = [];
+  const install = vi.fn(async (operations: readonly RogatioOperation[]) => {
+    installedOps = [...operations];
+    return { ok: true as const };
+  });
+  const request = vi.fn(async () => true);
+  const options = {
+    storage: {
+      read: async () => stored,
+      compareAndSwap: async (previous: unknown, next: unknown) => {
+        if (stored !== previous) return false;
+        stored = next;
+        return true;
+      },
+    },
+    permissions: {
+      contains: async () => true,
+      request,
+      remove: async () => true,
+    },
+    installer: {
+      current: async () => installedOps,
+      install,
+    },
+    nativeRuntime: {
+      start: vi.fn(async () => ({ state: "started" as const })),
+      stop: vi.fn(async () => ({ state: "stopped" as const })),
+      status: vi.fn(async () => ({ state: "stopped" as const })),
+      sendPolicy: vi.fn(async (_frames: Uint8Array[]) => {}),
+      send:
+        mockConnect === null
+          ? undefined
+          : vi.fn(async () => ({
+              protocol: "v1" as const,
+              type: "mock.connect",
+              timestamp: 1,
+              metadata: await mockConnect(),
+            })),
+    },
+    extensionId: "test-extension-id",
+    generateId: () => "project-a",
+    now: () => 1,
+  };
+  return { options, install };
+}
+
+function harness(mockConnect: (() => Promise<MockConnectMetadata>) | null) {
+  const { options, ...rest } = harnessOptions(mockConnect);
+  return { app: createExtensionApplication(options), ...rest };
+}
+
+async function prepareMockProject(app: {
+  handle(value: unknown): Promise<unknown>;
+}) {
+  await app.handle({
+    version: 1,
+    command: "create-project",
+    data: mockProject,
+  });
+  await app.handle({
+    version: 1,
+    command: "set-group-enabled",
+    projectId: "project-a",
+    groupId: "group-a",
+    enabled: true,
+  });
+  await app.handle({
+    version: 1,
+    command: "grant-permissions",
+    projectId: "project-a",
+    origins: ["https://example.com"],
+  });
+}
 
 describe(" mock projection", () => {
   it("projects a mock operation as installable with the matcher preserved", () => {
@@ -105,5 +214,90 @@ describe(" mock DNR translation", () => {
     const current = await installer.current();
     expect(current).toHaveLength(1);
     expect(current[0]).toBe(mockOp);
+  });
+});
+
+describe(" extension mock rules under the unified native runtime", () => {
+  it("reports enabled mock rules as needs proxy while the unified runtime is not started", async () => {
+    const { app } = harness(null);
+    await prepareMockProject(app);
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: {
+        ruleStatuses: [{ status: "needs proxy" }],
+        nativeRuntimeState: { phase: "stopped" },
+      },
+    });
+  });
+
+  it("starts the unified runtime and reports mock rules active", async () => {
+    const { app } = harness(async () => ({
+      port: 8890,
+      mocks: [{ ruleId: "rule-mock", token: "tok1" }],
+    }));
+    await prepareMockProject(app);
+
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: true,
+      value: { nativeRuntimeState: { phase: "started" } },
+    });
+
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: {
+        ruleStatuses: [{ status: "active" }],
+        nativeRuntimeState: { phase: "started" },
+      },
+    });
+  });
+
+  it("keeps mock rules needing the runtime when the host does not answer mock.connect", async () => {
+    const { app } = harness(async () => {
+      throw new Error("host disconnected");
+    });
+    await prepareMockProject(app);
+
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: true,
+      value: { nativeRuntimeState: { phase: "started" } },
+    });
+
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: {
+        ruleStatuses: [{ status: "needs proxy" }],
+        nativeRuntimeState: { phase: "started" },
+      },
+    });
+  });
+
+  it("reports a stable mock-token error when the host has no token for the rule", async () => {
+    const { app } = harness(async () => ({ port: 8890, mocks: [] }));
+    await prepareMockProject(app);
+
+    await app.handle({ version: 1, command: "start-native-runtime" });
+    const state = await app.handle({ version: 1, command: "get-state" });
+    const value = (state as { value: { ruleStatuses: unknown[] } }).value;
+    const status = value.ruleStatuses[0] as {
+      status: string;
+      diagnostics?: readonly { code: string }[];
+    };
+    expect(status.status).toBe("error");
+    expect(
+      status.diagnostics?.some(
+        (d) => d.code === "extension.mock-token-missing",
+      ),
+    ).toBe(true);
   });
 });

@@ -88,6 +88,90 @@ function button(label: string, command: string): HTMLButtonElement {
   return result;
 }
 
+/** Tone class for the runtime status dot: running, failed, or neutral. */
+function runtimeStatusTone(): string {
+  const phase = state.nativeRuntimeState?.phase ?? "stopped";
+  if (phase === "started") return "rogatio-runtime-running";
+  if (phase === "failed" || phase === "error") return "rogatio-runtime-failed";
+  if (phase === "starting") return "rogatio-runtime-starting";
+  return "rogatio-runtime-idle";
+}
+
+/** Human-readable runtime phase for the sidebar status line. */
+function runtimeStatusText(): string {
+  const phase = state.nativeRuntimeState?.phase ?? "stopped";
+  switch (phase) {
+    case "starting":
+      return "starting";
+    case "started":
+      return "running";
+    case "failed":
+      return "failed to start";
+    case "unsupported":
+      return "unavailable on this platform";
+    case "error":
+      return "error";
+    default:
+      return "stopped";
+  }
+}
+
+/**
+ * The blocking status behind the badge's attention flag, derived from the
+ * actual rule statuses (REQ-GAV-004) with the shared f21 precedence
+ * (error > needs proxy > needs permission > unsupported). The badge and the
+ * sidebar note must describe what is actually blocking — never a canned
+ * "grant access" hint when permissions are already granted.
+ */
+interface AttentionExplanation {
+  readonly blocking: string;
+  readonly explanation: string;
+  readonly fix: string;
+}
+
+const ATTENTION_PRECEDENCE: readonly string[] = [
+  "error",
+  "needs proxy",
+  "needs permission",
+  "unsupported",
+];
+
+function attentionFromStatuses(): AttentionExplanation | null {
+  if (state.badge?.attention !== true) return null;
+  const statuses = state.ruleStatuses ?? [];
+  for (const blocking of ATTENTION_PRECEDENCE) {
+    if (!statuses.some((status) => status.status === blocking)) continue;
+    if (blocking === "error") {
+      return {
+        blocking:
+          "rules failed to install: re-activate the group or restart the runtime",
+        explanation: "some rules failed to install.",
+        fix: "Re-activate the group, or restart the runtime for proxy-backed rules.",
+      };
+    }
+    if (blocking === "needs proxy") {
+      return {
+        blocking: "needs proxy: start runtime",
+        explanation: "some rules need the proxy runtime.",
+        fix: "Click 'Start runtime'.",
+      };
+    }
+    if (blocking === "needs permission") {
+      return {
+        blocking: "needs permission: grant declared access",
+        explanation: "some rules need permission.",
+        fix: "Click 'Grant declared access' after reviewing origins.",
+      };
+    }
+    return {
+      blocking: "unsupported rules: no action available",
+      explanation: "some rules are unsupported in this browser.",
+      fix: "",
+    };
+  }
+  return null;
+}
+
 function countGroups(value: unknown): number {
   return isProjectRecord(value) && Array.isArray(value.groups)
     ? value.groups.length
@@ -135,12 +219,10 @@ function renderTopbar(shell: HTMLElement): void {
   const badge = document.createElement("span");
   badge.dataset.badgeState = "true";
   badge.className = "rogatio-badge-pill";
+  const attention = attentionFromStatuses();
   const attentionText = state.badge?.attention ? " (attention needed)" : "";
-  const attentionReason = state.badge?.attention
-    ? state.ruleStatuses
-      ? " — needs permission: grant declared access"
-      : ""
-    : "";
+  const attentionReason =
+    attention !== null && state.ruleStatuses ? ` — ${attention.blocking}` : "";
   badge.textContent = state.badge
     ? `Active rules: ${state.badge.text}${attentionText}${attentionReason}`
     : `Active rules: 0${attentionText}${attentionReason}`;
@@ -202,6 +284,14 @@ function renderSidebar(shell: HTMLElement): void {
   );
   sidebar.append(actions);
 
+  // Runtime status sits directly under the Start/Stop controls so the current
+  // phase is always visible next to the actions that change it.
+  const nativeRuntime = document.createElement("p");
+  nativeRuntime.dataset.nativeRuntimeState = "true";
+  nativeRuntime.className = `rogatio-runtime-status ${runtimeStatusTone()}`;
+  nativeRuntime.textContent = `Runtime status: ${runtimeStatusText()}`;
+  sidebar.append(nativeRuntime);
+
   const importInput = document.createElement("input");
   importInput.type = "file";
   importInput.accept = ".json,.rogatio.json,application/json";
@@ -247,18 +337,16 @@ function renderSidebar(shell: HTMLElement): void {
     sidebar.append(groups);
   }
 
-  if (state.badge?.attention) {
+  const attention = attentionFromStatuses();
+  if (attention !== null) {
     const attentionNote = document.createElement("p");
     attentionNote.className = "rogatio-attention-note";
-    attentionNote.textContent =
-      "Attention needed: some rules need permission. Click 'Grant declared access' after reviewing origins.";
+    const noteParts = [attention.explanation, attention.fix].filter(
+      (part) => part.length > 0,
+    );
+    attentionNote.textContent = `Attention needed: ${noteParts.join(" ")}`;
     sidebar.append(attentionNote);
   }
-
-  const nativeRuntime = document.createElement("p");
-  nativeRuntime.dataset.nativeRuntimeState = "true";
-  nativeRuntime.textContent = `Runtime: ${state.nativeRuntimeState?.phase ?? "stopped"}.`;
-  sidebar.append(nativeRuntime);
 
   const ruleStatuses = document.createElement("ul");
   ruleStatuses.dataset.ruleStatuses = "true";
@@ -690,10 +778,21 @@ async function nativeRuntimeCommand(
   command: "start-native-runtime" | "stop-native-runtime",
 ): Promise<void> {
   const response = await client.send({ version: 1, command });
-  statusMessage =
-    response?.ok === true
-      ? "Runtime state updated."
-      : "Runtime action unavailable on this platform.";
+  const code = response?.diagnostic?.code;
+  if (response?.ok === true) {
+    statusMessage =
+      command === "start-native-runtime"
+        ? "Runtime started."
+        : "Runtime stopped.";
+  } else if (code === "extension.native-host-missing") {
+    statusMessage =
+      "The native runtime host is not installed on this device. Run `rogatio runtime install --extension-id <extension ID>` once in a terminal, then click Start runtime again.";
+  } else if (code === "extension.native-runtime-unavailable") {
+    statusMessage = "Runtime action unavailable on this platform.";
+  } else {
+    statusMessage =
+      "The runtime action failed. Check the runtime status in the sidebar and try again.";
+  }
   await refresh();
 }
 

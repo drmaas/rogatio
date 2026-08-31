@@ -72,7 +72,7 @@ export function createServer(
         }
       }
 
-      const maxRetries = 3;
+      const maxRetries = 8;
       let lastError: Error | null = null;
 
       for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -85,14 +85,19 @@ export function createServer(
           return;
         } catch (e) {
           lastError = e as Error;
-          if ((e as NodeJS.ErrnoException).code !== "EADDRINUSE") {
+          const code = (e as NodeJS.ErrnoException).code;
+          // Windows reserves chunks of the dynamic port range (Hyper-V / WSL
+          // excluded port ranges), so a random candidate can fail to bind
+          // with EACCES just like a busy port fails with EADDRINUSE. Both are
+          // environmental and resolved by trying another random port.
+          if (code !== "EADDRINUSE" && code !== "EACCES") {
             throw new HttpServerError(
               "listen-failed",
               `Failed to start server: ${e}`,
               e as Error,
             );
           }
-          // Port in use, retry
+          // Port in use or reserved, retry with a different random port
         }
       }
 

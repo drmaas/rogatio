@@ -27,10 +27,19 @@ const requestBodyProject: RogatioProject = {
   ],
 };
 
-function harness() {
+type NativeStartResult = {
+  readonly state: "started" | "failed" | "unsupported";
+  readonly message?: string;
+};
+
+function harness(
+  start: () => Promise<NativeStartResult> = async () => ({
+    state: "started" as const,
+  }),
+) {
   let stored: unknown;
   const nativeRuntime = {
-    start: vi.fn(async () => ({ state: "started" as const })),
+    start: vi.fn(start),
     stop: vi.fn(async () => ({ state: "stopped" as const })),
     status: vi.fn(async () => ({ state: "stopped" as const })),
     sendPolicy: vi.fn(async (_frames: Uint8Array[]) => {}),
@@ -152,6 +161,53 @@ describe(" request-body extension status", () => {
     ).toMatchObject({
       ok: false,
       diagnostic: { code: "extension.native-runtime-unavailable" },
+    });
+  });
+
+  it("reports the host-missing diagnostic and failed phase when the native host is not installed", async () => {
+    const { app, nativeRuntime } = harness(async () => ({
+      state: "unsupported" as const,
+      message: "extension.native-host-missing",
+    }));
+    await prepare(app);
+
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: false,
+      diagnostic: { code: "extension.native-host-missing" },
+    });
+    expect(nativeRuntime.start).toHaveBeenCalledOnce();
+
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: { nativeRuntimeState: { phase: "failed" } },
+    });
+  });
+
+  it("reports a transition failure for other native start failures", async () => {
+    const { app } = harness(async () => ({
+      state: "failed" as const,
+      message: "extension.native-runtime-transition",
+    }));
+    await prepare(app);
+
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: false,
+      diagnostic: { code: "extension.native-runtime-transition" },
+    });
+
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: { nativeRuntimeState: { phase: "failed" } },
     });
   });
 });
