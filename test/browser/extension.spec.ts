@@ -105,6 +105,7 @@ test("reports an actionable message and failed status when the native host is mi
     };
     const runtime = {
       lastError: undefined,
+      id: "a".repeat(32),
       sendMessage(
         message: { command?: string },
         callback: (value: unknown) => void,
@@ -146,6 +147,23 @@ test("reports an actionable message and failed status when the native host is mi
   await expect(
     page.getByText(/rogatio runtime install --extension-id/),
   ).toBeVisible();
+  // The page fills in its own browser-assigned extension ID, so the user
+  // never has to hunt for it in chrome://extensions.
+  await expect(page.locator("[data-install-command]")).toHaveText(
+    `rogatio runtime install --extension-id ${"a".repeat(32)}`,
+  );
+  await expect(page.locator("[data-extension-id]")).toContainText(
+    `Extension ID: ${"a".repeat(32)}`,
+  );
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "Copy install command" }).click();
+  await expect(page.locator(".rogatio-status")).toContainText(
+    "Install command copied",
+  );
+  const clipboard = await page.evaluate(() => navigator.clipboard.readText());
+  expect(clipboard).toBe(
+    `rogatio runtime install --extension-id ${"a".repeat(32)}`,
+  );
   await expect(page.locator("[data-native-runtime-state]")).toContainText(
     "Runtime status: failed to start",
   );
