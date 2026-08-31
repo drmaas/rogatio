@@ -43,9 +43,9 @@
   `window.prompt`, hidden file input, `role="status"` line, draft preservation),
   `popup.css` (fixed 420px, type scale, internal list scroll, forced-colors/reduced-motion)
 - [x] Stage 8 — verification (see evidence below)
-- [ ] Stage 9 — no separate fresh-context review round was run; the single-commit scope
-  was validated end-to-end (unit + browser + manual exercise). Recorded as a residual
-  process gap rather than a code risk.
+- [x] Stage 9 — fresh-context review pass over the merged state (see Review below):
+  PASS with four low-severity findings and one coverage recommendation, none blocking;
+  dispositions recorded as follow-up candidates.
 - [x] Stage 10 — documentation: F25 spec, `docs/architecture.md`, `README.md`
 - [x] Stage 11 — release (see Release State)
 
@@ -79,6 +79,47 @@
 - **D4:** Fixed 420px body instead of content-sized width so rows stay readable in every
   project; long lists scroll inside the list, bounded under Chrome's 600px popup cap.
 
+## Review (2026-08-31, post-merge fresh-context pass)
+
+Distinct review pass by the session model over the merged F25 state (`f68196c`), re-read
+from source rather than from the implementation context. Contracts re-verified:
+
+- `MAX_PROJECT_NAME_LENGTH` (100) matches `LIMITS.maxLabelLength` (`browser-schema.ts`).
+- `create-project` / `import-project` message shapes are identical to the management
+  page's own sends (`extension-page-entry.ts`), so both actions genuinely reuse the
+  existing lifecycle.
+- The service worker routes both commands to the repository (`service-worker.ts`);
+  `refresh()` re-queries `get-state` and rebuilds the model, so the list reflects the
+  new active project after create/import.
+- Hygiene: no `innerHTML` anywhere (all `textContent`); group links use
+  `encodeURIComponent`; the repository stays the only validator — the popup passes the
+  parsed file value through unchanged and reports the service worker's verdict.
+
+Findings (none blocking; dispositions are follow-up candidates, not shipped changes):
+
+- **F-1 (low, truthfulness):** if `get-state` fails inside the post-action `refresh()`,
+  the already-set status line is never rendered and the list stays stale (the early
+  return skips `render()`). The same pattern pre-exists in the management page.
+- **F-2 (low, UX):** no in-flight guard on the Create submit — a rapid double-submit
+  can send two `create-project` commands and create two empty projects (the second
+  stays inactive per the repository's first-project rule).
+- **F-3 (low, robustness):** no size cap before `JSON.parse(await file.text())` on the
+  untrusted import file; a very large file could freeze the popup.
+- **F-4 (nit, accessibility):** after a successful create the form is removed while
+  focus sits on its detached submit button (focus falls to `<body>`); `aria-controls`
+  references the form id while the form is collapsed.
+- **F-5 (recommendation, tests):** add an adversarial popup-model case asserting that a
+  parsed non-object payload (e.g. `null`, an array) is dispatched unchanged and reported
+  truthfully as a failure — the repository already fails closed.
+
+Observations, no action (outside F25 scope): a second file-picker selection during an
+in-flight import races the first; a failed initial `get-state` leaves the popup blank
+(pre-existing F21 behavior); `toggle` ignores the response `ok` flag (F21, unchanged per
+AC-004).
+
+Verdict: PASS. REQ-001..007 and AC-001..005 hold against the merged implementation; the
+findings above are hardening candidates for a follow-up slice.
+
 ## Release State
 
 - Commit `4f8adfd` pushed to `origin/feature/popup-project-actions`; PR #53 opened
@@ -90,4 +131,5 @@
 - Post-merge: `main` synced to `f68196c`; worktree removed; local branch deleted
   (squash merge, so `-D` after parity proof); remote branch auto-deleted on merge;
   tracking issue #52 closed by the merge.
-- Residual: Stage 9 fresh-context review was not run (see Stage Status).
+- Residual: closed — a post-merge fresh-context review pass ran on 2026-08-31 (see
+  Review); four low-severity hardening findings remain as follow-up candidates.
