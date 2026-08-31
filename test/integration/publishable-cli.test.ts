@@ -44,6 +44,60 @@ async function get(url: string): Promise<{ status: number; body: string }> {
   return { status: response.status, body: await response.text() };
 }
 
+// Retry rm with a small backoff to absorb Windows file-handle-release
+// latency after the rogatio edit child process exits. If the temp dir is
+// still locked after every attempt we leave it for the OS to clean up
+// rather than masking the test's pass/fail status with a thrown error.
+async function rmWithRetry(path: string): Promise<void> {
+  for (const delay of [0, 200, 500, 1000]) {
+    if (delay > 0) await new Promise((r) => setTimeout(r, delay));
+    try {
+      await rm(path, { recursive: true, force: true });
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "EBUSY" && code !== "ENOTEMPTY" && code !== "EPERM") {
+        return;
+      }
+    }
+  }
+}
+
+// Tear down the edit server and await the child so vitest doesn't catch it
+// as an unhandled error. On Windows, `process.kill(pid)` does not propagate
+// to descendants; use the child handle's own `.kill()` which Node routes
+// through the Job Object so the whole process tree is signaled.
+async function stopEditServer(
+  editServer: ReturnType<typeof execFileAsync> | undefined,
+): Promise<void> {
+  if (!editServer || editServer.child.pid === undefined) return;
+  try {
+    editServer.child.kill("SIGTERM");
+  } catch {
+    // already gone
+  }
+  const exited = await Promise.race([
+    editServer.then(
+      () => true,
+      () => true,
+    ),
+    new Promise<false>((r) => setTimeout(() => r(false), 2000)),
+  ]);
+  if (exited) return;
+  try {
+    editServer.child.kill("SIGKILL");
+  } catch {
+    // already gone
+  }
+  await Promise.race([
+    editServer.then(
+      () => undefined,
+      () => undefined,
+    ),
+    new Promise((r) => setTimeout(r, 1000)),
+  ]);
+}
+
 describe("publishable CLI tarball", () => {
   it("packs a tarball free of workspace:* and @rogatio/* dependencies with bundled dist/editor", async () => {
     const build = await run(pnpm, ["build"], root);
@@ -204,24 +258,12 @@ describe("publishable CLI tarball", () => {
         font.body.length,
         "editor font body must be non-empty",
       ).toBeGreaterThan(0);
-
-      // Tear down the edit server now (before the consumer is removed) and
-      // await the child promise so vitest doesn't catch it as an unhandled
-      // error and the OS releases the file handles before the rm runs.
-      if (editServer && editServer.child.pid !== undefined) {
-        try {
-          process.kill(editServer.child.pid, "SIGTERM");
-        } catch {
-          // already gone
-        }
-        await Promise.race([
-          editServer.catch(() => undefined),
-          new Promise((r) => setTimeout(r, 2000)),
-        ]);
-        editServer = undefined;
-      }
     } finally {
-      await rm(temp, { recursive: true, force: true });
+      // Tear the server down before the temp dir, so the OS has a chance to
+      // release file handles before the rm runs. Both are safe to retry /
+      // no-op on failure so a transient lock does not fail the test.
+      await stopEditServer(editServer);
+      await rmWithRetry(temp);
     }
   }, 90_000);
 });
