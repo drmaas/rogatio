@@ -1,6 +1,6 @@
 # Implementation Plan — Group Activation Visibility + Attention Explanation
 
-## Approved scope (from spec f-group-activation-visibility.md)
+## Approved scope (from spec f24-group-activation-visibility.md)
 - No per-rule enable/disable change (group-level only preserved).
 - Presentational changes in `packages/extension/src/extension-page-entry.ts` and related CSS.
 
