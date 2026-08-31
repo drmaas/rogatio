@@ -24,20 +24,32 @@ describe("editorAssetPaths", () => {
   });
 
   it("resolves the dist-layout editor bundle to packages/cli/dist/editor/", () => {
-    const paths = editorAssetPaths(`${repoRoot}/packages/cli/dist/node`);
-    expect(paths.bundle).toBe(`${repoRoot}/packages/cli/dist/editor/index.js`);
-    expect(paths.css).toBe(`${repoRoot}/packages/cli/dist/editor/index.css`);
-    expect(paths.fonts).toBe(`${repoRoot}/packages/cli/dist/editor/fonts`);
+    const paths = editorAssetPaths(
+      resolve(repoRoot, "packages", "cli", "dist", "node"),
+    );
+    expect(paths.bundle).toBe(
+      resolve(repoRoot, "packages", "cli", "dist", "editor", "index.js"),
+    );
+    expect(paths.css).toBe(
+      resolve(repoRoot, "packages", "cli", "dist", "editor", "index.css"),
+    );
+    expect(paths.fonts).toBe(
+      resolve(repoRoot, "packages", "cli", "dist", "editor", "fonts"),
+    );
   });
 
   it("resolves the src-layout editor bundle to packages/editor/dist/browser/", () => {
-    const paths = editorAssetPaths(`${repoRoot}/packages/cli/src/commands`);
+    const paths = editorAssetPaths(
+      resolve(repoRoot, "packages", "cli", "src", "commands"),
+    );
     expect(paths.bundle).toBe(
-      `${repoRoot}/packages/editor/dist/browser/index.js`,
+      resolve(repoRoot, "packages", "editor", "dist", "browser", "index.js"),
     );
     expect(paths.css).toBe(
-      `${repoRoot}/packages/editor/dist/browser/index.css`,
+      resolve(repoRoot, "packages", "editor", "dist", "browser", "index.css"),
     );
-    expect(paths.fonts).toBe(`${repoRoot}/packages/editor/dist/browser/fonts`);
+    expect(paths.fonts).toBe(
+      resolve(repoRoot, "packages", "editor", "dist", "browser", "fonts"),
+    );
   });
 });

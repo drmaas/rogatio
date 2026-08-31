@@ -106,7 +106,12 @@ describe("publishable CLI tarball", () => {
 
       const listing = await run(tar, ["-tzf", tarball], temp);
       expect(listing.code, listing.stderr).toBe(0);
-      const entries = listing.stdout.split("\n");
+      // tar on Windows can emit paths with a leading "./" and "\\" separators;
+      // normalize so the assertions below are platform-independent.
+      const entries = listing.stdout
+        .split("\n")
+        .map((e) => e.replace(/\\\\/g, "/").replace(/^\.\//, "").trim())
+        .filter(Boolean);
 
       for (const path of [
         "package/dist/node/index.js",

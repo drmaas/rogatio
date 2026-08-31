@@ -7,12 +7,14 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
 const root = resolve(import.meta.dirname, "../..");
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const packages = ["schema", "compiler", "dry-run", "editor", "runtime", "cli"];
@@ -63,9 +65,17 @@ describe(" packaged CLI integration", () => {
       const tarballPaths = packages.map((packageName) =>
         join(tarballs, `rogatio-${packageName}-0.0.0.tgz`),
       );
+      const ajvPackage = dirname(require.resolve("ajv/package.json"));
       const install = await run(
         "npm",
-        ["install", "--offline", "--no-audit", "--no-fund", ...tarballPaths],
+        [
+          "install",
+          "--offline",
+          "--no-audit",
+          "--no-fund",
+          ...tarballPaths,
+          ajvPackage,
+        ],
         consumer,
       );
       expect(install.code, install.stderr).toBe(0);
