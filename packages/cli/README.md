@@ -9,11 +9,24 @@ optional local runtime used for mocks and response/request body rewriting.
 
 ## Install
 
+Requires Node.js 24 or newer. Install the CLI globally with your preferred
+package manager:
+
 ```sh
 npm install -g @rogatio/cli
 ```
 
-Requires Node.js 24+.
+```sh
+pnpm add -g @rogatio/cli
+```
+
+```sh
+bun add -g @rogatio/cli
+```
+
+```sh
+vp install -g @rogatio/cli
+```
 
 ## Usage
 

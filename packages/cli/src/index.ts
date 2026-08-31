@@ -6,13 +6,12 @@ import { editCommand } from "./commands/edit.js";
 import { runRuntimeHostEntry, runtimeCommand } from "./commands/runtime.js";
 import { testCommand, testCommandNeedsStdin } from "./commands/test.js";
 import { verifyCommand } from "./commands/verify.js";
+import { isDistBuild } from "./utils/asset-paths.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Handle both source (packages/cli/src) and dist (packages/cli/dist/node) locations
-const isDist = __dirname.includes("/dist/") || __dirname.includes("\\dist\\");
 const packageJsonPath = resolve(
   __dirname,
-  isDist ? "../../package.json" : "../package.json",
+  isDistBuild(__dirname) ? "../../package.json" : "../package.json",
 );
 const packageJson = JSON.parse(
   await import("node:fs/promises").then((fs) =>

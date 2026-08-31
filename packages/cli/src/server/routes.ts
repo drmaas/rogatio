@@ -17,11 +17,11 @@ export interface RouteContext {
   shutdown: () => void;
   /** HTML document served at GET /editor.html. */
   editorHtml: string;
-  /** Absolute path to the @rogatio/editor browser bundle served at GET /vendor/editor.js. */
+  /** Absolute path to the editor browser bundle shipped with the cli, served at GET /vendor/editor.js. */
   editorBundlePath: string;
-  /** Absolute path to the @rogatio/editor browser stylesheet served at GET /vendor/editor.css. */
+  /** Absolute path to the editor stylesheet shipped with the cli, served at GET /vendor/editor.css. */
   editorCssPath: string;
-  /** Absolute path to the directory of bundled editor fonts served at GET /vendor/fonts/<file>. */
+  /** Absolute path to the directory of editor fonts shipped with the cli, served at GET /vendor/fonts/<file>. */
   editorFontsPath: string;
 }
 

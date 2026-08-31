@@ -50,6 +50,10 @@ importers:
 
   packages/cli:
     dependencies:
+      ajv:
+        specifier: 8.17.1
+        version: 8.17.1
+    devDependencies:
       '@rogatio/compiler':
         specifier: workspace:*
         version: link:../compiler
@@ -65,7 +69,6 @@ importers:
       '@rogatio/schema':
         specifier: workspace:*
         version: link:../schema
-    devDependencies:
       '@types/node':
         specifier: 26.2.0
         version: 26.2.0

@@ -47,20 +47,52 @@ Every rule can be dry-run against a bounded batch of URLs before saving. The off
 reports regex, origin, method, and resource-type results without contacting the target or
 changing installed rules.
 
-## Installation
+## CLI
 
-Rogatio requires **Node.js 24+** and **pnpm 10.32.1**.
-
-Install the CLI from the workspace:
+The CLI is distributed as an npm package from the public npm registry. It
+requires **Node.js 24 or newer**. Install the CLI globally with your preferred
+package manager:
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm build
+npm install -g @rogatio/cli
 ```
 
-The Chrome extension is built as an unsigned MV3 package and loaded manually from the
-release ZIP (no browser-store install or auto-update). See
-[`docs/architecture.md`](docs/architecture.md) for packaging details.
+```sh
+pnpm add -g @rogatio/cli
+```
+
+```sh
+bun add -g @rogatio/cli
+```
+
+```sh
+vp install -g @rogatio/cli
+```
+
+Verify the install:
+
+```sh
+rogatio --help
+```
+
+The public CLI consists exactly of `edit`, `verify`, `test`, `runtime`, and
+`runtime-host`.
+
+## Chrome extension
+
+The extension is **unsigned** and manually loaded from a GitHub Release ZIP.
+There is no browser-store install or automatic update.
+
+1. Download the extension ZIP attached to the latest
+   [GitHub Release](https://github.com/drmaas/rogatio/releases).
+2. Unpack it to a stable local directory.
+3. Open `chrome://extensions`, enable **Developer mode**, and choose
+   **Load unpacked**.
+4. Select the unpacked extension directory.
+
+Chrome sideloading may require the organization's extension entitlement. The
+extension does not request broad host permissions up front; you grant only each
+project's declared site access when you import a project.
 
 The editor, extension management page, and toolbar popup share a dark design
 system (Hanken Grotesk + JetBrains Mono bundled offline, dot-grid page background,

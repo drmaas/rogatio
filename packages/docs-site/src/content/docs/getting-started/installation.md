@@ -6,19 +6,29 @@ description: Install the Rogatio CLI from npm and manually load the Chrome exten
 ## CLI
 
 The CLI is distributed as an npm package from the public npm registry. It requires
-**Node.js 24 or newer**.
+**Node.js 24 or newer**. Install the CLI globally with your preferred package manager:
 
-1. Install the CLI globally:
+```sh
+npm install -g @rogatio/cli
+```
 
-   ```bash
-   npm install -g @rogatio/cli
-   ```
+```sh
+pnpm add -g @rogatio/cli
+```
 
-2. Verify the install:
+```sh
+bun add -g @rogatio/cli
+```
 
-   ```bash
-   rogatio --help
-   ```
+```sh
+vp install -g @rogatio/cli
+```
+
+Verify the install:
+
+```sh
+rogatio --help
+```
 
 The public CLI consists exactly of `edit`, `verify`, and `runtime`. See the
 [CLI reference](/reference/cli/).
@@ -28,7 +38,8 @@ The public CLI consists exactly of `edit`, `verify`, and `runtime`. See the
 The extension is **unsigned** and manually loaded from a GitHub Release ZIP. There is no
 browser-store install or automatic update.
 
-1. Download the extension ZIP attached to the latest GitHub Release.
+1. Download the extension ZIP attached to the latest
+   [GitHub Release](https://github.com/drmaas/rogatio/releases).
 2. Unpack it to a stable local directory.
 3. Open `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.
 4. Select the unpacked extension directory.
