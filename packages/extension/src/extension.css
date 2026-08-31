@@ -275,6 +275,13 @@ body {
 .rogatio-runtime-starting::before {
   background: var(--rogatio-warning);
 }
+.rogatio-extension-id {
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.75rem;
+  color: var(--rogatio-faint);
+  word-break: break-all;
+  user-select: all;
+}
 .rogatio-main {
   min-width: 0;
   padding: 1rem clamp(1rem, 3vw, 2rem) 3rem;
@@ -284,6 +291,23 @@ body {
   color: var(--rogatio-muted);
   font-size: 0.875rem;
   min-height: 1.25rem;
+}
+.rogatio-install-command {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: -0.5rem 0 1rem;
+}
+.rogatio-install-command code {
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.8rem;
+  color: var(--rogatio-text);
+  background: var(--rogatio-surface-inset);
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  padding: 0.3rem 0.55rem;
+  word-break: break-all;
 }
 
 /* Project cards (Overview / Dashboard) */

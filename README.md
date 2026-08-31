@@ -121,7 +121,8 @@ click **Start runtime**.
 
 ```sh
 # Register the native-messaging host once (required before Start runtime works)
-rogatio runtime install --extension-id <32-char extension ID>
+# <extension ID> is shown in the extension sidebar ("Extension ID: …")
+rogatio runtime install --extension-id <extension ID>
 
 # Start the native-messaging host for the project (launched by the extension)
 rogatio runtime-host .rogatio.json
@@ -134,8 +135,10 @@ Then open the extension, click **Start runtime**, and matched requests
 will be redirected to the configured mock response. Mock rules report
 `needs proxy` while the runtime is stopped and `active` when connected; the
 sidebar runtime status line shows the current phase next to the Start/Stop
-controls. If the host manifest is not installed, starting reports an actionable
-error naming `rogatio runtime install --extension-id <extension ID>`.
+controls, with the browser-assigned extension ID shown beneath it. If the host
+manifest is not installed, starting shows the exact ready-to-run
+`rogatio runtime install --extension-id <your extension ID>` command with a
+one-click copy button.
 
 ## Project layout
 

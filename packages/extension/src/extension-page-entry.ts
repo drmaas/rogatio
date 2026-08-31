@@ -61,6 +61,8 @@ let pendingProjectId: string | null = null;
 let activeTab: "dashboard" | "workspace" = "dashboard";
 let editor: EditorController | undefined;
 let statusMessage = "";
+/** Ready-to-run native host install command shown with a copy button. */
+let installCommand: string | null = null;
 let permissionOrigins: readonly string[] = [];
 let permissionGranted = false;
 
@@ -86,6 +88,12 @@ function button(label: string, command: string): HTMLButtonElement {
   result.textContent = label;
   result.dataset.command = command;
   return result;
+}
+
+/** The browser-assigned extension ID, needed for the native host install. */
+function extensionId(): string {
+  const id = chrome.runtime.id;
+  return typeof id === "string" && id.length > 0 ? id : "";
 }
 
 /** Tone class for the runtime status dot: running, failed, or neutral. */
@@ -292,6 +300,15 @@ function renderSidebar(shell: HTMLElement): void {
   nativeRuntime.textContent = `Runtime status: ${runtimeStatusText()}`;
   sidebar.append(nativeRuntime);
 
+  // The browser-assigned extension ID is what `rogatio runtime install` pins
+  // in the native-messaging manifest; always show it so the install step
+  // never requires hunting through chrome://extensions.
+  const extensionIdLine = document.createElement("p");
+  extensionIdLine.dataset.extensionId = "true";
+  extensionIdLine.className = "rogatio-extension-id";
+  extensionIdLine.textContent = `Extension ID: ${extensionId() || "unknown"}`;
+  sidebar.append(extensionIdLine);
+
   const importInput = document.createElement("input");
   importInput.type = "file";
   importInput.accept = ".json,.rogatio.json,application/json";
@@ -490,6 +507,15 @@ function renderShell(): void {
   status.setAttribute("role", "status");
   status.textContent = statusMessage;
   main.append(status);
+  if (installCommand) {
+    const row = document.createElement("div");
+    row.className = "rogatio-install-command";
+    const code = document.createElement("code");
+    code.dataset.installCommand = "true";
+    code.textContent = installCommand;
+    row.append(code, button("Copy install command", "copy-install-command"));
+    main.append(row);
+  }
 
   if (activeTab === "dashboard") {
     renderOverview(main);
@@ -517,6 +543,7 @@ function renderShell(): void {
     if (command === "switch") void switchProject();
     if (command === "create") void createProject();
     if (command === "import") importInput().click();
+    if (command === "copy-install-command") void copyInstallCommand();
     if (command === "review-permissions") void reviewPermissions();
     if (command === "grant-permissions") void grantPermissions();
     if (command === "start-native-runtime")
@@ -779,14 +806,22 @@ async function nativeRuntimeCommand(
 ): Promise<void> {
   const response = await client.send({ version: 1, command });
   const code = response?.diagnostic?.code;
+  installCommand = null;
   if (response?.ok === true) {
     statusMessage =
       command === "start-native-runtime"
         ? "Runtime started."
         : "Runtime stopped.";
   } else if (code === "extension.native-host-missing") {
-    statusMessage =
-      "The native runtime host is not installed on this device. Run `rogatio runtime install --extension-id <extension ID>` once in a terminal, then click Start runtime again.";
+    const id = extensionId();
+    if (id.length > 0) {
+      installCommand = `rogatio runtime install --extension-id ${id}`;
+      statusMessage =
+        "The native runtime host is not installed on this device. Run the install command below once in a terminal, then click Start runtime again.";
+    } else {
+      statusMessage =
+        "The native runtime host is not installed on this device. Run `rogatio runtime install --extension-id <extension ID>` once in a terminal, then click Start runtime again.";
+    }
   } else if (code === "extension.native-runtime-unavailable") {
     statusMessage = "Runtime action unavailable on this platform.";
   } else {
@@ -794,6 +829,34 @@ async function nativeRuntimeCommand(
       "The runtime action failed. Check the runtime status in the sidebar and try again.";
   }
   await refresh();
+}
+
+async function copyInstallCommand(): Promise<void> {
+  if (!installCommand) return;
+  statusMessage = (await copyText(installCommand))
+    ? "Install command copied. Paste it in a terminal, run it, then click Start runtime again."
+    : "Copying failed. Select the command text and copy it manually.";
+  await refresh();
+}
+
+async function copyText(value: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    // Clipboard API can be unavailable in some contexts; fall back to a
+    // selection-based copy on a temporary textarea.
+    const area = document.createElement("textarea");
+    area.value = value;
+    area.setAttribute("readonly", "true");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    const copied = document.execCommand("copy");
+    area.remove();
+    return copied;
+  }
 }
 
 async function refresh(): Promise<void> {
