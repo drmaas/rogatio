@@ -18,11 +18,6 @@ export interface PopupProjectRule {
   readonly name?: unknown;
 }
 
-export interface PopupProjectRule {
-  readonly id?: unknown;
-  readonly name?: unknown;
-}
-
 export interface PopupProjectGroup {
   readonly id: string;
   readonly name: string;
@@ -96,6 +91,18 @@ export interface PopupModel {
   readonly activeProjectName: string | null;
   readonly rows: () => readonly PopupRuleRow[];
   readonly toggle: (groupId: string, enabled: boolean) => Promise<void>;
+  /**
+   * Creates an empty project through the existing `create-project` lifecycle.
+   * Returns whether the service worker accepted the command; only the first
+   * created project becomes active (repository rule).
+   */
+  readonly createProject: (name: string) => Promise<boolean>;
+  /**
+   * Imports a parsed `.rogatio.json` value through the existing
+   * `import-project` lifecycle. Returns whether the service worker accepted
+   * the command; the repository validates the data and fails closed.
+   */
+  readonly importProject: (data: unknown) => Promise<boolean>;
   readonly openAppUrl: () => string;
   readonly groupUrl: (groupId: string) => string;
 }
@@ -155,6 +162,24 @@ export function createPopupModel(options: PopupModelOptions): PopupModel {
         groupId,
         enabled,
       });
+    },
+    async createProject(name) {
+      const trimmed = name.trim();
+      if (trimmed.length === 0) return false;
+      const response = await send({
+        version: 1,
+        command: "create-project",
+        data: { version: 1, name: trimmed, groups: [] },
+      });
+      return response?.ok === true;
+    },
+    async importProject(data) {
+      const response = await send({
+        version: 1,
+        command: "import-project",
+        data,
+      });
+      return response?.ok === true;
     },
     openAppUrl() {
       return MANAGEMENT_PAGE;
