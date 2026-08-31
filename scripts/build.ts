@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  access,
   copyFile,
   mkdir,
   readdir,
@@ -97,13 +98,13 @@ const targets: BuildTarget[] = [
     output: "packages/cli/dist/node/index.js",
     platform: "node",
     target: "node24",
-    external: [
-      "@rogatio/schema",
-      "@rogatio/compiler",
-      "@rogatio/editor",
-      "@rogatio/runtime",
-    ],
+    external: ["ajv"],
     alias: {
+      "@rogatio/schema": resolve(root, "packages/schema/dist/node/index.js"),
+      "@rogatio/compiler": resolve(
+        root,
+        "packages/compiler/dist/node/index.js",
+      ),
       "@rogatio/dry-run": resolve(root, "packages/dry-run/dist/node/index.js"),
       "@rogatio/runtime": resolve(root, "packages/runtime/dist/node/index.js"),
     },
@@ -279,6 +280,36 @@ await Promise.all(
     }),
   ),
 );
+
+// Mirror the editor's browser artifacts into the CLI tarball so the published
+// @rogatio/cli can locate the editor assets at runtime without depending on
+// the @rogatio/editor package being installed.
+const editorBrowserDir = resolve(root, "packages/editor/dist/browser");
+try {
+  await access(editorBrowserDir);
+} catch {
+  throw new Error(
+    `Editor browser dist missing: ${editorBrowserDir} — run the full pnpm build first.`,
+  );
+}
+const cliEditorDir = resolve(root, "packages/cli/dist/editor");
+await mkdir(cliEditorDir, { recursive: true });
+await copyFile(
+  resolve(editorBrowserDir, "index.js"),
+  resolve(cliEditorDir, "index.js"),
+);
+await copyFile(
+  resolve(editorBrowserDir, "index.css"),
+  resolve(cliEditorDir, "index.css"),
+);
+await mkdir(resolve(cliEditorDir, "fonts"), { recursive: true });
+for (const file of fontFiles) {
+  await copyFile(
+    resolve(editorBrowserDir, "fonts", file),
+    resolve(cliEditorDir, "fonts", file),
+  );
+}
+
 console.log(
   `Built ${targets.length} ESM artifact(s); manifest: build-manifest.json`,
 );

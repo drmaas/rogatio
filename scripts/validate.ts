@@ -138,6 +138,16 @@ async function checkArtifacts(): Promise<void> {
       await access(resolve(root, dir, file));
     }
   }
+  for (const file of [
+    "packages/cli/dist/editor/index.js",
+    "packages/cli/dist/editor/index.css",
+  ]) {
+    await access(resolve(root, file));
+  }
+  await access(resolve(root, "packages/cli/dist/editor/fonts"));
+  for (const file of fontFiles) {
+    await access(resolve(root, "packages/cli/dist/editor/fonts", file));
+  }
   for (const css of [
     "packages/editor/dist/browser/index.css",
     "packages/extension/dist/extension-page.css",

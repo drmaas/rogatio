@@ -1,5 +1,12 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -72,6 +79,47 @@ describe(" packaged CLI integration", () => {
         consumer,
       );
       expect(install.code, install.stderr).toBe(0);
+
+      const cliPkgPath = join(
+        consumer,
+        "node_modules",
+        "@rogatio",
+        "cli",
+        "package.json",
+      );
+      const cliPkgRaw = await readFile(cliPkgPath, "utf8");
+      const cliPkg = JSON.parse(cliPkgRaw);
+      const deps = cliPkg.dependencies ?? {};
+      const rogatioKeys = Object.keys(deps).filter((k) =>
+        k.startsWith("@rogatio/"),
+      );
+      expect(
+        rogatioKeys,
+        `installed cli must not depend on any @rogatio/* package; saw: ${rogatioKeys.join(", ")}`,
+      ).toEqual([]);
+      expect(
+        cliPkgRaw,
+        "installed cli package.json must not contain any workspace: protocol",
+      ).not.toContain("workspace:");
+      expect(
+        deps.ajv,
+        "installed cli must declare ajv 8.17.1 as a real published dep",
+      ).toBe("8.17.1");
+
+      const editorBundlePath = join(
+        consumer,
+        "node_modules",
+        "@rogatio",
+        "cli",
+        "dist",
+        "editor",
+        "index.js",
+      );
+      const editorBundle = await stat(editorBundlePath);
+      expect(
+        editorBundle.size,
+        "installed cli must ship a non-empty dist/editor/index.js",
+      ).toBeGreaterThan(0);
 
       const projectPath = join(consumer, "project.json");
       await writeFile(

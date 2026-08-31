@@ -1,11 +1,11 @@
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { createServer } from "../server/http.js";
 import {
   createRoutes,
   generateCsrfToken,
   type RouteContext,
 } from "../server/routes.js";
+import { editorAssetPaths } from "../utils/asset-paths.js";
 import { launchBrowser } from "../utils/browser.js";
 import { ProjectFileError, readProject, writeProject } from "../utils/file.js";
 
@@ -139,17 +139,13 @@ Options:
   const serverUrl = `http://127.0.0.1:${server.port}`;
   const editorUrl = `${serverUrl}/editor.html`;
 
-  // Resolve the @rogatio/editor browser bundle so the editor page can load it
-  let editorBundlePath: string;
-  try {
-    editorBundlePath = fileURLToPath(import.meta.resolve("@rogatio/editor"));
-  } catch (e) {
-    console.error(`Error: cannot resolve @rogatio/editor bundle: ${e}`);
-    await server.stop();
-    return { exitCode: Promise.resolve(2), shutdown: () => {} };
-  }
-  const editorCssPath = editorBundlePath.replace(/index\.js$/u, "index.css");
-  const editorFontsPath = resolve(editorBundlePath, "..", "fonts");
+  // Locate the editor bundle, css, and fonts from the published tarball
+  // (or the workspace editor build during development).
+  const {
+    bundle: editorBundlePath,
+    css: editorCssPath,
+    fonts: editorFontsPath,
+  } = editorAssetPaths();
 
   context.editorHtml = generateEditorHtml(serverUrl, csrfToken, filePath);
   context.editorBundlePath = editorBundlePath;

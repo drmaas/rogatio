@@ -10,12 +10,15 @@ export default {
     if (!version) return;
 
     return [
-      `## npm`,
+      `## Install`,
       ``,
-      `This release publishes [\`@rogatio/cli@${version}\`](https://www.npmjs.com/package/@rogatio/cli/v/${version}).`,
+      `This release publishes [\`@rogatio/cli@${version}\`](https://www.npmjs.com/package/@rogatio/cli/v/${version}). Install globally with your preferred package manager:`,
       ``,
       "```sh",
       `npm install -g @rogatio/cli@${version}`,
+      `pnpm add -g @rogatio/cli@${version}`,
+      `bun add -g @rogatio/cli@${version}`,
+      `vp install -g @rogatio/cli@${version}`,
       "```",
       ``,
     ].join("\n");

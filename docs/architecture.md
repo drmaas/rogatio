@@ -1213,7 +1213,12 @@ packed tarballs, and the real extension service worker.
    validate/save/cancel, file writes, shutdown). The mock runtime (`rogatio runtime`) is
    started as a real process and its pairing/authorization/mock-response journey is proven
    over real loopback HTTP, including denial paths. These tests are cross-platform and run
-   in the `cross-platform` CI job.
+   in the `cross-platform` CI job. The published `@rogatio/cli` is self-contained: esbuild
+   fully inlines `@rogatio/schema`, `@rogatio/compiler`, `@rogatio/dry-run`, `@rogatio/editor`,
+   and `@rogatio/runtime` into a single ESM bundle with no `workspace:*` leakage; the only
+   declared runtime dep is `ajv`. The bundled editor assets (JS, CSS, woff2 fonts) are
+   mirrored into `packages/cli/dist/editor/` at build time so the published tarball is
+   installable via `npm`, `pnpm`, `bun`, or `vp` without any pnpm workspace machinery.
 
 2. **Packaged-install tests:** the packed-tarball CLI test above is the packaged-install
    proof for the CLI. The extension's "package" is its built `packages/extension/dist`
