@@ -91,16 +91,16 @@ describe("rogatio runtime command ()", () => {
     void error;
   });
 
-  it("exits 1 for a schema-invalid project via runtime-host", async () => {
+  it("exits 1 for a schema-invalid project via runtime host", async () => {
     const projectPath = join(testDir, ".rogatio.json");
     await writeFile(projectPath, JSON.stringify({ version: 1, name: "x" }));
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const code = await runtimeCommand(["runtime-host", projectPath]);
+    const code = await runtimeCommand(["host", projectPath]);
     expect(code).toBe(1);
     error.mockRestore();
   });
 
-  it("rejects a file mock resolved outside the configured root via runtime-host", async () => {
+  it("rejects a file mock resolved outside the configured root via runtime host", async () => {
     const projectPath = join(testDir, ".rogatio.json");
     await writeProject(
       projectPath,
@@ -127,12 +127,7 @@ describe("rogatio runtime command ()", () => {
       }),
     );
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const code = await runtimeCommand([
-      "runtime-host",
-      "--root",
-      testDir,
-      projectPath,
-    ]);
+    const code = await runtimeCommand(["host", "--root", testDir, projectPath]);
     expect(code).toBe(1);
     error.mockRestore();
   });

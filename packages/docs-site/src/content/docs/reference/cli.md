@@ -1,9 +1,9 @@
 ---
 title: CLI reference
-description: The rogatio CLI commands edit, verify, and runtime.
+description: The rogatio CLI commands edit, verify, test, and runtime.
 ---
 
-The public CLI consists exactly of `edit`, `verify`, and `runtime`.
+The public CLI consists exactly of `edit`, `verify`, `test`, and `runtime`.
 
 ## `rogatio edit [path]`
 
@@ -19,12 +19,20 @@ Validates a `.rogatio.json` file (default `cwd/.rogatio.json`, or `-` for stdin)
 - Human-readable output by default; `--json` for machine-readable structured diagnostics.
 - Exit codes: `0` = valid, `1` = invalid (diagnostics), `2` = error (IO/parse).
 
+## `rogatio test [path] [url...]`
+
+Runs the offline dry-run test engine against a `.rogatio.json` file (see
+[Dry-run testing](/guides/dry-run/)). Accepts inline URLs, a JSON case file, or stdin;
+`--json` for machine-readable output.
+
 ## `rogatio runtime <subcommand>`
 
 Controls the local runtime (see [Local runtime](/guides/runtime/)):
 
-- `rogatio runtime start` / `stop` / `status` — control the running runtime process.
-- `rogatio runtime install | status | trust | untrust | uninstall` — manage the
+- `rogatio runtime activate` / `deactivate` / `status` — control the runtime activation state.
+- `rogatio runtime host <path>` — run the consolidated native-messaging host for a project
+  on stdio (normally launched by the browser extension; run manually only for debugging).
+- `rogatio runtime install | trust | untrust | uninstall` — manage the
   device-local native-messaging host registration and CA trust for request-body rules.
 
 ## Notes

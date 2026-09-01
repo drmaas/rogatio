@@ -53,9 +53,9 @@ describe("rogatio runtime command ()", () => {
     expect(code).toBeGreaterThanOrEqual(0);
   });
 
-  it("start without extension policy cannot begin live interception", async () => {
+  it("activate without extension policy cannot begin live interception", async () => {
     silence();
-    const code = await runtimeCommand(["start"]);
+    const code = await runtimeCommand(["activate"]);
     // Should report unsupported or process diagnostics only
     expect(code).toBe(0);
   });

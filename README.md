@@ -75,8 +75,8 @@ Verify the install:
 rogatio --help
 ```
 
-The public CLI consists exactly of `edit`, `verify`, `test`, `runtime`, and
-`runtime-host`.
+The public CLI consists exactly of `edit`, `verify`, `test`, and `runtime` (which
+includes the `host` subcommand).
 
 ## Chrome extension
 
@@ -125,9 +125,9 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port. |
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
-| `rogatio runtime <start\|stop\|status>` | Native-messaging runtime control. The native host starts unconditionally (no capability gate); it serves pairing, authorization, and mock delivery over stdio native-messaging. `status` reports runtime and trust state. |
+| `rogatio runtime <activate\|deactivate\|status>` | Runtime activation control. `activate`/`deactivate` flip the persisted activation state the extension reads; `status` reports runtime and trust state. The native host starts unconditionally (no capability gate); it serves pairing, authorization, and mock delivery over stdio native-messaging. |
 | `rogatio runtime <install\|trust\|untrust\|uninstall>` | Request-body trust lifecycle. `install` writes the native-messaging host manifest; `trust` provisions and trusts the device-local CA; `untrust`/`uninstall` remove CA trust and the manifest (idempotent). The CA/trust provisioning remains capability-gated at the OS level and reports `unsupported` without error on incapable platforms. `rogatio runtime status` reports both runtime and trust state. |
-| `rogatio runtime-host <path>` | Starts the consolidated native-messaging host for the project on stdio (used by the browser extension). Mock delivery, pairing, and authorization all flow through this single host; no separate HTTP mock server exists. |
+| `rogatio runtime host <path>` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Mock delivery, pairing, and authorization all flow through this single host; no separate HTTP mock server exists. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome, grant only declared site access, and activate the groups you need.
@@ -151,21 +151,27 @@ A `mock` rule returns a configured status, optional headers, optional delay, and
 an inline body or a live UTF-8 snapshot of one approved local file — without
 contacting upstream. Mocks are delivered by the consolidated native-messaging
 host; the extension performs the one-time `mock.connect` handshake when you
-click **Start runtime**.
+click **Activate runtime**.
 
 ```sh
-# Register the native-messaging host once (required before Start runtime works)
+# Register the native-messaging host once (required before Activate runtime works)
 # <extension ID> is shown in the extension sidebar ("Extension ID: …")
 rogatio runtime install --extension-id <extension ID>
 
-# Start the native-messaging host for the project (launched by the extension)
-rogatio runtime-host .rogatio.json
+# Activate the runtime for the project
+rogatio runtime activate
+
+# Deactivate the runtime
+rogatio runtime deactivate
+
+# Run the native-messaging host (normally launched by the browser; useful for debugging)
+rogatio runtime host .rogatio.json
 
 # Override the confined file root
-rogatio runtime-host .rogatio.json --root ~/projects/demo
+rogatio runtime host .rogatio.json --root ~/projects/demo
 ```
 
-Then open the extension, click **Start runtime**, and matched requests
+Then open the extension, click **Activate runtime**, and matched requests
 will be redirected to the configured mock response. Mock rules report
 `needs proxy` while the runtime is stopped and `active` when connected; the
 sidebar runtime status line shows the current phase next to the Start/Stop

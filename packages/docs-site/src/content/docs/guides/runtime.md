@@ -9,11 +9,11 @@ all flow over the `v1` native-messaging envelope (spec REQ-001..REQ-005).
 
 ## `rogatio runtime` lifecycle
 
-- `rogatio runtime start` / `stop` / `status` control the running native host.
+- `rogatio runtime activate` / `deactivate` / `status` control the runtime activation state.
 - `rogatio runtime install | status | trust | untrust | uninstall` manage the device-local
   native-messaging host registration and the device-local CA trust that request-body
   interception requires.
-- `rogatio runtime-host <path>` launches the consolidated native-messaging host for a project
+- `rogatio runtime host <path>` launches the consolidated native-messaging host for a project
   on stdio. The browser extension connects to it for pairing, authorization, and mock delivery.
 
 ## Activation is unconditional for the host

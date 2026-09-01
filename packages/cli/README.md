@@ -39,8 +39,8 @@ rogatio <command> [options]
 | `rogatio edit [path]` | Launch the browser editor for `.rogatio.json`. |
 | `rogatio verify [path]` | Validate a `.rogatio.json` file (schema + compiler). |
 | `rogatio test [path] [url...]` | Run offline dry-run tests against `.rogatio.json`. |
-| `rogatio runtime <start\|stop\|status\|install\|trust\|untrust\|uninstall>` | Control the native messaging runtime and request-body trust. |
-| `rogatio runtime-host <path>` | Start the consolidated native-messaging host for the project (mock/pair/authorize over stdio). |
+| `rogatio runtime <activate\|deactivate\|status\|install\|trust\|untrust\|uninstall>` | Control the native messaging runtime and request-body trust. |
+| `rogatio runtime host <path>` | Run the consolidated native-messaging host for the project (mock/pair/authorize over stdio). Normally launched by the browser; run manually only for debugging. |
 
 Global options: `--help, -h` and `--version, -v`. Run `rogatio <command> --help`
 for command-specific usage.
@@ -57,8 +57,8 @@ rogatio verify .rogatio.json
 # Dry-run rules against a set of URLs
 rogatio test .rogatio.json https://example.com/ https://example.com/app.js
 
-# Start the native-messaging host for the project (launched by the extension)
-rogatio runtime-host .rogatio.json
+# Run the native-messaging host for the project (normally launched by the browser)
+rogatio runtime host .rogatio.json
 ```
 
 ## Exit codes

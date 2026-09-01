@@ -113,8 +113,8 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
-  runtime <start|stop|status|install|trust|untrust|uninstall>  Native messaging runtime and request-body trust control
-  runtime-host [path]  Run the consolidated native-messaging runtime host
+  runtime <activate|deactivate|status|install|trust|untrust|uninstall>  Native messaging runtime activation and request-body trust control
+  runtime host [path]  Run the consolidated native-messaging runtime host
 
 Global Options:
   --help, -h      Show help
@@ -161,16 +161,17 @@ Exit codes:
 
 function showRuntimeHelp(): void {
   console.log(`Usage: rogatio runtime <command> [options]
-       rogatio runtime-host [path]
+       rogatio runtime host [path]
 
 Native messaging runtime control for response-body and request-body rules. The
 runtime no longer serves an HTTP mock server; mock delivery happens in the
 consolidated native-messaging host (spec REQ-001..REQ-005).
 
 Native runtime commands:
-  start     Start the runtime (explicit, no auto-start)
-  stop      Stop the runtime (idempotent)
-  status    Show the current runtime and trust state
+  activate   Activate the runtime (explicit, no auto-activation)
+  deactivate Deactivate the runtime (idempotent)
+  host [path]  Run the consolidated native-messaging runtime host
+  status     Show the current runtime and trust state
 
 Request-body trust commands:
   install   Install the native-messaging host manifest (requires --extension-id)
@@ -179,17 +180,17 @@ Request-body trust commands:
   uninstall Uninstall the native-messaging host manifest (idempotent)
 
 Native host command:
-  runtime-host [path]  Run the consolidated native-messaging runtime host. The
-                      browser launches this process via the native-messaging
-                      manifest; it reads pairing/authorization/mock envelopes from
-                      stdin and writes responses to stdout.
+  host [path]  Run the consolidated native-messaging runtime host. The browser
+               launches this process via the native-messaging manifest; it reads
+               pairing/authorization/mock envelopes from stdin and writes
+               responses to stdout.
 
 Options:
   --root <dir>    Root for confined file mocks (default: project directory)
   --extension-id  Extension ID for native messaging manifest (required for install)
   --help, -h      Show this help
 
-The native runtime activates unconditionally once started; the device-local CA /
+The native runtime activates unconditionally once activated; the device-local CA /
 PAC routing capability only affects request-body interception, not the host
 control plane.
 

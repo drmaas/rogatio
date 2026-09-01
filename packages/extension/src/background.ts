@@ -46,7 +46,7 @@ interface NativeRuntimeAdapter {
 
 /**
  * Production native-messaging adapter. Chrome launches the consolidated native
- * host (`rogatio runtime-host <path>`) via `connectNative`; the host's stdio
+ * host (`rogatio runtime host <path>`) via `connectNative`; the host's stdio
  * frame loop reads envelopes and returns response envelopes (spec REQ-001).
  * Control-plane methods (`start`/`stop`/`status`/`sendPolicy`) are thin shims;
  * the host is running once connected and receives lifecycle envelopes directly.

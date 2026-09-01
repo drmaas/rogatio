@@ -24,8 +24,8 @@ function showRuntimeHelp(): void {
 Native messaging runtime control for response-body and request-body rules.
 
 Native runtime commands:
-  start     Start the runtime (explicit, no auto-start)
-  stop      Stop the runtime (idempotent)
+  activate  Activate the runtime (explicit, no auto-activation)
+  deactivate Deactivate the runtime (idempotent)
   status    Show the current runtime and trust state
 
 Request-body trust commands:
@@ -36,10 +36,10 @@ Request-body trust commands:
   uninstall Uninstall the native-messaging host manifest (idempotent)
 
 Native host command:
-  runtime-host [path]  Run the consolidated native-messaging runtime host,
-                       reading pairing/authorization/mock envelopes from stdin
-                       and writing responses to stdout. This process is what the
-                       browser launches via the native-messaging manifest.
+  host [path]  Run the consolidated native-messaging runtime host, reading
+               pairing/authorization/mock envelopes from stdin and writing
+               responses to stdout. This process is what the browser launches
+               via the native-messaging manifest.
 
 Options:
   --extension-id    Extension ID for native messaging manifest (required for install)
@@ -109,16 +109,16 @@ async function nativeRuntimeCommand(args: string[]): Promise<number> {
   });
 
   switch (subcommand) {
-    case "start": {
+    case "activate": {
       const result = await controller.start();
       if (result.state === "running") {
-        console.log("runtime started");
+        console.log("runtime activated");
         return 0;
       }
-      console.error(`runtime start failed: ${result.state}`);
+      console.error(`runtime activate failed: ${result.state}`);
       return 1;
     }
-    case "stop": {
+    case "deactivate": {
       const result = await controller.stop();
       console.log(`runtime ${result.state}`);
       return 0;
@@ -389,11 +389,12 @@ export async function runtimeCommand(
   )
     return trustRuntimeCommand(args);
   if (first === "status") return runtimeStatusCommand(args);
-  if (first === "start" || first === "stop") return nativeRuntimeCommand(args);
-  if (first === "runtime-host") return runtimeHostCommand(args.slice(1));
+  if (first === "activate" || first === "deactivate")
+    return nativeRuntimeCommand(args);
+  if (first === "host") return runtimeHostCommand(args.slice(1));
 
   console.error(
-    `Error: 'rogatio runtime' no longer starts an HTTP mock server. Use 'rogatio runtime-host [path]' to run the native-messaging host, or one of: start, stop, status, install, trust, untrust, uninstall.`,
+    `Error: 'rogatio runtime' no longer starts an HTTP mock server. Use 'rogatio runtime host [path]' to run the native-messaging host, or one of: activate, deactivate, status, install, trust, untrust, uninstall.`,
   );
   showRuntimeHelp();
   return 2;

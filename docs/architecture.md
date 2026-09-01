@@ -358,7 +358,7 @@ The request-body trust lifecycle touches only device-local trust material: the m
 
 - Bundling host manifest + CA trust into the macOS runtime `start`: rejected because install/trust are device-level, persistent, and intentionally separate from the per-session runtime lifecycle; conflating them would force re-trust on every start.
 - Persisting trust state in the project file: rejected; trust is device-local, not project state, and must not travel with `.rogatio.json`.
-- Auto-install/auto-trust on `runtime start`: rejected; explicit, capability-gated user actions only, per the macOS runtime's no-auto-start stance.
+- Auto-install/auto-trust on `runtime activate`: rejected; explicit, capability-gated user actions only, per the macOS runtime's no-auto-start stance.
 
 The complete proposed contract and acceptance criteria are in `docs/specs/f16-request-body-trust.md`; the staged workflow record is in `docs/f16-workflow.md`.
 
@@ -1037,7 +1037,7 @@ capabilities, sockets, timers, active request state, and transform workers befor
 removing owned routing.
 
 The CLI may report or diagnose a process-local native runtime, but it cannot claim or
-control the extension-owned live browser session. `runtime start` without a validated
+control the extension-owned live browser session. `runtime activate` without a validated
 extension policy never enables request-body interception. No command auto-installs
 trust, auto-starts Chrome routing, or silently takes over another proxy/PAC/enterprise
 controller.
@@ -1334,10 +1334,11 @@ runtime need (spec REQ-001).
   unconditionally; new `host.ts` is the stdio native-messaging loop plus a loopback
   mock-body faucet (`--mock-port`); `proxy.ts` retained (request-body markers).
 - `packages/cli/src/commands/runtime.ts`: removed the `rogatio runtime [path]` HTTP
-  mock-server path; added `rogatio runtime-host <path>` (with `--mock-port`); kept native
-  start/stop/status and trust lifecycle. The CLI `rogatio` binary also routes a
-  `runtime-host` argv[1] basename to the host entry point so the native-messaging
-  manifest's `runtime-host` executable works.
+  mock-server path; added `rogatio runtime host <path>` (with `--mock-port`); kept native
+  activate/deactivate/status and trust lifecycle. The CLI `rogatio` binary also exposes
+  `rogatio runtime host <path>` (with `--mock-port`) as the user-facing way to run the
+  host entry point; the native-messaging manifest's `runtime-host` executable basename
+  routes to the same entry point so the browser-spawned process works.
 - `packages/extension/src/background.ts`: production `nativeRuntime` adapter built over
   `chrome.runtime.connectNative` (envelope `send` + thin start/stop/status/sendPolicy
   shims). Mocks are discovered via `connectNativeMock` (`mock.connect`) and delivered
