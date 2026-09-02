@@ -1,4 +1,4 @@
-# Phase 9 — Refactor (opt-in)
+# Phase 10 — Refactor (opt-in)
 
 This phase only runs if the user opts in. The skill always asks first; it never auto-runs refactoring.
 
@@ -41,10 +41,11 @@ Follow `human-gates.md`. Print the agent's numbered list of refactor candidates.
 For each approved candidate, follow the implementation loop:
 
 1. Phase 5: implement the refactor in a fresh subagent.
-2. Phase 6: implementation review.
-3. Phase 7: commit (asked, never auto).
+2. Phase 6: verify.
+3. Phase 7: implementation review.
+4. Phase 8: commit (asked, never auto).
 
-Run phases 5, 6, 7 once per approved candidate. After all candidates are done, end the workflow.
+Run phases 5, 6, 7, 8 once per approved candidate. After all candidates are done, end the workflow.
 
 ## Exit conditions
 

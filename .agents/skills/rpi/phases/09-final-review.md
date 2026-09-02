@@ -1,4 +1,4 @@
-# Phase 8 — Final review (agent + human)
+# Phase 9 — Final review (agent + human)
 
 Goal: a fresh-context subagent reviews the cumulative changes on the branch as a senior engineer, fixes what it can, then the user reviews.
 
@@ -32,4 +32,4 @@ Follow `human-gates.md`. Print the agent's numbered list and the file count chan
 - The user replied Approved.
 - All `CHECKLIST.md` items are complete or explicitly deferred.
 
-Move to `phases/09-refactor.md` (which always begins with the opt-in question).
+Move to `phases/10-refactor.md` (which always begins with the opt-in question).

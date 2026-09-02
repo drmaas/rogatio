@@ -1,4 +1,4 @@
-# Phase 6 — Implementation review (agent + human)
+# Phase 7 — Implementation review (agent + human)
 
 Goal: a fresh-context subagent reviews the implementation of the just-completed phase against `PLAN.md`, revises where the agent is confident, then the user reviews.
 
@@ -11,6 +11,7 @@ Prompt template: `templates/implement-review-prompt.md`.
 The subagent must:
 
 - Read `docs/rpi/<feature>/PLAN.md`, `docs/rpi/<feature>/CHECKLIST.md`, and `docs/rpi/<feature>/RESEARCH.md`.
+- Read `## Implementation strategy` from `PLAN.md`. Verify the implementation actually followed it. TDD means tests exist for every acceptance criterion in the phase and were written before or alongside the production change with at least one recorded red state in the implementer's summary. Code first means tests exist for every acceptance criterion. Flag mismatches.
 - Run `git diff <base-branch>..HEAD -- <files touched in the current phase>` to see the actual changes.
 - Run the repository's canonical validation command.
 - Review the diff as a senior engineer. Look for: type errors, missing tests, edge cases the plan called out that were missed, scope creep, off-plan refactors, dead code, leaked secrets or local settings.
@@ -33,4 +34,4 @@ Follow `human-gates.md`. Print the agent's numbered list and the list of files t
 - The user replied Approved.
 - The implementation matches the plan for the current phase.
 
-Move to `phases/07-commit.md`.
+Move to `phases/08-commit.md`.

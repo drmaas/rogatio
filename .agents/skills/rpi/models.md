@@ -20,6 +20,7 @@ If the user did not specify a tier, ask before delegating any work.
 | Plan | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
 | Plan review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
 | Implementation | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
+| Verify | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
 | Implementation review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
 | Final review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
 | Refactor | `opencode/hy3-free` | `openrouter/thinkingmachines/inkling-small:free` |
