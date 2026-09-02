@@ -103,8 +103,8 @@ describe(" packaged CLI integration", () => {
       ).not.toContain("workspace:");
       expect(
         deps.ajv,
-        "installed cli must declare ajv 8.17.1 as a real published dep",
-      ).toBe("8.17.1");
+        "installed cli must declare ajv 8.18.0 as a real published dep",
+      ).toBe("8.18.0");
 
       const editorBundlePath = join(
         consumer,
