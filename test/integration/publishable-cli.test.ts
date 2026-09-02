@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -11,6 +11,10 @@ const require = createRequire(import.meta.url);
 const root = resolve(import.meta.dirname, "../..");
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const tar = process.platform === "win32" ? "tar.exe" : "tar";
+const cliManifest = JSON.parse(
+  await readFile(join(root, "packages/cli/package.json"), "utf8"),
+) as { dependencies?: Record<string, string> };
+const expectedAjv = cliManifest.dependencies?.ajv;
 
 async function run(
   command: string,
@@ -136,9 +140,14 @@ describe("publishable CLI tarball", () => {
         pkgRaw.stdout,
         "cli tarball package.json must not contain any workspace: protocol",
       ).not.toContain("workspace:");
-      expect(deps.ajv, "cli tarball must declare ajv as a real dep").toBe(
-        "8.18.0",
-      );
+      expect(
+        expectedAjv,
+        "workspace cli package.json must declare ajv as an exact published version",
+      ).toMatch(/^\d+\.\d+\.\d+(?:[-+][\w.~-]+)?$/);
+      expect(
+        deps.ajv,
+        `cli tarball must declare the workspace ajv version (${expectedAjv}) as a real dep`,
+      ).toBe(expectedAjv);
       expect(pkg.files, 'cli tarball files manifest must be ["dist"]').toEqual([
         "dist",
       ]);
