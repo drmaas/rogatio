@@ -19,11 +19,11 @@ supported browser.
 
 ## Capability-based activation
 
-- **Mocks** use `rogatio runtime` and the local mock/response server.
-- **Response-body** and **request-body** rules use native messaging through `rogatio runtime`
-  with explicit Start/Stop controls. Request-body rules additionally use
+- **Mocks**, **response-body**, and **request-body** rules use the unified native host through
+  `rogatio runtime activate` / `deactivate` / `status`; the host itself runs as
+  `rogatio runtime host <path>`. Request-body rules additionally use
   `rogatio runtime install | status | trust | untrust | uninstall`.
-- The two runtimes are independent and may run together.
+- Mock, response-body, and request-body rules share one runtime session.
 
 ## Limitations
 

@@ -1,12 +1,12 @@
 # Rogatio Architecture
 
-**Status:** F23 unified native-host runtime direction approved and implemented for the current start/stop-only extension control surface.
+**Status:** F23 unified native-host runtime direction approved and implemented for the current activate/deactivate extension control surface.
 
 ## F23 Unified Native-Host Runtime Direction
 
-One extension-launched native host owns mock, response-body, request-body, internal proxy/TLS, and upstream forwarding. Native messaging carries lifecycle, policy, and metadata/control; observed traffic bodies remain in the host-owned interception path. Start is transactional and installs exact scoped PAC routing after policy, trust, capability, and collision checks. Stop removes only owned routing, aborts active operations, invalidates capabilities, clears transient body buffers, and restores prior proxy state.
+One extension-launched native host owns mock, response-body, request-body, internal proxy/TLS, and upstream forwarding. Native messaging carries lifecycle, policy, and metadata/control; observed traffic bodies remain in the host-owned interception path. Activation (`runtime activate`) is transactional and installs exact scoped PAC routing after policy, trust, capability, and collision checks. Deactivation (`runtime deactivate`) removes only owned routing, aborts active operations, invalidates capabilities, clears transient body buffers, and restores prior proxy state.
 
-The extension exposes only Start runtime and Stop runtime during normal use. Separate Check and connect actions and mock connection state are removed. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. CLI functionality remains limited to one-time host installation, CA trust, and administrative diagnostics; it is not required to connect or operate a browser session.
+The extension exposes only Start runtime and Stop runtime during normal use (the extension UI verbs; the CLI equivalents are `rogatio runtime activate` / `deactivate`). Separate Check and connect actions and mock connection state are removed. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. CLI functionality remains limited to one-time host installation, CA trust, and administrative diagnostics; it is not required to connect or operate a browser session.
 
 
 ## Package Boundaries
@@ -300,15 +300,15 @@ The complete proposed contract and acceptance criteria are in `docs/specs/f6-run
 
 ## macOS Native-Messaging Runtime
 
-The macOS native-messaging runtime is the single native host that response-body and request-body rules reach through Chrome native messaging. Under the approved F23 direction, mock, response-body, request-body, internal proxy/TLS, and upstream forwarding share this one process and one Start/Stop lifecycle; there is no separate user-facing proxy/connect server.
+The macOS native-messaging runtime is the single native host that response-body and request-body rules reach through Chrome native messaging. Under the approved F23 direction, mock, response-body, request-body, internal proxy/TLS, and upstream forwarding share this one process and one Activate/Deactivate lifecycle; there is no separate user-facing proxy/connect server.
 
 ### Ownership and data flow
 
-`@rogatio/runtime` gains the macOS native-messaging control, lifecycle, revalidation, envelope, and interception-gate modules. `@rogatio/cli` gains a real `rogatio runtime` command (`start` / `stop` / `status` / `--help`). The schema package remains authoritative for the project shape and origins; the compiler remains authoritative for matcher operations used in revalidation. The macOS runtime does not add response-body, request-body-trust, or request-body rule behavior, only the runtime those slices depend on.
+`@rogatio/runtime` gains the macOS native-messaging control, lifecycle, revalidation, envelope, and interception-gate modules. `@rogatio/cli` gains a real `rogatio runtime` command (`activate` / `deactivate` / `status` / `--help`; the native-messaging host runs as the `host` subcommand). The schema package remains authoritative for the project shape and origins; the compiler remains authoritative for matcher operations used in revalidation. The macOS runtime does not add response-body, request-body-trust, or request-body rule behavior, only the runtime those slices depend on.
 
 Four owned layers:
 
-- **Lifecycle controller:** explicit `start` / `stop` / `status` with guarded states `stopped → starting → started → stopping → stopped`, idempotent `stop()`, and a capability-based activation gate that reports `unsupported` only when a trusted device-local CA cannot be provisioned or Chrome PAC routing would collide with an existing controlling proxy/PAC/extension/enterprise policy.
+- **Lifecycle controller:** explicit `activate` / `deactivate` / `status` with guarded states `stopped → starting → started → stopping → stopped`, idempotent `deactivate()`, and a capability-based activation gate that reports `unsupported` only when a trusted device-local CA cannot be provisioned or Chrome PAC routing would collide with an existing controlling proxy/PAC/extension/enterprise policy.
 - **Revalidation core:** `revalidateAuthority(context)` independently re-derives authority from the validated schema project and compiled compiler operation for an incoming request. It does not trust the browser's grant; the AND of rule existence, urlRegex match, effective-origin membership, method match, resource-type match, initiator scope, and target-origin membership must all hold.
 - **Control envelope:** a versioned `f14-v1` JSON channel (`start`, `stop`, `status`, `authorize`, `transform-request-meta`, `transform-response-meta`) carrying metadata only. Bodies never cross the envelope; a structural test proves it.
 - **Interception gate (capability-based):** scoped Chrome PAC generation as a deterministic pure function, plus an ephemeral TLS proxy / device-local CA module reachable only after a successful capability-based activation. When the required capabilities are absent, it returns `runtime.unsupported` and performs no socket or certificate work, regardless of OS.
@@ -366,7 +366,7 @@ The complete proposed contract and acceptance criteria are in `docs/specs/f16-re
 
 F23 consolidates runtime-dependent behavior behind one extension-launched native host. The host owns the internal loopback proxy and TLS interception, while native messaging carries lifecycle, policy, and metadata/control only; observed traffic bodies remain in the host-owned interception path. Start is transactional: it validates the immutable active policy, opens the host/provider, and installs exact scoped PAC routing only after collision, trust, and capability checks. Failure rolls back all Rogatio-owned state. Stop removes only owned PAC/proxy state, aborts active operations, invalidates capabilities, clears transient body buffers, and restores the prior browser proxy configuration.
 
-The extension exposes only Start runtime and Stop runtime during normal use. A separate Check and connect action and separate mock-connection state are not part of the target model. Mock, response-body, and request-body rules share one runtime session. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. The CLI remains available for one-time native-host installation, CA trust, and administrative diagnostics, but it is not required to connect or operate a browser session.
+The extension exposes only Start runtime and Stop runtime during normal use (the extension UI verbs; the CLI equivalents are `rogatio runtime activate` / `deactivate`). A separate Check and connect action and separate mock-connection state are not part of the target model. Mock, response-body, and request-body rules share one runtime session. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. The CLI remains available for one-time native-host installation, CA trust, and administrative diagnostics, but it is not required to connect or operate a browser session.
 
 The internal proxy remains narrowly scoped: exact authorized origins, bounded HTTP/1.1 request handling, strict TLS/target/address validation, no redirects or proxy recursion, and no traffic persistence. Unsupported signed, compressed, multipart, binary, or otherwise unsafe transformations do not produce a partial request; they pass through untouched where protocol-safe. See `docs/specs/f23-unified-native-host-runtime.md` and `docs/plans/f23-unified-native-host-runtime.md` for the approved requirements and implementation sequence.
 
@@ -754,11 +754,17 @@ The version-1 schema keeps `action` optional to preserve backward compatibility 
 
 ## Mock Rules
 
+> **Superseded (F23):** the sections below record the original F13 HTTP mock-server design.
+> Under the unified native-host runtime direction, mock delivery moved into the native host
+> (`rogatio runtime host`) over the `mock.connect` native-messaging handshake; the standalone
+> HTTP mock server, `/v1/connection` endpoint, and Check-and-connect flow were removed. The
+> rule payload, editor extension, and dry-run preview described here remain accurate.
+
 The mock-rules package adds the `mock` rule type as a vertical slice: a configured HTTP status, optional
 response headers, an optional delay, and either an inline body or a live UTF-8 snapshot
 of one approved local file, served to matched browser requests without ever contacting
 upstream. It integrates the rule slice with the runtime server, the editor, the CLI,
-and the extension, including the single user-clicked Check-and-connect request.
+and the extension, including the extension's native-host `mock.connect` handshake during runtime activation.
 
 ### Rule payload and compiler
 
@@ -853,8 +859,11 @@ and still returns authorization decisions only.
   mock rule has a token, stores the connection info in memory, transitions the mock
   runtime state through `RuntimeStateController` (`disconnected → checking →
   connected/failed` with `lastCheck`), installs the mock DNR rules, and recomputes
-  statuses. The extension page gains a "Check and connect" button and a mock runtime
-  status readout; the state response includes the mock runtime state.
+The user experience is: register the native-messaging host once with
+`rogatio runtime install --extension-id <extension ID>`, then use the extension's
+**Activate runtime** control (backed by `rogatio runtime activate`); the separate
+Check-and-connect command and mock-connection state are superseded. The sidebar runtime
+status line sits directly beneath the Activate/Deactivate controls.
 - **Statuses:** mock ops report `needs proxy` while the runtime is not connected;
   `active` when connected and installed; a stable `error` diagnostic when connected but
   the runtime has no token for the rule (project changed after start — directs
@@ -1241,8 +1250,8 @@ packed tarballs, and the real extension service worker.
      installed through the real `chrome.declarativeNetRequest.updateDynamicRules` API and
      accepted by Chrome, proving the translated rule shape is Chrome-valid (RE2, domains,
      resource types).
-   - **Mock runtime journey:** the real `rogatio runtime` process is started; the real
-     extension's "Check and connect" flow pairs with it and reports `connected`.
+   - **Mock runtime journey:** the real `rogatio runtime host` process is started; the real
+     extension's native-host `mock.connect` handshake pairs with it and reports `connected`.
 
 ### The permission-prompt boundary (evidence-based)
 

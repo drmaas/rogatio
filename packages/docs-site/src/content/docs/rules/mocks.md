@@ -15,8 +15,10 @@ contact upstream**.
 
 ## Connecting
 
-- Mocks use `rogatio runtime` and exactly one user-clicked **Check and connect** request.
-- Its status represents the last check, not continuous monitoring.
+- Mocks are delivered by the consolidated native-messaging host. Activate it with
+  `rogatio runtime activate`; the extension performs the one-time `mock.connect`
+  handshake when you click **Start runtime**.
+- Its status represents the last activation check, not continuous monitoring.
 - The mock/response server binds only `127.0.0.1`, pairs through a random capability and
   preset digest, authorizes the exact rule, confines file access, and enforces SSRF,
   DNS-rebinding, redirect, credential, method, timeout, and size controls. It is never a

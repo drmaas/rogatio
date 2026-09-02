@@ -4,14 +4,22 @@
 
 Read `rogatio-overview.md` and `docs/architecture.md` before changing scope. Respect the documented package boundaries and non-goals; do not expand scope beyond the current feature without an explicit change.
 
+## Documentation Map
+
+- `rogatio-overview.md` — product scope, functionality, platform support, and non-goals.
+- `docs/architecture.md` — package boundaries, per-package decisions, and rejected alternatives.
+- `docs/specs/` and `docs/plans/` — per-feature requirements and implementation sequences.
+- `docs/workflows/` — per-feature workflow records (stage status, approvals, review rounds, verification evidence, release state).
+- `README.md` and `packages/*/README.md` — user-facing overview and usage.
+- `CONTRIBUTING.md` — setup, branching, coding standards, commit/issue policy, and validation workflow.
+
 ## Durable Documentation
 
-- Specifications belong in `docs/specs/`; brainstorm output stays ephemeral.
-- Implementation plans belong in `docs/plans/`.
-- Architecture decisions belong in `docs/architecture.md`.
+- Specifications belong in `docs/specs/`; implementation plans belong in `docs/plans/`; architecture decisions belong in `docs/architecture.md`.
 - Raw brainstorm output is ephemeral; do not create or retain brainstorm documents. Prompt before deleting existing brainstorm files.
 - Workflow logs record stage status, approvals, review rounds, verification evidence, and release state.
 - Documentation changes must keep `docs/architecture.md`, `README.md`, `AGENTS.md`, and any affected specification, plan, or workflow log synchronized.
+- If a change alters behavior, boundaries, CLI surface, or the public contract, update the affected docs in the same change; verify claims (commands, flags, exit codes) against the code rather than the previous text.
 
 ## Agent Model Tiers
 
@@ -67,11 +75,12 @@ The `sdd` and `doit` skills repeat the operational tier-selection rules and role
 - Preserve the documented pnpm `10.32.1`, Node 24 baseline, TypeScript 7, and ESM/NodeNext constraints unless the specification is explicitly revised.
 - Keep package boundaries and dependency direction explicit.
 - Do not commit generated build output, coverage, browser binaries, dependency directories, environment files, or secrets.
-- Every commit must reference an open issue (`#<NN>` or `Closes #<NN>`); the `.husky/commit-msg` hook enforces this. Before committing, reuse an existing issue or create one automatically, and confirm the issue number with the user rather than inventing one. See `CONTRIBUTING.md`.
+- Every commit must reference an open issue (`#<NN>` or `Closes #<NN>`) and follow Conventional Commits format; the `.husky/commit-msg` hook enforces both. Before committing, reuse an existing issue or create one automatically, and confirm the issue number with the user rather than inventing one. See `CONTRIBUTING.md`.
+- Releases are cut by semantic-release on merge to `main` (conventional-commit driven): `fix:` bumps the patch, `feat:` the minor, and `!` / `BREAKING CHANGE:` a major. Version 2.0.0 therefore requires a breaking-change footer or `!` marker on a commit that merges to `main`.
 - Review new dependencies and install-script permissions before adding them.
 - Use cross-platform Node-based scripts instead of Bash-only orchestration.
 - Verify real test execution, emitted builds, and browser prerequisites; do not accept false-green checks.
-- Run the repository's canonical validation command before declaring work complete.
+- Run the repository's canonical validation command (`pnpm validate`) before declaring work complete; it is the same fail-fast sequence CI runs.
 - Keep negative fixtures outside normal typecheck and Biome inputs, and preserve their intended failures.
 - Treat build manifests, package output, coverage, browser reports, browser binaries, and dependencies as generated or local-only.
 - Before editing with multiple worktrees, verify `git rev-parse --show-toplevel`, the current branch, `git worktree list`, and repository status; never guess an absolute path.
@@ -79,13 +88,13 @@ The `sdd` and `doit` skills repeat the operational tier-selection rules and role
 - For code that consumes untrusted structured data, include adversarial tests for those behaviors and other relevant malformed inputs.
 - Keep public diagnostics and serialized output stable and independent of third-party wording or incidental iteration order.
 - CI should run the same authoritative validation used locally rather than a weaker manually duplicated subset.
-- Keep the proposed F5 editor as a framework-free, browser-safe DOM boundary: use host-supplied F2/F3 validation and save ports, preserve detached draft state, and do not import Node-only validation artifacts into browser output.
+- Keep the editor as a framework-free, browser-safe DOM boundary: use host-supplied validation and save ports, preserve detached draft state, and do not import Node-only validation artifacts into browser output.
 
 ## Workflow
 
 **Enter the worktree FIRST.** Before ANY specification, architecture, brainstorm output, plan, test, or code change — create or enter the feature worktree and confirm the shell is operating in it. No edits of any kind (including `docs/specs/`, `docs/plans/`, `docs/architecture.md`) happen in the main checkout.
 
-Use a dedicated feature worktree for implementation. Before declaring an implementation complete, run the project validation sequence and record evidence against the relevant acceptance criteria. Before release, audit staged, unstaged, tracked, and untracked files for unrelated changes, generated output, local settings, and secrets. A single explicit user authorization for a clearly defined set of commit, push, PR, merge, or cleanup actions remains valid for that set; ask again only when authorization is absent, ambiguous, or scope changes. Never force-push or push directly to a protected default branch. After merge, reconcile release/status documentation and verify the default branch, worktrees, and remote refs are in the intended final state.
+Use a dedicated feature worktree for implementation. Before declaring an implementation complete, run `pnpm validate` and record evidence against the relevant acceptance criteria. Before release, audit staged, unstaged, tracked, and untracked files for unrelated changes, generated output, local settings, and secrets. A single explicit user authorization for a clearly defined set of commit, push, PR, merge, or cleanup actions remains valid for that set; ask again only when authorization is absent, ambiguous, or scope changes. Never force-push or push directly to a protected default branch. After merge, reconcile release/status documentation and verify the default branch, worktrees, and remote refs are in the intended final state.
 
 Always prompt before deleting files or directories.
 
