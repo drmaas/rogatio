@@ -137,7 +137,7 @@ describe("publishable CLI tarball", () => {
         "cli tarball package.json must not contain any workspace: protocol",
       ).not.toContain("workspace:");
       expect(deps.ajv, "cli tarball must declare ajv as a real dep").toBe(
-        "8.17.1",
+        "8.18.0",
       );
       expect(pkg.files, 'cli tarball files manifest must be ["dist"]').toEqual([
         "dist",
