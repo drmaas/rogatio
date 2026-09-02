@@ -13,12 +13,13 @@ Prompt template: `templates/implement-prompt.md`, parameterized with the current
 The subagent must:
 
 - Read `docs/rpi/<feature>/PLAN.md`, `docs/rpi/<feature>/CHECKLIST.md`, and `docs/rpi/<feature>/RESEARCH.md`. No other context.
+- Read `## Implementation strategy` from `PLAN.md`. If TDD: write the tests listed in the phase's acceptance criteria first, run them and capture the red state, then implement. If Code first: implement, then add the same tests. Do not switch strategy mid-phase. If the strategy is wrong for this phase, stop and report.
 - Implement only the tasks for the current phase. Do not start the next phase.
 - Check off tasks in `CHECKLIST.md` as they complete. Do not delete unchecked items; the reviewer needs to see what was skipped.
 - Run the repository's canonical validation command after the phase. Record the output.
 - Stop and report if any acceptance criterion cannot be met. Do not invent workarounds.
 - Self-review once. Catch and fix obvious issues.
-- Return a one-paragraph summary: what was done, validation result, anything skipped or deferred.
+- Return a one-paragraph summary: what was done, the implementation strategy followed, validation result, anything skipped or deferred, and (for TDD) the recorded red state.
 
 ## Scope discipline
 
@@ -35,5 +36,6 @@ No human gate in the implementer step. The gate is in phase 6 (implementation re
 - All tasks for the current phase are checked off or explicitly deferred.
 - Repository validation command passed.
 - Subagent returned its summary.
+- The implementation matched the strategy recorded in `PLAN.md` `## Implementation strategy`.
 
-Move to `phases/06-implement-review.md`.
+Move to `phases/06-verify.md` (the per-iteration verify step). Only move to `phases/07-implement-review.md` after verify returns green.

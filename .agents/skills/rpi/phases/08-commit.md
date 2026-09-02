@@ -1,4 +1,4 @@
-# Phase 7 — Commit (asked, never auto)
+# Phase 8 — Commit (asked, never auto)
 
 Goal: ask the user to commit the phase. Never auto-commit.
 
@@ -20,7 +20,7 @@ Goal: ask the user to commit the phase. Never auto-commit.
 
    - **Commit as suggested** — the skill runs the user's command verbatim.
    - **Commit with my message** — user provides the exact command; the skill runs it.
-   - **Skip commit, continue** — the user wants to keep iterating; the skill does not commit, returns to phase 5 for the next phase (or phase 8 if all phases done).
+    - **Skip commit, continue** — the user wants to keep iterating; the skill does not commit, returns to phase 5 for the next phase (or phase 9 if all phases done).
    - **Abort** — stop the workflow.
 
 3. The skill never runs `git add` or `git commit` without the user explicitly choosing one of the first two options.
@@ -50,4 +50,4 @@ If anything looks off, stop and surface it to the user before asking to commit.
 - The user replied Commit, Commit with my message, Skip, or Abort.
 - If Commit or Commit with my message: the commit succeeded; the next phase reads the new HEAD.
 
-After Commit: return to phase 5 for the next phase, or move to phase 8 if all phases in `CHECKLIST.md` are done.
+After Commit: return to phase 5 for the next phase, or move to phase 9 if all phases in `CHECKLIST.md` are done.

@@ -4,12 +4,12 @@ After every agent review phase, the skill pauses and surfaces the agent's findin
 
 ## Where the gates fire
 
-- After research review (phase 3 in `phases/02-research-review.md`).
-- After plan review (phase 5 in `phases/04-plan-review.md`).
-- After each implementation review (phase 7 in `phases/06-implement-review.md`).
-- After final review (phase 9 in `phases/08-final-review.md`).
+- After research review (phase 2 in `phases/02-research-review.md`).
+- After plan review (phase 5 in `phases/04-plan-review.md`). The plan-review gate also surfaces the agent-chosen implementation strategy (TDD or Code first) read from `PLAN.md` `## Implementation strategy`. The user can override by editing `PLAN.md` before clicking Approved, or by selecting **Revise** and naming the desired strategy.
+- After each implementation review (phase 8 in `phases/07-implement-review.md`).
+- After final review (phase 10 in `phases/09-final-review.md`).
 
-The commit step is also a gate (phase 8 in `phases/07-commit.md`), but it asks a different question.
+The commit step is also a gate (phase 9 in `phases/08-commit.md`), but it asks a different question.
 
 ## Gate behavior
 
@@ -20,8 +20,11 @@ The commit step is also a gate (phase 8 in `phases/07-commit.md`), but it asks a
    Agent summary: <one-paragraph summary>
    Agent-edited files: <list, with line counts>
    Self-revisions applied: <list of changes the agent already made>
+   Implementation strategy: <TDD or Code first — only on the plan-review gate>
    === end gate ===
    ```
+
+   On the plan-review gate, the `Implementation strategy` line shows the value from `PLAN.md` `## Implementation strategy`. The user may override by editing `PLAN.md` before clicking Approved, or by selecting **Revise** and naming the desired strategy.
 
 2. By default, the skill does not dump the full diff. If the user wants detail, the skill prints the diff on demand.
 

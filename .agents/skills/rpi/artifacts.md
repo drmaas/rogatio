@@ -9,7 +9,7 @@ docs/rpi/<feature>/
   RESEARCH.md     # produced in step 2
   PLAN.md         # produced in step 4
   CHECKLIST.md    # produced in step 4, updated throughout step 6
-  REFACTOR.md     # produced in step 10 (only if user opts in)
+  REFACTOR.md     # produced in step 11 (only if user opts in)
 ```
 
 `<feature>` is a kebab-case slug, lowercased, no spaces, no leading or trailing dashes. Examples: `f5-editor`, `runtime-command-gating`, `csv-export-v2`.
@@ -32,6 +32,7 @@ Update protocol: the research-review subagent edits `RESEARCH.md` in place. The 
 
 Captures the implementation plan. Sections:
 
+- **Implementation strategy** — `TDD` (default) or `Code first` with one-line justification. Set by the plan-review subagent; the user may override before approving.
 - **Goal** — one paragraph.
 - **Non-goals** — what the change explicitly does not do.
 - **Architecture** — design choices and rationale.
@@ -57,7 +58,7 @@ The plan-review subagent writes the initial checklist when it writes `PLAN.md`.
 
 ## REFACTOR.md
 
-Only created if the user opts into step 10. Sections:
+Only created if the user opts into step 11. Sections:
 
 - **Candidate** — what to refactor and why.
 - **Expected benefit** — what improves.
