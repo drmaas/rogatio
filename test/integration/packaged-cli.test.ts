@@ -18,6 +18,10 @@ const require = createRequire(import.meta.url);
 const root = resolve(import.meta.dirname, "../..");
 const pnpm = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const packages = ["schema", "compiler", "dry-run", "editor", "runtime", "cli"];
+const cliManifest = JSON.parse(
+  await readFile(join(root, "packages/cli/package.json"), "utf8"),
+) as { dependencies?: Record<string, string> };
+const expectedAjv = cliManifest.dependencies?.ajv;
 
 async function run(command: string, args: string[], cwd: string) {
   try {
@@ -102,9 +106,13 @@ describe(" packaged CLI integration", () => {
         "installed cli package.json must not contain any workspace: protocol",
       ).not.toContain("workspace:");
       expect(
+        expectedAjv,
+        "workspace cli package.json must declare ajv as an exact published version",
+      ).toMatch(/^\d+\.\d+\.\d+(?:[-+][\w.~-]+)?$/);
+      expect(
         deps.ajv,
-        "installed cli must declare ajv 8.18.0 as a real published dep",
-      ).toBe("8.18.0");
+        `installed cli must declare the workspace ajv version (${expectedAjv}) as a real published dep`,
+      ).toBe(expectedAjv);
 
       const editorBundlePath = join(
         consumer,

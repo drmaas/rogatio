@@ -320,8 +320,12 @@ async function checkBoundaries(): Promise<void> {
   const schemaManifest = JSON.parse(
     await readFile(resolve(root, "packages/schema/package.json"), "utf8"),
   ) as { dependencies?: Record<string, string> };
-  if (schemaManifest.dependencies?.ajv !== "8.18.0")
-    throw new Error("Schema must declare its exact Ajv runtime dependency");
+  if (schemaManifest.dependencies?.ajv === undefined)
+    throw new Error("Schema must declare its Ajv runtime dependency");
+  if (!/^\d+\.\d+\.\d+(?:[-+][\w.~-]+)?$/.test(schemaManifest.dependencies.ajv))
+    throw new Error(
+      "Schema must declare its Ajv runtime dependency as an exact published version",
+    );
   if ("@rogatio/compiler" in (schemaManifest.dependencies ?? {}))
     throw new Error("Schema must not depend on the compiler");
   const compilerManifest = JSON.parse(
