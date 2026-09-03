@@ -23,6 +23,13 @@ export default {
     pkg.version = version;
     writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
+    const manifestPath = resolve(distDir, "manifest.json");
+    if (existsSync(manifestPath)) {
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      manifest.version = version;
+      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    }
+
     if (!existsSync(distDir)) {
       throw new Error(`Extension dist missing: ${distDir}`);
     }

@@ -241,9 +241,23 @@ for (const target of targets) {
     bytes: contents.length,
   };
 }
+const extensionPkgPath = resolve(root, "packages/extension/package.json");
+const extensionPkg = JSON.parse(await readFile(extensionPkgPath, "utf8"));
+const manifestDest = resolve(root, "packages/extension/dist/manifest.json");
 await copyFile(
   resolve(root, "packages/extension/public/manifest.json"),
-  resolve(root, "packages/extension/dist/manifest.json"),
+  manifestDest,
+);
+await writeFile(
+  manifestDest,
+  `${JSON.stringify(
+    {
+      ...JSON.parse(await readFile(manifestDest, "utf8")),
+      version: extensionPkg.version,
+    },
+    null,
+    2,
+  )}\n`,
 );
 await copyFile(
   resolve(root, "packages/extension/public/index.html"),
