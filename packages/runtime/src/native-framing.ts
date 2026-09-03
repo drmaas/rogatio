@@ -11,7 +11,6 @@ export enum NativeFrameType {
   PolicyPart = "policy-part",
   PolicyCommit = "policy-commit",
   RuntimeStart = "runtime.start",
-  RuntimeActivate = "runtime.activate",
   RuntimeStop = "runtime.stop",
   RuntimeStatus = "runtime.status",
   RequestPrepare = "request.prepare",

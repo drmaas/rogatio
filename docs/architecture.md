@@ -6,9 +6,9 @@
 
 ## F23 Unified Native-Host Runtime Direction
 
-One extension-launched native host owns mock, response-body, request-body, internal proxy/TLS, and upstream forwarding. Native messaging carries lifecycle, policy, and metadata/control; observed traffic bodies remain in the host-owned interception path. Activation (`runtime activate`) is transactional and installs exact scoped PAC routing after policy, trust, capability, and collision checks. Deactivation (`runtime deactivate`) removes only owned routing, aborts active operations, invalidates capabilities, clears transient body buffers, and restores prior proxy state.
+One extension-launched native host owns mock, response-body, request-body, internal proxy/TLS, and upstream forwarding. Native messaging carries lifecycle, policy, and metadata/control; observed traffic bodies remain in the host-owned interception path. The host is launched by the browser via the native-messaging manifest when the user clicks **Start runtime** in the extension; clicking **Stop runtime** unregisters the session. Only owned routing is removed on stop, active operations are aborted, transient body buffers are cleared, and prior proxy state is restored.
 
-The extension exposes only Start runtime and Stop runtime during normal use (the extension UI verbs; the CLI equivalents are `rogatio runtime activate` / `deactivate`). Separate Check and connect actions and mock connection state are removed. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. CLI functionality remains limited to one-time host installation, CA trust, and administrative diagnostics; it is not required to connect or operate a browser session.
+The extension exposes only Start runtime and Stop runtime during normal use. The CLI has no lifecycle subcommand; the previous `rogatio runtime activate` / `deactivate` / `status` commands were removed because they were pure ceremony over an empty-preset controller and did not control the real session. Separate Check and connect actions and mock connection state are removed. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. CLI functionality remains limited to one-time host installation, CA trust, and administrative diagnostics; it is not required to connect or operate a browser session.
 
 
 ## Package Boundaries
@@ -302,7 +302,7 @@ The complete proposed contract and acceptance criteria are in `docs/specs/f6-run
 
 ## macOS Native-Messaging Runtime
 
-The macOS native-messaging runtime is the single native host that response-body and request-body rules reach through Chrome native messaging. Under the approved F23 direction, mock, response-body, request-body, internal proxy/TLS, and upstream forwarding share this one process and one Activate/Deactivate lifecycle; there is no separate user-facing proxy/connect server.
+The macOS native-messaging runtime is the single native host that response-body and request-body rules reach through Chrome native messaging. Under the approved F23 direction, mock, response-body, request-body, internal proxy/TLS, and upstream forwarding share this one process and one Start/Stop lifecycle; there is no separate user-facing proxy/connect server.
 
 ### Ownership and data flow
 
@@ -360,7 +360,7 @@ The request-body trust lifecycle touches only device-local trust material: the m
 
 - Bundling host manifest + CA trust into the macOS runtime `start`: rejected because install/trust are device-level, persistent, and intentionally separate from the per-session runtime lifecycle; conflating them would force re-trust on every start.
 - Persisting trust state in the project file: rejected; trust is device-local, not project state, and must not travel with `.rogatio.json`.
-- Auto-install/auto-trust on `runtime activate`: rejected; explicit, capability-gated user actions only, per the macOS runtime's no-auto-start stance.
+- Auto-install/auto-trust on lifecycle start: rejected; explicit, capability-gated user actions only, per the macOS runtime's no-auto-start stance.
 
 The complete proposed contract and acceptance criteria are in `docs/specs/f16-request-body-trust.md`; the staged workflow record is in `docs/f16-workflow.md`.
 
@@ -368,7 +368,7 @@ The complete proposed contract and acceptance criteria are in `docs/specs/f16-re
 
 F23 consolidates runtime-dependent behavior behind one extension-launched native host. The host owns the internal loopback proxy and TLS interception, while native messaging carries lifecycle, policy, and metadata/control only; observed traffic bodies remain in the host-owned interception path. Start is transactional: it validates the immutable active policy, opens the host/provider, and installs exact scoped PAC routing only after collision, trust, and capability checks. Failure rolls back all Rogatio-owned state. Stop removes only owned PAC/proxy state, aborts active operations, invalidates capabilities, clears transient body buffers, and restores the prior browser proxy configuration.
 
-The extension exposes only Start runtime and Stop runtime during normal use (the extension UI verbs; the CLI equivalents are `rogatio runtime activate` / `deactivate`). A separate Check and connect action and separate mock-connection state are not part of the target model. Mock, response-body, and request-body rules share one runtime session. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. The CLI remains available for one-time native-host installation, CA trust, and administrative diagnostics, but it is not required to connect or operate a browser session.
+The extension exposes only Start runtime and Stop runtime during normal use. The CLI has no lifecycle subcommand; see the append-only decision record at `docs/specs/cli-activate-deactivate-removal.md` (when frozen) for the removal rationale. A separate Check and connect action and separate mock-connection state are not part of the target model. Mock, response-body, and request-body rules share one runtime session. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. The CLI remains available for one-time native-host installation, CA trust, and administrative diagnostics, but it is not required to connect or operate a browser session.
 
 The internal proxy remains narrowly scoped: exact authorized origins, bounded HTTP/1.1 request handling, strict TLS/target/address validation, no redirects or proxy recursion, and no traffic persistence. Unsupported signed, compressed, multipart, binary, or otherwise unsafe transformations do not produce a partial request; they pass through untouched where protocol-safe. See `docs/specs/f23-unified-native-host-runtime.md` and `docs/plans/f23-unified-native-host-runtime.md` for the approved requirements and implementation sequence.
 
@@ -863,9 +863,9 @@ and still returns authorization decisions only.
   connected/failed` with `lastCheck`), installs the mock DNR rules, and recomputes
 The user experience is: register the native-messaging host once with
 `rogatio runtime install --extension-id <extension ID>`, then use the extension's
-**Activate runtime** control (backed by `rogatio runtime activate`); the separate
+**Start runtime** control. The separate
 Check-and-connect command and mock-connection state are superseded. The sidebar runtime
-status line sits directly beneath the Activate/Deactivate controls.
+status line sits directly beneath the Start/Stop controls.
 - **Statuses:** mock ops report `needs proxy` while the runtime is not connected;
   `active` when connected and installed; a stable `error` diagnostic when connected but
   the runtime has no token for the rule (project changed after start — directs
@@ -1048,8 +1048,9 @@ capabilities, sockets, timers, active request state, and transform workers befor
 removing owned routing.
 
 The CLI may report or diagnose a process-local native runtime, but it cannot claim or
-control the extension-owned live browser session. `runtime activate` without a validated
-extension policy never enables request-body interception. No command auto-installs
+control the extension-owned live browser session. The lifecycle is owned by the extension;
+the previous CLI `runtime activate` / `deactivate` / `status` subcommands have been
+removed. No command auto-installs
 trust, auto-starts Chrome routing, or silently takes over another proxy/PAC/enterprise
 controller.
 
@@ -1219,7 +1220,8 @@ packed tarballs, and the real extension service worker.
 1. **Integration tests (`test/integration/`, Vitest, Node):** real-process journeys using
    the built artifacts. The packaged CLI is produced with `pnpm pack` for every `@rogatio/*`
    workspace package, installed with `npm install --offline` into a temp directory, and
-   executed as a real binary (`verify`, `test`, `runtime status`, `--version`). The CLI
+   executed as a real binary (`verify`, `test`, `runtime install --extension-id …`,
+   `runtime host`, `--version`). The CLI
    `edit` server is driven over real HTTP (editor page, vendor bundle, CSRF-protected
    validate/save/cancel, file writes, shutdown). The mock runtime (`rogatio runtime`) is
    started as a real process and its pairing/authorization/mock-response journey is proven

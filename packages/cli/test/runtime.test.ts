@@ -79,14 +79,16 @@ describe("rogatio runtime command ()", () => {
     await rm(testDir, { recursive: true, force: true });
   });
 
-  it("rejects starting an HTTP mock server via `rogatio runtime <path>`", async () => {
+  it("rejects starting the runtime via `rogatio runtime <path>`", async () => {
     const projectPath = join(testDir, ".rogatio.json");
     await writeProject(projectPath, mockProject());
     const error = (console as unknown as { error: (m: string) => void }).error;
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const code = await runtimeCommand([projectPath]);
     expect(code).toBe(2);
-    expect(spy.mock.calls.join("\n")).toContain("HTTP mock server");
+    expect(spy.mock.calls.join("\n")).toMatch(
+      /no longer starts|unknown runtime subcommand/,
+    );
     spy.mockRestore();
     void error;
   });

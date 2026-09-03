@@ -822,6 +822,10 @@ async function nativeRuntimeCommand(
       statusMessage =
         "The native runtime host is not installed on this device. Run `rogatio runtime install --extension-id <extension ID>` once in a terminal, then click Start runtime again.";
     }
+  } else if (code === "extension.request-body-needs-trust") {
+    installCommand = "rogatio runtime trust";
+    statusMessage =
+      "Request-body rules need the device-local CA trusted. Run `rogatio runtime trust` once in a terminal, then click Start runtime again. Mocks and response-body rules do not need trust.";
   } else if (code === "extension.native-runtime-unavailable") {
     statusMessage = "Runtime action unavailable on this platform.";
   } else {

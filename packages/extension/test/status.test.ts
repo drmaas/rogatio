@@ -188,6 +188,30 @@ describe(" request-body extension status", () => {
     });
   });
 
+  it("reports the request-body-needs-trust diagnostic and failed phase when the host rejects for missing trust", async () => {
+    const { app, nativeRuntime } = harness(async () => ({
+      state: "failed" as const,
+      message: "extension.request-body-needs-trust",
+    }));
+    await prepare(app);
+
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: false,
+      diagnostic: { code: "extension.request-body-needs-trust" },
+    });
+    expect(nativeRuntime.start).toHaveBeenCalledOnce();
+
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: { nativeRuntimeState: { phase: "failed" } },
+    });
+  });
+
   it("reports a transition failure for other native start failures", async () => {
     const { app } = harness(async () => ({
       state: "failed" as const,

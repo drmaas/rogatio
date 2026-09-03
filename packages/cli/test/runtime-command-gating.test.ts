@@ -52,23 +52,4 @@ describe("rogatio runtime command ()", () => {
     // Should report capability status without partial changes
     expect(code).toBeGreaterThanOrEqual(0);
   });
-
-  it("activate without extension policy cannot begin live interception", async () => {
-    silence();
-    const code = await runtimeCommand(["activate"]);
-    // Should report unsupported or process diagnostics only
-    expect(code).toBe(0);
-  });
-
-  it("status reports safe runtime/trust state without paths, certificates, bodies, headers, credentials", async () => {
-    silence();
-    const log = vi.spyOn(console, "log");
-    const code = await runtimeCommand(["status"]);
-    expect(code).toBe(0);
-    const output = log.mock.calls.join("\n");
-    // Should not contain sensitive data
-    expect(output).not.toMatch(
-      /certificate|private.*key|credential|cookie|authorization/i,
-    );
-  });
 });
