@@ -234,7 +234,8 @@ validation workflow before you start.
 
 - [`rogatio-overview.md`](rogatio-overview.md) — product and technical overview.
 - [`docs/architecture.md`](docs/architecture.md) — package boundaries and decisions.
-- [`docs/specs/`](docs/specs) and [`docs/plans/`](docs/plans) — per-area specs and plans.
+- [`docs/decisions/`](docs/decisions) — active decision records (specs, plans, workflow logs) for current and upcoming features.
+- [`docs/specs/`](docs/specs), [`docs/plans/`](docs/plans), and [`docs/workflows/`](docs/workflows) — frozen per-area decision history. New work writes to `docs/decisions/`.
 
 The published user documentation site is built from `packages/docs-site` (Astro + Starlight).
 Run it locally from the repo root:

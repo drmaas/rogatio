@@ -1,5 +1,7 @@
 # Rogatio Architecture
 
+> Code is the source of truth for current behavior. Links to `docs/specs/`, `docs/plans/`, and `docs/workflows/` point to frozen decision records; see `AGENTS.md` "Source-of-truth priority".
+
 **Status:** F23 unified native-host runtime direction approved and implemented for the current activate/deactivate extension control surface.
 
 ## F23 Unified Native-Host Runtime Direction

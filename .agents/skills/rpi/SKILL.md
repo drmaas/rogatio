@@ -6,12 +6,12 @@ compatibility: Requires Git with worktree support, the repository's existing dev
 
 # Research, Plan, Implement, Review (RPI)
 
-A markdown-driven engineering workflow. Each phase is a fresh-context session that writes or reads artifacts under `docs/rpi/<feature>/`. After every agent review, a human review gate pauses the workflow so the user sees the agent's findings before continuing.
+A markdown-driven engineering workflow. Each phase is a fresh-context session that writes or reads artifacts under `docs/rpi/<feature>/`. On feature release, the approved artifacts migrate to `docs/decisions/<feature>/` and are frozen; the `docs/rpi/<feature>/` folder is then removed. After every agent review, a human review gate pauses the workflow so the user sees the agent's findings before continuing.
 
 The 11 steps below correspond to the phases in this skill. Each phase has its own file under `phases/` with the exact prompt to send the subagent and the human-gate behavior.
 
 1. Start with a clear problem statement.
-2. Research → `docs/rpi/<feature>/RESEARCH.md`.
+2. Research → `docs/rpi/<feature>/RESEARCH.md` (draft; becomes `docs/decisions/<feature>/research.md` on release).
 3. Research review (agent + human gate).
 4. Planning → `docs/rpi/<feature>/PLAN.md` and `docs/rpi/<feature>/CHECKLIST.md`.
 5. Plan review (agent + human gate; agent picks the feature's implementation strategy and records it in `PLAN.md`).
@@ -85,7 +85,7 @@ The diagram from the source article, transcribed:
 - Agent review always happens before the human review gate. The agent must self-revise the artifact first; the human only reads when obvious problems are already addressed.
 - Human gates are mandatory after research review, plan review, per-phase implementation review, and final review. The skill pauses and surfaces the agent's findings; it does not auto-proceed.
 - The skill never commits, pushes, opens a PR, or deletes files without explicit per-action user authorization.
-- Artifacts live at `docs/rpi/<feature>/[RESEARCH|PLAN|CHECKLIST|REFACTOR].md`. `<feature>` is a stable kebab-case slug chosen at workflow start.
+- Artifacts live at `docs/rpi/<feature>/[RESEARCH|PLAN|CHECKLIST|REFACTOR].md` while the feature is active. On release, `RESEARCH.md` and `PLAN.md` migrate to `docs/decisions/<feature>/research.md` and `docs/decisions/<feature>/plan.md` and are frozen; `CHECKLIST.md` is retired; the `docs/rpi/<feature>/` folder is removed.
 - `CHECKLIST.md` is the implementation tracker; the implementer updates it as work progresses.
 - The user picks the provider tier (opencode-go, opencode-zen, openrouter, or freebuff) at workflow start. The skill records it in workflow state and uses the per-phase routing table in `models.md`.
 - Free tier is preferred. If no no-retention free model fits a phase, the skill pauses and asks the user before using a model that retains or trains on data.
@@ -95,6 +95,8 @@ The diagram from the source article, transcribed:
 - Watch for over-engineering at every review pass: abstractions and helpers not asked for, error handling for impossible cases, configuration where hardcoded values would do, features or refactors beyond scope. The reviewer should flag each instance.
 - Treat untrusted values and unusual object behavior defensively, including inherited properties, accessors, proxies, cycles, sparse collections, and mutable shared state when relevant.
 - Keep public diagnostics and serialized output deterministic and independent of third-party wording or incidental iteration order.
+- `RESEARCH.md`, `PLAN.md`, and `REFACTOR.md` are draft documents during the active feature. Once the corresponding human gate approves them, they are append-only: corrections are made by writing a new addendum or amending the workflow state, not by editing the approved artifact. On release they migrate to `docs/decisions/<feature>/` and are frozen.
+- RPI artifacts are decision records once approved, not behavior specs. The code is the source of truth for what the system does. See `AGENTS.md` "Source-of-truth priority".
 
 ## Agent Model Tiers
 
@@ -140,7 +142,7 @@ Verify model availability once with `opencode models` at workflow start. Record 
 
 - **`sdd`** — heavier: formal specification, single human review gate before implementation, planning and tests as first-class artifacts. Use when the change is large, cross-cutting, or has compliance/security surface.
 - **`doit`** — lighter: no formal spec, no human approval gate, focuses on fast execution. Use when the change is well-scoped and bounded.
-- **rpi** (this skill) — middle ground: lightweight markdown artifacts, but review cycles after research, plan, each implementation phase, and final. Human gates are mandatory but cheap because the agent has already self-revised. Each implementation iteration runs through implementation → verify (format, lint, typecheck, tests) → review, and the plan-review subagent records the feature's implementation strategy in `PLAN.md` (TDD by default).
+- **rpi** (this skill) — middle ground: lightweight markdown artifacts under `docs/rpi/<feature>/`, but review cycles after research, plan, each implementation phase, and final. Human gates are mandatory but cheap because the agent has already self-revised. Each implementation iteration runs through implementation → verify (format, lint, typecheck, tests) → review, and the plan-review subagent records the feature's implementation strategy in `PLAN.md` (TDD by default). On release, approved artifacts migrate to `docs/decisions/<feature>/` and freeze.
 
 ## Source
 

@@ -99,13 +99,13 @@ At workflow start, verify the selected tier's IDs with `opencode models` or the 
 
 ## Stage 1 — Brainstorm and scope
 
-Quickly establish enough context to implement safely. Run the primary pass with the primary-brainstorm model, then give its result and repository evidence to the adversarial model for a challenge. Keep both raw outputs ephemeral and do not create `docs/specs/<feature>-brainstorm.md` files.
+Quickly establish enough context to implement safely. Run the primary pass with the primary-brainstorm model, then give its result and repository evidence to the adversarial model for a challenge. Keep both raw outputs ephemeral and do not create `docs/decisions/<feature>/brainstorm.md` files.
 
 - Restate the requested outcome and affected users/callers.
 - Inspect current behavior and the relevant code/documentation.
 - Identify constraints, invariants, security/privacy concerns, compatibility requirements, and non-goals.
 - Consider alternatives when the design is not obvious and choose the smallest sound approach.
-- Write concise behavioral notes and acceptance checks, using stable IDs such as `AC-001` when useful. Keep them in the task/PR description, or persist them to `docs/specs/<feature>.md` if a durable note is warranted.
+- Write concise behavioral notes and acceptance checks, using stable IDs such as `AC-001` when useful. Keep them in the task/PR description, or persist them to `docs/decisions/<feature>/notes.md` if a durable note is warranted.
 - Ask only questions that block a safe implementation. Do not wait for a formal approval packet.
 
 Skip the adversarial pass only when the change is a pure documentation or config edit with no behavior, security, persistence, migration, public-API, or compatibility surface; record the skip reason.
@@ -134,7 +134,7 @@ Have the architecture+plan model write them. Record:
 - The acceptance-check IDs it covers, when useful.
 - The test or verification that proves it is done.
 
-Persist the plan to `docs/plans/<feature>.md` when the change is large enough to outlive the session; otherwise keep it in the task or PR description. Record durable architecture decisions in `docs/architecture.md` only when the change shifts boundaries or decisions. If planning reveals scope or architecture ambiguity, return to Stage 1 rather than guessing.
+Persist the plan to `docs/decisions/<feature>/plan.md` when the change is large enough to outlive the session; on release, move it to `docs/plans/<feature>.md` and freeze. Otherwise keep it in the task or PR description. Record durable architecture decisions in `docs/architecture.md` only when the change shifts boundaries or decisions. If planning reveals scope or architecture ambiguity, return to Stage 1 rather than guessing. Once written, the plan is append-only; corrections after approval are made by amending the workflow log or writing a new plan addendum, not by editing the plan in place.
 
 ## Stage 3 — Write tests first
 
@@ -227,7 +227,7 @@ If approval for any release action is absent or ambiguous, stop after preparing 
 - [ ] Work happened in the intended feature worktree.
 - [ ] Primary and adversarial brainstorm passes were completed ephemerally (or the skip was recorded with reason); only the focused architecture decision is retained (architecture in `docs/architecture.md` when applicable).
 - [ ] Each role's model was checked; fallbacks were recorded, not silently substituted.
-- [ ] A lightweight, ordered plan with a focused architecture note is recorded (in `docs/plans/<feature>.md` or the task/PR description).
+- [ ] A lightweight, ordered plan with a focused architecture note is recorded (in `docs/decisions/<feature>/plan.md` or the task/PR description).
 - [ ] No unresolved requirement or architecture ambiguity was guessed through.
 - [ ] Tests were written first or the exception was documented.
 - [ ] Relevant formatting, linting, type, unit, integration, E2E, and build checks pass.
