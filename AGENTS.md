@@ -8,18 +8,16 @@ Read `rogatio-overview.md` and `docs/architecture.md` before changing scope. Res
 
 - `rogatio-overview.md` — product scope, functionality, platform support, and non-goals.
 - `docs/architecture.md` — package boundaries, per-package decisions, and rejected alternatives.
-- `docs/specs/` and `docs/plans/` — per-feature requirements and implementation sequences.
-- `docs/workflows/` — per-feature workflow records (stage status, approvals, review rounds, verification evidence, release state).
 - `README.md` and `packages/*/README.md` — user-facing overview and usage.
 - `CONTRIBUTING.md` — setup, branching, coding standards, commit/issue policy, and validation workflow.
+- `.agents/skills/` — operational workflows (`sdd`, `doit`, `rpi`).
 
 ## Durable Documentation
 
-- Specifications belong in `docs/specs/`; implementation plans belong in `docs/plans/`; architecture decisions belong in `docs/architecture.md`.
+- The code is the source of truth for what the system does. Decision records (specs, plans, workflow logs) describe *why* a feature is the way it is, *what was rejected*, and *what was approved* — not what the system currently does.
+- New decision records go under `docs/decisions/<feature>/` (`spec.md`, `plan.md`, `workflow.md`). On release or supersession they are moved (not copied, not edited) to `docs/specs/<feature>.md`, `docs/plans/<feature>.md`, or `docs/workflows/<feature>-workflow.md` and frozen. Once frozen, they are read-only; if a record goes stale, write a new one with a `> Superseded by:` footer.
+- Only `docs/architecture.md`, `README.md`, `packages/*/README.md`, and `packages/docs-site/` describe current behavior and must be kept in sync with the code. Decision records are append-only and do not require synchronization on behavior changes.
 - Raw brainstorm output is ephemeral; do not create or retain brainstorm documents. Prompt before deleting existing brainstorm files.
-- Workflow logs record stage status, approvals, review rounds, verification evidence, and release state.
-- Documentation changes must keep `docs/architecture.md`, `README.md`, `AGENTS.md`, and any affected specification, plan, or workflow log synchronized.
-- If a change alters behavior, boundaries, CLI surface, or the public contract, update the affected docs in the same change; verify claims (commands, flags, exit codes) against the code rather than the previous text.
 
 ## Agent Model Tiers
 
@@ -90,9 +88,21 @@ The `sdd` and `doit` skills repeat the operational tier-selection rules and role
 - CI should run the same authoritative validation used locally rather than a weaker manually duplicated subset.
 - Keep the editor as a framework-free, browser-safe DOM boundary: use host-supplied validation and save ports, preserve detached draft state, and do not import Node-only validation artifacts into browser output.
 
+## Source-of-truth priority
+
+When a claim about the system conflicts across sources, trust them in this order:
+
+1. The code in `packages/`, `samples/`, and the repository root.
+2. The tests in `packages/*/test/`, `packages/*/src/**/__tests__/`, and the workspace test scripts.
+3. `docs/architecture.md` — package boundaries, per-package decisions, and rejected alternatives.
+4. `README.md` and `packages/*/README.md` — user-facing overview and usage.
+5. Decision records under `docs/specs/`, `docs/plans/`, `docs/workflows/`, and `docs/decisions/` — what was decided, by whom, when, and what was rejected. They describe the decision, not the system.
+
+Do not use a decision record to answer "what does the system do?" Use it to answer "why is it this way?" and "what was rejected?" If a decision record and the code disagree, the code wins; the disagreement is captured on the next review by adding a `Superseded by` footer to the frozen record.
+
 ## Workflow
 
-**Enter the worktree FIRST.** Before ANY specification, architecture, brainstorm output, plan, test, or code change — create or enter the feature worktree and confirm the shell is operating in it. No edits of any kind (including `docs/specs/`, `docs/plans/`, `docs/architecture.md`) happen in the main checkout.
+**Enter the worktree FIRST.** Before ANY specification, architecture, brainstorm output, plan, test, or code change — create or enter the feature worktree and confirm the shell is operating in it. No edits happen in the main checkout.
 
 Use a dedicated feature worktree for implementation. Before declaring an implementation complete, run `pnpm validate` and record evidence against the relevant acceptance criteria. Before release, audit staged, unstaged, tracked, and untracked files for unrelated changes, generated output, local settings, and secrets. A single explicit user authorization for a clearly defined set of commit, push, PR, merge, or cleanup actions remains valid for that set; ask again only when authorization is absent, ambiguous, or scope changes. Never force-push or push directly to a protected default branch. After merge, reconcile release/status documentation and verify the default branch, worktrees, and remote refs are in the intended final state.
 

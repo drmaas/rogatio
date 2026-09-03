@@ -88,12 +88,14 @@ At workflow start, verify the selected tier's IDs with `opencode models` or the 
 
 Use the repository's established locations when they exist. Otherwise use these defaults:
 
-- Brainstorm notes: ephemeral working context only. Do not create or retain `docs/specs/<feature>-brainstorm.md` files. Preserve only the decisions that survive synthesis in the architecture, specification, plan, and workflow record.
+- Brainstorm notes: ephemeral working context only. Do not create or retain `docs/decisions/<feature>/brainstorm.md` files. Preserve only the decisions that survive synthesis in the architecture, specification, plan, and workflow record.
 - Architecture decision: `docs/architecture.md` (human readable), updated as boundaries change.
-- Specification: `docs/specs/<feature>.md`.
-- Implementation plan: `docs/plans/<feature>.md`.
+- Specification: `docs/decisions/<feature>/spec.md` while in draft or approved status. On release or supersession the file is moved (not copied, not edited) to `docs/specs/<feature>.md` and gains a `> Status: frozen <date>` header.
+- Implementation plan: `docs/decisions/<feature>/plan.md` while in draft or approved status. On release or supersession the file is moved to `docs/plans/<feature>.md` and frozen.
+- Workflow log: `docs/decisions/<feature>/workflow.md` — running record of stage status, review rounds, findings, and verification results. On feature completion the file is moved to `docs/workflows/<feature>-workflow.md` and frozen.
 - Tests: mapped to acceptance-criterion IDs where practical.
-- Workflow log: stage status, review rounds, findings, decisions, and verification results.
+
+Decision records under `docs/specs/`, `docs/plans/`, and `docs/workflows/` are **frozen decision history**: do not edit them. If a record goes stale, write a new one with a `> Superseded by:` footer pointing to the replacement. The code is the source of truth for current behavior; decision records describe the decision, not the system. See `AGENTS.md` "Source-of-truth priority".
 
 Prefer durable documents for the architecture, specification, and plan when the change is large enough that another engineer will need to implement or review it. For a small change, the same information may be kept in the task or PR description, but still pass through every gate. If old brainstorm files exist, treat them as disposable working artifacts and prompt before deleting them.
 
@@ -132,7 +134,7 @@ Keep architecture decisions proportional to the change. Write durable boundary a
 
 ## Stage 3 — Write the specification
 
-Have the specification model write the specification to `docs/specs/<feature>.md` using the synthesized architecture and the ephemeral brainstorm findings. It must be a testable specification in user and system terms. Include:
+Have the specification model write the specification to `docs/decisions/<feature>/spec.md` using the synthesized architecture and the ephemeral brainstorm findings. It must be a testable specification in user and system terms. Include:
 
 1. Problem statement and goals.
 2. Scope and explicit non-goals.
@@ -144,7 +146,7 @@ Have the specification model write the specification to `docs/specs/<feature>.md
 8. Migration, rollout, and backward-compatibility behavior.
 9. Open questions and assumptions.
 
-Every acceptance criterion should be observable and specific enough to become a test or a documented manual check. State what the system must not do when that boundary matters.
+Every acceptance criterion should be observable and specific enough to become a test or a documented manual check. State what the system must not do when that boundary matters. Once the user approves this specification (Stage 4), the file is append-only: corrections after approval are made by writing a new `spec-NN-<topic>.md` or by amending the workflow log, not by editing the approved spec.
 
 ## Stage 4 — Human review gate
 
@@ -159,7 +161,7 @@ Stop and wait for explicit approval. Do not write the implementation plan or tes
 
 ## Stage 5 — Write the implementation plan
 
-After approval, have the plan model write the ordered plan to `docs/plans/<feature>.md`. It must be concrete enough for another engineer to execute. For each task include:
+After approval, have the plan model write the ordered plan to `docs/decisions/<feature>/plan.md`. It must be concrete enough for another engineer to execute. For each task include:
 
 - The relevant file, module, package, or configuration area.
 - The behavior or invariant being added/changed.
@@ -167,7 +169,7 @@ After approval, have the plan model write the ordered plan to `docs/plans/<featu
 - The acceptance-criterion IDs covered.
 - The test or verification that proves completion.
 
-Separate foundational changes from integration and cleanup. Identify generated files, migrations, feature flags, rollback steps, and documentation updates. Keep the plan aligned with the approved scope; if it is no longer aligned, return to the appropriate earlier stage instead of quietly expanding scope.
+Separate foundational changes from integration and cleanup. Identify generated files, migrations, feature flags, rollback steps, and documentation updates. Keep the plan aligned with the approved scope; if it is no longer aligned, return to the appropriate earlier stage instead of quietly expanding scope. Once the plan is written, it is append-only like the spec: post-approval edits go in a new plan addendum or in the workflow log.
 
 ## Stage 6 — Write tests first
 
@@ -261,14 +263,15 @@ A change is complete only when:
 
 - [ ] Work happened in the intended feature worktree.
 - [ ] Primary and adversarial brainstorm passes were completed ephemerally (or the skip was recorded with reason); only synthesized architecture decisions are retained (architecture in `docs/architecture.md`).
-- [ ] The specification at `docs/specs/<feature>.md` was explicitly approved by the user.
-- [ ] The implementation plan at `docs/plans/<feature>.md` maps tasks to acceptance criteria.
+- [ ] The specification at `docs/decisions/<feature>/spec.md` was explicitly approved by the user.
+- [ ] The implementation plan at `docs/decisions/<feature>/plan.md` maps tasks to acceptance criteria.
 - [ ] Each role's model was checked; fallbacks were recorded, not silently substituted.
 - [ ] Tests were written first or the exception was documented.
 - [ ] Relevant formatting, linting, type, unit, integration, E2E, and build checks pass.
 - [ ] The canonical validation command was rerun after implementation and after later fixes; CI runs the same authoritative validation.
 - [ ] Fresh-context review passed within three rounds, or unresolved findings were escalated.
 - [ ] Documentation this change touches is updated (architecture, README, AGENTS as applicable).
+- [ ] On feature release, `docs/decisions/<feature>/{spec,plan,workflow}.md` are moved to `docs/specs/`, `docs/plans/`, and `docs/workflows/` respectively and frozen.
 - [ ] The user approved commit/push/PR actions before they were performed.
 - [ ] The final release audit covered staged, unstaged, tracked, and untracked files; the commit and PR contain only intended changes and include verification evidence.
 - [ ] After merge, release/status documentation, the default branch, worktrees, local branches, and remote refs were reconciled and verified.
