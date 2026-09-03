@@ -4,6 +4,37 @@
 
 Read `rogatio-overview.md` and `docs/architecture.md` before changing scope. Respect the documented package boundaries and non-goals; do not expand scope beyond the current feature without an explicit change.
 
+## Codebase Structure
+
+Strict TS 7, ESM/NodeNext monorepo, pnpm 10.32.1, Node 24. Built with esbuild (`scripts/build.ts`); linted/formatted by Biome; tested by Vitest (unit) and Playwright (browser journeys); docs site uses Astro 7 + Starlight.
+
+Dependency direction (no cycles, no skipping):
+
+```
+schema → compiler → { editor, dry-run, browser-core } → { cli, extension }
+                                                          ↑
+                              runtime (depends on schema + compiler only)
+```
+
+Package roles — when reading code, start here to know which boundary you are in:
+
+- `packages/schema` — version-1 JSON Schema (draft 2020-12, `additionalProperties: false`), AJV validation, origins, bounds, forbidden-header lists, semantic validation. No actions, no consumers.
+- `packages/compiler` — pure transform: validated source → browser-neutral `MatcherOperation` / `RedirectOperation` / `QueryOperation` / `MockOperation` / `RequestBodyOperation` + stable diagnostics. No I/O, no matching execution.
+- `packages/browser-core` — browser-neutral core: versioned project storage, migrations, per-project permissions/enablement, compare-and-swap lifecycle, atomic install with recovery, in-memory runtime state model, rule statuses (`active | disabled | needs permission | needs proxy | unsupported | error`), badge math. Platform-specific work enters through injected `StorageAdapter` / `RuleInstallerAdapter` ports.
+- `packages/editor` — framework-free DOM editor (view + controller + draft state). Public boundary is `createEditor(options) → EditorController`; host supplies `validate` and `save` adapters. Browser bundle must contain no `node:` imports or Ajv — hosts wire validation through the `browser-schema`/compiler adapter.
+- `packages/extension` — Chrome MV3 boundary: service worker, popup, management page, DNR projection (`extension/src/dnr.ts`, `projection.ts`), native-session bridge, popup model. Owns Chrome API adapters and the browser-safe `browser-schema.ts` mirror.
+- `packages/cli` — public surface: `rogatio edit | verify | test | runtime`. Hosts the editor over a loopback HTTP server (`127.0.0.1`, random port, CSRF token). `runtime` subcommands: `activate | deactivate | install | status | trust | untrust | uninstall | host`.
+- `packages/runtime` — private Node ESM runtime foundation: loopback mock/response server (`policy`, `protocol`, `outbound`, `confined-file`), macOS native-messaging host (`lifecycle`, `revalidate`, `interception`, `pac`, `proxy`, `tls`, `x509`, `trust`), capability-based activation gate. Owns the F23 unified native host.
+- `packages/dry-run` — pure offline rule matcher: `dryRunProject(operations, cases)` with 4-dimension results (regex, origin, method, resourceType) and `previewAction` seam. No network, no FS, no permission, no runtime.
+- `packages/sanity` / `packages/smoke` — small focused test/utility packages; check `packages/<name>/README.md` before assuming role.
+- `packages/docs-site` — Astro/Starlight docs site. Excluded from root `tsc`/`biome` (see `tsconfig.json` `exclude`, `.biomeignore`); isolated by design.
+
+Workspace-wide files: `scripts/build.ts` (esbuild build), `scripts/validate.ts` (canonical pre-commit/CI gate, also `pnpm validate`), `scripts/serve-smoke.ts` (smoke HTTP server), `scripts/release-*.mjs` (semantic-release plugins), `biome.json`, `tsconfig.base.json`, `playwright.config.ts`, `vitest.config.ts`, `pnpm-workspace.yaml`, `build-manifest.json` (canonical artifact list asserted by the validator).
+
+Test layout: per-package `packages/<name>/test/` and `packages/<name>/src/**/__tests__/` for unit; `test/integration/` for cross-package/process journeys on built artifacts; `test/browser/` for real-Chromium Playwright journeys; `test/fixtures/` for shared fixtures; `samples/basic/` for a runnable `.rogatio.json` example.
+
+Quick orientation rule: locate the feature in `docs/architecture.md` (which package owns it, what it must not do), then read that package's `src/index.ts`/`types.ts`, then the test that exercises the seam you are about to touch.
+
 ## Documentation Map
 
 - `rogatio-overview.md` — product scope, functionality, platform support, and non-goals.
