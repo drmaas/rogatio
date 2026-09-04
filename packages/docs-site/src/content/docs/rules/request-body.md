@@ -23,7 +23,9 @@ runtime-owned TLS proxy.
   PAC, extension, or enterprise policy.
 - Where the required capabilities are absent, activation reports `unsupported`; Linux and
   Windows may still verify, edit, import, export, and dry-run request-body rules.
-- Requires the device-local CA trust installed via `rogatio runtime install | trust`
-  (see [Local runtime](/guides/runtime/)).
+- Requires the device-local CA trust installed via `rogatio runtime install`
+  (the same `install` command provisions the CA on capable platforms; on
+  incapable platforms the install completes without CA trust). See
+  [Local runtime](/guides/runtime/).
 - Observed bodies are processed in-process only and never persisted, logged, exported, or
   transferred through native messaging.

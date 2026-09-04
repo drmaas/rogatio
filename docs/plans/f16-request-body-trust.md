@@ -49,6 +49,8 @@
 - `install`/`trust` print success or `trust unsupported: <reasons>`, exit 0 on unsupported;
   malformed args exit 2 (AC-008). Covers REQ-004, AC-008.
 
+> Superseded by: feat/collapse-runtime-install-and-trust
+
 ### T7 — Tests (`packages/runtime/test/f16-trust.test.ts`, `packages/cli/test/...`)
 - Unit: manifest shape/determinism/confinement/origin validation (AC-001/002).
 - Capability pure/injectable (AC-003).
@@ -77,3 +79,5 @@
 ## Rollback
 - All changes confined to `f16-trust.ts`, runtime `index.ts`, CLI `runtime.ts` + help strings.
 - No schema/compiler change; reversible by removing the module export and CLI routing.
+
+> Superseded by: feat/collapse-runtime-install-and-trust

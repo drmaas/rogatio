@@ -338,19 +338,18 @@ The **request-body trust lifecycle** that request-body interception (the request
 
 ### Ownership and data flow
 
-`@rogatio/runtime` gains a `trust` module with a `createRequestBodyTrustController` controller and pure helper functions. `@rogatio/cli` extends `rogatio runtime` with `install | status | trust | untrust | uninstall`. Five owned operations:
+`@rogatio/runtime` gains a `trust` module with a `createRequestBodyTrustController` controller and pure helper functions. `@rogatio/cli` extends `rogatio runtime` with `install | untrust | uninstall`. Four owned operations:
 
-- **install:** write the native-messaging host manifest (`com.rogatio.runtime.json`) into the platform's Chrome native-messaging manifest directory, pointing at the installed runtime host. Capability-based: the manifest directory must be resolvable and writable and the host path must exist; otherwise report `trust.unsupported`.
-- **status:** report `{ installed, trusted, platform, capabilityReasons }` without side effects; reads the manifest (present + well-formed) and the CA trust standing.
-- **trust:** provision a device-local CA into the OS trust store (capability-based; macOS keychain reference platform) and record it as trusted. Idempotent.
-- **untrust:** remove the device-local CA trust from the OS trust store. No-op when not trusted. Idempotent.
+- **install:** register the native-messaging host and (on capable platforms) provision the device-local CA in a single, transactional call. Writes the native-messaging host manifest (`com.rogatio.runtime.json`) into the platform's Chrome native-messaging manifest directory, pointing at the installed runtime host; then, capability-gated, generates the device-local CA key + certificate, writes them under the install root, and invokes the platform-native `caTrustInstaller` to record the CA in the OS trust store. On incapable platforms, the install completes without CA trust and the caller is informed. Returns `runtime install complete: manifest + device-local CA trusted` on success and `trust unsupported: <reasons>` when any capability is missing. Idempotent across repeated calls with the same extension ID.
+- **untrust:** remove the device-local CA trust from the OS trust store and remove the CA material under the install root. No-op when not trusted. Idempotent.
 - **uninstall:** remove the native-messaging host manifest. No-op when not installed. Idempotent.
+- **status:** report `{ installed, trusted, platform, capabilityReasons }` without side effects; reads the manifest (present + well-formed) and the CA trust standing.
 
 Three owned layers:
 
 - **Manifest generation (pure):** `generateNativeMessagingManifest(hostPath, name)` returns a fixed-shape JSON `{ name, description, path, type: "stdio", allowed_origins: [...] }`, deterministic for the same inputs. The manifest carries no secrets; `path` must be absolute and confined to an expected install root before emission.
-- **Capability gate:** `detectTrustCapabilities()` reports whether host-manifest install and CA trust install are possible on the current platform/config. Capability-based, not OS-name-based, mirroring the macOS runtime REQ-008: a non-macOS platform with the required tooling may still install/trust; a macOS platform missing the tooling reports `trust.unsupported`.
-- **Trust controller:** `install`/`uninstall`/`trust`/`untrust`/`status` with explicit idempotency and a single stable error set. No telemetry, no retained state beyond the manifest file and the OS trust store; nothing is persisted to the project, the runtime, or disk outside the manifest path.
+- **Capability gate:** `detectTrustCapabilities()` reports whether host-manifest install and CA trust install are possible on the current platform/config. Capability-based, not OS-name-based, mirroring the macOS runtime REQ-008: a non-macOS platform with the required tooling may still install; a macOS platform missing the tooling reports `trust.unsupported`.
+- **Trust controller:** `install`/`uninstall`/`untrust`/`status` with explicit idempotency and a single stable error set. No telemetry, no retained state beyond the manifest file, the CA material under the install root, and the OS trust store; nothing is persisted to the project, the runtime, or disk outside the install root. The unified `install` performs the manifest capability check first and the CA-trust capability check after the manifest is written; on a CA-trust capability miss after the manifest write, the manifest is rolled back so the install either completes transactionally or writes nothing.
 
 ### Authority and confidentiality boundary
 

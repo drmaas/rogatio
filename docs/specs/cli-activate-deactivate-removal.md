@@ -42,6 +42,8 @@ Make the lifecycle surface match reality:
 - We are not removing `rogatio runtime install|trust|untrust|uninstall`. The
   request-body trust lifecycle is real and capability-gated, even though it
   reports `unsupported` on most platforms today.
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 - We are not removing `rogatio runtime host`. It is the entry point the
   browser launches via the native-messaging manifest.
 - We are not changing the wire protocol. The frame enum still uses
@@ -62,6 +64,8 @@ Make the lifecycle surface match reality:
   `rogatio runtime install` / `trust` flow as needed; we do not add a new
   dedicated subcommand.)
 - `rogatio runtime install|trust|untrust|uninstall` → unchanged.
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 - `rogatio runtime host [path]` → unchanged.
 - `rogatio runtime` (no subcommand) and `rogatio runtime --help` → updated
   help text. No more "Native runtime commands" section.
@@ -82,6 +86,8 @@ Make the lifecycle surface match reality:
   `rogatio runtime trust` in a terminal, then click Start again." This
   message is only rendered when the active project actually has request-body
   rules; otherwise the generic install hint is enough.
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 - The trust diagnostic is emitted by `service-worker.ts` when
   `startNativeSession` returns ok but the host reports a trust-required
   condition. We classify this from the existing `sessionResult.reason`
@@ -124,6 +130,8 @@ never wired to those envelopes.
   unknown-subcommand error.
 - `rogatio runtime install|trust|untrust|uninstall|host` continue to work
   (including their `unsupported` reports on gated platforms).
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 - `rogatio --help` and `rogatio runtime --help` no longer mention
   activate/deactivate/status.
 - The extension management page shows the request-body-needs-trust message

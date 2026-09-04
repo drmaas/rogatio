@@ -176,7 +176,8 @@ manifest is not installed, starting shows the exact ready-to-run
 `rogatio runtime install --extension-id <your extension ID>` command with a
 one-click copy button. If the project has request-body rules and the
 device-local CA is not yet trusted, the message points to
-`rogatio runtime trust` instead.
+`rogatio runtime install --extension-id <your extension ID>` instead (the same
+install command also provisions the device-local CA on capable platforms).
 
 ## Project layout
 

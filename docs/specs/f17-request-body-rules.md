@@ -404,6 +404,8 @@ routing.
   result and bounded action preview but never reads a live body or persists test input.
 - **REQ-103:** `rogatio runtime install --extension-id <id>` requires the exact explicit
   ID. `runtime trust` remains explicit and capability-gated.
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 - **REQ-104:** `runtime start` never auto-installs trust and cannot start live body
   interception without extension policy. `runtime status` exposes only safe state.
 - **REQ-105:** Unsupported platforms and provider failures produce deterministic

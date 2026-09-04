@@ -812,20 +812,20 @@ async function nativeRuntimeCommand(
       command === "start-native-runtime"
         ? "Runtime started."
         : "Runtime stopped.";
-  } else if (code === "extension.native-host-missing") {
+  } else if (
+    code === "extension.native-host-missing" ||
+    code === "extension.request-body-needs-trust"
+  ) {
     const id = extensionId();
     if (id.length > 0) {
       installCommand = `rogatio runtime install --extension-id ${id}`;
-      statusMessage =
-        "The native runtime host is not installed on this device. Run the install command below once in a terminal, then click Start runtime again.";
     } else {
-      statusMessage =
-        "The native runtime host is not installed on this device. Run `rogatio runtime install --extension-id <extension ID>` once in a terminal, then click Start runtime again.";
+      installCommand = null;
     }
-  } else if (code === "extension.request-body-needs-trust") {
-    installCommand = "rogatio runtime trust";
     statusMessage =
-      "Request-body rules need the device-local CA trusted. Run `rogatio runtime trust` once in a terminal, then click Start runtime again. Mocks and response-body rules do not need trust.";
+      code === "extension.native-host-missing"
+        ? "The native runtime host is not installed on this device. Run the install command below once in a terminal, then click Start runtime again."
+        : "Request-body rules need the device-local CA trusted on this device. Run the install command below to register the host and (on capable platforms) trust the device-local CA, then click Start runtime again. Mocks and response-body rules do not need trust.";
   } else if (code === "extension.native-runtime-unavailable") {
     statusMessage = "Runtime action unavailable on this platform.";
   } else {

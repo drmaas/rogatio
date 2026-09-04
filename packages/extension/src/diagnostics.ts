@@ -54,7 +54,7 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.native-host-missing":
     "The native runtime host is not installed on this device. Run `rogatio runtime install --extension-id <extension ID>` once, then start the runtime again.",
   "extension.request-body-needs-trust":
-    "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime trust` in a terminal, then click Start runtime again. Mocks and response-body rules do not need trust.",
+    "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime install --extension-id <extension ID>` to register the host and (on capable platforms) trust the device-local CA, then click Start runtime again. Mocks and response-body rules do not need trust.",
 };
 
 export function extensionDiagnostic(
