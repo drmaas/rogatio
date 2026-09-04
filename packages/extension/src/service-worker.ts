@@ -578,11 +578,14 @@ export function createExtensionApplication(
           // A failed start must leave truthful state behind: the session did
           // not open, so the phase is `failed`, and the reason is surfaced as
           // a distinct diagnostic so the UI can tell the user what to do
-          // (for example, installing the missing native host).
+          // (for example, installing the missing native host or trusting
+          // the device-local CA for request-body rules).
           nativePhase = "failed";
-          return sessionResult.reason === "extension.native-host-missing"
-            ? failure("extension.native-host-missing")
-            : failure("extension.native-runtime-transition");
+          if (sessionResult.reason === "extension.native-host-missing")
+            return failure("extension.native-host-missing");
+          if (sessionResult.reason === "extension.request-body-needs-trust")
+            return failure("extension.request-body-needs-trust");
+          return failure("extension.native-runtime-transition");
         }
 
         nativePhase = "started";

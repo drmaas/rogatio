@@ -113,7 +113,7 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
-  runtime <activate|deactivate|status|install|trust|untrust|uninstall>  Native messaging runtime activation and request-body trust control
+  runtime <install|trust|untrust|uninstall|host>  Native messaging runtime control and request-body trust management
   runtime host [path]  Run the consolidated native-messaging runtime host
 
 Global Options:
@@ -167,12 +167,6 @@ Native messaging runtime control for response-body and request-body rules. The
 runtime no longer serves an HTTP mock server; mock delivery happens in the
 consolidated native-messaging host (spec REQ-001..REQ-005).
 
-Native runtime commands:
-  activate   Activate the runtime (explicit, no auto-activation)
-  deactivate Deactivate the runtime (idempotent)
-  host [path]  Run the consolidated native-messaging runtime host
-  status     Show the current runtime and trust state
-
 Request-body trust commands:
   install   Install the native-messaging host manifest (requires --extension-id)
   trust     Provision and trust the device-local CA
@@ -185,14 +179,17 @@ Native host command:
                pairing/authorization/mock envelopes from stdin and writes
                responses to stdout.
 
+The lifecycle of the runtime (start/stop) is driven from the extension's
+Start/Stop controls, not the CLI. Run 'rogatio runtime install --extension-id
+<id>' once to register the host, then use the extension.
+
 Options:
   --root <dir>    Root for confined file mocks (default: project directory)
   --extension-id  Extension ID for native messaging manifest (required for install)
   --help, -h      Show this help
 
-The native runtime activates unconditionally once activated; the device-local CA /
-PAC routing capability only affects request-body interception, not the host
-control plane.
+The device-local CA / PAC routing capability only affects request-body
+interception, not the host control plane.
 
 Exit codes:
   0  Stopped cleanly / success

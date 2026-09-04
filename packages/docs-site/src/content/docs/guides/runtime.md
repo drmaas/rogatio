@@ -9,8 +9,11 @@ all flow over the `v1` native-messaging envelope (spec REQ-001..REQ-005).
 
 ## `rogatio runtime` lifecycle
 
-- `rogatio runtime activate` / `deactivate` / `status` control the runtime activation state.
-- `rogatio runtime install | status | trust | untrust | uninstall` manage the device-local
+- The runtime (start/stop) is driven from the extension's **Start runtime** and
+  **Stop runtime** controls. The CLI has no lifecycle subcommand; the host is
+  launched by the browser via the native-messaging manifest once `install` has
+  registered it.
+- `rogatio runtime install | trust | untrust | uninstall` manage the device-local
   native-messaging host registration and the device-local CA trust that request-body
   interception requires.
 - `rogatio runtime host <path>` launches the consolidated native-messaging host for a project

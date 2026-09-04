@@ -19,10 +19,10 @@ supported browser.
 
 ## Capability-based activation
 
-- **Mocks**, **response-body**, and **request-body** rules use the unified native host through
-  `rogatio runtime activate` / `deactivate` / `status`; the host itself runs as
+- **Mocks**, **response-body**, and **request-body** rules use the unified native host, started
+  by the browser via the extension's Start/Stop controls; the host itself runs as
   `rogatio runtime host <path>`. Request-body rules additionally use
-  `rogatio runtime install | status | trust | untrust | uninstall`.
+  `rogatio runtime install | trust | untrust | uninstall`.
 - Mock, response-body, and request-body rules share one runtime session.
 
 ## Limitations

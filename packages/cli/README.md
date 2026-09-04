@@ -39,7 +39,7 @@ rogatio <command> [options]
 | `rogatio edit [path]` | Launch the browser editor for `.rogatio.json`. |
 | `rogatio verify [path]` | Validate a `.rogatio.json` file (schema + compiler). |
 | `rogatio test [path] [url...]` | Run offline dry-run tests against `.rogatio.json`. |
-| `rogatio runtime <activate\|deactivate\|status\|install\|trust\|untrust\|uninstall>` | Control the native messaging runtime and request-body trust. |
+| `rogatio runtime <install\|trust\|untrust\|uninstall>` | Manage the native-messaging host manifest and request-body trust lifecycle. |
 | `rogatio runtime host <path>` | Run the consolidated native-messaging host for the project (mock/pair/authorize over stdio). Normally launched by the browser; run manually only for debugging. |
 
 Global options: `--help, -h` and `--version, -v`. Run `rogatio <command> --help`

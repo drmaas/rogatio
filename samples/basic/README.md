@@ -98,31 +98,28 @@ Mock, response-body, and request-body rules need a local runtime. Response-body 
 request-body rules additionally use native messaging and (on capable platforms) a
 device-local CA.
 
-Start the consolidated native-messaging runtime:
+First, register the native-messaging host once so Chrome can launch it:
 
 ```sh
-# Start the runtime process (no capability gate; serves pairing/authorization)
-rogatio runtime start
-
-# Confirm it is up and report trust standing
-rogatio runtime status
+rogatio runtime install --extension-id <your extension ID>
+# <your extension ID> is shown in the extension sidebar
 ```
 
-Then, in the Rogatio management page, choose **Check and connect** under the mock runtime
-section. Mock rules change from `needs proxy` to `active` once connected.
+Then, in the Rogatio management page, click **Start runtime**. The browser launches the
+host via the manifest; mock rules change from `needs proxy` to `active` once connected.
+Click **Stop runtime** to stop the session.
 
-For request-body rules only, also install and (on macOS or another capable platform) trust
-the native host so Chrome can route eligible POST/PUT/PATCH bodies through the runtime:
+For request-body rules only, also (on macOS or another capable platform) trust the device-local
+CA so Chrome can route eligible POST/PUT/PATCH bodies through the runtime:
 
 ```sh
-rogatio runtime install   # writes the native-messaging host manifest
 rogatio runtime trust     # provisions + trusts the device-local CA (capability-gated)
 ```
 
 If `install` or `trust` reports `unsupported` on your platform, request-body interception
 cannot activate there — you can still verify, edit, import, export, and dry-run the rule.
-Stop everything with `rogatio runtime stop`; remove trust/host with `rogatio runtime
-untrust` and `rogatio runtime uninstall`.
+Stop the runtime from the extension; remove trust/host with `rogatio runtime untrust` and
+`rogatio runtime uninstall`.
 
 ## 7. Validate each rule
 

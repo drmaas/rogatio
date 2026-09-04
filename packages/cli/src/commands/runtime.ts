@@ -2,7 +2,6 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import {
-  createNativeRuntimeController,
   createRequestBodyTrustController,
   defaultTrustInstallRoot,
   normalizeRuntimePreset,
@@ -20,35 +19,35 @@ export interface RuntimeCommandResult {
 
 function showRuntimeHelp(): void {
   console.log(`Usage: rogatio runtime <command> [options]
+       rogatio runtime host [path]
 
-Native messaging runtime control for response-body and request-body rules.
-
-Native runtime commands:
-  activate  Activate the runtime (explicit, no auto-activation)
-  deactivate Deactivate the runtime (idempotent)
-  status    Show the current runtime and trust state
+Native messaging runtime control for response-body and request-body rules. The
+runtime no longer serves an HTTP mock server; mock delivery happens in the
+consolidated native-messaging host (spec REQ-001..REQ-005).
 
 Request-body trust commands:
-  install   Install the native-messaging host manifest
-             Requires --extension-id <32-char-id>
+  install   Install the native-messaging host manifest (requires --extension-id)
   trust     Provision and trust the device-local CA
   untrust   Remove the device-local CA trust (idempotent)
   uninstall Uninstall the native-messaging host manifest (idempotent)
 
 Native host command:
-  host [path]  Run the consolidated native-messaging runtime host, reading
-               pairing/authorization/mock envelopes from stdin and writing
-               responses to stdout. This process is what the browser launches
-               via the native-messaging manifest.
+  host [path]  Run the consolidated native-messaging runtime host. The browser
+               launches this process via the native-messaging manifest; it reads
+               pairing/authorization/mock envelopes from stdin and writes
+               responses to stdout.
+
+The lifecycle of the runtime (start/stop) is driven from the extension's
+Start/Stop controls, not the CLI. Run 'rogatio runtime install --extension-id
+<id>' once to register the host, then use the extension.
 
 Options:
   --extension-id    Extension ID for native messaging manifest (required for install)
   --root <dir>      Root for confined file mocks (default: project directory)
   --help, -h        Show this help
 
-The native runtime activates unconditionally once started (spec REQ-004); the
-device-local CA / PAC routing capability only affects request-body interception,
-not the host control plane.`);
+The device-local CA / PAC routing capability only affects request-body
+interception, not the host control plane.`);
 }
 
 function toMatcherOperations(
@@ -100,39 +99,6 @@ function buildMockConfigs(
     });
   }
   return { ok: true, value: configs };
-}
-
-async function nativeRuntimeCommand(args: string[]): Promise<number> {
-  const subcommand = args[0];
-  const controller = createNativeRuntimeController({
-    preset: await loadControlPreset(),
-  });
-
-  switch (subcommand) {
-    case "activate": {
-      const result = await controller.start();
-      if (result.state === "running") {
-        console.log("runtime activated");
-        return 0;
-      }
-      console.error(`runtime activate failed: ${result.state}`);
-      return 1;
-    }
-    case "deactivate": {
-      const result = await controller.stop();
-      console.log(`runtime ${result.state}`);
-      return 0;
-    }
-    case "status": {
-      console.log(`runtime ${controller.status().state}`);
-      return 0;
-    }
-    default: {
-      console.error(`Error: unknown runtime subcommand: ${subcommand ?? ""}`);
-      showRuntimeHelp();
-      return 2;
-    }
-  }
 }
 
 function makeTrustController() {
@@ -220,34 +186,6 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
       showRuntimeHelp();
       return 2;
   }
-}
-
-async function runtimeStatusCommand(_args: string[]): Promise<number> {
-  const controller = makeTrustController();
-  const status = await controller.status();
-  console.log(
-    `runtime ${createNativeRuntimeController({ preset: await loadControlPreset() }).status().state}`,
-  );
-  console.log(`trust installed: ${status.installed}`);
-  console.log(`trust established: ${status.trusted}`);
-  if (!status.installed || !status.trusted) {
-    console.error(
-      `trust unsupported: ${(status.capabilityReasons ?? ["unknown"]).join(", ")}`,
-    );
-  }
-  return 0;
-}
-
-async function loadControlPreset() {
-  const { normalizeRuntimePreset } = await import("@rogatio/runtime");
-  const result = normalizeRuntimePreset({
-    version: 1,
-    limits: RUNTIME_LIMITS,
-    matchers: [],
-    grants: [],
-  });
-  if (!result.ok) throw new Error("Failed to build control preset");
-  return result.value;
 }
 
 async function runtimeHostCommand(args: string[]): Promise<number> {
@@ -355,7 +293,7 @@ async function runtimeHostCommand(args: string[]): Promise<number> {
 }
 
 export function runtimeCommand(
-  args: ["start" | "stop" | "status", ...string[]],
+  args: ["install" | "trust" | "untrust" | "uninstall" | "host", ...string[]],
   options?: { stdinInput?: string },
 ): Promise<number>;
 export function runtimeCommand(
@@ -388,13 +326,10 @@ export async function runtimeCommand(
     first === "uninstall"
   )
     return trustRuntimeCommand(args);
-  if (first === "status") return runtimeStatusCommand(args);
-  if (first === "activate" || first === "deactivate")
-    return nativeRuntimeCommand(args);
   if (first === "host") return runtimeHostCommand(args.slice(1));
 
   console.error(
-    `Error: 'rogatio runtime' no longer starts an HTTP mock server. Use 'rogatio runtime host [path]' to run the native-messaging host, or one of: activate, deactivate, status, install, trust, untrust, uninstall.`,
+    `Error: 'rogatio runtime' no longer starts or stops the runtime. Use 'rogatio runtime install|trust|untrust|uninstall' to manage the host manifest and request-body trust, or 'rogatio runtime host [path]' to run the native-messaging host. Start/stop is driven from the extension's controls.`,
   );
   showRuntimeHelp();
   return 2;

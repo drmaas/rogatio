@@ -125,8 +125,7 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port. |
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
-| `rogatio runtime <activate\|deactivate\|status>` | Runtime activation control. `activate`/`deactivate` flip the persisted activation state the extension reads; `status` reports runtime and trust state. The native host starts unconditionally (no capability gate); it serves pairing, authorization, and mock delivery over stdio native-messaging. |
-| `rogatio runtime <install\|trust\|untrust\|uninstall>` | Request-body trust lifecycle. `install` writes the native-messaging host manifest; `trust` provisions and trusts the device-local CA; `untrust`/`uninstall` remove CA trust and the manifest (idempotent). The CA/trust provisioning remains capability-gated at the OS level and reports `unsupported` without error on incapable platforms. `rogatio runtime status` reports both runtime and trust state. |
+| `rogatio runtime <install\|trust\|untrust\|uninstall>` | Request-body trust lifecycle. `install` writes the native-messaging host manifest; `trust` provisions and trusts the device-local CA; `untrust`/`uninstall` remove CA trust and the manifest (idempotent). The CA/trust provisioning remains capability-gated at the OS level and reports `unsupported` without error on incapable platforms. |
 | `rogatio runtime host <path>` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Mock delivery, pairing, and authorization all flow through this single host; no separate HTTP mock server exists. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
@@ -158,11 +157,8 @@ click **Start runtime**.
 # <extension ID> is shown in the extension sidebar ("Extension ID: …")
 rogatio runtime install --extension-id <extension ID>
 
-# Activate the runtime for the project
-rogatio runtime activate
-
-# Deactivate the runtime
-rogatio runtime deactivate
+# Start the runtime from the extension's Start runtime control
+# (Stop runtime stops it; mocks/response-body rules need only the host installed)
 
 # Run the native-messaging host (normally launched by the browser; useful for debugging)
 rogatio runtime host .rogatio.json
@@ -174,11 +170,13 @@ rogatio runtime host .rogatio.json --root ~/projects/demo
 Then open the extension, click **Start runtime**, and matched requests
 will be redirected to the configured mock response. Mock rules report
 `needs proxy` while the runtime is stopped and `active` when connected; the
-sidebar runtime status line shows the current phase next to the Activate/Deactivate
+sidebar runtime status line shows the current phase next to the Start/Stop
 controls, with the browser-assigned extension ID shown beneath it. If the host
 manifest is not installed, starting shows the exact ready-to-run
 `rogatio runtime install --extension-id <your extension ID>` command with a
-one-click copy button.
+one-click copy button. If the project has request-body rules and the
+device-local CA is not yet trusted, the message points to
+`rogatio runtime trust` instead.
 
 ## Project layout
 

@@ -19,28 +19,31 @@ describe("rogatio runtime command", () => {
     expect(log.mock.calls.join("\n")).toContain("rogatio runtime");
   });
 
-  it("activates the runtime without capability gating", async () => {
+  it("help text does not advertise the removed activate/deactivate/status subcommands", async () => {
     silence();
     const log = vi.spyOn(console, "log");
+    await runtimeCommand(["--help"]);
+    const output = log.mock.calls.join("\n");
+    expect(output).not.toMatch(/activate/);
+    expect(output).not.toMatch(/deactivate/);
+  });
+
+  it("rejects activate with exit code 2", async () => {
+    silence();
     const code = await runtimeCommand(["activate"]);
-    expect(code).toBe(0);
-    expect(log.mock.calls.join("\n")).toContain("runtime activated");
+    expect(code).toBe(2);
   });
 
-  it("prints a state on status", async () => {
-    silence();
-    const log = vi.spyOn(console, "log");
-    const code = await runtimeCommand(["status"]);
-    expect(code).toBe(0);
-    expect(log.mock.calls.join("\n")).toMatch(
-      /runtime (idle|unsupported|running|stopped)/,
-    );
-  });
-
-  it("deactivates and returns 0", async () => {
+  it("rejects deactivate with exit code 2", async () => {
     silence();
     const code = await runtimeCommand(["deactivate"]);
-    expect(code).toBe(0);
+    expect(code).toBe(2);
+  });
+
+  it("rejects status with exit code 2", async () => {
+    silence();
+    const code = await runtimeCommand(["status"]);
+    expect(code).toBe(2);
   });
 
   it("returns 2 for an unknown subcommand", async () => {

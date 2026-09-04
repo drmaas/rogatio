@@ -29,11 +29,12 @@ Runs the offline dry-run test engine against a `.rogatio.json` file (see
 
 Controls the local runtime (see [Local runtime](/guides/runtime/)):
 
-- `rogatio runtime activate` / `deactivate` / `status` — control the runtime activation state.
 - `rogatio runtime host <path>` — run the consolidated native-messaging host for a project
   on stdio (normally launched by the browser extension; run manually only for debugging).
 - `rogatio runtime install | trust | untrust | uninstall` — manage the
   device-local native-messaging host registration and CA trust for request-body rules.
+- Start/stop of the runtime itself is driven from the extension's Start/Stop controls;
+  the CLI does not have a lifecycle subcommand.
 
 ## Notes
 

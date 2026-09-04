@@ -15,7 +15,8 @@ export type ExtensionDiagnosticCode =
   | "extension.mock-check-in-progress"
   | "extension.native-runtime-unavailable"
   | "extension.native-runtime-transition"
-  | "extension.native-host-missing";
+  | "extension.native-host-missing"
+  | "extension.request-body-needs-trust";
 
 export interface ExtensionDiagnostic {
   readonly code: ExtensionDiagnosticCode;
@@ -52,6 +53,8 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.native-runtime-transition": "The runtime could not change state.",
   "extension.native-host-missing":
     "The native runtime host is not installed on this device. Run `rogatio runtime install --extension-id <extension ID>` once, then start the runtime again.",
+  "extension.request-body-needs-trust":
+    "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime trust` in a terminal, then click Start runtime again. Mocks and response-body rules do not need trust.",
 };
 
 export function extensionDiagnostic(
