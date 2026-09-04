@@ -21,6 +21,8 @@ provisions and removes the device-local CA trust, reports the current standing, 
 capability-gated exactly like F14. It does not implement F15/F17 rule behavior, only the
 trust surface those slices pre-condition.
 
+> Superseded by: feat/collapse-runtime-install-and-trust
+
 ## Scope And Non-Goals
 
 ### In scope
@@ -29,6 +31,8 @@ trust surface those slices pre-condition.
   `install()`, `uninstall()`, `trust()`, `untrust()`, `status()` and idempotency.
 - A `rogatio runtime install | status | trust | untrust | uninstall` CLI surface on the
   existing `runtime` command, replacing the prior `start`/`stop`/`status`-only help.
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 - A pure `generateNativeMessagingManifest(hostPath, name, allowedOrigins)` producing a
   fixed-shape, deterministic manifest with no secrets.
 - A capability gate `detectTrustCapabilities()` reporting whether host-manifest install
@@ -100,6 +104,8 @@ path, CA material, or third-party tooling text to an untrusted reader.
 - **REQ-004:** The CLI `rogatio runtime` command shall implement `install`, `status`,
   `trust`, `untrust`, and `uninstall` in addition to the existing `start`, `stop`,
   `status`, and `--help`.
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 
 ### Native-Messaging Host Manifest
 
@@ -215,6 +221,8 @@ export interface RequestBodyTrustControllerOptions {
   readonly clock?: () => number;
 }
 
+> Superseded by: feat/collapse-runtime-install-and-trust
+
 export function createRequestBodyTrustController(
   options?: RequestBodyTrustControllerOptions,
 ): {
@@ -224,6 +232,8 @@ export function createRequestBodyTrustController(
   untrust(): Promise<TrustResult>;
   status(): Promise<TrustStatus> | TrustStatus;
 };
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 
 export function generateNativeMessagingManifest(
   hostPath: string,
@@ -244,6 +254,8 @@ export type F16ErrorCode =
   | "trust.write-failed"
   | "trust.capability-error"
   | "trust.internal";
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 ```
 
 ## Native-Messaging Manifest
@@ -279,6 +291,8 @@ rogatio runtime uninstall    Remove the native-messaging host manifest
 trusted: <bool>`. `uninstall`/`untrust` are idempotent and print success. Malformed CLI
 arguments exit `2`.
 
+> Superseded by: feat/collapse-runtime-install-and-trust
+
 ## Verification Obligations
 
 ### Manifest and capability
@@ -310,6 +324,8 @@ arguments exit `2`.
 - **AC-008:** `rogatio runtime install | status | trust | untrust | uninstall` run; help
   lists them; `status` reflects standing; `install`/`trust` report `unsupported` cleanly
   on incapable platforms; malformed args exit `2`.
+
+> Superseded by: feat/collapse-runtime-install-and-trust
 - **AC-009:** The runtime package and CLI build as Node ESM; root format, lint, strict
   typecheck, build, package tests, and canonical validation remain authoritative.
 - **AC-010:** Scope inspection proves F16 contains no F15/F17 rule behavior, no F14

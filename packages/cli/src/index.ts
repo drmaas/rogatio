@@ -113,7 +113,7 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
-  runtime <install|trust|untrust|uninstall|host>  Native messaging runtime control and request-body trust management
+  runtime <install|untrust|uninstall|host>  Native messaging runtime control and request-body trust management
   runtime host [path]  Run the consolidated native-messaging runtime host
 
 Global Options:
@@ -168,8 +168,8 @@ runtime no longer serves an HTTP mock server; mock delivery happens in the
 consolidated native-messaging host (spec REQ-001..REQ-005).
 
 Request-body trust commands:
-  install   Install the native-messaging host manifest (requires --extension-id)
-  trust     Provision and trust the device-local CA
+  install   Install the native-messaging host manifest and (on capable
+            platforms) provision the device-local CA (requires --extension-id)
   untrust   Remove the device-local CA trust (idempotent)
   uninstall Uninstall the native-messaging host manifest (idempotent)
 
@@ -188,8 +188,8 @@ Options:
   --extension-id  Extension ID for native messaging manifest (required for install)
   --help, -h      Show this help
 
-The device-local CA / PAC routing capability only affects request-body
-interception, not the host control plane.
+The device-local CA / PAC routing capability is invoked from the unified
+install command on capable platforms; it does not have a separate verb.
 
 Exit codes:
   0  Stopped cleanly / success

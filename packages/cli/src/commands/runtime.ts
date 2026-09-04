@@ -26,8 +26,8 @@ runtime no longer serves an HTTP mock server; mock delivery happens in the
 consolidated native-messaging host (spec REQ-001..REQ-005).
 
 Request-body trust commands:
-  install   Install the native-messaging host manifest (requires --extension-id)
-  trust     Provision and trust the device-local CA
+  install   Install the native-messaging host manifest and (on capable
+            platforms) provision the device-local CA (requires --extension-id)
   untrust   Remove the device-local CA trust (idempotent)
   uninstall Uninstall the native-messaging host manifest (idempotent)
 
@@ -46,8 +46,8 @@ Options:
   --root <dir>      Root for confined file mocks (default: project directory)
   --help, -h        Show this help
 
-The device-local CA / PAC routing capability only affects request-body
-interception, not the host control plane.`);
+The device-local CA / PAC routing capability is invoked from the unified
+install command on capable platforms; it does not have a separate verb.`);
 }
 
 function toMatcherOperations(
@@ -161,13 +161,7 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
       return reportTrust(
         "install",
         await controller.install(extensionId ?? ""),
-        "trust installed",
-      );
-    case "trust":
-      return reportTrust(
-        "trust",
-        await controller.trust(),
-        "trust established",
+        "runtime install complete: manifest + device-local CA trusted",
       );
     case "untrust":
       return reportTrust(
@@ -293,7 +287,7 @@ async function runtimeHostCommand(args: string[]): Promise<number> {
 }
 
 export function runtimeCommand(
-  args: ["install" | "trust" | "untrust" | "uninstall" | "host", ...string[]],
+  args: ["install" | "untrust" | "uninstall" | "host", ...string[]],
   options?: { stdinInput?: string },
 ): Promise<number>;
 export function runtimeCommand(
@@ -329,7 +323,7 @@ export async function runtimeCommand(
   if (first === "host") return runtimeHostCommand(args.slice(1));
 
   console.error(
-    `Error: 'rogatio runtime' no longer starts or stops the runtime. Use 'rogatio runtime install|trust|untrust|uninstall' to manage the host manifest and request-body trust, or 'rogatio runtime host [path]' to run the native-messaging host. Start/stop is driven from the extension's controls.`,
+    `Error: 'rogatio runtime' no longer starts or stops the runtime. Use 'rogatio runtime install|untrust|uninstall' to manage the host manifest and request-body trust, or 'rogatio runtime host [path]' to run the native-messaging host. Start/stop is driven from the extension's controls.`,
   );
   showRuntimeHelp();
   return 2;

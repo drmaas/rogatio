@@ -157,10 +157,12 @@ describe(" trust controller lifecycle", () => {
     expect((await controller.status()).installed).toBe(false);
   });
 
-  it("trust provisions the confined CA and invokes the installer once", async () => {
+  it("install provisions the confined CA and invokes the installer once (idempotent)", async () => {
     const installer = vi.fn(async () => {});
     const controller = createRequestBodyTrustController({
       installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
       detectCapabilities: () => ({
         manifest: true,
         caTrust: true,
@@ -168,38 +170,22 @@ describe(" trust controller lifecycle", () => {
       }),
       caTrustInstaller: installer,
     });
-    const first = await controller.trust();
+    const first = await controller.install("abcdefghijklmnopabcdefghijklmnop");
     expect(first.ok).toBe(true);
-    expect(first.state).toBe("trusted");
+    expect(first.state).toBe("installed");
     expect(installer).toHaveBeenCalledTimes(1);
-    const second = await controller.trust();
+    const second = await controller.install("abcdefghijklmnopabcdefghijklmnop");
     expect(second.ok).toBe(true);
     expect(installer).toHaveBeenCalledTimes(1); // idempotent
     expect((await controller.status()).trusted).toBe(true);
-  });
-
-  it("trust reports unsupported when caTrust capability is absent", async () => {
-    const installer = vi.fn(async () => {});
-    const controller = createRequestBodyTrustController({
-      installRoot: root,
-      detectCapabilities: () => ({
-        manifest: true,
-        caTrust: false,
-        reasons: ["no-ca-tooling"],
-      }),
-      caTrustInstaller: installer,
-    });
-    const result = await controller.trust();
-    expect(result.ok).toBe(false);
-    expect(result.state).toBe("unsupported");
-    expect(installer).not.toHaveBeenCalled();
-    expect((await controller.status()).trusted).toBe(false);
   });
 
   it("untrust removes the CA material and is a no-op when absent", async () => {
     const remover = vi.fn(async () => {});
     const controller = createRequestBodyTrustController({
       installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
       detectCapabilities: capable,
       caTrustInstaller: async () => {},
       caTrustRemover: remover,
@@ -207,7 +193,7 @@ describe(" trust controller lifecycle", () => {
     const noop = await controller.untrust();
     expect(noop.ok).toBe(true);
     expect(remover).not.toHaveBeenCalled();
-    await controller.trust();
+    await controller.install("abcdefghijklmnopabcdefghijklmnop");
     expect((await controller.status()).trusted).toBe(true);
     await controller.untrust();
     expect(remover).toHaveBeenCalledTimes(1);
@@ -223,12 +209,129 @@ describe(" trust controller lifecycle", () => {
       caTrustInstaller: async () => {},
     });
     await controller.install("abcdefghijklmnopabcdefghijklmnop");
-    await controller.trust();
     const status = await controller.status();
     const serialized = JSON.stringify(status);
     expect(serialized).not.toContain(join(root, "runtime-host"));
     expect(serialized).not.toContain(join(root, "com.rogatio.runtime.json"));
     expect(serialized).not.toContain(root);
+  });
+
+  it("unified install: manifest + CA + installer all run when both capabilities present (AC-1)", async () => {
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    expect(result.state).toBe("installed");
+    expect(installer).toHaveBeenCalledTimes(1);
+    const status = await controller.status();
+    expect(status.installed).toBe(true);
+    expect(status.trusted).toBe(true);
+  });
+
+  it("unified install: manifest cap absent returns unsupported and writes nothing (AC-2)", async () => {
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: () => ({
+        manifest: false,
+        caTrust: true,
+        reasons: ["manifest-dir-unwritable"],
+      }),
+      caTrustInstaller: installer,
+    });
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(false);
+    expect(result.state).toBe("unsupported");
+    expect(result.reasons).toContain("manifest-dir-unwritable");
+    expect(installer).not.toHaveBeenCalled();
+    const status = await controller.status();
+    expect(status.installed).toBe(false);
+    expect(status.trusted).toBe(false);
+  });
+
+  it("unified install: caTrust cap absent rolls back the just-written manifest (AC-3)", async () => {
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: () => ({
+        manifest: true,
+        caTrust: false,
+        reasons: ["no-ca-tooling"],
+      }),
+      caTrustInstaller: installer,
+    });
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(false);
+    expect(result.state).toBe("unsupported");
+    expect(result.reasons).toContain("no-ca-tooling");
+    expect(installer).not.toHaveBeenCalled();
+    const status = await controller.status();
+    expect(status.installed).toBe(false);
+    expect(status.trusted).toBe(false);
+  });
+
+  it("unified install: caTrustInstaller throws rolls back both CA and manifest (AC-4)", async () => {
+    const throwingInstaller = vi.fn(() => {
+      throw new Error("nope");
+    });
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: throwingInstaller,
+    });
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(false);
+    expect(result.state).toBe("unsupported");
+    expect(throwingInstaller).toHaveBeenCalledTimes(1);
+    const status = await controller.status();
+    expect(status.installed).toBe(false);
+    expect(status.trusted).toBe(false);
+
+    const okInstaller = vi.fn(async () => {});
+    const controllerRetry = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: okInstaller,
+    });
+    const retry = await controllerRetry.install(
+      "abcdefghijklmnopabcdefghijklmnop",
+    );
+    expect(retry.ok).toBe(true);
+    expect(okInstaller).toHaveBeenCalledTimes(1);
+  });
+
+  it("unified install: idempotent re-call does not re-invoke installer (AC-5)", async () => {
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+    const first = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(first.ok).toBe(true);
+    expect(installer).toHaveBeenCalledTimes(1);
+    const second = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(second.ok).toBe(true);
+    expect(installer).toHaveBeenCalledTimes(1);
+    const status = await controller.status();
+    expect(status.installed).toBe(true);
+    expect(status.trusted).toBe(true);
   });
 });
 

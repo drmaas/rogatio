@@ -45,11 +45,4 @@ describe("rogatio runtime command ()", () => {
     // Should not fail with extension-id error (may fail on missing trust/manifest)
     expect(code).not.toBe(2);
   });
-
-  it("trust command remains explicit and capability-gated", async () => {
-    silence();
-    const code = await runtimeCommand(["trust"]);
-    // Should report capability status without partial changes
-    expect(code).toBeGreaterThanOrEqual(0);
-  });
 });

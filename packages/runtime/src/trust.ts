@@ -289,7 +289,64 @@ export function createRequestBodyTrustController(
         reasons: [codeOf(error, "trust.write-failed")],
       };
     }
+    const caTrustCaps = await detect();
+    if (!caTrustCaps.caTrust) {
+      try {
+        await rm(manifestPath(), { force: true });
+      } catch {
+        // best-effort rollback; original capability reason still wins
+      }
+      return unsupportedResult(caTrustCaps);
+    }
+    const trustResult = await trust();
+    if (!trustResult.ok) {
+      try {
+        await rm(caKeyFile, { force: true });
+        await rm(caPubFile, { force: true });
+        await rm(caCertFile, { force: true });
+      } catch {
+        // best-effort rollback; original error code still wins
+      }
+      try {
+        await rm(manifestPath(), { force: true });
+      } catch {
+        // best-effort rollback
+      }
+      installerCalled = false;
+      return trustResult;
+    }
     return { ok: true, state: "installed" };
+  }
+
+  async function runCaTrust(): Promise<void> {
+    const caps = await detect();
+    if (!caps.caTrust) {
+      throw new TrustError(
+        "trust.unsupported",
+        "caTrust capability absent",
+        caps.reasons,
+      );
+    }
+    if (!(await existsFile(caKeyFile)) || !(await existsFile(caCertFile))) {
+      const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
+
+      // Generate self-signed X.509 CA certificate
+      const certResult = createCertificate(
+        "CN=Rogatio Request-Body CA",
+        privateKey,
+        TRUST_LIMITS.caValidityDays,
+      );
+      const certPem = certResult.certPem;
+      const certKeyPem = certResult.keyPem;
+
+      await writeFileAtomic(caKeyFile, certKeyPem);
+      await writeFileAtomic(caPubFile, certPem); // Store cert as public key for compatibility
+      await writeFileAtomic(caCertFile, certPem);
+    }
+    if (caTrustInstaller && !installerCalled) {
+      await caTrustInstaller(await readFile(caCertFile, "utf8"));
+      installerCalled = true;
+    }
   }
 
   async function uninstall(): Promise<TrustResult> {
@@ -306,29 +363,8 @@ export function createRequestBodyTrustController(
   }
 
   async function trust(): Promise<TrustResult> {
-    const caps = await detect();
-    if (!caps.caTrust) return unsupportedResult(caps);
     try {
-      if (!(await existsFile(caKeyFile)) || !(await existsFile(caCertFile))) {
-        const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
-
-        // Generate self-signed X.509 CA certificate
-        const certResult = createCertificate(
-          "CN=Rogatio Request-Body CA",
-          privateKey,
-          TRUST_LIMITS.caValidityDays,
-        );
-        const certPem = certResult.certPem;
-        const certKeyPem = certResult.keyPem;
-
-        await writeFileAtomic(caKeyFile, certKeyPem);
-        await writeFileAtomic(caPubFile, certPem); // Store cert as public key for compatibility
-        await writeFileAtomic(caCertFile, certPem);
-      }
-      if (caTrustInstaller && !installerCalled) {
-        await caTrustInstaller(await readFile(caCertFile, "utf8"));
-        installerCalled = true;
-      }
+      await runCaTrust();
     } catch (error) {
       return {
         ok: false,
@@ -378,5 +414,5 @@ export function createRequestBodyTrustController(
     };
   }
 
-  return { install, uninstall, trust, untrust, status };
+  return { install, uninstall, untrust, status };
 }
