@@ -22,8 +22,9 @@ supported browser.
 - **Mocks**, **response-body**, and **request-body** rules use the unified native host, started
   by the browser via the extension's Start/Stop controls; the host itself runs as
   `rogatio runtime host <path>`. Request-body rules additionally use
-  `rogatio runtime install | untrust | uninstall`; the same `install` command
-  also provisions the device-local CA on capable platforms.
+  `rogatio runtime install | uninstall`; the same `install` command
+  also provisions the device-local CA on capable platforms. `uninstall` removes
+  the host manifest, the device-local CA files, and the trust installation (idempotent).
 - Mock, response-body, and request-body rules share one runtime session.
 
 ## Limitations

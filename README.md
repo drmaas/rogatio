@@ -125,7 +125,7 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port. |
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
-| `rogatio runtime <install\|trust\|untrust\|uninstall>` | Request-body trust lifecycle. `install` writes the native-messaging host manifest; `trust` provisions and trusts the device-local CA; `untrust`/`uninstall` remove CA trust and the manifest (idempotent). The CA/trust provisioning remains capability-gated at the OS level and reports `unsupported` without error on incapable platforms. |
+| `rogatio runtime <install\|uninstall>` | Request-body trust lifecycle. `install` registers the native-messaging host manifest and (on capable platforms) provisions and trusts the device-local CA in a single, transactional call. `uninstall` removes the host manifest, the device-local CA files, and the trust installation (idempotent). The CA/trust provisioning remains capability-gated at the OS level and reports `unsupported` without error on incapable platforms. |
 | `rogatio runtime host <path>` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Mock delivery, pairing, and authorization all flow through this single host; no separate HTTP mock server exists. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
@@ -178,6 +178,8 @@ one-click copy button. If the project has request-body rules and the
 device-local CA is not yet trusted, the message points to
 `rogatio runtime install --extension-id <your extension ID>` instead (the same
 install command also provisions the device-local CA on capable platforms).
+To remove the host and the device-local CA trust, run
+`rogatio runtime uninstall` (idempotent).
 
 ## Project layout
 

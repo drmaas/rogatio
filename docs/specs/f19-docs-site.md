@@ -67,6 +67,8 @@ Goals:
     response-body rewriting, request-body replacement.
   - Reference: CLI (`edit`, `verify`, `runtime install|status|trust|untrust|uninstall`),
     extension, supported platforms & capabilities, security & privacy model, architecture.
+
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 - **REQ-004** — The new package must be excluded from the root `tsconfig.json` `exclude`
   and added to `.biomeignore`, so root `typecheck` and Biome do not process Astro/Markdown.
 - **REQ-005** — Root canonical validation (`pnpm format:check`, `pnpm lint`,

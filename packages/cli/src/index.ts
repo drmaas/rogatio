@@ -113,7 +113,7 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
-  runtime <install|untrust|uninstall|host>  Native messaging runtime control and request-body trust management
+  runtime <install|uninstall|host>  Native messaging runtime control and request-body trust management
   runtime host [path]  Run the consolidated native-messaging runtime host
 
 Global Options:
@@ -170,8 +170,7 @@ consolidated native-messaging host (spec REQ-001..REQ-005).
 Request-body trust commands:
   install   Install the native-messaging host manifest and (on capable
             platforms) provision the device-local CA (requires --extension-id)
-  untrust   Remove the device-local CA trust (idempotent)
-  uninstall Uninstall the native-messaging host manifest (idempotent)
+  uninstall Remove the native-messaging host manifest and the device-local CA trust (idempotent)
 
 Native host command:
   host [path]  Run the consolidated native-messaging runtime host. The browser

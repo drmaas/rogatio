@@ -200,6 +200,8 @@ Author tests before production implementation. Add only test/configuration files
 - Require `rogatio runtime install --extension-id <id>`. Reject omitted, malformed, wildcard, or mismatched IDs before writes.
 - Preserve explicit `trust`, `untrust`, `install`, `uninstall`; do not auto-run from `runtime start`.
 
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
+
 **Covers:** AC-009, AC-024, AC-028
 
 ### Task 6: Add F17 Policy, Canonicalization, Native Framing, and Host Control
@@ -458,6 +460,8 @@ Keep `pnpm-lock.yaml` unchanged because no new dependency is approved. Change on
 - No schema-version migration required. Existing projects without F17 fields remain valid. Older consumers may reject F17 fields but must not silently discard them.
 - Runtime rollback: explicit stop, stop acceptance, invalidate policy/capabilities/pending work, remove only Rogatio-owned markers/PAC, restore PAC only when ownership and prior value still match, stop provider, retain external settings.
 - Do not automatically remove F16 trust artifacts during code rollback. `untrust` and `uninstall` remain explicit user actions.
+
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 - Code rollback: revert of F17 source, tests, build/validation, and documentation changes. Do not delete files, worktrees, trust artifacts, or generated output without required prompt and authorization.
 
 ## Canonical Verification

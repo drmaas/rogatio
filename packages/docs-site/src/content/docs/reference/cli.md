@@ -31,10 +31,11 @@ Controls the local runtime (see [Local runtime](/guides/runtime/)):
 
 - `rogatio runtime host <path>` — run the consolidated native-messaging host for a project
   on stdio (normally launched by the browser extension; run manually only for debugging).
-- `rogatio runtime install | untrust | uninstall` — register the
+- `rogatio runtime install | uninstall` — register the
   device-local native-messaging host and (on capable platforms) trust the
-  device-local CA for request-body rules in a single install call; `untrust`
-  removes CA trust, `uninstall` removes the host.
+  device-local CA for request-body rules in a single install call;
+  `uninstall` removes the host manifest, the device-local CA files, and the
+  trust installation (idempotent).
 - Start/stop of the runtime itself is driven from the extension's Start/Stop controls;
   the CLI does not have a lifecycle subcommand.
 

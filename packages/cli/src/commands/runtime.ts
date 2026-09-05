@@ -28,8 +28,7 @@ consolidated native-messaging host (spec REQ-001..REQ-005).
 Request-body trust commands:
   install   Install the native-messaging host manifest and (on capable
             platforms) provision the device-local CA (requires --extension-id)
-  untrust   Remove the device-local CA trust (idempotent)
-  uninstall Uninstall the native-messaging host manifest (idempotent)
+  uninstall Remove the native-messaging host manifest and the device-local CA trust (idempotent)
 
 Native host command:
   host [path]  Run the consolidated native-messaging runtime host. The browser
@@ -129,7 +128,7 @@ function reportTrust(
     return 0;
   }
   console.error(
-    `trust ${subcommand} failed: ${(result.reasons ?? ["unknown"]).join(", ")}`,
+    `runtime ${subcommand} failed: ${(result.reasons ?? ["unknown"]).join(", ")}`,
   );
   return 1;
 }
@@ -163,17 +162,11 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
         await controller.install(extensionId ?? ""),
         "runtime install complete: manifest + device-local CA trusted",
       );
-    case "untrust":
-      return reportTrust(
-        "untrust",
-        await controller.untrust(),
-        "trust removed",
-      );
     case "uninstall":
       return reportTrust(
         "uninstall",
         await controller.uninstall(),
-        "trust manifest uninstalled",
+        "runtime uninstall complete: manifest + device-local CA removed",
       );
     default:
       console.error(`Error: unknown runtime subcommand: ${subcommand ?? ""}`);
@@ -287,7 +280,7 @@ async function runtimeHostCommand(args: string[]): Promise<number> {
 }
 
 export function runtimeCommand(
-  args: ["install" | "untrust" | "uninstall" | "host", ...string[]],
+  args: ["install" | "uninstall" | "host", ...string[]],
   options?: { stdinInput?: string },
 ): Promise<number>;
 export function runtimeCommand(
@@ -313,17 +306,12 @@ export async function runtimeCommand(
   }
 
   const first = args[0];
-  if (
-    first === "install" ||
-    first === "trust" ||
-    first === "untrust" ||
-    first === "uninstall"
-  )
+  if (first === "install" || first === "trust" || first === "uninstall")
     return trustRuntimeCommand(args);
   if (first === "host") return runtimeHostCommand(args.slice(1));
 
   console.error(
-    `Error: 'rogatio runtime' no longer starts or stops the runtime. Use 'rogatio runtime install|untrust|uninstall' to manage the host manifest and request-body trust, or 'rogatio runtime host [path]' to run the native-messaging host. Start/stop is driven from the extension's controls.`,
+    `Error: 'rogatio runtime' no longer starts or stops the runtime. Use 'rogatio runtime install|uninstall' to manage the host manifest and request-body trust, or 'rogatio runtime host [path]' to run the native-messaging host. Start/stop is driven from the extension's controls.`,
   );
   showRuntimeHelp();
   return 2;

@@ -37,11 +37,15 @@ Make the lifecycle surface match reality:
   own failure mode that needs its own diagnostic, not the generic
   "extension.native-host-missing" path.
 
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
+
 ## Non-goals
 
 - We are not removing `rogatio runtime install|trust|untrust|uninstall`. The
   request-body trust lifecycle is real and capability-gated, even though it
   reports `unsupported` on most platforms today.
+
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 
 > Superseded by: feat/collapse-runtime-install-and-trust
 - We are not removing `rogatio runtime host`. It is the entry point the
@@ -132,6 +136,7 @@ never wired to those envelopes.
   (including their `unsupported` reports on gated platforms).
 
 > Superseded by: feat/collapse-runtime-install-and-trust
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 - `rogatio --help` and `rogatio runtime --help` no longer mention
   activate/deactivate/status.
 - The extension management page shows the request-body-needs-trust message
