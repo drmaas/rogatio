@@ -13,11 +13,12 @@ all flow over the `v1` native-messaging envelope (spec REQ-001..REQ-005).
   **Stop runtime** controls. The CLI has no lifecycle subcommand; the host is
   launched by the browser via the native-messaging manifest once `install` has
   registered it.
-- `rogatio runtime install | untrust | uninstall` manage the device-local
+- `rogatio runtime install | uninstall` manage the device-local
   native-messaging host registration. The same `install` invocation also
   provisions and trusts the device-local CA on which request-body interception
   depends; on incapable platforms, the install completes without CA trust and
-  the caller is informed.
+  the caller is informed. `uninstall` removes the host manifest, the device-local
+  CA files, and the trust installation (idempotent).
 - `rogatio runtime host <path>` launches the consolidated native-messaging host for a project
   on stdio. The browser extension connects to it for pairing, authorization, and mock delivery.
 

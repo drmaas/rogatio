@@ -20,19 +20,15 @@ vi.mock("@rogatio/runtime", async () => {
   };
 });
 
-describe("rogatio runtime install (unified success)", () => {
-  it("prints the unified install success message when install succeeds", async () => {
+describe("rogatio runtime uninstall (unified success)", () => {
+  it("prints the unified uninstall success message when uninstall succeeds", async () => {
     const { runtimeCommand } = await import("../src/commands/runtime.js");
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    const code = await runtimeCommand([
-      "install",
-      "--extension-id",
-      "abcdefghijklmnopabcdefghijklmnop",
-    ]);
+    const code = await runtimeCommand(["uninstall"]);
     expect(code).toBe(0);
     expect(log.mock.calls.join("\n")).toContain(
-      "runtime install complete: manifest + device-local CA trusted",
+      "runtime uninstall complete: manifest + device-local CA removed",
     );
     expect(err).not.toHaveBeenCalled();
   });

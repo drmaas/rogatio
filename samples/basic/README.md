@@ -114,7 +114,7 @@ Click **Stop runtime** to stop the session.
 
 If `install` reports `unsupported` on your platform, request-body interception cannot
 activate there — you can still verify, edit, import, export, and dry-run the rule.
-Stop the runtime from the extension; remove trust/host with `rogatio runtime untrust` and
+Stop the runtime from the extension; remove the host and CA trust with
 `rogatio runtime uninstall`.
 
 ## 7. Validate each rule

@@ -39,7 +39,7 @@ rogatio <command> [options]
 | `rogatio edit [path]` | Launch the browser editor for `.rogatio.json`. |
 | `rogatio verify [path]` | Validate a `.rogatio.json` file (schema + compiler). |
 | `rogatio test [path] [url...]` | Run offline dry-run tests against `.rogatio.json`. |
-| `rogatio runtime <install\|untrust\|uninstall>` | Register the native-messaging host (and, on capable platforms, the device-local CA) in one transactional install; `untrust` removes CA trust; `uninstall` removes the host. |
+| `rogatio runtime <install\|uninstall>` | Register the native-messaging host (and, on capable platforms, the device-local CA) in one transactional install; `uninstall` removes the host manifest, the device-local CA files, and the CA trust installation (idempotent). |
 | `rogatio runtime host <path>` | Run the consolidated native-messaging host for the project (mock/pair/authorize over stdio). Normally launched by the browser; run manually only for debugging. |
 
 Global options: `--help, -h` and `--version, -v`. Run `rogatio <command> --help`

@@ -22,6 +22,7 @@ capability-gated exactly like F14. It does not implement F15/F17 rule behavior, 
 trust surface those slices pre-condition.
 
 > Superseded by: feat/collapse-runtime-install-and-trust
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 
 ## Scope And Non-Goals
 
@@ -33,6 +34,7 @@ trust surface those slices pre-condition.
   existing `runtime` command, replacing the prior `start`/`stop`/`status`-only help.
 
 > Superseded by: feat/collapse-runtime-install-and-trust
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 - A pure `generateNativeMessagingManifest(hostPath, name, allowedOrigins)` producing a
   fixed-shape, deterministic manifest with no secrets.
 - A capability gate `detectTrustCapabilities()` reporting whether host-manifest install
@@ -59,6 +61,8 @@ trust surface those slices pre-condition.
   uninstall`. Control parsing, manifest generation, capability detection, and status
   work cross-platform; `install`/`trust` perform filesystem/trust-store writes only where
   the capabilities exist.
+
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 - **Trust controller (`@rogatio/runtime`):** owns manifest emission, capability gate,
   CA trust install/removal, idempotency, and the stable error set.
 - **Chrome extension (future client):** benefits from an installed manifest so native
@@ -106,6 +110,7 @@ path, CA material, or third-party tooling text to an untrusted reader.
   `status`, and `--help`.
 
 > Superseded by: feat/collapse-runtime-install-and-trust
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 
 ### Native-Messaging Host Manifest
 
@@ -134,6 +139,8 @@ path, CA material, or third-party tooling text to an untrusted reader.
 - **REQ-011:** `uninstall()` shall remove the manifest file. When no manifest exists it
   returns success (no-op) and removes nothing; removal is atomic and leaves no partial
   file.
+
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 - **REQ-012:** `trust()` shall provision the device-local CA into the OS trust store and
   mark it trusted. When CA trust is impossible (capability absent) it returns
   `trust.unsupported` and performs no trust-store work. `trust()` is idempotent when
@@ -141,6 +148,8 @@ path, CA material, or third-party tooling text to an untrusted reader.
 - **REQ-013:** `untrust()` shall remove the device-local CA trust from the OS trust store
   and remove the confined CA material when present. When not trusted it returns success
   (no-op). `untrust()` never errors on a missing CA.
+
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 - **REQ-014:** `status()` shall return `{ installed: boolean, trusted: boolean, platform,
   capabilityReasons }` with no side effects; `installed` reflects manifest presence and
   well-formedness, `trusted` reflects CA trust standing.
@@ -292,6 +301,7 @@ trusted: <bool>`. `uninstall`/`untrust` are idempotent and print success. Malfor
 arguments exit `2`.
 
 > Superseded by: feat/collapse-runtime-install-and-trust
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 
 ## Verification Obligations
 
@@ -326,6 +336,7 @@ arguments exit `2`.
   on incapable platforms; malformed args exit `2`.
 
 > Superseded by: feat/collapse-runtime-install-and-trust
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 - **AC-009:** The runtime package and CLI build as Node ESM; root format, lint, strict
   typecheck, build, package tests, and canonical validation remain authoritative.
 - **AC-010:** Scope inspection proves F16 contains no F15/F17 rule behavior, no F14

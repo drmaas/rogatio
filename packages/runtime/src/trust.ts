@@ -349,14 +349,26 @@ export function createRequestBodyTrustController(
     }
   }
 
+  async function removeCa(): Promise<void> {
+    const caWasPresent = await existsFile(caKeyFile);
+    await rm(caKeyFile, { force: true });
+    await rm(caPubFile, { force: true });
+    await rm(caCertFile, { force: true });
+    if (caWasPresent && caTrustRemover) {
+      await caTrustRemover();
+    }
+  }
+
   async function uninstall(): Promise<TrustResult> {
     try {
       await rm(manifestPath(), { force: true });
+      await removeCa();
+      installerCalled = false;
     } catch (error) {
       return {
         ok: false,
         state: "unsupported",
-        reasons: [codeOf(error, "trust.write-failed")],
+        reasons: [error instanceof Error ? error.message : String(error)],
       };
     }
     return { ok: true, state: "uninstalled" };
@@ -373,25 +385,6 @@ export function createRequestBodyTrustController(
       };
     }
     return { ok: true, state: "trusted" };
-  }
-
-  async function untrust(): Promise<TrustResult> {
-    try {
-      if ((await existsFile(caKeyFile)) && caTrustRemover) {
-        await caTrustRemover();
-      }
-      await rm(caKeyFile, { force: true });
-      await rm(caPubFile, { force: true });
-      await rm(caCertFile, { force: true });
-      installerCalled = false;
-    } catch (error) {
-      return {
-        ok: false,
-        state: "unsupported",
-        reasons: [codeOf(error, "trust.internal")],
-      };
-    }
-    return { ok: true, state: "untrusted" };
   }
 
   async function status(): Promise<TrustStatus> {
@@ -414,5 +407,5 @@ export function createRequestBodyTrustController(
     };
   }
 
-  return { install, uninstall, untrust, status };
+  return { install, uninstall, status };
 }

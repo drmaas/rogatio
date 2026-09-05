@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -141,20 +141,27 @@ describe(" trust controller lifecycle", () => {
   });
 
   it("uninstall is a no-op when absent and removes the manifest otherwise", async () => {
+    const remover = vi.fn(async () => {});
     const controller = createRequestBodyTrustController({
       installRoot: root,
       manifestDir: root,
       hostPath: join(root, "runtime-host"),
       detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+      caTrustRemover: remover,
     });
     const noop = await controller.uninstall();
     expect(noop.ok).toBe(true);
     expect(noop.state).toBe("uninstalled");
+    expect(remover).not.toHaveBeenCalled();
     await controller.install("abcdefghijklmnopabcdefghijklmnop");
     expect((await controller.status()).installed).toBe(true);
+    expect((await controller.status()).trusted).toBe(true);
     const removed = await controller.uninstall();
     expect(removed.ok).toBe(true);
+    expect(remover).toHaveBeenCalledTimes(1);
     expect((await controller.status()).installed).toBe(false);
+    expect((await controller.status()).trusted).toBe(false);
   });
 
   it("install provisions the confined CA and invokes the installer once (idempotent)", async () => {
@@ -178,26 +185,6 @@ describe(" trust controller lifecycle", () => {
     expect(second.ok).toBe(true);
     expect(installer).toHaveBeenCalledTimes(1); // idempotent
     expect((await controller.status()).trusted).toBe(true);
-  });
-
-  it("untrust removes the CA material and is a no-op when absent", async () => {
-    const remover = vi.fn(async () => {});
-    const controller = createRequestBodyTrustController({
-      installRoot: root,
-      manifestDir: root,
-      hostPath: join(root, "runtime-host"),
-      detectCapabilities: capable,
-      caTrustInstaller: async () => {},
-      caTrustRemover: remover,
-    });
-    const noop = await controller.untrust();
-    expect(noop.ok).toBe(true);
-    expect(remover).not.toHaveBeenCalled();
-    await controller.install("abcdefghijklmnopabcdefghijklmnop");
-    expect((await controller.status()).trusted).toBe(true);
-    await controller.untrust();
-    expect(remover).toHaveBeenCalledTimes(1);
-    expect((await controller.status()).trusted).toBe(false);
   });
 
   it("status leaks no manifest path, host path, or CA material", async () => {
@@ -333,6 +320,144 @@ describe(" trust controller lifecycle", () => {
     expect(status.installed).toBe(true);
     expect(status.trusted).toBe(true);
   });
+
+  it("unified uninstall: removes manifest + CA files + invokes remover (AC-1)", async () => {
+    const remover = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+      caTrustRemover: remover,
+    });
+    const installed = await controller.install(
+      "abcdefghijklmnopabcdefghijklmnop",
+    );
+    expect(installed.ok).toBe(true);
+    expect(installed.state).toBe("installed");
+    expect(await fileExists(join(root, "com.rogatio.runtime.json"))).toBe(true);
+    expect(await fileExists(join(root, ".rogatio-ca.key"))).toBe(true);
+    expect(await fileExists(join(root, ".rogatio-ca.pub"))).toBe(true);
+    expect(await fileExists(join(root, ".rogatio-ca.crt"))).toBe(true);
+
+    const removed = await controller.uninstall();
+    expect(removed.ok).toBe(true);
+    expect(removed.state).toBe("uninstalled");
+    expect(remover).toHaveBeenCalledTimes(1);
+    expect(await fileExists(join(root, "com.rogatio.runtime.json"))).toBe(
+      false,
+    );
+    expect(await fileExists(join(root, ".rogatio-ca.key"))).toBe(false);
+    expect(await fileExists(join(root, ".rogatio-ca.pub"))).toBe(false);
+    expect(await fileExists(join(root, ".rogatio-ca.crt"))).toBe(false);
+
+    const status = await controller.status();
+    expect(status.installed).toBe(false);
+    expect(status.trusted).toBe(false);
+  });
+
+  it("unified uninstall: idempotent re-call is a no-op (AC-2)", async () => {
+    const remover = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+      caTrustRemover: remover,
+    });
+    await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    const first = await controller.uninstall();
+    expect(first.ok).toBe(true);
+    expect(first.state).toBe("uninstalled");
+    expect(remover).toHaveBeenCalledTimes(1);
+
+    const second = await controller.uninstall();
+    expect(second.ok).toBe(true);
+    expect(second.state).toBe("uninstalled");
+    expect(remover).toHaveBeenCalledTimes(1);
+    expect(await fileExists(join(root, "com.rogatio.runtime.json"))).toBe(
+      false,
+    );
+    expect(await fileExists(join(root, ".rogatio-ca.key"))).toBe(false);
+  });
+
+  it("unified uninstall: succeeds without capability gating (AC-3)", async () => {
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: () => ({
+        manifest: false,
+        caTrust: false,
+        reasons: ["no-capability-provider"],
+      }),
+    });
+    const result = await controller.uninstall();
+    expect(result.ok).toBe(true);
+    expect(result.state).toBe("uninstalled");
+    expect(await fileExists(join(root, "com.rogatio.runtime.json"))).toBe(
+      false,
+    );
+  });
+
+  it("unified uninstall: caTrustRemover throw removes files and surfaces unsupported (AC-4)", async () => {
+    const remover = vi.fn(() => {
+      throw new Error("remover-failure-observed");
+    });
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+      caTrustRemover: remover,
+    });
+    await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(await fileExists(join(root, "com.rogatio.runtime.json"))).toBe(true);
+    expect(await fileExists(join(root, ".rogatio-ca.key"))).toBe(true);
+
+    const result = await controller.uninstall();
+    expect(result.ok).toBe(false);
+    expect(result.state).toBe("unsupported");
+    expect(result.reasons).toContain("remover-failure-observed");
+    expect(await fileExists(join(root, "com.rogatio.runtime.json"))).toBe(
+      false,
+    );
+    expect(await fileExists(join(root, ".rogatio-ca.key"))).toBe(false);
+    expect(await fileExists(join(root, ".rogatio-ca.pub"))).toBe(false);
+    expect(await fileExists(join(root, ".rogatio-ca.crt"))).toBe(false);
+  });
+
+  it("unified uninstall: status non-leakage + public surface narrowing (AC-5)", async () => {
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+    });
+    await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    const uninstalled = await controller.uninstall();
+    expect(uninstalled.ok).toBe(true);
+
+    const status = await controller.status();
+    const serialized = JSON.stringify(status);
+    expect(serialized).not.toContain(join(root, "runtime-host"));
+    expect(serialized).not.toContain(join(root, "com.rogatio.runtime.json"));
+    expect(serialized).not.toContain(root);
+    expect(serialized).not.toContain(".rogatio-ca.key");
+    expect(serialized).not.toContain(".rogatio-ca.pub");
+    expect(serialized).not.toContain(".rogatio-ca.crt");
+    expect(status.installed).toBe(false);
+    expect(status.trusted).toBe(false);
+
+    expect(controller).not.toHaveProperty("untrust");
+    expect(Object.keys(controller).sort()).toEqual(
+      ["install", "status", "uninstall"].sort(),
+    );
+  });
 });
 
 describe(" scope and limits", () => {
@@ -364,3 +489,12 @@ describe(" scope and limits", () => {
     expect(defaultTrustInstallRoot("linux")).toContain("rogatio");
   });
 });
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}

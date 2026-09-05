@@ -39,6 +39,9 @@
   - all mutating ops capability-gated; unsupported → stable result, no throw (REQ-015).
 - Covers REQ-009..015, REQ-018/019/020, AC-004..007.
 
+> Superseded by: feat/collapse-runtime-install-and-trust
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
+
 ### T5 — Runtime package export (`packages/runtime/src/index.ts`)
 - Export `f16-trust.js` symbols. No change to F14 exports.
 
@@ -50,6 +53,7 @@
   malformed args exit 2 (AC-008). Covers REQ-004, AC-008.
 
 > Superseded by: feat/collapse-runtime-install-and-trust
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 
 ### T7 — Tests (`packages/runtime/test/f16-trust.test.ts`, `packages/cli/test/...`)
 - Unit: manifest shape/determinism/confinement/origin validation (AC-001/002).
@@ -81,3 +85,4 @@
 - No schema/compiler change; reversible by removing the module export and CLI routing.
 
 > Superseded by: feat/collapse-runtime-install-and-trust
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust

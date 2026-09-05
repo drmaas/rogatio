@@ -59,6 +59,8 @@ Files: `packages/runtime/src/lifecycle.ts`, `packages/runtime/src/interception.t
   logic (migrate from deleted `server.ts`).
 - `startInterception` / `revalidateAuthority`: keep; apply to all transforms uniformly.
 - `trust.ts`: keep CA install/uninstall/trust/untrust/status; manifest stays `v1`.
+
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 Tests: `lifecycle.test.ts` (unit) — start with no adapter reports `running`, not `unsupported`;
   pair→authorize→mock.connect→mock.request→mock.response path; revalidation denies invalid.
 AC: REQ-001, REQ-004, REQ-006, REQ-009, REQ-010, AC-001, AC-002, AC-003, AC-004, AC-007.

@@ -19,7 +19,7 @@ describe("rogatio runtime command", () => {
     expect(log.mock.calls.join("\n")).toContain("rogatio runtime");
   });
 
-  it("help text does not advertise the removed activate/deactivate/status/trust subcommands", async () => {
+  it("help text does not advertise the removed activate/deactivate/status/trust/untrust subcommands", async () => {
     silence();
     const log = vi.spyOn(console, "log");
     await runtimeCommand(["--help"]);
@@ -28,6 +28,7 @@ describe("rogatio runtime command", () => {
     expect(output).not.toMatch(/deactivate/);
     expect(output).not.toMatch(/status/);
     expect(output).not.toMatch(/^ {2}trust\b/m);
+    expect(output).not.toMatch(/^ {2}untrust\b/m);
   });
 
   it("rejects activate with exit code 2", async () => {
@@ -57,6 +58,16 @@ describe("rogatio runtime command", () => {
     expect(err.mock.calls.join("\n")).toContain(
       "unknown runtime subcommand: trust",
     );
+    expect(log.mock.calls.join("\n")).toContain("rogatio runtime");
+  });
+
+  it("rejects untrust with exit code 2 and prints the help text", async () => {
+    silence();
+    const log = vi.spyOn(console, "log");
+    const err = vi.spyOn(console, "error");
+    const code = await runtimeCommand(["untrust"]);
+    expect(code).toBe(2);
+    expect(err.mock.calls.join("\n")).toContain("rogatio runtime");
     expect(log.mock.calls.join("\n")).toContain("rogatio runtime");
   });
 

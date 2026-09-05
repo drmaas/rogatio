@@ -118,6 +118,8 @@ The extension service-worker (`service-worker.ts`) removes separate `MockRuntime
 ### REQ-009 — Native messaging manifest and CA trust preserved
 `packages/runtime/src/trust.ts`: `createRequestBodyTrustController`, `generateNativeMessagingManifest` preserved (adapted for unconditional activation). Device-local CA install/uninstall/trust/untrust/status continues to work; no `unsupported` state from adapter absence.
 
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
+
 ### REQ-010 — Authority revalidation preserved and unified
 `packages/runtime/src/interception.ts`: `revalidateAuthority` applies to all transforms (mock, body, header, redirect, query). No separate authorization mechanism for mock vs body vs header.
 

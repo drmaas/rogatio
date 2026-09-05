@@ -94,6 +94,8 @@ Files:
 
 - `README.md:128` — drop the `runtime <activate|deactivate|status>` row;
   keep `install|trust|untrust|uninstall` and `host`
+
+> Superseded by: feat/collapse-runtime-uninstall-and-untrust
 - `README.md:156-181` (Mock rules section) — remove
   `rogatio runtime activate` / `deactivate`; reword to "Start the runtime
   from the extension's Start/Stop controls"
