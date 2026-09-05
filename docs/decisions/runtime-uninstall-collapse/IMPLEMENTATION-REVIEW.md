@@ -1,0 +1,11 @@
+# Implementation review
+
+> **Implementation review (2026-09-04, free tier `openrouter` primary `nemotron-3-ultra-free`, fallback `inkling-small:free`).** Verdict: **READY WITH MINOR FLAGS**. All 9 locked decisions are honored: `removeCa()` is closure-private (`trust.ts:352-360`); the unified `uninstall` calls it plus `rm(manifestPath())` (`trust.ts:362-375`); the factory return is exactly `{ install, uninstall, status }` (`trust.ts:410`); `untrust` is removed from the overload union, the switch, both `showRuntimeHelp` copies, the long-form error, AND the `first === "untrust"` routing clause (per locked decision R-3, intentionally asymmetric with PR #79's inert `trust` clause). `caTrustRemover` throw is best-effort: files removed first (`trust.ts:354-358`), then guarded remover call. The 18 frozen-doc footers across 8 files are present (line drift on `cli-activate-deactivate-removal.md` correctly handled — PR #79 footers at L46/L90 were skipped; untrust-enumerating body lines at L33 and L131 were footnoted). The 10 live-doc files describe the unified uninstall consistently; `AGENTS.md:26` honors the plan-review human-gate decision; `README.md:128` honors locked decision R-5a. The pre-existing `editor-asset-paths.test.ts` failure is documented in CHECKLIST §5.1 and passes in isolation once `dist/editor/` is built (the canonical `pnpm validate` includes the build step). All seven ACs are satisfied. No new exports, dependencies, packages, CLI flags, config options, or docs files were introduced.
+>
+> **Human-gate decision (2026-09-04):** "Fix all four." Implementation-review surfaced 4 minor items. All four were fixed in place:
+> 1. Added 2 missing frozen-doc footers (`docs/specs/f16-request-body-trust.md:60-61` CLI operator; `docs/specs/cli-activate-deactivate-removal.md:44` "We are not removing" line). Frozen-doc count: 18 → 20.
+> 2. Deleted the dead `untrust:` mock at `packages/cli/test/runtime-install-success.test.ts:13` (PR #79 leftover; not exercised).
+> 3. Renamed the `trust ${subcommand} failed:` literal at `packages/cli/src/commands/runtime.ts:131` to `runtime ${subcommand} failed:` to reflect that `trust` is no longer a CLI verb.
+> 4. Final `pnpm validate` re-run: green (80 files / 588 tests / 23 playwright passed / 3 skipped).
+>
+> The implementation is ready for commit.
