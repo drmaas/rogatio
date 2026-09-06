@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { accessSync, constants, mkdirSync, unlinkSync } from "node:fs";
+import { dirname } from "node:path";
 import { join as posixJoin } from "node:path/posix";
 import type { TrustCapabilities } from "../trust.js";
 import { TrustError } from "../trust.js";
@@ -35,8 +36,18 @@ const linuxAdapter: TrustPlatformAdapter = {
 
     try {
       accessSync(caDir, constants.W_OK);
-    } catch {
-      reasons.push("ca-store-unwritable");
+    } catch (err: unknown) {
+      // Directory doesn't exist yet — check if the parent is writable
+      // so mkdirSync({ recursive: true }) in the installer can create it.
+      if ((err as NodeJS.ErrnoException)?.code === "ENOENT") {
+        try {
+          accessSync(dirname(caDir), constants.W_OK);
+        } catch {
+          reasons.push("ca-store-unwritable");
+        }
+      } else {
+        reasons.push("ca-store-unwritable");
+      }
     }
 
     const manifest =

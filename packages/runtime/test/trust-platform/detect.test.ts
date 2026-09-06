@@ -131,9 +131,47 @@ describe("TrustPlatformAdapter detect()", () => {
       expect(result.reasons).toContain("manifest-dir-unwritable");
     });
 
-    it("returns ca-store-unwritable when ca dir not writable", () => {
+    it("returns ca-store-unwritable when ca dir exists but not writable", () => {
       mockAccessSync.mockImplementation((path) => {
-        if (String(path).includes("ca-certificates")) throw new Error("EACCES");
+        const p = String(path);
+        if (p === "/home/test/.local/share/ca-certificates")
+          throw new Error("EACCES");
+      });
+
+      const adapter = selectTrustPlatformAdapter("linux");
+      const result = adapter.detect();
+
+      expect(result.manifest).toBe(true);
+      expect(result.caTrust).toBe(false);
+      expect(result.reasons).toContain("ca-store-unwritable");
+    });
+
+    it("does not report ca-store-unwritable when ca dir missing but parent writable", () => {
+      mockAccessSync.mockImplementation((path) => {
+        const p = String(path);
+        if (p === "/home/test/.local/share/ca-certificates") {
+          const err = new Error("ENOENT") as NodeJS.ErrnoException;
+          err.code = "ENOENT";
+          throw err;
+        }
+      });
+
+      const adapter = selectTrustPlatformAdapter("linux");
+      const result = adapter.detect();
+
+      expect(result.manifest).toBe(true);
+      expect(result.caTrust).toBe(true);
+      expect(result.reasons).not.toContain("ca-store-unwritable");
+    });
+
+    it("returns ca-store-unwritable when neither ca dir nor parent writable", () => {
+      mockAccessSync.mockImplementation((path) => {
+        const p = String(path);
+        if (
+          p === "/home/test/.local/share/ca-certificates" ||
+          p === "/home/test/.local/share"
+        )
+          throw new Error("EACCES");
       });
 
       const adapter = selectTrustPlatformAdapter("linux");
