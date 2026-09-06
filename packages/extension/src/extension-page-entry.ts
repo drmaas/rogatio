@@ -6,7 +6,7 @@ import {
   type EditorController,
 } from "@rogatio/editor";
 import { validateProjectDetailed } from "./browser-schema.js";
-import { checkAISupport } from "./native-session.js";
+import { checkAISupport, type NativeSessionOptions } from "./native-session.js";
 
 interface StoredProject {
   readonly id: string;
@@ -884,7 +884,52 @@ async function copyText(value: string): Promise<boolean> {
 
 async function checkNativeAISupport(): Promise<void> {
   try {
-    const supported = await checkAISupport(client);
+    const adapter: NativeSessionOptions = {
+      extensionId: extensionId(),
+      nativeRuntime: {
+        start: async () => ({
+          state: "unsupported",
+          message: "not implemented",
+        }),
+        stop: async () => ({ state: "stopped" }),
+        status: async () => ({ state: "stopped" }),
+        sendPolicy: async () => {},
+        send: async (envelope) => {
+          return new Promise((resolve) => {
+            chrome.runtime.sendMessage(envelope, (response: unknown) => {
+              const error = chrome.runtime.lastError;
+              if (error) {
+                resolve({
+                  protocol: "v1",
+                  type: "ai.error",
+                  timestamp: Date.now(),
+                  metadata: {
+                    code: "extension.message-failed",
+                    message: error.message,
+                    retryable: false,
+                  },
+                } as any);
+              } else {
+                resolve(response as any);
+              }
+            });
+          });
+        },
+      },
+      getProject: async () => {
+        if (!state.activeProjectId) return null;
+        const project = state.projects[state.activeProjectId];
+        if (!project) return null;
+        return { data: project.data, enabledGroupIds: project.enabledGroupIds };
+      },
+      getGrantedOrigins: async () => {
+        const projectId = state.activeProjectId;
+        return projectId
+          ? (state.projects[projectId]?.grantedOrigins ?? [])
+          : [];
+      },
+    };
+    const supported = await checkAISupport(adapter);
     aiSupported = supported;
     aiStatusChecked = true;
     renderShell();

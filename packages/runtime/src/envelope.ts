@@ -26,6 +26,9 @@ const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "mock.connect",
   "mock.request",
   "mock.response",
+  "ai.complete",
+  "ai.stream.chunk",
+  "ai.error",
 ]);
 
 export class EnvelopeError extends Error {
