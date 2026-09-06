@@ -18,7 +18,9 @@
     "build": "node ../../scripts/build.ts"
   },
   "dependencies": {
+    "@peculiar/x509": "^2.1.0",
     "@rogatio/compiler": "workspace:*",
-    "@rogatio/schema": "workspace:*"
+    "@rogatio/schema": "workspace:*",
+    "reflect-metadata": "^0.2.2"
   }
 }

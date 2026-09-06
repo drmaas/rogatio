@@ -8,6 +8,7 @@ import {
   RUNTIME_LIMITS,
   type RuntimeMockConfig,
   runNativeHost,
+  selectTrustPlatformAdapter,
 } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { readProject } from "../utils/file.js";
@@ -102,6 +103,7 @@ function buildMockConfigs(
 
 function makeTrustController() {
   const platform = process.platform;
+  const adapter = selectTrustPlatformAdapter(platform);
   const installRoot = defaultTrustInstallRoot(platform);
   return createRequestBodyTrustController({
     platform,
@@ -109,6 +111,10 @@ function makeTrustController() {
     hostPath: join(installRoot, "runtime-host"),
     hostName: "com.rogatio.runtime",
     allowedOrigins: [],
+    manifestDir: adapter.defaultManifestDir(),
+    detectCapabilities: () => adapter.detect(),
+    caTrustInstaller: (cert) => adapter.caTrustInstaller(cert),
+    caTrustRemover: () => adapter.caTrustRemover(),
   });
 }
 
@@ -122,9 +128,30 @@ function reportTrust(
     return 0;
   }
   if (result.state === "unsupported") {
-    console.error(
-      `trust unsupported: ${(result.reasons ?? ["unknown"]).join(", ")}`,
-    );
+    const reasons = result.reasons ?? ["unknown"];
+    console.error(`trust unsupported: ${reasons.join(", ")}`);
+
+    // Platform-specific remediation hints
+    const hints: Record<string, string> = {
+      "tooling-missing":
+        "Hint: install required tooling (macOS: security; Linux: update-ca-certificates; Windows: certutil is built-in)",
+      "manifest-dir-unwritable":
+        "Hint: check permissions on Chrome NativeMessagingHosts directory or run with appropriate access",
+      "keychain-unwritable":
+        "Hint: macOS login keychain not writable; try running with appropriate keychain access or use sudo for system keychain (future slice)",
+      "ca-store-unwritable":
+        "Hint: ~/.local/share/ca-certificates not writable; check permissions",
+      "elevation-required":
+        "Hint: Windows system certificate store requires Administrator; re-run in elevated terminal (future slice)",
+    };
+
+    for (const reason of reasons) {
+      const hint = hints[reason];
+      if (hint) {
+        console.error(hint);
+      }
+    }
+
     return 0;
   }
   console.error(
