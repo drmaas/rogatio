@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { accessSync, constants, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { join as posixJoin } from "node:path/posix";
 import type { TrustCapabilities } from "../trust.js";
 import { TrustError } from "../trust.js";
 import type { TrustPlatformAdapter } from "./types.js";
@@ -10,7 +11,7 @@ const win32Adapter: TrustPlatformAdapter = {
   platform: "win32",
   defaultManifestDir: () => {
     const appdata = process.env.APPDATA ?? "";
-    return join(appdata, "Google", "Chrome", "NativeMessagingHosts");
+    return posixJoin(appdata, "Google", "Chrome", "NativeMessagingHosts");
   },
   defaultCaInstallPath: () => {
     return "Cert:\\CurrentUser\\Root";

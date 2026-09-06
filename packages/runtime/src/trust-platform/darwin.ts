@@ -2,6 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { accessSync, constants, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { join as posixJoin } from "node:path/posix";
 import type { TrustCapabilities } from "../trust.js";
 import { TrustError } from "../trust.js";
 import type { TrustPlatformAdapter } from "./types.js";
@@ -10,14 +11,14 @@ const darwinAdapter: TrustPlatformAdapter = {
   platform: "darwin",
   defaultManifestDir: () => {
     const home = process.env.HOME ?? "";
-    return join(
+    return posixJoin(
       home,
       "Library/Application Support/Google/Chrome/NativeMessagingHosts",
     );
   },
   defaultCaInstallPath: () => {
     const home = process.env.HOME ?? "";
-    return join(home, "Library/Keychains/login.keychain-db");
+    return posixJoin(home, "Library/Keychains/login.keychain-db");
   },
   detect(): TrustCapabilities {
     const reasons: string[] = [];

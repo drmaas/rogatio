@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { accessSync, constants, mkdirSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { join as posixJoin } from "node:path/posix";
 import type { TrustCapabilities } from "../trust.js";
 import { TrustError } from "../trust.js";
 import type { TrustPlatformAdapter } from "./types.js";
@@ -9,11 +9,11 @@ const linuxAdapter: TrustPlatformAdapter = {
   platform: "linux",
   defaultManifestDir: () => {
     const home = process.env.HOME ?? "";
-    return join(home, ".config/google-chrome/NativeMessagingHosts");
+    return posixJoin(home, ".config/google-chrome/NativeMessagingHosts");
   },
   defaultCaInstallPath: () => {
     const home = process.env.HOME ?? "";
-    return join(home, ".local/share/ca-certificates");
+    return posixJoin(home, ".local/share/ca-certificates");
   },
   detect(): TrustCapabilities {
     const reasons: string[] = [];
@@ -54,7 +54,7 @@ const linuxAdapter: TrustPlatformAdapter = {
   },
   async caTrustInstaller(certPem: string): Promise<void> {
     const caDir = this.defaultCaInstallPath();
-    const certPath = join(caDir, "rogatio-ca.crt");
+    const certPath = posixJoin(caDir, "rogatio-ca.crt");
 
     try {
       mkdirSync(caDir, { recursive: true });
@@ -104,7 +104,7 @@ const linuxAdapter: TrustPlatformAdapter = {
   },
   async caTrustRemover(): Promise<void> {
     const caDir = this.defaultCaInstallPath();
-    const certPath = join(caDir, "rogatio-ca.crt");
+    const certPath = posixJoin(caDir, "rogatio-ca.crt");
 
     try {
       unlinkSync(certPath);
