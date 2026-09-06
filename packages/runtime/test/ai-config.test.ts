@@ -39,6 +39,23 @@ describe("ai-config", () => {
   });
 
   describe("getProviderConfigPath", () => {
+    let originalPlatform: string;
+
+    beforeEach(() => {
+      originalPlatform = process.platform;
+      Object.defineProperty(process, "platform", {
+        value: "linux",
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process, "platform", {
+        value: originalPlatform,
+        configurable: true,
+      });
+    });
+
     it("returns Linux path with XDG_CONFIG_HOME", () => {
       process.env.XDG_CONFIG_HOME = path.join(testConfigDir, "xdg");
       process.env.HOME = "/home/user";
@@ -152,6 +169,7 @@ describe("ai-config", () => {
 
   describe("writeProviderConfig / readProviderConfig / deleteProviderConfig", () => {
     let configPath: string;
+    let originalPlatform: string;
 
     beforeEach(() => {
       // Use test directory for config
@@ -160,12 +178,17 @@ describe("ai-config", () => {
       delete process.env.USERPROFILE;
       delete process.env.LOCALAPPDATA;
 
-      const originalPlatform = process.platform;
+      // Mock platform as linux for these tests
+      originalPlatform = process.platform;
       Object.defineProperty(process, "platform", {
         value: "linux",
         configurable: true,
       });
       configPath = getProviderConfigPath();
+    });
+
+    afterEach(() => {
+      // Restore platform
       Object.defineProperty(process, "platform", {
         value: originalPlatform,
         configurable: true,
