@@ -39,6 +39,7 @@ rogatio <command> [options]
 | `rogatio edit [path]` | Launch the browser editor for `.rogatio.json`. |
 | `rogatio verify [path]` | Validate a `.rogatio.json` file (schema + compiler). |
 | `rogatio test [path] [url...]` | Run offline dry-run tests against `.rogatio.json`. |
+| `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
 | `rogatio runtime <install\|uninstall>` | Register the native-messaging host (and, on capable platforms, the device-local CA) in one transactional install; `uninstall` removes the host manifest, the device-local CA files, and the CA trust installation (idempotent). |
 | `rogatio runtime host <path>` | Run the consolidated native-messaging host for the project (mock/pair/authorize over stdio). Normally launched by the browser; run manually only for debugging. |
 
@@ -66,6 +67,26 @@ rogatio runtime host .rogatio.json
 - `0` — success
 - `1` — invalid project (diagnostics present) or test/validation errors
 - `2` — usage or IO error
+
+## AI-Assisted Rule Authoring
+
+```sh
+# Configure AI provider (interactive)
+rogatio ai setup
+
+# List/show/test/delete AI configuration
+rogatio ai ls
+rogatio ai show
+rogatio ai test
+rogatio ai delete
+```
+
+Configuration is stored at `~/.config/rogatio/provider.json` (Linux), `~/Library/Application Support/rogatio/provider.json` (macOS), or `%LOCALAPPDATA%\rogatio\provider.json` (Windows) with `600` permissions.
+
+When AI is configured, `rogatio edit` shows an **AI Assist** button in the command bar. Click it to:
+- Generate rules from natural language
+- Fix validation errors (max 3 auto-fix iterations)
+- Fix dry-run mismatches
 
 ## Related
 

@@ -9,6 +9,11 @@ export {
 } from "./rule-types/index.js";
 export { createRedirectRuleType } from "./rule-types/redirect.js";
 export type {
+  AIAssistChunk,
+  AIAssistRequest,
+  AIAssistResponse,
+  AIProposal,
+  EditorAIAssistHandler,
   EditorController,
   EditorDiagnostic,
   EditorOptions,
@@ -17,6 +22,7 @@ export type {
   EditorSaveResult,
   EditorValidator,
   ResourceType,
+  RuleProposal,
   RuleTypeFieldContext,
   RuleTypeFieldExtension,
   RuleTypeFieldMount,

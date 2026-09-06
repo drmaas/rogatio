@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { createAIClient, readProviderConfig } from "@rogatio/runtime";
 import { createServer } from "../server/http.js";
 import {
   createRoutes,
@@ -106,6 +107,13 @@ Options:
     }
   }
 
+  // Read AI provider config
+  let aiClient: ReturnType<typeof createAIClient> | undefined;
+  const providerConfig = await readProviderConfig();
+  if (providerConfig) {
+    aiClient = createAIClient(providerConfig);
+  }
+
   // Generate CSRF token
   const csrfToken = generateCsrfToken();
 
@@ -121,6 +129,7 @@ Options:
     editorBundlePath: "",
     editorCssPath: "",
     editorFontsPath: "",
+    aiClient,
   };
 
   // Create and start server (optionally on a fixed port)
@@ -147,7 +156,12 @@ Options:
     fonts: editorFontsPath,
   } = editorAssetPaths();
 
-  context.editorHtml = generateEditorHtml(serverUrl, csrfToken, filePath);
+  context.editorHtml = generateEditorHtml(
+    serverUrl,
+    csrfToken,
+    filePath,
+    !!aiClient,
+  );
   context.editorBundlePath = editorBundlePath;
   context.editorCssPath = editorCssPath;
   context.editorFontsPath = editorFontsPath;
@@ -203,7 +217,71 @@ function generateEditorHtml(
   apiBase: string,
   csrfToken: string,
   filePath: string,
+  aiConfigured: boolean,
 ): string {
+  const aiAssistHandler = aiConfigured
+    ? `
+    aiAssist: async function*(request) {
+      const res = await fetch(apiBase + '/api/ai/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken,
+        },
+        body: JSON.stringify({
+          messages: request.context.project ? [
+            { role: 'system', content: 'You are an expert Rogatio rule author.' },
+            { role: 'user', content: request.prompt }
+          ] : [{ role: 'user', content: request.prompt }],
+          model: 'gpt-4o-mini',
+          stream: true,
+        }),
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        yield { type: 'error', error: error.message };
+        return;
+      }
+      
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) {
+        yield { type: 'error', error: 'No response body' };
+        return;
+      }
+      
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.type === 'token' && parsed.content) {
+              yield { type: 'token', content: parsed.content };
+            } else if (parsed.done) {
+              yield { type: 'done', proposal: parsed.proposal };
+              return;
+            } else if (parsed.error) {
+              yield { type: 'error', error: parsed.error };
+              return;
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+      yield { type: 'done', proposal: null };
+    },`
+    : "";
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -309,6 +387,7 @@ function generateEditorHtml(
       onCancel: () => {
         cancel();
       },
+      ${aiAssistHandler}
     });
   </script>
 </body>

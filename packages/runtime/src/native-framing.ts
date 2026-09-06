@@ -14,6 +14,9 @@ export enum NativeFrameType {
   RuntimeStop = "runtime.stop",
   RuntimeStatus = "runtime.status",
   RequestPrepare = "request.prepare",
+  AIComplete = "ai.complete",
+  AIStreamChunk = "ai.stream.chunk",
+  AIError = "ai.error",
 }
 
 export interface NativeFrame {
@@ -26,6 +29,75 @@ export interface NativeFrame {
   readonly partCount?: number;
   readonly index?: number;
   readonly data?: string;
+}
+
+export interface AICompleteRequest {
+  readonly protocol: "v1";
+  readonly type: NativeFrameType.AIComplete;
+  readonly requestId: string;
+  readonly extensionId?: string;
+  readonly metadata: {
+    readonly messages: readonly {
+      readonly role: "system" | "user" | "assistant" | "tool";
+      readonly content: string;
+    }[];
+    readonly model: string;
+    readonly temperature?: number;
+    readonly responseFormat?: { readonly type: "json_object" };
+  };
+}
+
+export interface AIStreamChunkRequest {
+  readonly protocol: "v1";
+  readonly type: NativeFrameType.AIStreamChunk;
+  readonly requestId: string;
+  readonly extensionId?: string;
+  readonly metadata: {
+    readonly messages: readonly {
+      readonly role: "system" | "user" | "assistant" | "tool";
+      readonly content: string;
+    }[];
+    readonly model: string;
+    readonly temperature?: number;
+  };
+}
+
+export interface AICompleteResponse {
+  readonly protocol: "v1";
+  readonly type: NativeFrameType.AIComplete;
+  readonly requestId: string;
+  readonly metadata: {
+    readonly content: string;
+    readonly usage?: {
+      readonly promptTokens: number;
+      readonly completionTokens: number;
+    };
+  };
+}
+
+export interface AIStreamChunkResponse {
+  readonly protocol: "v1";
+  readonly type: NativeFrameType.AIStreamChunk;
+  readonly requestId: string;
+  readonly metadata: {
+    readonly delta: string;
+    readonly done: boolean;
+    readonly usage?: {
+      readonly promptTokens: number;
+      readonly completionTokens: number;
+    };
+  };
+}
+
+export interface AIErrorResponse {
+  readonly protocol: "v1";
+  readonly type: NativeFrameType.AIError;
+  readonly requestId: string;
+  readonly metadata: {
+    readonly code: string;
+    readonly message: string;
+    readonly retryable: boolean;
+  };
 }
 
 export function encodeNativeFrame(frame: NativeFrame): Uint8Array {

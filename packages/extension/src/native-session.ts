@@ -16,6 +16,74 @@ export interface NativeEnvelopeInput {
 
 export type NativeEnvelope = NativeEnvelopeInput;
 
+// AI envelope types
+export interface AICompleteRequest {
+  readonly protocol: "v1";
+  readonly type: "ai.complete";
+  readonly requestId: string;
+  readonly metadata: {
+    readonly messages: readonly {
+      readonly role: "system" | "user" | "assistant" | "tool";
+      readonly content: string;
+    }[];
+    readonly model: string;
+    readonly temperature?: number;
+    readonly responseFormat?: { readonly type: "json_object" };
+  };
+}
+
+export interface AIStreamChunkRequest {
+  readonly protocol: "v1";
+  readonly type: "ai.stream.chunk";
+  readonly requestId: string;
+  readonly metadata: {
+    readonly messages: readonly {
+      readonly role: "system" | "user" | "assistant" | "tool";
+      readonly content: string;
+    }[];
+    readonly model: string;
+    readonly temperature?: number;
+  };
+}
+
+export interface AICompleteResponse {
+  readonly protocol: "v1";
+  readonly type: "ai.complete";
+  readonly requestId: string;
+  readonly metadata: {
+    readonly content: string;
+    readonly usage?: {
+      readonly promptTokens: number;
+      readonly completionTokens: number;
+    };
+  };
+}
+
+export interface AIStreamChunkResponse {
+  readonly protocol: "v1";
+  readonly type: "ai.stream.chunk";
+  readonly requestId: string;
+  readonly metadata: {
+    readonly delta: string;
+    readonly done: boolean;
+    readonly usage?: {
+      readonly promptTokens: number;
+      readonly completionTokens: number;
+    };
+  };
+}
+
+export interface AIErrorResponse {
+  readonly protocol: "v1";
+  readonly type: "ai.error";
+  readonly requestId: string;
+  readonly metadata: {
+    readonly code: string;
+    readonly message: string;
+    readonly retryable: boolean;
+  };
+}
+
 async function createHash(
   algorithm: string,
   data: Uint8Array,
@@ -232,6 +300,102 @@ export async function requestNativeMock(
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Send an AI completion request to the native host.
+ * Returns the complete response or null on error.
+ */
+export async function requestAIComplete(
+  options: NativeSessionOptions,
+  messages: readonly {
+    role: "system" | "user" | "assistant" | "tool";
+    content: string;
+  }[],
+  model: string,
+  temperature?: number,
+  responseFormat?: { type: "json_object" },
+): Promise<AICompleteResponse | null> {
+  const send = options.nativeRuntime.send;
+  if (!send) return null;
+  try {
+    const requestId = crypto.randomUUID();
+    const response = await send({
+      protocol: "v1",
+      type: "ai.complete",
+      requestId,
+      timestamp: Date.now(),
+      metadata: { messages, model, temperature, responseFormat },
+    });
+    if (response.type !== "ai.complete") return null;
+    return response as AICompleteResponse;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stream AI completion from the native host.
+ * Yields each stream chunk as it arrives.
+ */
+export async function* requestAIStream(
+  options: NativeSessionOptions,
+  messages: readonly {
+    role: "system" | "user" | "assistant" | "tool";
+    content: string;
+  }[],
+  model: string,
+  temperature?: number,
+): AsyncIterable<AIStreamChunkResponse> {
+  const send = options.nativeRuntime.send;
+  if (!send) return;
+  const requestId = crypto.randomUUID();
+  try {
+    const response = await send({
+      protocol: "v1",
+      type: "ai.stream.chunk",
+      requestId,
+      timestamp: Date.now(),
+      metadata: { messages, model, temperature },
+    });
+    if (response.type !== "ai.stream.chunk") return;
+    yield response as AIStreamChunkResponse;
+    if ((response.metadata as AIStreamChunkResponse["metadata"]).done) return;
+    // For subsequent chunks, we need to continue reading
+    // This is a simplified implementation; real streaming would need
+    // the native host to support continued streaming
+  } catch {
+    // Silently fail
+  }
+}
+
+/**
+ * Check if the native host supports AI (has send method and AI configured).
+ */
+export async function checkAISupport(
+  options: NativeSessionOptions,
+): Promise<boolean> {
+  const send = options.nativeRuntime.send;
+  if (!send) return false;
+  try {
+    const response = await send({
+      protocol: "v1",
+      type: "ai.complete",
+      requestId: crypto.randomUUID(),
+      timestamp: Date.now(),
+      metadata: {
+        messages: [{ role: "user", content: "ping" }],
+        model: "test",
+      },
+    });
+    return (
+      response.type !== "ai.error" ||
+      (response.metadata as AIErrorResponse["metadata"]).code !==
+        "ai.not-configured"
+    );
+  } catch {
+    return false;
   }
 }
 
