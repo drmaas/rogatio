@@ -1,3 +1,8 @@
+import {
+  type AIClient,
+  type AIProviderConfig,
+  createAIClient,
+} from "./ai-client.js";
 import { authorizeExact } from "./authorization.js";
 import {
   acquireOperation,
@@ -64,6 +69,8 @@ export interface NativeRuntimeControllerOptions {
   ) => void | Promise<void>;
   readonly onStop?: () => void | Promise<void>;
   readonly clock?: () => number;
+  /** Optional AI provider config for AI completions via native messaging. */
+  readonly aiProviderConfig?: AIProviderConfig;
 }
 
 export interface RuntimeStartResult {
@@ -125,6 +132,12 @@ export function createNativeRuntimeController(
   let activation: RuntimeActivation | undefined;
   let capability: CapabilityState | undefined;
   const mockTokens = new Map<string, RuntimeMockConfig>();
+
+  // Initialize AI client if config provided
+  let aiClient: AIClient | undefined;
+  if (options.aiProviderConfig) {
+    aiClient = createAIClient(options.aiProviderConfig);
+  }
 
   return {
     async start(sessionConfig?: SessionConfig): Promise<RuntimeStartResult> {
@@ -360,6 +373,129 @@ export function createNativeRuntimeController(
             timestamp,
             metadata: { state, presetDigest: preset.digest },
           };
+        }
+        case "ai.complete": {
+          if (!aiClient) {
+            return {
+              protocol: "v1",
+              type: "ai.error",
+              ...(requestId !== undefined ? { requestId } : {}),
+              timestamp,
+              metadata: {
+                code: "ai.not-configured",
+                message: "AI provider not configured",
+                retryable: false,
+              },
+            };
+          }
+          const meta = input.metadata as {
+            messages: readonly {
+              role: "system" | "user" | "assistant" | "tool";
+              content: string;
+            }[];
+            model: string;
+            temperature?: number;
+            responseFormat?: { type: "json_object" };
+          };
+          try {
+            const result = await aiClient.complete({
+              messages: meta.messages,
+              model: meta.model,
+              temperature: meta.temperature,
+              responseFormat: meta.responseFormat,
+            });
+            return {
+              protocol: "v1",
+              type: "ai.complete",
+              ...(requestId !== undefined ? { requestId } : {}),
+              timestamp,
+              metadata: {
+                content: result.content,
+                usage: result.usage,
+              },
+            };
+          } catch (e) {
+            return {
+              protocol: "v1",
+              type: "ai.error",
+              ...(requestId !== undefined ? { requestId } : {}),
+              timestamp,
+              metadata: {
+                code: "ai.error",
+                message:
+                  e instanceof Error ? e.message : "AI completion failed",
+                retryable: true,
+              },
+            };
+          }
+        }
+        case "ai.stream.chunk": {
+          if (!aiClient) {
+            return {
+              protocol: "v1",
+              type: "ai.error",
+              ...(requestId !== undefined ? { requestId } : {}),
+              timestamp,
+              metadata: {
+                code: "ai.not-configured",
+                message: "AI provider not configured",
+                retryable: false,
+              },
+            };
+          }
+          const meta = input.metadata as {
+            messages: readonly {
+              role: "system" | "user" | "assistant" | "tool";
+              content: string;
+            }[];
+            model: string;
+            temperature?: number;
+          };
+          try {
+            for await (const chunk of aiClient.stream({
+              messages: meta.messages,
+              model: meta.model,
+              temperature: meta.temperature,
+            })) {
+              // For streaming, we return each chunk as a separate envelope
+              // The caller (extension) will need to handle multiple envelopes
+              return {
+                protocol: "v1",
+                type: "ai.stream.chunk",
+                ...(requestId !== undefined ? { requestId } : {}),
+                timestamp,
+                metadata: {
+                  delta: chunk.delta,
+                  done: chunk.done,
+                  usage: chunk.usage,
+                },
+              };
+            }
+            // If stream ends without done=true, return final chunk
+            return {
+              protocol: "v1",
+              type: "ai.stream.chunk",
+              ...(requestId !== undefined ? { requestId } : {}),
+              timestamp,
+              metadata: {
+                delta: "",
+                done: true,
+                usage: undefined,
+              },
+            };
+          } catch (e) {
+            return {
+              protocol: "v1",
+              type: "ai.error",
+              ...(requestId !== undefined ? { requestId } : {}),
+              timestamp,
+              metadata: {
+                code: "ai.error",
+                message: e instanceof Error ? e.message : "AI streaming failed",
+                retryable: true,
+              },
+            };
+          }
         }
         default: {
           return {

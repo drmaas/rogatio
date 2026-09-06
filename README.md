@@ -125,24 +125,78 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port. |
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
+| `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
 | `rogatio runtime <install\|uninstall>` | Request-body trust lifecycle. `install` registers the native-messaging host manifest and (on capable platforms) provisions and trusts the device-local CA in a single, transactional call. `uninstall` removes the host manifest, the device-local CA files, and the trust installation (idempotent). The CA/trust provisioning remains capability-gated at the OS level and reports `unsupported` without error on incapable platforms. |
 | `rogatio runtime host <path>` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Mock delivery, pairing, and authorization all flow through this single host; no separate HTTP mock server exists. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome, grant only declared site access, and activate the groups you need.
 
-## Dry-run testing
+## AI-Assisted Rule Authoring
+
+Rogatio includes an AI assistant to help generate, fix, and explain rules. The AI runs locally on your machine using your configured provider (OpenAI, Ollama, OpenRouter, vLLM, or any OpenAI-compatible endpoint).
+
+### Setup
 
 ```sh
-# Test URLs against a project (human-readable output)
-rogatio test .rogatio.json --urls "https://example.com/,https://other.com/" --method GET --resource-type main_frame
+# Interactive configuration (prompts for provider URL, model, API key)
+rogatio ai setup
 
-# Test from JSON file with explicit cases
-rogatio test .rogatio.json --urls-file test-cases.json --json
+# List current configuration
+rogatio ai ls
 
-# Test from stdin
-cat test-cases.json | rogatio test .rogatio.json --urls-file -
+# Show configuration (API key redacted)
+rogatio ai show
+
+# Test connection to provider
+rogatio ai test
+
+# Remove configuration
+rogatio ai delete
 ```
+
+Configuration is stored at:
+- **Linux**: `~/.config/rogatio/provider.json`
+- **macOS**: `~/Library/Application Support/rogatio/provider.json`
+- **Windows**: `%LOCALAPPDATA%\rogatio\provider.json`
+
+The config file has `600` permissions (owner read/write only). The API key never appears in `.rogatio.json` or git history.
+
+### Using AI in the Editor
+
+1. Run `rogatio edit` to open the editor
+2. Click **AI Assist** in the command bar (or use the mobile nav)
+3. Type a natural language prompt like:
+   - "Create a redirect rule for api.example.com to mock.local"
+   - "Add a mock rule that returns 200 with {'status': 'ok'}"
+   - "Fix the invalid regex on rule xyz"
+4. AI streams the proposal token-by-token
+5. Click **Apply** to add the rule to your project, or **Reject** to discard
+
+### AI Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| **Generate** | Create new rules from natural language |
+| **Fix** | Automatically fix schema validation errors (max 3 iterations) |
+| **Fix dry-run** | Modify rules to match failing test cases |
+| **Explain** | Describe what a rule or project does |
+
+### In the Chrome Extension
+
+When the native runtime is started (`Start runtime`), the extension management page shows an **AI Status** indicator. AI Assist is available in the management page when the runtime is running.
+
+### Security & Privacy
+
+- **Zero telemetry** — No data sent to Rogatio servers
+- **Your provider, your data** — Requests go only to your configured AI endpoint
+- **API key isolation** — Stored in config file (600 perms), read only by `rogatio edit` and `rogatio runtime host`
+- **Validation gate** — All AI output passes through schema + compiler validation before being applied
+- **No browser direct calls** — AI runs in CLI server process or native host, not in browser
+
+### Provider Compatibility
+
+Tested with: OpenAI, Ollama, OpenRouter, vLLM. Any OpenAI-compatible chat completions endpoint works.
 
 ## Mock rules
 

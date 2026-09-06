@@ -2,6 +2,7 @@
 import { realpathSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { aiCommand } from "./commands/ai.js";
 import { editCommand } from "./commands/edit.js";
 import { runRuntimeHostEntry, runtimeCommand } from "./commands/runtime.js";
 import { testCommand, testCommandNeedsStdin } from "./commands/test.js";
@@ -39,6 +40,8 @@ export async function cli(
       return handleVerify(commandArgs);
     case "runtime":
       return handleRuntime(commandArgs);
+    case "ai":
+      return handleAI(commandArgs);
     case "--help":
     case "-h":
       return showHelp();
@@ -78,6 +81,14 @@ async function handleRuntime(args: string[]): Promise<number> {
   }
   const result = await runtimeCommand(args);
   return typeof result === "number" ? result : await result.exitCode;
+}
+
+async function handleAI(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    showAIHelp();
+    return 0;
+  }
+  return await aiCommand(args);
 }
 
 async function handleTest(args: string[]): Promise<number> {
@@ -209,8 +220,8 @@ Arguments:
 Options:
   --urls <list>        Comma-separated list of URLs to test
   --urls-file <path>   Path to JSON file containing array of test cases
-                       Each case: { "url": "...", "method"?: "...", "resourceType"?: "..." }
-                       Use '-' to read from stdin
+                        Each case: { "url": "...", "method"?: "...", "resourceType"?: "..." }
+                        Use '-' to read from stdin
   --method <m>         Default HTTP method for all test cases (GET, POST, etc.)
   --resource-type <t>  Default resource type for all test cases
   --max-cases <n>      Maximum number of test cases (default: 256)
@@ -227,6 +238,22 @@ Exit codes:
   0  Success (all valid, results may include non-matches)
   1  Validation/compile/test errors
   2  Usage error (invalid arguments, missing input)`);
+}
+
+function showAIHelp(): void {
+  console.log(`Usage: rogatio ai <command> [options]
+
+AI provider configuration commands.
+
+Commands:
+  setup      Interactively configure AI provider (URL, model, API key)
+  ls         List configured AI provider
+  show       Show current AI provider configuration (key redacted)
+  delete     Delete AI provider configuration
+  test       Test connection to AI provider
+
+Options:
+  --help, -h  Show this help`);
 }
 
 if (

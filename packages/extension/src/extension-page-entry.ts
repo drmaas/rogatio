@@ -6,6 +6,7 @@ import {
   type EditorController,
 } from "@rogatio/editor";
 import { validateProjectDetailed } from "./browser-schema.js";
+import { checkAISupport } from "./native-session.js";
 
 interface StoredProject {
   readonly id: string;
@@ -65,6 +66,9 @@ let statusMessage = "";
 let installCommand: string | null = null;
 let permissionOrigins: readonly string[] = [];
 let permissionGranted = false;
+/** AI support status from native host */
+let aiSupported = false;
+let aiStatusChecked = false;
 
 function safeProjectData(): unknown {
   if (!state.activeProjectId)
@@ -299,6 +303,21 @@ function renderSidebar(shell: HTMLElement): void {
   nativeRuntime.className = `rogatio-runtime-status ${runtimeStatusTone()}`;
   nativeRuntime.textContent = `Runtime status: ${runtimeStatusText()}`;
   sidebar.append(nativeRuntime);
+
+  // AI status - check if native host supports AI
+  const aiStatus = document.createElement("p");
+  aiStatus.dataset.aiStatus = "true";
+  aiStatus.className = "rogatio-ai-status";
+  if (aiSupported) {
+    aiStatus.textContent = "AI: Ready";
+    aiStatus.className += " rogatio-ai-ready";
+  } else if (aiStatusChecked) {
+    aiStatus.textContent = "AI: Not configured";
+    aiStatus.className += " rogatio-ai-not-configured";
+  } else {
+    aiStatus.textContent = "AI: Checking...";
+  }
+  sidebar.append(aiStatus);
 
   // The browser-assigned extension ID is what `rogatio runtime install` pins
   // in the native-messaging manifest; always show it so the install step
@@ -863,6 +882,19 @@ async function copyText(value: string): Promise<boolean> {
   }
 }
 
+async function checkNativeAISupport(): Promise<void> {
+  try {
+    const supported = await checkAISupport(client);
+    aiSupported = supported;
+    aiStatusChecked = true;
+    renderShell();
+  } catch {
+    aiSupported = false;
+    aiStatusChecked = true;
+    renderShell();
+  }
+}
+
 async function refresh(): Promise<void> {
   const response = await client.send({ version: 1, command: "refresh" });
   if (response?.ok !== true || !response.value) {
@@ -878,6 +910,15 @@ async function refresh(): Promise<void> {
   }
   if (pendingProjectId && !Object.hasOwn(state.projects, pendingProjectId))
     pendingProjectId = state.activeProjectId;
+
+  // Check AI support when runtime is running
+  if (state.nativeRuntimeState?.phase === "started") {
+    await checkNativeAISupport();
+  } else {
+    aiSupported = false;
+    aiStatusChecked = false;
+  }
+
   renderShell();
 }
 

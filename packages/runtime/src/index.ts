@@ -1,4 +1,8 @@
 export { classifyAddress, isPublicAddress } from "./address-policy.js";
+export * from "./ai-assist.js";
+export * from "./ai-client.js";
+export * from "./ai-config.js";
+export * from "./ai-prompt.js";
 export { authorizeExact } from "./authorization.js";
 export { isConfinedFileSupported, readConfinedFile } from "./confined-file.js";
 export * from "./envelope.js";

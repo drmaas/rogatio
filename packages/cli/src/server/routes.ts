@@ -6,6 +6,7 @@ import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject } from "@rogatio/dry-run";
+import type { AIClient, AICompletionOptions } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { createMockPreviewAction } from "../utils/mock-preview.js";
 
@@ -23,6 +24,8 @@ export interface RouteContext {
   editorCssPath: string;
   /** Absolute path to the directory of editor fonts shipped with the cli, served at GET /vendor/fonts/<file>. */
   editorFontsPath: string;
+  /** AI client for completions (optional, when AI is configured). */
+  aiClient?: AIClient;
 }
 
 export function generateCsrfToken(): string {
@@ -480,6 +483,158 @@ export function createRoutes(context: RouteContext) {
       );
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(result));
+      return;
+    }
+
+    // POST /api/ai/complete — non-streaming AI completion
+    if (pathname === "/api/ai/complete" && method === "POST") {
+      if (!validateCsrf(req, context.csrfToken)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "csrf-invalid",
+            message: "Invalid CSRF token",
+          }),
+        );
+        return;
+      }
+
+      if (!context.aiClient) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "ai-not-configured",
+            message: "AI provider not configured",
+          }),
+        );
+        return;
+      }
+
+      let body: unknown;
+      try {
+        const bodyText = await getRequestBody(req);
+        body = JSON.parse(bodyText);
+      } catch (error) {
+        const failure = bodyErrorResponse(error);
+        res.writeHead(failure.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(failure.body));
+        return;
+      }
+
+      if (!isRecord(body) || !Array.isArray(body.messages)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "invalid-request",
+            message: "Missing or invalid messages array",
+          }),
+        );
+        return;
+      }
+
+      try {
+        const options: AICompletionOptions = {
+          messages: body.messages as AICompletionOptions["messages"],
+          model: typeof body.model === "string" ? body.model : "",
+          temperature:
+            typeof body.temperature === "number" ? body.temperature : undefined,
+          stream: false,
+          responseFormat:
+            body.responseFormat as AICompletionOptions["responseFormat"],
+        };
+        const result = await context.aiClient?.complete(options);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(result));
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "ai-error",
+            message: e instanceof Error ? e.message : "AI completion failed",
+          }),
+        );
+      }
+      return;
+    }
+
+    // POST /api/ai/stream — streaming AI completion (SSE)
+    if (pathname === "/api/ai/stream" && method === "POST") {
+      if (!validateCsrf(req, context.csrfToken)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "csrf-invalid",
+            message: "Invalid CSRF token",
+          }),
+        );
+        return;
+      }
+
+      if (!context.aiClient) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "ai-not-configured",
+            message: "AI provider not configured",
+          }),
+        );
+        return;
+      }
+
+      let body: unknown;
+      try {
+        const bodyText = await getRequestBody(req);
+        body = JSON.parse(bodyText);
+      } catch (error) {
+        const failure = bodyErrorResponse(error);
+        res.writeHead(failure.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(failure.body));
+        return;
+      }
+
+      if (!isRecord(body) || !Array.isArray(body.messages)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "invalid-request",
+            message: "Missing or invalid messages array",
+          }),
+        );
+        return;
+      }
+
+      try {
+        const options: AICompletionOptions = {
+          messages: body.messages as AICompletionOptions["messages"],
+          model: typeof body.model === "string" ? body.model : "",
+          temperature:
+            typeof body.temperature === "number" ? body.temperature : undefined,
+          stream: true,
+          responseFormat:
+            body.responseFormat as AICompletionOptions["responseFormat"],
+        };
+
+        res.writeHead(200, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+          ...corsHeaders,
+        });
+
+        const stream = context.aiClient?.stream(options);
+        for await (const chunk of stream) {
+          const data = `data: ${JSON.stringify(chunk)}\n\n`;
+          res.write(data);
+        }
+        res.end();
+      } catch (e) {
+        const errorData = `data: ${JSON.stringify({
+          type: "error",
+          error: e instanceof Error ? e.message : "AI streaming failed",
+        })}\n\n`;
+        res.write(errorData);
+        res.end();
+      }
       return;
     }
 

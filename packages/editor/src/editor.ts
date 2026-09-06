@@ -1,7 +1,9 @@
 import type { HttpMethod, ResourceType } from "@rogatio/schema";
 import { hasControl } from "@rogatio/schema";
+import { createAIAssistPanel } from "./ai-assist-panel.js";
 import { builtInRuleTypes } from "./rule-types/index.js";
 import {
+  type AIProposal,
   type DryRunResult,
   type DryRunTestCase,
   type EditorController,
@@ -547,6 +549,7 @@ class EditorControllerImpl implements EditorController {
   private testResult: DryRunResult | undefined = undefined;
   private testRunning = false;
   private testRequestId = 0;
+  private aiAssistPanel: ReturnType<typeof createAIAssistPanel> | null = null;
 
   constructor(
     options: EditorOptions,
@@ -564,6 +567,19 @@ class EditorControllerImpl implements EditorController {
     const initialDiagnostics = this.collectDiagnostics(this.draft);
     if (initialDiagnostics.length > 0) {
       throw new EditorInitializationError(initialDiagnostics);
+    }
+
+    // Initialize AI Assist Panel if handler provided
+    if (options.aiAssist) {
+      this.aiAssistPanel = createAIAssistPanel(
+        this.root,
+        {
+          getDraft: () => this.getDraft(),
+          navigateToGroup: (groupId) => this.navigateToGroup(groupId),
+        },
+        (proposal: AIProposal) => this.applyAIProposal(proposal),
+        () => {}, // onClose
+      );
     }
 
     this.host = this.document.createElement("div");
@@ -652,6 +668,10 @@ class EditorControllerImpl implements EditorController {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    if (this.aiAssistPanel) {
+      this.aiAssistPanel.hide();
+      this.aiAssistPanel = null;
+    }
     this.cleanupExtensions();
     this.host.removeEventListener("click", this.handleClick);
     this.host.removeEventListener("input", this.handleInput);
@@ -819,6 +839,12 @@ class EditorControllerImpl implements EditorController {
   };
 
   private dispatchCommand(command: string, element: HTMLElement): void {
+    if (command === "ai-assist") {
+      if (this.aiAssistPanel) {
+        this.aiAssistPanel.show();
+      }
+      return;
+    }
     if (command === "validate") {
       this.validate();
       return;
@@ -1383,6 +1409,66 @@ class EditorControllerImpl implements EditorController {
     this.render();
   }
 
+  private applyAIProposal(proposal: AIProposal): void {
+    for (const ruleProposal of proposal.rules) {
+      // Find or create the group
+      let group = this.groupById(ruleProposal.groupId);
+      if (!group) {
+        // Create the group if it doesn't exist
+        const groupId = ruleProposal.groupId;
+        this.draft.groups.push({
+          id: groupId,
+          name: "AI Group",
+          origins: [],
+          rules: [],
+        });
+        group = this.groupById(groupId);
+      }
+      if (!group) return;
+
+      // Generate unique rule ID
+      const ruleId = this.nextId("rule-ai");
+
+      // Build the rule object
+      const rule: DraftRule = {
+        id: ruleId,
+        name: ruleProposal.name,
+        urlRegex: ruleProposal.urlRegex,
+        origins: ruleProposal.origins ?? [],
+        resourceTypes: ruleProposal.resourceTypes ?? ["main_frame"],
+        priority: ruleProposal.priority ?? 100,
+      };
+
+      if (ruleProposal.method) {
+        rule.method = ruleProposal.method;
+      }
+
+      // Set the action based on rule kind
+      const actionField =
+        ruleProposal.kind === "redirect" || ruleProposal.kind === "mock"
+          ? ruleProposal.kind
+          : "action";
+
+      rule[actionField] = ruleProposal.action;
+
+      // Add the rule to the group
+      group.rules.push(rule);
+
+      // Mark as changed and update focus
+      this.markChanged();
+      this.focusRequest = pointer(
+        "groups",
+        this.groupIndex(group.id),
+        "rules",
+        group.rules.length - 1,
+        "name",
+      );
+    }
+
+    this.statusMessage = `Applied ${proposal.rules.length} rule${proposal.rules.length === 1 ? "" : "s"} from AI.`;
+    this.render();
+  }
+
   private addGroupOrigin(groupId: string): void {
     const group = this.groupById(groupId);
     if (!group || this.saving) return;
@@ -1872,6 +1958,12 @@ class EditorControllerImpl implements EditorController {
   private renderCommandBar(): void {
     this.commandBar.replaceChildren();
     this.commandBar.setAttribute("aria-busy", this.saving ? "true" : "false");
+    // AI Assist button (only when AI is configured)
+    if (this.aiAssistPanel) {
+      this.commandBar.append(
+        this.createCommandButton("AI Assist", "ai-assist", this.saving),
+      );
+    }
     this.commandBar.append(
       this.createCommandButton("Validate", "validate", this.saving),
       this.createCommandButton("Save", "save", this.saving || !this.isDirty()),

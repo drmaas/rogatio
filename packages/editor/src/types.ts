@@ -92,6 +92,56 @@ export type EditorDryRunHandler = (
   options?: { maxCases?: number },
 ) => DryRunResult | Promise<DryRunResult>;
 
+export interface AIAssistRequest {
+  readonly kind: "generate" | "fix" | "explain";
+  readonly prompt: string;
+  readonly context: {
+    readonly project: EditorProjectSnapshot;
+    readonly activeGroupId?: string;
+    readonly focusedRuleId?: string;
+    readonly diagnostics?: readonly EditorDiagnostic[];
+    readonly dryRunCases?: readonly DryRunTestCase[];
+  };
+}
+
+export interface AIAssistChunk {
+  readonly type: "token" | "done" | "error";
+  readonly content?: string;
+  readonly proposal?: AIProposal;
+  readonly error?: { readonly code: string; readonly message: string };
+}
+
+export interface AIProposal {
+  readonly rules: readonly RuleProposal[];
+  readonly explanation: string;
+}
+
+export interface RuleProposal {
+  readonly kind:
+    | "redirect"
+    | "query"
+    | "header"
+    | "mock"
+    | "response-body"
+    | "request-body";
+  readonly groupId: string;
+  readonly name: string;
+  readonly urlRegex: string;
+  readonly origins?: readonly string[];
+  readonly resourceTypes?: readonly string[];
+  readonly priority?: number;
+  readonly method?: string;
+  readonly action: unknown;
+}
+
+export type EditorAIAssistHandler = (
+  request: AIAssistRequest,
+) => AsyncIterable<AIAssistChunk> | Promise<AIAssistResponse>;
+
+export interface AIAssistResponse {
+  readonly proposal: AIProposal;
+}
+
 export interface RuleTypeFieldExtension {
   readonly id: string;
   readonly label: string;
@@ -132,6 +182,7 @@ export interface EditorOptions {
   readonly onCancel?: () => void;
   readonly ruleTypes?: readonly RuleTypeFieldExtension[];
   readonly dryRun?: EditorDryRunHandler;
+  readonly aiAssist?: EditorAIAssistHandler;
 }
 
 export interface EditorController {
