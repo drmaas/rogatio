@@ -1,4 +1,33 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@rogatio/runtime", async () => {
+  const actual =
+    await vi.importActual<typeof import("@rogatio/runtime")>(
+      "@rogatio/runtime",
+    );
+  return {
+    ...actual,
+    createRequestBodyTrustController: () => ({
+      install: async () => ({ ok: true, state: "installed" as const }),
+      uninstall: async () => ({ ok: true, state: "uninstalled" as const }),
+      status: async () => ({
+        installed: true,
+        trusted: true,
+        platform: "linux",
+        capabilityReasons: [],
+      }),
+    }),
+    selectTrustPlatformAdapter: () => ({
+      platform: "linux",
+      defaultManifestDir: () => "/mock/manifest",
+      defaultCaInstallPath: () => "/mock/ca",
+      detect: () => ({ manifest: true, caTrust: true, reasons: [] }),
+      caTrustInstaller: async () => {},
+      caTrustRemover: async () => {},
+    }),
+  };
+});
+
 import { runtimeCommand } from "../src/commands/runtime.js";
 
 afterEach(() => {

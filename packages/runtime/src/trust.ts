@@ -331,7 +331,7 @@ export function createRequestBodyTrustController(
       const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
 
       // Generate self-signed X.509 CA certificate
-      const certResult = createCertificate(
+      const certResult = await createCertificate(
         "CN=Rogatio Request-Body CA",
         privateKey,
         TRUST_LIMITS.caValidityDays,

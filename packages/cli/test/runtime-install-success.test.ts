@@ -17,6 +17,14 @@ vi.mock("@rogatio/runtime", async () => {
         capabilityReasons: [],
       }),
     }),
+    selectTrustPlatformAdapter: () => ({
+      platform: "linux",
+      defaultManifestDir: () => "/mock/manifest",
+      defaultCaInstallPath: () => "/mock/ca",
+      detect: () => ({ manifest: true, caTrust: true, reasons: [] }),
+      caTrustInstaller: async () => {},
+      caTrustRemover: async () => {},
+    }),
   };
 });
 
