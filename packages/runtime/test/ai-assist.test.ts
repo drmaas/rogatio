@@ -1,12 +1,11 @@
-import type { EditorDiagnostic } from "@rogatio/editor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AIAssistRequest,
   type AIProposal,
-  type AIProviderConfig,
+  type DryRunResult,
   runAIAssist,
 } from "../src/ai-assist.js";
-import type { AIClient } from "../src/ai-client.js";
+import type { AIClient, AIProviderConfig } from "../src/ai-client.js";
 import { buildSystemPrompt } from "../src/ai-prompt.js";
 
 describe("ai-assist", () => {
@@ -17,12 +16,18 @@ describe("ai-assist", () => {
   };
 
   let mockClient: AIClient;
-  let validateMock: ReturnType<typeof vi.fn>;
-  let dryRunMock: ReturnType<typeof vi.fn>;
+  let validateMock = vi
+    .fn<(value: unknown) => readonly EditorDiagnostic[]>()
+    .mockReturnValue([]);
+  let dryRunMock =
+    vi.fn<(project: unknown, cases: readonly unknown[]) => DryRunResult>();
 
   beforeEach(() => {
-    validateMock = vi.fn().mockReturnValue([]);
-    dryRunMock = vi.fn();
+    validateMock = vi
+      .fn<(value: unknown) => readonly EditorDiagnostic[]>()
+      .mockReturnValue([]);
+    dryRunMock =
+      vi.fn<(project: unknown, cases: readonly unknown[]) => DryRunResult>();
 
     mockClient = {
       complete: vi.fn().mockResolvedValue({ content: "", usage: undefined }),
@@ -50,7 +55,10 @@ describe("ai-assist", () => {
     };
   }
 
-  function createValidProject(): unknown {
+  function createValidProject(): { groups?: unknown[] } & Record<
+    string,
+    unknown
+  > {
     return {
       version: 1,
       name: "Test Project",
@@ -72,7 +80,7 @@ describe("ai-assist", () => {
         content: JSON.stringify(proposal),
         usage: { promptTokens: 100, completionTokens: 50 },
       });
-      validateMock.mockReturnValue([]); // No diagnostics = valid
+      validateMock = vi.fn().mockReturnValue([]);
 
       const request: AIAssistRequest = {
         kind: "generate",
@@ -106,7 +114,7 @@ describe("ai-assist", () => {
       mockClient.stream = vi.fn().mockImplementation(async function* () {
         for (const chunk of chunks) yield chunk;
       });
-      validateMock.mockReturnValue([]);
+      validateMock = vi.fn().mockReturnValue([]);
 
       const request: AIAssistRequest = {
         kind: "generate",
@@ -118,10 +126,7 @@ describe("ai-assist", () => {
         request,
         mockConfig,
         validateMock,
-        dryRunMock as (
-          project: unknown,
-          cases: readonly import("@rogatio/editor").DryRunTestCase[],
-        ) => import("@rogatio/editor").DryRunResult,
+        dryRunMock,
         mockClient,
       );
 
@@ -136,20 +141,26 @@ describe("ai-assist", () => {
       });
       const fixedProposal = createMockProposal();
 
-      mockClient.complete
+      mockClient.complete = vi
+        .fn()
         .mockResolvedValueOnce({ content: JSON.stringify(invalidProposal) })
         .mockResolvedValueOnce({ content: JSON.stringify(fixedProposal) });
 
-      validateMock
-        .mockReturnValueOnce([
-          {
-            code: "schema.invalid-regex",
-            severity: "error",
-            path: "/groups/0/rules/0/urlRegex",
-            message: "Invalid regex",
-          } as EditorDiagnostic,
-        ])
-        .mockReturnValueOnce([]);
+      let validateCallCount = 0;
+      validateMock = vi.fn((_value: unknown) => {
+        validateCallCount++;
+        if (validateCallCount === 1) {
+          return [
+            {
+              code: "schema.invalid-regex",
+              severity: "error" as const,
+              path: "/groups/0/rules/0/urlRegex",
+              message: "Invalid regex",
+            } as EditorDiagnostic,
+          ];
+        }
+        return [];
+      });
 
       const request: AIAssistRequest = {
         kind: "generate",
@@ -161,10 +172,7 @@ describe("ai-assist", () => {
         request,
         mockConfig,
         validateMock,
-        dryRunMock as (
-          project: unknown,
-          cases: readonly import("@rogatio/editor").DryRunTestCase[],
-        ) => import("@rogatio/editor").DryRunResult,
+        dryRunMock,
         mockClient,
       );
 
@@ -178,10 +186,10 @@ describe("ai-assist", () => {
         rules: [{ ...createMockProposal().rules[0], urlRegex: "[invalid" }],
       });
 
-      mockClient.complete.mockResolvedValue({
+      mockClient.complete = vi.fn().mockResolvedValue({
         content: JSON.stringify(invalidProposal),
       });
-      validateMock.mockReturnValue([
+      validateMock = vi.fn().mockReturnValue([
         {
           code: "schema.invalid-regex",
           severity: "error",
@@ -197,16 +205,7 @@ describe("ai-assist", () => {
       };
 
       await expect(
-        runAIAssist(
-          request,
-          mockConfig,
-          validateMock,
-          dryRunMock as (
-            project: unknown,
-            cases: readonly import("@rogatio/editor").DryRunTestCase[],
-          ) => import("@rogatio/editor").DryRunResult,
-          mockClient,
-        ),
+        runAIAssist(request, mockConfig, validateMock, dryRunMock, mockClient),
       ).rejects.toThrow(/max fix attempts/i);
 
       expect(mockClient.complete).toHaveBeenCalled();
@@ -219,20 +218,26 @@ describe("ai-assist", () => {
       });
       const fixedProposal = createMockProposal();
 
-      mockClient.complete
+      mockClient.complete = vi
+        .fn()
         .mockResolvedValueOnce({ content: JSON.stringify(invalidProposal) })
         .mockResolvedValueOnce({ content: JSON.stringify(fixedProposal) });
 
-      validateMock
-        .mockReturnValueOnce([
-          {
-            code: "schema.invalid-regex",
-            severity: "error",
-            path: "/groups/0/rules/0/urlRegex",
-            message: "Invalid regex",
-          } as EditorDiagnostic,
-        ])
-        .mockReturnValueOnce([]);
+      let validateCallCount = 0;
+      validateMock = vi.fn((_value: unknown) => {
+        validateCallCount++;
+        if (validateCallCount === 1) {
+          return [
+            {
+              code: "schema.invalid-regex",
+              severity: "error" as const,
+              path: "/groups/0/rules/0/urlRegex",
+              message: "Invalid regex",
+            } as EditorDiagnostic,
+          ];
+        }
+        return [];
+      });
 
       const request: AIAssistRequest = {
         kind: "generate",
@@ -244,23 +249,19 @@ describe("ai-assist", () => {
         request,
         mockConfig,
         validateMock,
-        dryRunMock as (
-          project: unknown,
-          cases: readonly import("@rogatio/editor").DryRunTestCase[],
-        ) => import("@rogatio/editor").DryRunResult,
+        dryRunMock,
         mockClient,
       );
 
-      // Verify complete was called at least once
       expect(mockClient.complete).toHaveBeenCalled();
     });
 
     it("handles fix request kind", async () => {
       const fixedProposal = createMockProposal();
-      mockClient.complete.mockResolvedValue({
+      mockClient.complete = vi.fn().mockResolvedValue({
         content: JSON.stringify(fixedProposal),
       });
-      validateMock.mockReturnValue([]);
+      validateMock = vi.fn().mockReturnValue([]);
 
       const request: AIAssistRequest = {
         kind: "fix",
@@ -282,10 +283,7 @@ describe("ai-assist", () => {
         request,
         mockConfig,
         validateMock,
-        dryRunMock as (
-          project: unknown,
-          cases: readonly import("@rogatio/editor").DryRunTestCase[],
-        ) => import("@rogatio/editor").DryRunResult,
+        dryRunMock,
         mockClient,
       );
 
@@ -345,3 +343,10 @@ describe("ai-assist", () => {
     });
   });
 });
+
+interface EditorDiagnostic {
+  readonly code: string;
+  readonly severity: "error";
+  readonly path: string;
+  readonly message: string;
+}

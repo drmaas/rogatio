@@ -1,4 +1,4 @@
-import type { AIAssistRequest, AIProposal } from "./types.js";
+import type { AIProposal, EditorProjectSnapshot } from "./types.js";
 
 interface AIMessage {
   role: "user" | "assistant" | "system";
@@ -9,8 +9,8 @@ interface AIMessage {
 
 export function createAIAssistPanel(
   _container: HTMLElement,
-  editor: {
-    getDraft: () => unknown;
+  _editor: {
+    getDraft: () => EditorProjectSnapshot;
     navigateToGroup: (groupId: string | null | undefined) => void;
   },
   onApply: (proposal: AIProposal) => void,
@@ -21,6 +21,9 @@ export function createAIAssistPanel(
   isVisible: () => boolean;
   addMessage: (message: AIMessage) => void;
   clearMessages: () => void;
+  startStreaming: (role: "assistant") => void;
+  updateStreamingContent: (content: string) => void;
+  finishStreaming: (proposal?: AIProposal) => void;
 } {
   let visible = false;
   let streamingContent = "";
@@ -395,14 +398,6 @@ export function createAIAssistPanel(
     if (!prompt) return;
 
     // This will be connected to the actual AI handler via the editor
-    const _request: AIAssistRequest = {
-      kind: "generate",
-      prompt,
-      context: {
-        project: editor.getDraft(),
-      },
-    };
-
     // The actual streaming is handled by the editor's aiAssist handler
     // This UI just displays the streamed content
     textarea.value = "";

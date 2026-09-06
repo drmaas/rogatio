@@ -307,7 +307,10 @@ export type EnvelopeMessageType =
   | "authorize.response"
   | "mock.connect"
   | "mock.request"
-  | "mock.response";
+  | "mock.response"
+  | "ai.complete"
+  | "ai.stream.chunk"
+  | "ai.error";
 
 export interface PairRequest {
   readonly capability: string;

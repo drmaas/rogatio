@@ -1,6 +1,7 @@
 import {
   type AIClient,
   type AIProviderConfig,
+  type ChatMessage,
   createAIClient,
 } from "./ai-client.js";
 import { authorizeExact } from "./authorization.js";
@@ -399,7 +400,7 @@ export function createNativeRuntimeController(
           };
           try {
             const result = await aiClient.complete({
-              messages: meta.messages,
+              messages: [...meta.messages] as ChatMessage[],
               model: meta.model,
               temperature: meta.temperature,
               responseFormat: meta.responseFormat,
@@ -453,7 +454,7 @@ export function createNativeRuntimeController(
           };
           try {
             for await (const chunk of aiClient.stream({
-              messages: meta.messages,
+              messages: [...meta.messages] as ChatMessage[],
               model: meta.model,
               temperature: meta.temperature,
             })) {

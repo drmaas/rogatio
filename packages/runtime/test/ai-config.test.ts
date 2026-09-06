@@ -39,6 +39,23 @@ describe("ai-config", () => {
   });
 
   describe("getProviderConfigPath", () => {
+    let originalPlatform: string;
+
+    beforeEach(() => {
+      originalPlatform = process.platform;
+      Object.defineProperty(process, "platform", {
+        value: "linux",
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process, "platform", {
+        value: originalPlatform,
+        configurable: true,
+      });
+    });
+
     it("returns Linux path with XDG_CONFIG_HOME", () => {
       process.env.XDG_CONFIG_HOME = path.join(testConfigDir, "xdg");
       process.env.HOME = "/home/user";
@@ -152,6 +169,7 @@ describe("ai-config", () => {
 
   describe("writeProviderConfig / readProviderConfig / deleteProviderConfig", () => {
     let configPath: string;
+    let originalPlatform: string;
 
     beforeEach(() => {
       // Use test directory for config
@@ -160,12 +178,17 @@ describe("ai-config", () => {
       delete process.env.USERPROFILE;
       delete process.env.LOCALAPPDATA;
 
-      const originalPlatform = process.platform;
+      // Mock platform as linux for these tests
+      originalPlatform = process.platform;
       Object.defineProperty(process, "platform", {
         value: "linux",
         configurable: true,
       });
       configPath = getProviderConfigPath();
+    });
+
+    afterEach(() => {
+      // Restore platform
       Object.defineProperty(process, "platform", {
         value: originalPlatform,
         configurable: true,
@@ -199,6 +222,11 @@ describe("ai-config", () => {
     });
 
     it("sets file permissions to 0o600 (owner read/write only)", async () => {
+      if (originalPlatform === "win32") {
+        // Windows does not support POSIX permission bits via mode; skip
+        return;
+      }
+
       const config = {
         providerUrl: "https://api.openai.com/v1",
         model: "gpt-4o-mini",
@@ -209,7 +237,10 @@ describe("ai-config", () => {
 
       const stat = await fs.stat(configPath);
       // Check owner read/write only (0o600 = 0o100600 in stat.mode)
-      expect(stat.mode & 0o777).toBe(0o600);
+      // Mask with 0o777 to get permission bits, then verify group/other have no access
+      const perms = stat.mode & 0o777;
+      expect(perms & 0o077).toBe(0); // No group/other permissions
+      expect(perms & 0o600).toBe(0o600); // Owner has read/write
     });
 
     it("returns null when config does not exist", async () => {

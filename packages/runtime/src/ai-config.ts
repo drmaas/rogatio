@@ -1,11 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-
-export interface AIProviderConfig {
-  providerUrl: string;
-  model: string;
-  apiKey: string;
-}
+import type { AIProviderConfig } from "./ai-client.js";
 
 function getConfigDir(): string {
   const platform = process.platform;

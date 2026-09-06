@@ -16,6 +16,15 @@ export interface NativeEnvelopeInput {
 
 export type NativeEnvelope = NativeEnvelopeInput;
 
+/** Response envelope types that may not have timestamp (for AI responses). */
+type NativeEnvelopeResponse = {
+  readonly protocol: "v1";
+  readonly type: string;
+  readonly requestId?: string;
+  readonly timestamp?: number;
+  readonly metadata: Record<string, unknown>;
+};
+
 // AI envelope types
 export interface AICompleteRequest {
   readonly protocol: "v1";
@@ -307,6 +316,32 @@ export async function requestNativeMock(
  * Send an AI completion request to the native host.
  * Returns the complete response or null on error.
  */
+function isAIStreamChunkResponse(
+  response: NativeEnvelopeResponse,
+): response is AIStreamChunkResponse {
+  return (
+    response.type === "ai.stream.chunk" &&
+    typeof response.metadata === "object" &&
+    response.metadata !== null &&
+    "delta" in response.metadata &&
+    "done" in response.metadata &&
+    typeof (response.metadata as Record<string, unknown>).delta === "string" &&
+    typeof (response.metadata as Record<string, unknown>).done === "boolean"
+  );
+}
+
+function isAICompleteResponse(
+  response: NativeEnvelopeResponse,
+): response is AICompleteResponse {
+  return (
+    response.type === "ai.complete" &&
+    typeof response.metadata === "object" &&
+    response.metadata !== null &&
+    "content" in response.metadata &&
+    typeof (response.metadata as Record<string, unknown>).content === "string"
+  );
+}
+
 export async function requestAIComplete(
   options: NativeSessionOptions,
   messages: readonly {
@@ -328,8 +363,8 @@ export async function requestAIComplete(
       timestamp: Date.now(),
       metadata: { messages, model, temperature, responseFormat },
     });
-    if (response.type !== "ai.complete") return null;
-    return response as AICompleteResponse;
+    if (!isAICompleteResponse(response)) return null;
+    return response;
   } catch {
     return null;
   }
@@ -359,9 +394,9 @@ export async function* requestAIStream(
       timestamp: Date.now(),
       metadata: { messages, model, temperature },
     });
-    if (response.type !== "ai.stream.chunk") return;
-    yield response as AIStreamChunkResponse;
-    if ((response.metadata as AIStreamChunkResponse["metadata"]).done) return;
+    if (!isAIStreamChunkResponse(response)) return;
+    yield response;
+    if (response.metadata.done) return;
     // For subsequent chunks, we need to continue reading
     // This is a simplified implementation; real streaming would need
     // the native host to support continued streaming

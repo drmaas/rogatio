@@ -1434,8 +1434,10 @@ class EditorControllerImpl implements EditorController {
         id: ruleId,
         name: ruleProposal.name,
         urlRegex: ruleProposal.urlRegex,
-        origins: ruleProposal.origins ?? [],
-        resourceTypes: ruleProposal.resourceTypes ?? ["main_frame"],
+        origins: ruleProposal.origins ? [...ruleProposal.origins] : [],
+        resourceTypes: ruleProposal.resourceTypes
+          ? [...ruleProposal.resourceTypes]
+          : ["main_frame"],
         priority: ruleProposal.priority ?? 100,
       };
 
@@ -1456,9 +1458,10 @@ class EditorControllerImpl implements EditorController {
 
       // Mark as changed and update focus
       this.markChanged();
+      const groupIdStr = String(group.id);
       this.focusRequest = pointer(
         "groups",
-        this.groupIndex(group.id),
+        this.groupIndex(groupIdStr),
         "rules",
         group.rules.length - 1,
         "name",

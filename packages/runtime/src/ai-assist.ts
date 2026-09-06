@@ -72,7 +72,7 @@ export interface AIAssistRequest {
   kind: "generate" | "fix" | "explain";
   prompt: string;
   context: {
-    project: unknown;
+    project: { groups?: unknown[] } & Record<string, unknown>;
     activeGroupId?: string;
     focusedRuleId?: string;
     diagnostics?: readonly EditorDiagnostic[];
@@ -210,13 +210,11 @@ export async function runAIAssist(
     const isFixAttempt = attempts > 1 || request.kind === "fix";
     const validationErrors = (() => {
       if (!isFixAttempt || !currentProposal) return [];
-      const cp = currentProposal as AIProposal;
-      // @ts-expect-error - TypeScript incorrectly infers cp.rules as {} despite AIProposal type
+      const cp = currentProposal;
       return validate({
-        ...(request.context.project as Record<string, unknown>),
+        ...request.context.project,
         groups: [
-          ...((request.context.project as Record<string, unknown>).groups ??
-            []),
+          ...(request.context.project.groups ?? []),
           ...cp.rules.map((r) => ({
             ...r,
             id: `temp-${Date.now()}-${Math.random()}`,
@@ -263,9 +261,9 @@ export async function runAIAssist(
     // Validate the proposal by adding it to a copy of the project
     const proposalRules: readonly RuleProposal[] = proposal.rules;
     const testProject = {
-      ...(request.context.project as Record<string, unknown>),
+      ...request.context.project,
       groups: [
-        ...((request.context.project as Record<string, unknown>).groups ?? []),
+        ...(request.context.project.groups ?? []),
         ...proposalRules.map((r, i) => ({
           ...r,
           id: `ai-${Date.now()}-${i}`,
