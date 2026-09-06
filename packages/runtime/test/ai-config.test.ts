@@ -222,6 +222,11 @@ describe("ai-config", () => {
     });
 
     it("sets file permissions to 0o600 (owner read/write only)", async () => {
+      if (originalPlatform === "win32") {
+        // Windows does not support POSIX permission bits via mode; skip
+        return;
+      }
+
       const config = {
         providerUrl: "https://api.openai.com/v1",
         model: "gpt-4o-mini",
