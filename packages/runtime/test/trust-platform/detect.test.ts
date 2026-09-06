@@ -97,7 +97,13 @@ describe("TrustPlatformAdapter detect()", () => {
   });
 
   describe("linux", () => {
-    it("returns manifest:true, caTrust:true when tooling present and dirs writable", () => {
+    it("returns manifest:true, caTrust:true when tooling present, dirs writable, and sudo available", () => {
+      // sudo -n true succeeds (passwordless sudo available)
+      mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
+        if (cmd === "sudo") return { status: 0 };
+        return { status: 0 };
+      });
+
       const adapter = selectTrustPlatformAdapter("linux");
       const result = adapter.detect();
 
@@ -107,7 +113,10 @@ describe("TrustPlatformAdapter detect()", () => {
     });
 
     it("returns tooling-missing when update-ca-certificates not found", () => {
-      mockSpawnSync.mockReturnValue({ status: 1 });
+      mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
+        if (cmd === "which") return { status: 1 };
+        return { status: 0 };
+      });
 
       const adapter = selectTrustPlatformAdapter("linux");
       const result = adapter.detect();
@@ -122,6 +131,10 @@ describe("TrustPlatformAdapter detect()", () => {
         if (String(path).includes("NativeMessagingHosts"))
           throw new Error("EACCES");
       });
+      mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
+        if (cmd === "sudo") return { status: 0 };
+        return { status: 0 };
+      });
 
       const adapter = selectTrustPlatformAdapter("linux");
       const result = adapter.detect();
@@ -131,11 +144,15 @@ describe("TrustPlatformAdapter detect()", () => {
       expect(result.reasons).toContain("manifest-dir-unwritable");
     });
 
-    it("returns ca-store-unwritable when ca dir exists but not writable", () => {
+    it("returns elevation-required when ca dir not writable and no sudo", () => {
       mockAccessSync.mockImplementation((path) => {
         const p = String(path);
-        if (p === "/home/test/.local/share/ca-certificates")
-          throw new Error("EACCES");
+        if (p === "/usr/local/share/ca-certificates") throw new Error("EACCES");
+      });
+      // sudo -n true fails (no passwordless sudo)
+      mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
+        if (cmd === "sudo") return { status: 1 };
+        return { status: 0 };
       });
 
       const adapter = selectTrustPlatformAdapter("linux");
@@ -143,17 +160,18 @@ describe("TrustPlatformAdapter detect()", () => {
 
       expect(result.manifest).toBe(true);
       expect(result.caTrust).toBe(false);
-      expect(result.reasons).toContain("ca-store-unwritable");
+      expect(result.reasons).toContain("elevation-required");
     });
 
-    it("does not report ca-store-unwritable when ca dir missing but parent writable", () => {
+    it("returns caTrust:true when ca dir not writable but sudo available", () => {
       mockAccessSync.mockImplementation((path) => {
         const p = String(path);
-        if (p === "/home/test/.local/share/ca-certificates") {
-          const err = new Error("ENOENT") as NodeJS.ErrnoException;
-          err.code = "ENOENT";
-          throw err;
-        }
+        if (p === "/usr/local/share/ca-certificates") throw new Error("EACCES");
+      });
+      // sudo -n true succeeds
+      mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
+        if (cmd === "sudo") return { status: 0 };
+        return { status: 0 };
       });
 
       const adapter = selectTrustPlatformAdapter("linux");
@@ -161,17 +179,43 @@ describe("TrustPlatformAdapter detect()", () => {
 
       expect(result.manifest).toBe(true);
       expect(result.caTrust).toBe(true);
-      expect(result.reasons).not.toContain("ca-store-unwritable");
+      expect(result.reasons).not.toContain("elevation-required");
     });
 
-    it("returns ca-store-unwritable when neither ca dir nor parent writable", () => {
+    it("does not report elevation-required when ca dir missing but parent writable", () => {
+      mockAccessSync.mockImplementation((path) => {
+        const p = String(path);
+        if (p === "/usr/local/share/ca-certificates") {
+          const err = new Error("ENOENT") as NodeJS.ErrnoException;
+          err.code = "ENOENT";
+          throw err;
+        }
+      });
+      mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
+        if (cmd === "sudo") return { status: 0 };
+        return { status: 0 };
+      });
+
+      const adapter = selectTrustPlatformAdapter("linux");
+      const result = adapter.detect();
+
+      expect(result.manifest).toBe(true);
+      expect(result.caTrust).toBe(true);
+      expect(result.reasons).not.toContain("elevation-required");
+    });
+
+    it("returns elevation-required when neither ca dir nor parent writable and no sudo", () => {
       mockAccessSync.mockImplementation((path) => {
         const p = String(path);
         if (
-          p === "/home/test/.local/share/ca-certificates" ||
-          p === "/home/test/.local/share"
+          p === "/usr/local/share/ca-certificates" ||
+          p === "/usr/local/share"
         )
           throw new Error("EACCES");
+      });
+      mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
+        if (cmd === "sudo") return { status: 1 };
+        return { status: 0 };
       });
 
       const adapter = selectTrustPlatformAdapter("linux");
@@ -179,7 +223,7 @@ describe("TrustPlatformAdapter detect()", () => {
 
       expect(result.manifest).toBe(true);
       expect(result.caTrust).toBe(false);
-      expect(result.reasons).toContain("ca-store-unwritable");
+      expect(result.reasons).toContain("elevation-required");
     });
   });
 

@@ -36,7 +36,7 @@ describe("TrustPlatformAdapter paths", () => {
     vi.stubEnv("HOME", "/home/test");
     const adapter = selectTrustPlatformAdapter("linux");
     expect(adapter.defaultCaInstallPath()).toBe(
-      "/home/test/.local/share/ca-certificates",
+      "/usr/local/share/ca-certificates",
     );
   });
 

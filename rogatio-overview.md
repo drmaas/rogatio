@@ -34,6 +34,8 @@ Each browser profile can retain up to 64 uniquely named projects and has exactly
 
 Rules visibly report `active`, `disabled`, `needs permission`, `needs proxy`, `unsupported`, or `error`; the toolbar badge reflects the successfully installed active rules. Redirect, query, and header rules run entirely in the browser. Mocks, response-body, and request-body rules use native messaging through the unified `rogatio runtime` host, started and stopped from the extension's Start/Stop runtime controls. Request-body rules use the trust lifecycle `rogatio runtime install` (a single command that provisions both the native-messaging host and, on capable platforms, the device-local CA), and `rogatio runtime uninstall` to remove the host registration, the device-local CA files, and the CA trust; the native-messaging host itself runs as `rogatio runtime host <path>`. Mock connection state represents the last activation check, not continuous monitoring.
 
+CA trust installation requires elevated privileges: Linux requires `sudo` (passwordless or prompted), macOS requires keychain authorization, and Windows requires Administrator. The `rogatio runtime install` command reports `trust unsupported: <reasons>` when elevation is unavailable and exits 0 (the manifest is still installed; only the CA trust step is skipped).
+
 Chrome can place one bounded, redacted, live-only `[Rogatio]` record in the matched website's DevTools Console when Chrome authoritatively reports a current Rogatio DNSR match. It shows the intended action—not proof that the network operation succeeded—and creates no history or management-page feed.
 
 ## Architecture and technology

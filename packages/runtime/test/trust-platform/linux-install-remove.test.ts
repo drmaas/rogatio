@@ -29,7 +29,7 @@ describe("linux CA installer/remover", () => {
     vi.unstubAllEnvs();
   });
 
-  it("caTrustInstaller creates ca-certificates dir and writes cert", async () => {
+  it("caTrustInstaller writes cert with sudo and runs sudo update-ca-certificates", async () => {
     mockSpawn.mockReturnValue({
       stderr: { on: vi.fn() },
       on: (_event: string, cb: (code: number) => void) => {
@@ -42,9 +42,12 @@ describe("linux CA installer/remover", () => {
       "-----BEGIN CERTIFICATE-----\nMII...\n-----END CERTIFICATE-----\n",
     );
 
-    // Verify spawn was called twice: once for writing cert, once for update-ca-certificates
+    // Verify spawn was called twice: once for writing cert via sudo, once for sudo update-ca-certificates
     expect(mockSpawn).toHaveBeenCalledTimes(2);
-    expect(mockSpawn.mock.calls[1][0]).toBe("update-ca-certificates");
+    expect(mockSpawn.mock.calls[0][0]).toBe("sudo");
+    expect(mockSpawn.mock.calls[0][1]).toContain("sh");
+    expect(mockSpawn.mock.calls[1][0]).toBe("sudo");
+    expect(mockSpawn.mock.calls[1][1]).toContain("update-ca-certificates");
   });
 
   it("caTrustInstaller throws on non-zero exit", async () => {
@@ -63,13 +66,36 @@ describe("linux CA installer/remover", () => {
     ).rejects.toThrow(TrustError);
   });
 
-  it("caTrustRemover removes cert and runs update-ca-certificates", async () => {
+  it("caTrustInstaller throws elevation-required on permission denied", async () => {
+    const mockOn = vi.fn((_event: string, cb: (data: string) => void) => {
+      if (_event === "data") cb("sudo: a terminal is required\n");
+    });
+    mockSpawn.mockReturnValue({
+      stderr: { on: mockOn },
+      on: (_event: string, cb: (code: number) => void) => {
+        if (_event === "close") cb(1);
+      },
+    });
+
+    const adapter = selectTrustPlatformAdapter("linux");
+    try {
+      await adapter.caTrustInstaller(
+        "-----BEGIN CERTIFICATE-----\nMII...\n-----END CERTIFICATE-----\n",
+      );
+      expect.fail("should have thrown");
+    } catch (e) {
+      expect(e).toBeInstanceOf(TrustError);
+      expect((e as TrustError).reasons).toContain("elevation-required");
+    }
+  });
+
+  it("caTrustRemover removes cert without calling update-ca-certificates", async () => {
     mockSpawn.mockClear();
 
     const adapter = selectTrustPlatformAdapter("linux");
     await adapter.caTrustRemover();
 
-    // caTrustRemover is now idempotent and ignores errors, doesn't call update-ca-certificates
+    // caTrustRemover is idempotent and ignores errors, doesn't call update-ca-certificates
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
@@ -124,7 +150,7 @@ describe("linux CA installer/remover", () => {
       "-----BEGIN CERTIFICATE-----\nMII...\n-----END CERTIFICATE-----\n",
     );
 
-    // Each install calls spawn twice (write cert + update-ca-certificates)
+    // Each install calls spawn twice (write cert via sudo + sudo update-ca-certificates)
     expect(mockSpawn).toHaveBeenCalledTimes(4);
   });
 });

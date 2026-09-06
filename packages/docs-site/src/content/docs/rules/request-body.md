@@ -19,13 +19,15 @@ runtime-owned TLS proxy.
 
 ## Requirements and capabilities
 
+- Requires the native runtime to be started. Without the runtime, request-body rules
+  report `needs proxy`.
 - Activation is **capability-based** and cannot compose with another controlling proxy,
   PAC, extension, or enterprise policy.
 - Where the required capabilities are absent, activation reports `unsupported`; Linux and
   Windows may still verify, edit, import, export, and dry-run request-body rules.
-- Requires the device-local CA trust installed via `rogatio runtime install`
-  (the same `install` command provisions the CA on capable platforms; on
-  incapable platforms the install completes without CA trust). See
-  [Local runtime](/guides/runtime/).
+- Requires the device-local CA trust installed via `rogatio runtime install`. CA trust
+  installation requires elevated privileges: Linux (`sudo`), macOS (keychain password),
+  Windows (Administrator). On incapable platforms the install completes without CA trust.
+  See [Local runtime](/guides/runtime/).
 - Observed bodies are processed in-process only and never persisted, logged, exported, or
   transferred through native messaging.

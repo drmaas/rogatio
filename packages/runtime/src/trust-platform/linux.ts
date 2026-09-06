@@ -6,20 +6,24 @@ import type { TrustCapabilities } from "../trust.js";
 import { TrustError } from "../trust.js";
 import type { TrustPlatformAdapter } from "./types.js";
 
+const CA_DIR = "/usr/local/share/ca-certificates";
+const CERT_PATH = posixJoin(CA_DIR, "rogatio-ca.crt");
+
+function hasSudo(): boolean {
+  const result = spawnSync("sudo", ["-n", "true"], { timeout: 1000 });
+  return result.status === 0;
+}
+
 const linuxAdapter: TrustPlatformAdapter = {
   platform: "linux",
   defaultManifestDir: () => {
     const home = process.env.HOME ?? "";
     return posixJoin(home, ".config/google-chrome/NativeMessagingHosts");
   },
-  defaultCaInstallPath: () => {
-    const home = process.env.HOME ?? "";
-    return posixJoin(home, ".local/share/ca-certificates");
-  },
+  defaultCaInstallPath: () => CA_DIR,
   detect(): TrustCapabilities {
     const reasons: string[] = [];
     const manifestDir = this.defaultManifestDir();
-    const caDir = this.defaultCaInstallPath();
 
     const updateCa = spawnSync("which", ["update-ca-certificates"], {
       timeout: 1000,
@@ -34,19 +38,24 @@ const linuxAdapter: TrustPlatformAdapter = {
       reasons.push("manifest-dir-unwritable");
     }
 
+    // The system CA dir (/usr/local/share/ca-certificates) requires root to
+    // write.  Check whether it is directly writable; if not, check whether
+    // passwordless sudo is available.  If neither, report elevation-required.
     try {
-      accessSync(caDir, constants.W_OK);
+      accessSync(CA_DIR, constants.W_OK);
     } catch (err: unknown) {
-      // Directory doesn't exist yet — check if the parent is writable
-      // so mkdirSync({ recursive: true }) in the installer can create it.
       if ((err as NodeJS.ErrnoException)?.code === "ENOENT") {
+        // Directory doesn't exist yet — check if the parent is writable
+        // so mkdirSync({ recursive: true }) in the installer can create it.
         try {
-          accessSync(dirname(caDir), constants.W_OK);
+          accessSync(dirname(CA_DIR), constants.W_OK);
         } catch {
-          reasons.push("ca-store-unwritable");
+          if (!hasSudo()) {
+            reasons.push("elevation-required");
+          }
         }
-      } else {
-        reasons.push("ca-store-unwritable");
+      } else if (!hasSudo()) {
+        reasons.push("elevation-required");
       }
     }
 
@@ -55,7 +64,7 @@ const linuxAdapter: TrustPlatformAdapter = {
       !reasons.includes("manifest-dir-unwritable");
     const caTrust =
       !reasons.includes("tooling-missing") &&
-      !reasons.includes("ca-store-unwritable");
+      !reasons.includes("elevation-required");
 
     return {
       manifest,
@@ -64,37 +73,48 @@ const linuxAdapter: TrustPlatformAdapter = {
     };
   },
   async caTrustInstaller(certPem: string): Promise<void> {
-    const caDir = this.defaultCaInstallPath();
-    const certPath = posixJoin(caDir, "rogatio-ca.crt");
-
     try {
-      mkdirSync(caDir, { recursive: true });
+      mkdirSync(CA_DIR, { recursive: true });
     } catch {
       throw new TrustError("trust.internal", "ca-store-unwritable", [
         "ca-store-unwritable",
       ]);
     }
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const child = spawn("sh", [
+    const certResult = await new Promise<{ code: number; stderr: string }>(
+      (resolve) => {
+        const child = spawn("sudo", [
+          "sh",
           "-c",
-          `cat > "${certPath}" << 'EOF'\n${certPem}\nEOF`,
+          `cat > "${CERT_PATH}" << 'EOF'\n${certPem}\nEOF`,
         ]);
-        child.on("close", (code) =>
-          code === 0 ? resolve() : reject(new Error(`exit code ${code}`)),
-        );
-        child.on("error", reject);
-      });
-    } catch {
-      throw new TrustError("trust.internal", "ca-store-unwritable", [
-        "ca-store-unwritable",
-      ]);
+        let stderr = "";
+        child.stderr?.on("data", (data) => {
+          stderr += data.toString();
+        });
+        child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
+        child.on("error", (err) => resolve({ code: 1, stderr: err.message }));
+      },
+    );
+
+    if (certResult.code !== 0) {
+      const stderr = certResult.stderr.toLowerCase();
+      let reason: "ca-store-unwritable" | "elevation-required" =
+        "ca-store-unwritable";
+      if (
+        stderr.includes("permission") ||
+        stderr.includes("not permitted") ||
+        stderr.includes("no tty") ||
+        stderr.includes("terminal")
+      ) {
+        reason = "elevation-required";
+      }
+      throw new TrustError("trust.internal", reason, [reason]);
     }
 
     const result = await new Promise<{ code: number; stderr: string }>(
       (resolve) => {
-        const child = spawn("update-ca-certificates");
+        const child = spawn("sudo", ["update-ca-certificates"]);
         let stderr = "";
         child.stderr?.on("data", (data) => {
           stderr += data.toString();
@@ -106,19 +126,22 @@ const linuxAdapter: TrustPlatformAdapter = {
 
     if (result.code !== 0) {
       const stderr = result.stderr.toLowerCase();
-      let reason = "ca-store-unwritable";
-      if (stderr.includes("permission") || stderr.includes("not permitted")) {
-        reason = "ca-store-unwritable";
+      let reason: "ca-store-unwritable" | "elevation-required" =
+        "ca-store-unwritable";
+      if (
+        stderr.includes("permission") ||
+        stderr.includes("not permitted") ||
+        stderr.includes("no tty") ||
+        stderr.includes("terminal")
+      ) {
+        reason = "elevation-required";
       }
       throw new TrustError("trust.internal", reason, [reason]);
     }
   },
   async caTrustRemover(): Promise<void> {
-    const caDir = this.defaultCaInstallPath();
-    const certPath = posixJoin(caDir, "rogatio-ca.crt");
-
     try {
-      unlinkSync(certPath);
+      unlinkSync(CERT_PATH);
     } catch {
       // Ignore "not found" errors
     }
