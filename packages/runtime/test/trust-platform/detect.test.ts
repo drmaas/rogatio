@@ -149,9 +149,9 @@ describe("TrustPlatformAdapter detect()", () => {
         const p = String(path);
         if (p === "/usr/local/share/ca-certificates") throw new Error("EACCES");
       });
-      // sudo -n true fails (no passwordless sudo)
+      // sudo not installed
       mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
-        if (cmd === "sudo") return { status: 1 };
+        if (cmd === "which" && _args?.[0] === "sudo") return { status: 1 };
         return { status: 0 };
       });
 
@@ -168,9 +168,9 @@ describe("TrustPlatformAdapter detect()", () => {
         const p = String(path);
         if (p === "/usr/local/share/ca-certificates") throw new Error("EACCES");
       });
-      // sudo -n true succeeds
+      // sudo installed (which sudo succeeds)
       mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
-        if (cmd === "sudo") return { status: 0 };
+        if (cmd === "which" && _args?.[0] === "sudo") return { status: 0 };
         return { status: 0 };
       });
 
@@ -213,8 +213,9 @@ describe("TrustPlatformAdapter detect()", () => {
         )
           throw new Error("EACCES");
       });
+      // sudo not installed
       mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
-        if (cmd === "sudo") return { status: 1 };
+        if (cmd === "which" && _args?.[0] === "sudo") return { status: 1 };
         return { status: 0 };
       });
 
