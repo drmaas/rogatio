@@ -17,7 +17,9 @@ all flow over the `v1` native-messaging envelope (spec REQ-001..REQ-005).
   native-messaging host registration. The same `install` invocation also
   provisions and trusts the device-local CA on which request-body interception
   depends; on incapable platforms, the install completes without CA trust and
-  the caller is informed. `uninstall` removes the host manifest, the device-local
+  the caller is informed. CA trust installation requires elevated privileges:
+  Linux (`sudo`), macOS (keychain password), Windows (Administrator).
+  `uninstall` removes the host manifest, the device-local
   CA files, and the trust installation (idempotent).
 - `rogatio runtime host <path>` launches the consolidated native-messaging host for a project
   on stdio. The browser extension connects to it for pairing, authorization, and mock delivery.

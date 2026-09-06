@@ -28,7 +28,9 @@ consolidated native-messaging host (spec REQ-001..REQ-005).
 
 Request-body trust commands:
   install   Install the native-messaging host manifest and (on capable
-            platforms) provision the device-local CA (requires --extension-id)
+            platforms) provision the device-local CA (requires --extension-id).
+            CA trust requires root/admin: Linux (sudo), macOS (keychain
+            password), Windows (Administrator).
   uninstall Remove the native-messaging host manifest and the device-local CA trust (idempotent)
 
 Native host command:
@@ -138,11 +140,11 @@ function reportTrust(
       "manifest-dir-unwritable":
         "Hint: check permissions on Chrome NativeMessagingHosts directory or run with appropriate access",
       "keychain-unwritable":
-        "Hint: macOS login keychain not writable; try running with appropriate keychain access or use sudo for system keychain (future slice)",
+        "Hint: macOS login keychain not writable; try running with appropriate keychain access or use sudo for system keychain",
       "ca-store-unwritable":
-        "Hint: ~/.local/share/ca-certificates not writable; check permissions",
+        "Hint: /usr/local/share/ca-certificates not writable; check directory permissions",
       "elevation-required":
-        "Hint: Windows system certificate store requires Administrator; re-run in elevated terminal (future slice)",
+        "Hint: device-local CA trust requires root (Linux: sudo, macOS: keychain password, Windows: Administrator). Re-run with elevated privileges",
     };
 
     for (const reason of reasons) {

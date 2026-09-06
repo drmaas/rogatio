@@ -15,8 +15,9 @@ contact upstream**.
 
 ## Connecting
 
-- Mocks are delivered by the consolidated native-messaging host. The extension performs the
-  one-time `mock.connect` handshake when you click **Start runtime**.
+- Mocks require the native runtime. The extension performs the one-time `mock.connect`
+  handshake when you click **Start runtime**. Without the runtime, mocks report
+  `needs proxy`.
 - Its status represents the last activation check, not continuous monitoring.
 - The mock/response server binds only `127.0.0.1`, pairs through a random capability and
   preset digest, authorizes the exact rule, confines file access, and enforces SSRF,

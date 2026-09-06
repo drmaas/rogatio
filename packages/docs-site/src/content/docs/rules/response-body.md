@@ -15,7 +15,11 @@ local runtime.
 
 ## Requirements
 
-- Requires the local runtime to be started (see [Local runtime](/guides/runtime/)).
+- Requires the native runtime to be started (see [Local runtime](/guides/runtime/)).
+  Without the runtime, response-body rules report `needs proxy`.
+- Requires the device-local CA trust installed via `rogatio runtime install`. CA trust
+  installation requires elevated privileges: Linux (`sudo`), macOS (keychain password),
+  Windows (Administrator).
 - Activation is capability-based; where required capabilities are absent, activation reports
   `unsupported`.
 - Observed bodies are never persisted, logged, exported, or transferred through native
