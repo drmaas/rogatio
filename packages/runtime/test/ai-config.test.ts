@@ -232,7 +232,10 @@ describe("ai-config", () => {
 
       const stat = await fs.stat(configPath);
       // Check owner read/write only (0o600 = 0o100600 in stat.mode)
-      expect(stat.mode & 0o777).toBe(0o600);
+      // Mask with 0o777 to get permission bits, then verify group/other have no access
+      const perms = stat.mode & 0o777;
+      expect(perms & 0o077).toBe(0); // No group/other permissions
+      expect(perms & 0o600).toBe(0o600); // Owner has read/write
     });
 
     it("returns null when config does not exist", async () => {
