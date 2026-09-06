@@ -22,6 +22,12 @@ const cliManifest = JSON.parse(
   await readFile(join(root, "packages/cli/package.json"), "utf8"),
 ) as { dependencies?: Record<string, string> };
 const expectedAjv = cliManifest.dependencies?.ajv;
+const runtimeManifest = JSON.parse(
+  await readFile(join(root, "packages/runtime/package.json"), "utf8"),
+) as { dependencies?: Record<string, string> };
+const runtimeExternalPkgs = ["@peculiar/x509", "reflect-metadata"].filter(
+  (dep) => runtimeManifest.dependencies?.[dep],
+);
 
 async function run(command: string, args: string[], cwd: string) {
   try {
@@ -70,6 +76,15 @@ describe(" packaged CLI integration", () => {
         join(tarballs, `rogatio-${packageName}-0.0.0.tgz`),
       );
       const ajvPackage = dirname(require.resolve("ajv/package.json"));
+      const externalPkgs = [ajvPackage];
+      for (const dep of runtimeExternalPkgs) {
+        try {
+          externalPkgs.push(dirname(require.resolve(`${dep}/package.json`)));
+        } catch {
+          const mainEntry = require.resolve(dep);
+          externalPkgs.push(dirname(mainEntry));
+        }
+      }
       const install = await run(
         "npm",
         [
@@ -78,7 +93,7 @@ describe(" packaged CLI integration", () => {
           "--no-audit",
           "--no-fund",
           ...tarballPaths,
-          ajvPackage,
+          ...externalPkgs,
         ],
         consumer,
       );
