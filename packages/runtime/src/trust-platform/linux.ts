@@ -10,7 +10,7 @@ const CA_DIR = "/usr/local/share/ca-certificates";
 const CERT_PATH = posixJoin(CA_DIR, "rogatio-ca.crt");
 
 function hasSudo(): boolean {
-  const result = spawnSync("sudo", ["-n", "true"], { timeout: 1000 });
+  const result = spawnSync("which", ["sudo"], { timeout: 1000 });
   return result.status === 0;
 }
 
@@ -40,7 +40,7 @@ const linuxAdapter: TrustPlatformAdapter = {
 
     // The system CA dir (/usr/local/share/ca-certificates) requires root to
     // write.  Check whether it is directly writable; if not, check whether
-    // passwordless sudo is available.  If neither, report elevation-required.
+    // sudo is installed.  If neither, report elevation-required.
     try {
       accessSync(CA_DIR, constants.W_OK);
     } catch (err: unknown) {
