@@ -20,7 +20,8 @@ export type ExtensionCommand =
   | "set-group-enabled"
   | "start-native-runtime"
   | "stop-native-runtime"
-  | "get-native-runtime-status";
+  | "get-native-runtime-status"
+  | "diagnose-native-runtime";
 
 export interface ExtensionRequest {
   readonly version: 1;
@@ -53,6 +54,7 @@ const COMMANDS = new Set<ExtensionCommand>([
   "start-native-runtime",
   "stop-native-runtime",
   "get-native-runtime-status",
+  "diagnose-native-runtime",
 ]);
 
 export function parseRequest(value: unknown): ParseRequestResult {

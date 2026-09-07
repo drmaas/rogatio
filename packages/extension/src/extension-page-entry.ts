@@ -69,6 +69,16 @@ let permissionGranted = false;
 /** AI support status from native host */
 let aiSupported = false;
 let aiStatusChecked = false;
+/** Diagnostics modal state */
+let diagnosticsOpen = false;
+let diagnosticsData: {
+  phase: string;
+  extensionId: string | null;
+  hostName: string;
+  chromeError: string | null;
+  connectNativeAvailable: boolean;
+  timestamp: number;
+} | null = null;
 
 function safeProjectData(): unknown {
   if (!state.activeProjectId)
@@ -303,6 +313,12 @@ function renderSidebar(shell: HTMLElement): void {
   nativeRuntime.className = `rogatio-runtime-status ${runtimeStatusTone()}`;
   nativeRuntime.textContent = `Runtime status: ${runtimeStatusText()}`;
   sidebar.append(nativeRuntime);
+
+  // Show diagnostics button when runtime failed or is unsupported
+  const runtimePhase = state.nativeRuntimeState?.phase ?? "stopped";
+  if (runtimePhase === "failed" || runtimePhase === "unsupported") {
+    sidebar.append(button("Show diagnostics", "show-diagnostics"));
+  }
 
   // AI status - check if native host supports AI
   const aiStatus = document.createElement("p");
@@ -547,6 +563,11 @@ function renderShell(): void {
   shell.append(layout);
   root.append(shell);
 
+  // Render diagnostics modal if open
+  if (diagnosticsOpen && diagnosticsData) {
+    renderDiagnosticsModal(root);
+  }
+
   // Tab switching
   shell.addEventListener("click", (event) => {
     const target = event.target;
@@ -569,6 +590,7 @@ function renderShell(): void {
       void nativeRuntimeCommand("start-native-runtime");
     if (command === "stop-native-runtime")
       void nativeRuntimeCommand("stop-native-runtime");
+    if (command === "show-diagnostics") void showDiagnostics();
     if (command === "export") {
       const projectId = target.dataset.projectAction ?? pendingProjectId;
       if (projectId) pendingProjectId = projectId;
@@ -843,8 +865,8 @@ async function nativeRuntimeCommand(
     }
     statusMessage =
       code === "extension.native-host-missing"
-        ? "The native runtime host is not installed on this device. Run the install command below once in a terminal, then click Start runtime again."
-        : "Request-body rules need the device-local CA trusted on this device. Run the install command below to register the host and (on capable platforms) trust the device-local CA, then click Start runtime again. Mocks and response-body rules do not need trust.";
+        ? "The native runtime host is not installed on this device. Run the install command below once in a terminal, then restart Chrome and click Start runtime again. If you just ran install, try restarting Chrome first."
+        : "Request-body rules need the device-local CA trusted on this device. Run the install command below to register the host and (on capable platforms) trust the device-local CA, then restart Chrome and click Start runtime again. Mocks and response-body rules do not need trust.";
   } else if (code === "extension.native-runtime-unavailable") {
     statusMessage = "Runtime action unavailable on this platform.";
   } else {
@@ -938,6 +960,127 @@ async function checkNativeAISupport(): Promise<void> {
     aiStatusChecked = true;
     renderShell();
   }
+}
+
+async function showDiagnostics(): Promise<void> {
+  const response = await client.send({
+    version: 1,
+    command: "diagnose-native-runtime",
+  });
+  if (response?.ok === true && response.value) {
+    diagnosticsData = response.value as {
+      phase: string;
+      extensionId: string | null;
+      hostName: string;
+      chromeError: string | null;
+      connectNativeAvailable: boolean;
+      timestamp: number;
+    };
+    diagnosticsOpen = true;
+  }
+  renderShell();
+}
+
+function formatDiagnosticsText(): string {
+  if (!diagnosticsData) return "";
+  const lines = [
+    `Phase: ${diagnosticsData.phase}`,
+    `Extension ID: ${diagnosticsData.extensionId ?? "unknown"}`,
+    `Host name: ${diagnosticsData.hostName}`,
+    `connectNative available: ${diagnosticsData.connectNativeAvailable}`,
+    `Chrome error: ${diagnosticsData.chromeError ?? "none"}`,
+    `Timestamp: ${new Date(diagnosticsData.timestamp).toISOString()}`,
+  ];
+  return lines.join("\n");
+}
+
+async function copyDiagnostics(): Promise<void> {
+  const text = formatDiagnosticsText();
+  if (!text) return;
+  const ok = await copyText(text);
+  statusMessage = ok
+    ? "Diagnostics copied to clipboard."
+    : "Copying failed. Select the text and copy manually.";
+  renderShell();
+}
+
+function renderDiagnosticsModal(container: HTMLElement): void {
+  const overlay = document.createElement("div");
+  overlay.className = "rogatio-modal-overlay";
+
+  const modal = document.createElement("div");
+  modal.className = "rogatio-modal";
+
+  const header = document.createElement("div");
+  header.className = "rogatio-modal-header";
+  const title = document.createElement("h3");
+  title.textContent = "Runtime Diagnostics";
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.textContent = "\u00d7";
+  closeBtn.className = "rogatio-modal-close";
+  header.append(title, closeBtn);
+
+  const body = document.createElement("div");
+  body.className = "rogatio-modal-body";
+  if (diagnosticsData) {
+    const table = document.createElement("div");
+    table.className = "rogatio-diag-table";
+    const row = (label: string, value: string) => {
+      const r = document.createElement("div");
+      r.className = "rogatio-diag-row";
+      const l = document.createElement("span");
+      l.className = "rogatio-diag-label";
+      l.textContent = label;
+      const v = document.createElement("span");
+      v.className = "rogatio-diag-value";
+      v.textContent = value;
+      r.append(l, v);
+      return r;
+    };
+    table.append(
+      row("Phase", diagnosticsData.phase),
+      row("Extension ID", diagnosticsData.extensionId ?? "unknown"),
+      row("Host name", diagnosticsData.hostName),
+      row(
+        "connectNative",
+        diagnosticsData.connectNativeAvailable ? "available" : "missing",
+      ),
+      row("Chrome error", diagnosticsData.chromeError ?? "none"),
+    );
+    const hint = document.createElement("p");
+    hint.className = "rogatio-diag-hint";
+    hint.textContent =
+      "If the Chrome error mentions a missing file or permission, re-run the install command and restart Chrome.";
+    body.append(table, hint);
+  }
+
+  const footer = document.createElement("div");
+  footer.className = "rogatio-modal-footer";
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.textContent = "Copy diagnostics";
+  const closeFooterBtn = document.createElement("button");
+  closeFooterBtn.type = "button";
+  closeFooterBtn.textContent = "Close";
+  footer.append(copyBtn, closeFooterBtn);
+
+  modal.append(header, body, footer);
+  overlay.append(modal);
+  container.append(overlay);
+
+  // Direct listeners — the overlay is a sibling of shell, not a child, so
+  // the shell delegated click handler cannot reach these elements.
+  function closeModal(): void {
+    diagnosticsOpen = false;
+    renderShell();
+  }
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeModal();
+  });
+  closeBtn.addEventListener("click", closeModal);
+  closeFooterBtn.addEventListener("click", closeModal);
+  copyBtn.addEventListener("click", () => void copyDiagnostics());
 }
 
 async function refresh(): Promise<void> {

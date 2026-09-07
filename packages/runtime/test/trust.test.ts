@@ -455,7 +455,7 @@ describe(" trust controller lifecycle", () => {
 
     expect(controller).not.toHaveProperty("untrust");
     expect(Object.keys(controller).sort()).toEqual(
-      ["install", "status", "uninstall"].sort(),
+      ["install", "status", "uninstall", "verify"].sort(),
     );
   });
 });

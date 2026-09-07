@@ -52,9 +52,9 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
     "The runtime is unavailable on this platform.",
   "extension.native-runtime-transition": "The runtime could not change state.",
   "extension.native-host-missing":
-    "The native runtime host is not installed on this device. Run `rogatio runtime install --extension-id <extension ID>` once, then start the runtime again.",
+    "The native runtime host is not installed or not detected. Run `rogatio runtime install --extension-id <extension ID>`, then reload the extension at chrome://extensions (click the circular-arrow reload button on the Rogatio card) and start the runtime again.",
   "extension.request-body-needs-trust":
-    "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime install --extension-id <extension ID>` to register the host and (on capable platforms) trust the device-local CA, then click Start runtime again. Mocks and response-body rules do not need trust.",
+    "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime install --extension-id <extension ID>` to register the host and (on capable platforms) trust the device-local CA, then restart Chrome and click Start runtime again. Mocks and response-body rules do not need trust.",
 };
 
 export function extensionDiagnostic(

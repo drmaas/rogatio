@@ -184,11 +184,15 @@ export async function startNativeSession(
   | { ok: true; sessionId: string; policyDigest: string }
   | { ok: false; reason: string }
 > {
+  console.log("[rogatio] startNativeSession: getting project");
   const project = await options.getProject();
-  if (!project) return { ok: false, reason: "no-project" };
+  if (!project) {
+    console.log("[rogatio] no project");
+    return { ok: false, reason: "no-project" };
+  }
 
   const granted = await options.getGrantedOrigins();
-
+  console.log("[rogatio] building native policy");
   const policyResult = await buildNativePolicy(
     project.data,
     project.enabledGroupIds,
@@ -196,11 +200,56 @@ export async function startNativeSession(
     [],
     options.extensionId,
   );
-  if (!policyResult.ok) return { ok: false, reason: policyResult.reason };
+  if (!policyResult.ok) {
+    console.log("[rogatio] policy build failed:", policyResult.reason);
+    return { ok: false, reason: policyResult.reason };
+  }
+
+  // Send project data to host for deferred project loading.
+  // send() triggers ensurePort() → connectNative(), which launches the host
+  // process in idle state. The host receives runtime.project.set, validates
+  // the project, builds the preset, and transitions to running.
+  const send = options.nativeRuntime.send;
+  console.log("[rogatio] send available:", !!send);
+  if (send) {
+    console.log("[rogatio] sending runtime.project.set");
+    try {
+      const projectSetResponse = await send({
+        protocol: "v1",
+        type: "runtime.project.set",
+        timestamp: Date.now(),
+        metadata: { project: project.data },
+      });
+      console.log(
+        "[rogatio] project.set response:",
+        JSON.stringify(projectSetResponse),
+      );
+
+      if (
+        !projectSetResponse.metadata.ok &&
+        projectSetResponse.metadata.error !== "runtime.already-started"
+      ) {
+        console.log(
+          "[rogatio] project.set failed:",
+          projectSetResponse.metadata.error,
+        );
+        return {
+          ok: false,
+          reason: String(
+            projectSetResponse.metadata.error ?? "project-set-failed",
+          ),
+        };
+      }
+    } catch (error) {
+      console.log("[rogatio] project.set exception:", error);
+      return { ok: false, reason: String(error) };
+    }
+  }
 
   const sessionId = crypto.randomUUID();
   const policyFrames = encodePolicy(policyResult.value);
 
+  console.log("[rogatio] sending policy frames");
   await options.nativeRuntime.sendPolicy(policyFrames);
 
   const policyDigest = await computeDigest(policyResult.value);
