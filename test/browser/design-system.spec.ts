@@ -200,9 +200,7 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   await expect(page.locator("[data-project-card]")).toHaveCount(2);
   const firstCard = page.locator("[data-project-card]").first();
   await expect(firstCard).toContainText("Project A");
-  await expect(firstCard.locator("[data-project-status]")).toHaveText(
-    "Active Runtime",
-  );
+  await expect(firstCard.locator("[data-project-status]")).toHaveText("Idle");
   await expect(firstCard.locator("[data-project-groups]")).toHaveText("1");
   await expect(firstCard.locator("[data-project-rules]")).toHaveText("1");
   await expect(firstCard.locator("[data-project-enabled]")).toHaveText(

@@ -439,7 +439,9 @@ function renderOverview(shell: HTMLElement): void {
     card.className = "rogatio-project-card";
     card.dataset.projectCard = "true";
     card.dataset.projectId = id;
-    if (state.activeProjectId === id) card.dataset.active = "true";
+    const phase = state.nativeRuntimeState?.phase ?? "stopped";
+    const isStarted = phase === "started";
+    if (state.activeProjectId === id && isStarted) card.dataset.active = "true";
 
     const title = document.createElement("p");
     title.className = "rogatio-project-card-title";
@@ -451,8 +453,18 @@ function renderOverview(shell: HTMLElement): void {
     const status = document.createElement("span");
     status.dataset.projectStatus = "true";
     status.className = "rogatio-project-status";
-    status.textContent =
-      state.activeProjectId === id ? "Active Runtime" : "Idle";
+    const isActive = state.activeProjectId === id;
+    if (isActive && isStarted) {
+      status.textContent = "Active Runtime";
+    } else if (isActive && (phase === "failed" || phase === "error")) {
+      status.textContent = "Runtime failed";
+    } else if (isActive && phase === "unsupported") {
+      status.textContent = "Runtime unavailable";
+    } else if (isActive && phase === "starting") {
+      status.textContent = "Runtime starting";
+    } else {
+      status.textContent = "Idle";
+    }
     card.append(status);
 
     const stats = document.createElement("div");
