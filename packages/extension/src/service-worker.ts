@@ -111,7 +111,6 @@ function operationStatuses(
   grantedOrigins: readonly string[],
   mockTokens: ReadonlyMap<string, string>,
   nativePhase: NativeRuntimePhase | "unsupported",
-  mockConnected: boolean,
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -179,7 +178,9 @@ function operationStatuses(
       return { ...status };
     }
     if (operation?.kind === "mock") {
-      if (nativePhase !== "started" || !mockConnected) {
+      // Per consolidated native-runtime spec: mock rules need the native
+      // host started; separate mock-phase tracking removed.
+      if (nativePhase !== "started") {
         return {
           groupId: status.groupId,
           ruleId: status.ruleId,
@@ -348,7 +349,6 @@ export function createExtensionApplication(
       granted,
       mockTokens,
       nativePhase,
-      mockConnected,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),

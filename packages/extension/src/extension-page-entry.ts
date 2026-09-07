@@ -168,13 +168,13 @@ function attentionFromStatuses(): AttentionExplanation | null {
         blocking:
           "rules failed to install: re-activate the group or restart the runtime",
         explanation: "some rules failed to install.",
-        fix: "Re-activate the group, or restart the runtime for proxy-backed rules.",
+        fix: "Re-activate the group, or restart the native runtime.",
       };
     }
     if (blocking === "needs proxy") {
       return {
-        blocking: "needs proxy: start runtime",
-        explanation: "some rules need the proxy runtime.",
+        blocking: "needs runtime: start the native host",
+        explanation: "some rules need the native runtime.",
         fix: "Click 'Start runtime'.",
       };
     }
