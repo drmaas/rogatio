@@ -297,6 +297,7 @@ export type EnvelopeMessageType =
   | "runtime.start"
   | "runtime.stop"
   | "runtime.status"
+  | "runtime.project.set"
   | "authority.grant"
   | "authority.revoke"
   | "transform.request"

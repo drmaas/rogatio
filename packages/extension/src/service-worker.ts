@@ -60,6 +60,8 @@ export interface ExtensionApplicationOptions {
     sendPolicy(frames: Uint8Array[]): Promise<void>;
     /** Envelope protocol to the consolidated native host (spec REQ-001). */
     send?(envelope: NativeEnvelopeInput): Promise<NativeEnvelope>;
+    /** Chrome's last connectNative error message, if any. */
+    lastConnectError?(): string | null;
   };
 }
 
@@ -109,7 +111,6 @@ function operationStatuses(
   grantedOrigins: readonly string[],
   mockTokens: ReadonlyMap<string, string>,
   nativePhase: NativeRuntimePhase | "unsupported",
-  mockConnected: boolean,
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -177,7 +178,9 @@ function operationStatuses(
       return { ...status };
     }
     if (operation?.kind === "mock") {
-      if (nativePhase !== "started" || !mockConnected) {
+      // Per consolidated native-runtime spec: mock rules need the native
+      // host started; separate mock-phase tracking removed.
+      if (nativePhase !== "started") {
         return {
           groupId: status.groupId,
           ruleId: status.ruleId,
@@ -346,7 +349,6 @@ export function createExtensionApplication(
       granted,
       mockTokens,
       nativePhase,
-      mockConnected,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),
@@ -551,15 +553,33 @@ export function createExtensionApplication(
           : failure("extension.native-runtime-unavailable");
       }
       if (request.command === "start-native-runtime") {
+        console.log("[rogatio] start-native-runtime invoked");
         const current = await repository.state();
-        if (!current.ok) return failure("extension.storage-failed");
+        if (!current.ok) {
+          console.log("[rogatio] storage failed");
+          return failure("extension.storage-failed");
+        }
         const projectId = current.value.activeProjectId;
-        if (!projectId) return failure("extension.not-found");
+        if (!projectId) {
+          console.log("[rogatio] no active project");
+          return failure("extension.not-found");
+        }
         const project = current.value.projects[projectId];
-        if (!project) return failure("extension.not-found");
+        if (!project) {
+          console.log("[rogatio] project not found:", projectId);
+          return failure("extension.not-found");
+        }
 
+        console.log("[rogatio] compiling project:", project.data?.name);
         const compileResult = compileProject(project.data);
-        if (!compileResult.ok) return failure("extension.storage-failed");
+        if (!compileResult.ok) {
+          console.log("[rogatio] compile failed");
+          return failure("extension.storage-failed");
+        }
+        console.log(
+          "[rogatio] starting native session, extensionId:",
+          options.extensionId,
+        );
         const sessionResult = await startNativeSession({
           extensionId: options.extensionId,
           nativeRuntime: options.nativeRuntime,
@@ -574,6 +594,7 @@ export function createExtensionApplication(
           },
         });
 
+        console.log("[rogatio] session result:", JSON.stringify(sessionResult));
         if (!sessionResult.ok) {
           // A failed start must leave truthful state behind: the session did
           // not open, so the phase is `failed`, and the reason is surfaced as
@@ -701,6 +722,22 @@ export function createExtensionApplication(
       return {
         ok: true,
         value: { nativeRuntimeState: { phase: nativePhase } },
+      };
+    }
+    if (request.command === "diagnose-native-runtime") {
+      const chromeError = options.nativeRuntime?.lastConnectError?.() ?? null;
+      const connectNativeAvailable =
+        typeof chrome.runtime?.connectNative === "function";
+      return {
+        ok: true,
+        value: {
+          phase: nativePhase,
+          extensionId: options.extensionId ?? null,
+          hostName: "com.rogatio.runtime",
+          chromeError,
+          connectNativeAvailable,
+          timestamp: Date.now(),
+        },
       };
     }
     if (

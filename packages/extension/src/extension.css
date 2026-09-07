@@ -512,6 +512,96 @@ body {
     outline-color: Highlight;
   }
 }
+/* Diagnostics modal */
+.rogatio-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+.rogatio-modal {
+  background: var(--rogatio-surface, #1e1e2e);
+  border: 1px solid var(--rogatio-border, #313244);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  min-width: 340px;
+  max-width: 480px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  font-family: "Hanken Grotesk", system-ui, sans-serif;
+  color: var(--rogatio-text, #cdd6f4);
+}
+.rogatio-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--rogatio-border, #313244);
+}
+.rogatio-modal-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.rogatio-modal-close {
+  background: none;
+  border: none;
+  color: var(--rogatio-text, #cdd6f4);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.rogatio-modal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+.rogatio-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--rogatio-border, #313244);
+}
+.rogatio-modal-footer button {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--rogatio-border, #313244);
+  background: var(--rogatio-surface, #1e1e2e);
+  color: var(--rogatio-text, #cdd6f4);
+  font-size: 13px;
+  cursor: pointer;
+}
+.rogatio-modal-footer button:hover {
+  background: var(--rogatio-hover, #313244);
+}
+.rogatio-diag-table {
+  display: grid;
+  gap: 8px;
+}
+.rogatio-diag-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px;
+  font-size: 13px;
+}
+.rogatio-diag-label {
+  font-weight: 600;
+  color: var(--rogatio-subtext, #a6adc8);
+}
+.rogatio-diag-value {
+  font-family: "JetBrains Mono", monospace;
+  word-break: break-all;
+}
+.rogatio-diag-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--rogatio-subtext, #a6adc8);
+}
 @media (prefers-reduced-motion: reduce) {
   .rogatio-shell *,
   .rogatio-shell *::before,

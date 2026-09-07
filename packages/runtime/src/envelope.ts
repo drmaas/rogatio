@@ -10,11 +10,13 @@ const FORBIDDEN_BODY_KEYS = new Set(["body", "requestBody", "responseBody"]);
 
 const MOCK_BODY_KEY = "mockBody";
 const MOCK_BODY_ALLOWED_TYPES = new Set(["mock.response"]);
+const BODY_CHECK_EXEMPT_TYPES = new Set(["runtime.project.set"]);
 
 const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "runtime.start",
   "runtime.stop",
   "runtime.status",
+  "runtime.project.set",
   "authority.grant",
   "authority.revoke",
   "transform.request",
@@ -66,6 +68,7 @@ function assertNoBodyContent(
   type: string,
   metadata: Record<string, unknown>,
 ): void {
+  if (BODY_CHECK_EXEMPT_TYPES.has(type)) return;
   if (containsBodyKey(metadata)) {
     throw new EnvelopeError(
       "envelope must not carry request or response body content",

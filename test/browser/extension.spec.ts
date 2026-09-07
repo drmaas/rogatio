@@ -310,7 +310,7 @@ test("derives the attention reason from the actual rule statuses", async ({
   );
 
   await page.getByRole("button", { name: "Refresh" }).click();
-  await expect(badge).toContainText("needs proxy: start runtime");
+  await expect(badge).toContainText("needs runtime: start the native host");
   await expect(badge).not.toContainText("needs permission");
   await expect(page.locator(".rogatio-attention-note")).toContainText(
     "Start runtime",

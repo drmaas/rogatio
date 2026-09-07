@@ -10,7 +10,7 @@ import type {
 } from "./types.js";
 
 export interface NativeHostOptions {
-  readonly preset: NormalizedRuntimePreset;
+  readonly preset?: NormalizedRuntimePreset;
   readonly fileRoot?: string;
   /** Loopback port for the mock-body faucet (browser DNR redirect target). */
   readonly mockPort?: number;
@@ -128,13 +128,27 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
       let envelope: Envelope;
       try {
         envelope = decodeEnvelopeFrame(frame);
-      } catch {
+      } catch (error) {
+        console.error(
+          "[rogatio-host] decodeEnvelopeFrame failed:",
+          error instanceof Error ? error.message : String(error),
+        );
         return null;
       }
+      console.error(
+        "[rogatio-host] received envelope:",
+        envelope.type,
+        "requestId:",
+        envelope.requestId,
+      );
       let response: Envelope;
       try {
         response = await controller.handleEnvelope(envelope);
-      } catch {
+      } catch (error) {
+        console.error(
+          "[rogatio-host] handleEnvelope failed:",
+          error instanceof Error ? error.message : String(error),
+        );
         return null;
       }
       try {
@@ -164,10 +178,14 @@ export async function runNativeHost(
 
   let buffer = Buffer.alloc(0);
   stdin.on("data", (chunk: Buffer | string) => {
-    buffer = Buffer.concat([
-      buffer,
-      Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk),
-    ]);
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    console.error(
+      "[rogatio-host] stdin data:",
+      buf.length,
+      "bytes, buffer:",
+      buffer.length,
+    );
+    buffer = Buffer.concat([buffer, buf]);
     void (async () => {
       for (;;) {
         if (buffer.length < 4) break;
@@ -175,13 +193,21 @@ export async function runNativeHost(
         if (buffer.length < 4 + length) break;
         const frame = new Uint8Array(
           buffer.buffer,
-          buffer.byteOffset + 4,
-          length,
+          buffer.byteOffset,
+          4 + length,
         );
+        console.error("[rogatio-host] processing frame:", 4 + length, "bytes");
         const response = await host.processFrame(frame);
         buffer = buffer.subarray(4 + length);
         if (response && stdout.writable) {
+          console.error(
+            "[rogatio-host] writing response:",
+            response.length,
+            "bytes",
+          );
           stdout.write(Buffer.from(response));
+        } else {
+          console.error("[rogatio-host] no response to write");
         }
       }
     })();

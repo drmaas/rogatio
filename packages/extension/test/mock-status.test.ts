@@ -88,12 +88,22 @@ function harnessOptions(
       send:
         mockConnect === null
           ? undefined
-          : vi.fn(async () => ({
-              protocol: "v1" as const,
-              type: "mock.connect",
-              timestamp: 1,
-              metadata: await mockConnect(),
-            })),
+          : vi.fn(async (envelope?: { type?: string }) => {
+              if (envelope?.type === "runtime.project.set") {
+                return {
+                  protocol: "v1" as const,
+                  type: "runtime.project.set",
+                  timestamp: 1,
+                  metadata: { ok: true },
+                };
+              }
+              return {
+                protocol: "v1" as const,
+                type: "mock.connect",
+                timestamp: 1,
+                metadata: await mockConnect(),
+              };
+            }),
     },
     extensionId: "test-extension-id",
     generateId: () => "project-a",
@@ -257,7 +267,7 @@ describe(" extension mock rules under the unified native runtime", () => {
     });
   });
 
-  it("keeps mock rules needing the runtime when the host does not answer mock.connect", async () => {
+  it("keeps mock rules as error when the host does not return tokens after start", async () => {
     const { app } = harness(async () => {
       throw new Error("host disconnected");
     });
@@ -273,13 +283,17 @@ describe(" extension mock rules under the unified native runtime", () => {
     });
 
     const state = await app.handle({ version: 1, command: "get-state" });
-    expect(state).toMatchObject({
-      ok: true,
-      value: {
-        ruleStatuses: [{ status: "needs proxy" }],
-        nativeRuntimeState: { phase: "started" },
-      },
-    });
+    const value = (state as { value: { ruleStatuses: unknown[] } }).value;
+    const status = value.ruleStatuses[0] as {
+      status: string;
+      diagnostics?: readonly { code: string }[];
+    };
+    expect(status.status).toBe("error");
+    expect(
+      status.diagnostics?.some(
+        (d) => d.code === "extension.mock-token-missing",
+      ),
+    ).toBe(true);
   });
 
   it("reports a stable mock-token error when the host has no token for the rule", async () => {

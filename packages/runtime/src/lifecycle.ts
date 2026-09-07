@@ -1,3 +1,5 @@
+import { compileProject, type RogatioOperation } from "@rogatio/compiler";
+import { validateProjectDetailed } from "@rogatio/schema";
 import {
   type AIClient,
   type AIProviderConfig,
@@ -20,7 +22,9 @@ import {
   startInterception,
   stopInterception,
 } from "./interception.js";
+import { RUNTIME_LIMITS } from "./limits.js";
 import { mintToken, type RenderedMock, renderMockResponse } from "./mock.js";
+import { normalizeRuntimePreset } from "./preset.js";
 import type {
   AuthorizeRequest,
   Envelope,
@@ -60,7 +64,7 @@ export interface SessionConfig {
 }
 
 export interface NativeRuntimeControllerOptions {
-  readonly preset: NormalizedRuntimePreset;
+  readonly preset?: NormalizedRuntimePreset;
   readonly fileRoot?: string;
   /** Loopback faucet port the native host binds to serve mock bodies (REQ-003). */
   readonly mockPort?: number;
@@ -120,11 +124,15 @@ async function delay(ms: number): Promise<void> {
  * serves pairing, authorization, and mock delivery (spec REQ-001). Activation is
  * unconditional: the host runs whenever started, independent of any device-local
  * CA / PAC routing capability (spec REQ-004 / assumption D).
+ *
+ * When `preset` is omitted, the controller enters "deferred" mode: it stays idle
+ * until a `runtime.project.set` envelope arrives with the project data, which
+ * is validated, compiled, and used to build the preset before starting.
  */
 export function createNativeRuntimeController(
   options: NativeRuntimeControllerOptions,
 ): NativeRuntimeController {
-  const preset = options.preset;
+  let preset: NormalizedRuntimePreset | undefined = options.preset;
   const fileRoot = options.fileRoot;
   const mockPort = options.mockPort;
   const clock = options.clock ?? (() => Date.now());
@@ -145,6 +153,11 @@ export function createNativeRuntimeController(
       if (state === "running" || state === "starting") {
         if (activation) return { state: "running", activation };
         return { state };
+      }
+
+      // If no preset yet, stay idle (waiting for runtime.project.set)
+      if (!preset) {
+        return { state: "idle" };
       }
 
       const startedAt = clock();
@@ -210,6 +223,7 @@ export function createNativeRuntimeController(
     async serveMock(token: string): Promise<RuntimeResult<RenderedMock>> {
       const mock = mockTokens.get(token);
       if (mock === undefined) return failure("runtime.mock-unknown");
+      if (!preset) throw new Error("runtime not started");
       return renderMockResponse({
         mock,
         fileRoot,
@@ -229,12 +243,137 @@ export function createNativeRuntimeController(
     },
 
     async handleEnvelope(input: EnvelopeInput): Promise<Envelope> {
-      if (state !== "running" || capability === undefined) {
-        throw new Error("runtime not started");
-      }
       const now = clock();
       const requestId = input.requestId;
       const timestamp = now;
+
+      // Handle runtime.project.set in idle state (deferred project loading)
+      if (input.type === "runtime.project.set" && state === "idle") {
+        const projectData = input.metadata.project as unknown;
+        if (!projectData || typeof projectData !== "object") {
+          return {
+            protocol: "v1",
+            type: "runtime.project.set",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: "runtime.project-missing" },
+          };
+        }
+
+        const schemaResult = validateProjectDetailed(projectData);
+        if (!schemaResult.valid) {
+          return {
+            protocol: "v1",
+            type: "runtime.project.set",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: "runtime.project-invalid" },
+          };
+        }
+
+        const compileResult = compileProject(schemaResult.data);
+        if (!compileResult.ok) {
+          return {
+            protocol: "v1",
+            type: "runtime.project.set",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: {
+              ok: false,
+              error: "runtime.compile-failed",
+              diagnostics: compileResult.diagnostics,
+            },
+          };
+        }
+
+        const matcherOps: RogatioOperation[] = [];
+        const mockConfigs: RuntimeMockConfig[] = [];
+        for (const op of compileResult.operations) {
+          if (op.kind === "mock") {
+            const mock = op.mock;
+            let file: string | undefined;
+            if (mock.file !== undefined) {
+              file = mock.file;
+            }
+            mockConfigs.push({
+              ruleId: op.ruleId,
+              status: mock.status,
+              ...(mock.headers !== undefined ? { headers: mock.headers } : {}),
+              ...(mock.delayMs !== undefined ? { delayMs: mock.delayMs } : {}),
+              ...(mock.body !== undefined ? { body: mock.body } : {}),
+              ...(file !== undefined ? { file } : {}),
+            });
+          }
+          // Include all operations with a matcher field (including mocks)
+          // so normalizeRuntimePreset can match mock ruleIds to their matchers.
+          // Convert to MatcherOperation shape since the normalizer expects kind="matcher".
+          if ("matcher" in op) {
+            matcherOps.push({
+              kind: "matcher",
+              groupId: op.groupId,
+              ruleId: op.ruleId,
+              matcher: (op as { matcher: unknown }).matcher,
+            } as RogatioOperation);
+          }
+        }
+
+        const presetInput = {
+          version: 1,
+          limits: RUNTIME_LIMITS,
+          matchers: matcherOps,
+          grants: [],
+          ...(mockConfigs.length > 0 ? { mocks: mockConfigs } : {}),
+        };
+        console.error(
+          "[rogatio-host] normalizeRuntimePreset input: matchers=",
+          matcherOps.length,
+          "mocks=",
+          mockConfigs.length,
+          "grants=0",
+        );
+        const normalized = normalizeRuntimePreset(presetInput);
+        console.error(
+          "[rogatio-host] normalizeRuntimePreset result: ok=",
+          normalized.ok,
+        );
+
+        if (!normalized.ok) {
+          return {
+            protocol: "v1",
+            type: "runtime.project.set",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: "runtime.preset-invalid" },
+          };
+        }
+
+        preset = normalized.value;
+
+        // Start the controller now that we have a preset
+        const startResult = await this.start();
+        if (startResult.state !== "running") {
+          return {
+            protocol: "v1",
+            type: "runtime.project.set",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: "runtime.start-failed" },
+          };
+        }
+
+        return {
+          protocol: "v1",
+          type: "runtime.project.set",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: { ok: true, presetDigest: preset.digest },
+        };
+      }
+
+      // All other envelopes require running state
+      if (state !== "running" || capability === undefined) {
+        throw new Error("runtime not started");
+      }
 
       switch (input.type) {
         case "pair.request": {
@@ -293,6 +432,7 @@ export function createNativeRuntimeController(
               metadata: { authorized: false, error: op.error.code },
             };
           }
+          if (!preset) throw new Error("runtime not started");
           const result = authorizeExact(preset, meta.descriptor);
           op.value();
           if (!result.ok) {
@@ -322,6 +462,7 @@ export function createNativeRuntimeController(
           };
         }
         case "mock.connect": {
+          if (!preset) throw new Error("runtime not started");
           // The host is already bound to a single preset at start(); return its
           // mock tokens. The request presetDigest (if any) is informational and
           // not required to match (spec REQ-003).
@@ -367,6 +508,7 @@ export function createNativeRuntimeController(
           return renderMock(mock, requestId, timestamp);
         }
         case "runtime.status": {
+          if (!preset) throw new Error("runtime not started");
           return {
             protocol: "v1",
             type: "runtime.status",
@@ -517,6 +659,7 @@ export function createNativeRuntimeController(
     timestamp: number,
   ): Promise<Envelope> {
     if (mock.delayMs !== undefined) await delay(mock.delayMs);
+    if (!preset) throw new Error("runtime not started");
     const rendered = await renderMockResponse({
       mock,
       fileRoot,

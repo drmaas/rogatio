@@ -378,6 +378,7 @@ export function normalizeRuntimePreset(
     typeof snapshot.value !== "object" ||
     Array.isArray(snapshot.value)
   ) {
+    console.error("[rogatio-host] preset: snapshot invalid");
     return failure("runtime.invalid-preset");
   }
   const record = snapshot.value as Record<string, unknown>;
@@ -388,19 +389,38 @@ export function normalizeRuntimePreset(
     Object.keys(record).some((key) => !allowedKeys.includes(key)) ||
     !requiredKeys.every((key) => hasOwn(record, key)) ||
     (keyCount !== 4 && keyCount !== 5)
-  )
+  ) {
+    console.error(
+      "[rogatio-host] preset: key check failed, keys=",
+      Object.keys(record),
+    );
     return failure("runtime.invalid-preset");
-  if (record.version !== 1 || !sameLimits(record.limits))
+  }
+  if (record.version !== 1 || !sameLimits(record.limits)) {
+    console.error(
+      "[rogatio-host] preset: version/limits mismatch, version=",
+      record.version,
+      "limitsOk=",
+      sameLimits(record.limits),
+    );
     return failure("runtime.invalid-preset");
-  if (!Array.isArray(record.matchers) || !Array.isArray(record.grants))
+  }
+  if (!Array.isArray(record.matchers) || !Array.isArray(record.grants)) {
+    console.error("[rogatio-host] preset: matchers/grants not arrays");
     return failure("runtime.invalid-preset");
+  }
 
   const matchers: MatcherOperation[] = [];
   const matcherById = new Map<string, MatcherOperation>();
   for (const value of record.matchers) {
     const matcher = normalizeMatcher(value);
-    if (matcher === null || matcherById.has(matcher.ruleId))
+    if (matcher === null || matcherById.has(matcher.ruleId)) {
+      console.error(
+        "[rogatio-host] preset: matcher normalize failed, ruleId=",
+        (value as Record<string, unknown>)?.ruleId,
+      );
       return failure("runtime.invalid-preset");
+    }
     matcherById.set(matcher.ruleId, matcher);
     matchers.push(matcher);
   }
