@@ -42,6 +42,7 @@ interface NativeRuntimeAdapter {
   status(): Promise<{ state: NativeRuntimePhase | "unsupported" }>;
   sendPolicy(frames: Uint8Array[]): Promise<void>;
   send(envelope: NativeEnvelopeInput): Promise<NativeEnvelope>;
+  lastConnectError(): string | null;
 }
 
 /**
@@ -55,23 +56,40 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
   let port: ChromePort | null = null;
   let connected = false;
   let counter = 0;
+  let lastConnectError: string | null = null;
   const pending = new Map<string, (envelope: NativeEnvelope) => void>();
   const rejected = new Map<string, (reason: Error) => void>();
 
   function ensurePort(): ChromePort {
-    if (port) return port;
+    if (port) {
+      console.log("[rogatio] ensurePort: reusing existing port");
+      return port;
+    }
     const connect = api.runtime.connectNative;
     if (!connect) throw new NativeHostMissingError();
     let next: ChromePort;
     try {
+      console.log("[rogatio] ensurePort: connecting to", NATIVE_HOST_NAME);
       next = connect(NATIVE_HOST_NAME);
-    } catch {
+      lastConnectError = null;
+      console.log("[rogatio] ensurePort: connected successfully");
+    } catch (error) {
       // Chrome throws synchronously when the native-messaging host manifest is
-      // not registered (`rogatio runtime install` has not run on this device).
+      // not registered or the binary cannot be launched. Capture the actual
+      // error message so callers can distinguish missing manifest from missing
+      // binary, permission denied, etc.
+      console.log("[rogatio] ensurePort: connectNative FAILED:", error);
+      lastConnectError = error instanceof Error ? error.message : String(error);
       throw new NativeHostMissingError();
     }
     next.onMessage.addListener((message: unknown) => {
-      const envelope = message as { requestId?: unknown };
+      const envelope = message as { requestId?: unknown; type?: string };
+      console.log(
+        "[rogatio] onMessage:",
+        envelope.type,
+        "requestId:",
+        envelope.requestId,
+      );
       const requestId =
         envelope.requestId !== undefined
           ? String(envelope.requestId)
@@ -83,9 +101,12 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
         rejected.delete(requestId);
         if (resolve) resolve(message as NativeEnvelope);
         else if (reject) reject(new Error("unexpected response"));
+        else
+          console.log("[rogatio] onMessage: no pending request for", requestId);
       }
     });
     next.onDisconnect.addListener(() => {
+      console.log("[rogatio] port disconnected");
       connected = false;
       port = null;
       for (const reject of rejected.values())
@@ -104,7 +125,9 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       message?: string;
     }> {
       try {
+        console.log("[rogatio] background.start: ensurePort");
         const active = ensurePort();
+        console.log("[rogatio] background.start: posting runtime.start");
         active.postMessage({
           protocol: "v1",
           type: "runtime.start",
@@ -112,6 +135,7 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
         });
         return { state: "started" };
       } catch (error) {
+        console.log("[rogatio] background.start error:", error);
         if (isNativeHostMissingError(error))
           return {
             state: "unsupported",
@@ -147,6 +171,12 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       return;
     },
     send(envelope: NativeEnvelopeInput): Promise<NativeEnvelope> {
+      console.log(
+        "[rogatio] send:",
+        envelope.type,
+        "requestId:",
+        envelope.requestId,
+      );
       const active = ensurePort();
       const requestId = String(++counter);
       const full = { ...envelope, requestId } as NativeEnvelopeInput & {
@@ -158,12 +188,16 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
         active.postMessage(full);
         setTimeout(() => {
           if (pending.has(requestId)) {
+            console.log("[rogatio] send timeout for", envelope.type);
             pending.delete(requestId);
             rejected.delete(requestId);
             reject(new Error("native host timeout"));
           }
         }, 10000);
       });
+    },
+    lastConnectError(): string | null {
+      return lastConnectError;
     },
   };
 }

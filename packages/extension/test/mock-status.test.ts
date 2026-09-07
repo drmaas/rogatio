@@ -88,12 +88,22 @@ function harnessOptions(
       send:
         mockConnect === null
           ? undefined
-          : vi.fn(async () => ({
-              protocol: "v1" as const,
-              type: "mock.connect",
-              timestamp: 1,
-              metadata: await mockConnect(),
-            })),
+          : vi.fn(async (envelope?: { type?: string }) => {
+              if (envelope?.type === "runtime.project.set") {
+                return {
+                  protocol: "v1" as const,
+                  type: "runtime.project.set",
+                  timestamp: 1,
+                  metadata: { ok: true },
+                };
+              }
+              return {
+                protocol: "v1" as const,
+                type: "mock.connect",
+                timestamp: 1,
+                metadata: await mockConnect(),
+              };
+            }),
     },
     extensionId: "test-extension-id",
     generateId: () => "project-a",

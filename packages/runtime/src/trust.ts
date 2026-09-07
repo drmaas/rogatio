@@ -47,6 +47,17 @@ export interface TrustStatus {
   readonly capabilityReasons: readonly string[];
 }
 
+export interface VerifyResult {
+  readonly ok: boolean;
+  readonly manifestExists: boolean;
+  readonly manifestValid: boolean;
+  readonly binaryExists: boolean;
+  readonly binaryExecutable: boolean;
+  readonly caTrusted: boolean;
+  readonly allowedOriginsCount: number;
+  readonly reasons: readonly string[];
+}
+
 export type ErrorCode =
   | "trust.unsupported"
   | "trust.invalid-manifest"
@@ -407,5 +418,59 @@ export function createRequestBodyTrustController(
     };
   }
 
-  return { install, uninstall, status };
+  async function verify(): Promise<VerifyResult> {
+    const reasons: string[] = [];
+    let manifestExists = false;
+    let manifestValid = false;
+    let binaryExists = false;
+    let binaryExecutable = false;
+    let allowedOriginsCount = 0;
+    try {
+      const raw = await readFile(manifestPath(), "utf8");
+      manifestExists = true;
+      const parsed = JSON.parse(raw) as unknown;
+      if (isWellFormedManifest(parsed)) {
+        manifestValid = true;
+        const manifest = parsed as NativeMessagingManifest;
+        allowedOriginsCount = manifest.allowed_origins.length;
+        try {
+          const fileStat = await stat(manifest.path);
+          binaryExists = fileStat.isFile();
+          binaryExecutable = (fileStat.mode & 0o111) !== 0;
+          if (!binaryExists) reasons.push("binary-not-found");
+          if (!binaryExecutable) reasons.push("binary-not-executable");
+        } catch {
+          binaryExists = false;
+          reasons.push("binary-not-found");
+        }
+        if (allowedOriginsCount === 0) reasons.push("no-allowed-origins");
+      } else {
+        reasons.push("manifest-invalid");
+      }
+    } catch {
+      reasons.push("manifest-not-found");
+    }
+    const caTrusted =
+      (await existsFile(caKeyFile)) && (await existsFile(caCertFile));
+    if (!caTrusted) reasons.push("ca-not-trusted");
+    const ok =
+      manifestExists &&
+      manifestValid &&
+      binaryExists &&
+      binaryExecutable &&
+      caTrusted &&
+      allowedOriginsCount > 0;
+    return {
+      ok,
+      manifestExists,
+      manifestValid,
+      binaryExists,
+      binaryExecutable,
+      caTrusted,
+      allowedOriginsCount,
+      reasons,
+    };
+  }
+
+  return { install, uninstall, status, verify };
 }
