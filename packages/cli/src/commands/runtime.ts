@@ -11,45 +11,12 @@ import {
   selectTrustPlatformAdapter,
 } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
+import { showRuntimeHelp } from "../help.js";
 import { readProject } from "../utils/file.js";
 
 export interface RuntimeCommandResult {
   exitCode: Promise<number>;
   shutdown: () => void;
-}
-
-function showRuntimeHelp(): void {
-  console.log(`Usage: rogatio runtime <command> [options]
-       rogatio runtime host [path]
-
-Native messaging runtime control for response-body and request-body rules. The
-runtime no longer serves an HTTP mock server; mock delivery happens in the
-consolidated native-messaging host (spec REQ-001..REQ-005).
-
-Request-body trust commands:
-  install   Install the native-messaging host manifest and (on capable
-            platforms) provision the device-local CA (requires --extension-id).
-            CA trust requires root/admin: Linux (sudo), macOS (keychain
-            password), Windows (Administrator).
-  uninstall Remove the native-messaging host manifest and the device-local CA trust (idempotent)
-
-Native host command:
-  host [path]  Run the consolidated native-messaging runtime host. The browser
-               launches this process via the native-messaging manifest; it reads
-               pairing/authorization/mock envelopes from stdin and writes
-               responses to stdout.
-
-The lifecycle of the runtime (start/stop) is driven from the extension's
-Start/Stop controls, not the CLI. Run 'rogatio runtime install --extension-id
-<id>' once to register the host, then use the extension.
-
-Options:
-  --extension-id    Extension ID for native messaging manifest (required for install)
-  --root <dir>      Root for confined file mocks (default: project directory)
-  --help, -h        Show this help
-
-The device-local CA / PAC routing capability is invoked from the unified
-install command on capable platforms; it does not have a separate verb.`);
 }
 
 function toMatcherOperations(
