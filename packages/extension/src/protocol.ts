@@ -21,7 +21,8 @@ export type ExtensionCommand =
   | "start-native-runtime"
   | "stop-native-runtime"
   | "get-native-runtime-status"
-  | "diagnose-native-runtime";
+  | "diagnose-native-runtime"
+  | "generate-project";
 
 export interface ExtensionRequest {
   readonly version: 1;
@@ -55,6 +56,7 @@ const COMMANDS = new Set<ExtensionCommand>([
   "stop-native-runtime",
   "get-native-runtime-status",
   "diagnose-native-runtime",
+  "generate-project",
 ]);
 
 export function parseRequest(value: unknown): ParseRequestResult {

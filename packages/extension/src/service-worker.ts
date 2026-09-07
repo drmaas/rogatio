@@ -12,6 +12,7 @@ import {
   type RogatioOperation,
 } from "@rogatio/compiler";
 import { normalizeSiteOrigin } from "@rogatio/schema";
+import { validateProjectDetailed } from "./browser-schema.js";
 import {
   type ExtensionDiagnostic,
   extensionDiagnostic,
@@ -22,6 +23,7 @@ import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
   connectNativeMock,
   type NativeRuntimeConfig,
+  requestAIComplete,
   startNativeSession,
   stopNativeSession,
 } from "./native-session.js";
@@ -98,6 +100,10 @@ function conflict(current: unknown): Failure {
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
+
+const MAX_AI_PROMPT_LENGTH = 4000;
+const AI_GENERATION_SYSTEM_PROMPT =
+  "Return only one complete Rogatio version-1 JSON project. Use valid groups and rules; do not include markdown, commentary, credentials, or unknown properties.";
 
 function arrayOfStrings(value: unknown): readonly string[] | undefined {
   if (!Array.isArray(value)) return undefined;
@@ -405,6 +411,47 @@ export function createExtensionApplication(
     const data = request as Record<string, unknown>;
     if (request.command === "get-state" || request.command === "refresh") {
       return state();
+    }
+    if (request.command === "generate-project") {
+      const prompt = stringValue(data.prompt)?.trim();
+      if (!prompt || prompt.length > MAX_AI_PROMPT_LENGTH) {
+        return failure("extension.ai-invalid-prompt");
+      }
+      if (
+        !options.nativeRuntime ||
+        !options.extensionId ||
+        nativePhase !== "started" ||
+        !options.nativeRuntime.send
+      ) {
+        return failure("extension.ai-unavailable");
+      }
+      const aiResponse = await requestAIComplete(
+        {
+          extensionId: options.extensionId,
+          nativeRuntime: options.nativeRuntime,
+          getProject: async () => null,
+          getGrantedOrigins: async () => [],
+        },
+        [
+          { role: "system", content: AI_GENERATION_SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        "",
+        0.2,
+        { type: "json_object" },
+      );
+      if (!aiResponse) return failure("extension.ai-generation-failed");
+      let generated: unknown;
+      try {
+        generated = JSON.parse(aiResponse.metadata.content) as unknown;
+      } catch {
+        return failure("extension.ai-invalid-response");
+      }
+      const validation = validateProjectDetailed(generated);
+      if (!validation.valid) return failure("extension.ai-invalid-project");
+      const compiled = compileProject(validation.data);
+      if (!compiled.ok) return failure("extension.ai-invalid-project");
+      return { ok: true, value: structuredClone(validation.data) };
     }
     if (request.command === "select-project") {
       const projectId = stringValue(data.projectId);

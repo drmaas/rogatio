@@ -76,6 +76,7 @@ test("keeps project selection separate from explicit switch", async ({
   });
   await page.goto("/extension/index.html");
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
   const selector = page.getByLabel("Project to switch");
   await selector.selectOption("project-b");
   await expect(page.getByText("Selected Project B.")).toBeVisible();
@@ -140,6 +141,7 @@ test("reports an actionable message and failed status when the native host is mi
     });
   });
   await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Start runtime" }),
   ).toBeVisible();
@@ -223,6 +225,7 @@ test("keeps the platform-unavailable wording and truthful unsupported status", a
     });
   });
   await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
   await page.getByRole("button", { name: "Start runtime" }).click();
   await expect(
     page.getByText("Runtime action unavailable on this platform."),
@@ -303,6 +306,7 @@ test("derives the attention reason from the actual rule statuses", async ({
     });
   });
   await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
   const badge = page.locator("[data-badge-state]");
   await expect(badge).toContainText("needs permission: grant declared access");
   await expect(page.locator(".rogatio-attention-note")).toContainText(
@@ -378,6 +382,7 @@ test("reports the highest-precedence blocking status as the attention reason", a
     });
   });
   await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
   await expect(page.locator("[data-badge-state]")).toContainText(
     "rules failed to install",
   );

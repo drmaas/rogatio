@@ -439,6 +439,65 @@ body {
   max-width: 16rem;
   font-size: 0.82rem;
 }
+.rogatio-create-ai {
+  border-color: rgba(168, 85, 247, 0.55);
+  background: linear-gradient(
+    145deg,
+    rgba(88, 28, 135, 0.26),
+    rgba(30, 41, 59, 0.42)
+  );
+}
+.rogatio-create-ai .rogatio-create-icon {
+  background: #a855f7;
+}
+.rogatio-ai-composer {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  border-radius: var(--rogatio-radius);
+  background: var(--rogatio-surface);
+  padding: 1rem;
+}
+.rogatio-ai-composer h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.rogatio-ai-composer form {
+  display: grid;
+  gap: 0.65rem;
+}
+.rogatio-ai-composer label {
+  color: var(--rogatio-muted);
+  font-weight: 600;
+}
+.rogatio-ai-preview {
+  display: grid;
+  gap: 0.3rem;
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-inset);
+  padding: 0.75rem;
+}
+.rogatio-ai-preview p,
+.rogatio-ai-message {
+  margin: 0;
+  color: var(--rogatio-muted);
+  font-size: 0.875rem;
+}
+
+@media (forced-colors: active) {
+  .rogatio-create-ai,
+  .rogatio-ai-composer {
+    border-color: ButtonText;
+    background: Canvas;
+  }
+}
+
+@media (max-width: 48rem) {
+  .rogatio-project-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 @media (max-width: 48rem) {
   .rogatio-layout {

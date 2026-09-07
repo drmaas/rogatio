@@ -8,6 +8,7 @@ import {
   normalizeRuntimePreset,
   RUNTIME_LIMITS,
   type RuntimeMockConfig,
+  readProviderConfig,
   runNativeHost,
   selectTrustPlatformAdapter,
 } from "@rogatio/runtime";
@@ -312,9 +313,11 @@ async function runtimeHostCommand(args: string[]): Promise<number> {
 
   // Deferred mode: no project path provided, wait for runtime.project.set envelope
   if (!inputPath) {
+    const aiProviderConfig = await readProviderConfig();
     await runNativeHost({
       fileRoot: root,
       ...(mockPort !== undefined ? { mockPort } : {}),
+      ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
       onReady: () =>
         console.error(
           "rogatio runtime-host active (deferred, waiting for project)",
@@ -383,10 +386,12 @@ async function runtimeHostCommand(args: string[]): Promise<number> {
     return 2;
   }
 
+  const aiProviderConfig = await readProviderConfig();
   await runNativeHost({
     preset: normalized.value,
     fileRoot: rootDir,
     ...(mockPort !== undefined ? { mockPort } : {}),
+    ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
     onReady: () => console.error("rogatio runtime-host active"),
   });
   return 0;

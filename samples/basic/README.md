@@ -66,7 +66,7 @@ require the organization's extension entitlement.
 
 1. Click the Rogatio toolbar icon to open the management page (or open
    `chrome-extension://<id>/index.html` directly).
-2. In the sidebar, choose **Import project**.
+2. On the **Dashboard**, choose the **Import Project** tile.
 3. Select `samples/basic/.rogatio.json` from this repository.
 
 The project is imported as **disabled** with every group off and **no site access granted**.
@@ -105,10 +105,10 @@ bodies through the runtime:
 
 ```sh
 rogatio runtime install --extension-id <your extension ID>
-# <your extension ID> is shown in the extension sidebar
+# the extension's Workspace sidebar shows the extension ID
 ```
 
-Then, in the Rogatio management page, click **Start runtime**. The browser launches the
+Then, in the Rogatio management page's **Workspace** view, click **Start runtime**. The browser launches the
 host via the manifest; mock rules change from `needs proxy` to `active` once connected.
 Click **Stop runtime** to stop the session.
 

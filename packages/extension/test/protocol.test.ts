@@ -22,6 +22,19 @@ describe("F7 message protocol", () => {
     );
   });
 
+  it("accepts the versioned generate-project request", () => {
+    expect(
+      parseRequest({
+        version: 1,
+        command: "generate-project",
+        prompt: "make a redirect",
+      }),
+    ).toMatchObject({
+      ok: true,
+      value: { version: 1, command: "generate-project" },
+    });
+  });
+
   it("rejects cycles without invoking arbitrary properties", () => {
     const value: Record<string, unknown> = { version: 1, command: "refresh" };
     value.self = value;

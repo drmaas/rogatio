@@ -211,11 +211,21 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   await expect(firstCard.locator("[data-project-id-label]")).toHaveText(
     "ID: project-a",
   );
-  await expect(page.locator("[data-create-project]")).toBeVisible();
+  await expect(page.locator(".rogatio-sidebar")).toHaveCount(0);
+  await expect(page.locator(".rogatio-create-project")).toHaveCount(3);
+  await expect(page.locator('[data-command="create"]')).toBeVisible();
+  await expect(page.locator('[data-command="import"]')).toBeVisible();
+  await expect(page.locator('[data-command="ai-generate"]')).toBeVisible();
 
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.locator(".rogatio-sidebar")).toBeVisible();
+  await expect(page.locator("[data-project-selector]")).toBeVisible();
+
+  await page.getByRole("button", { name: "Dashboard", exact: true }).click();
   await page.locator("[data-project-card]").nth(1).click();
   await expect(page.getByText("Opened Project B.")).toBeVisible();
   await expect(page.locator("[data-overview]")).toBeHidden();
+  await expect(page.locator(".rogatio-sidebar")).toBeVisible();
   await expect(
     page.locator("[data-editor-root] [data-rogatio-editor]"),
   ).toBeVisible();

@@ -69,6 +69,10 @@ let permissionGranted = false;
 /** AI support status from native host */
 let aiSupported = false;
 let aiStatusChecked = false;
+let aiPromptOpen = false;
+let aiBusy = false;
+let aiPreview: unknown | null = null;
+let aiMessage = "";
 /** Diagnostics modal state */
 let diagnosticsOpen = false;
 let diagnosticsData: {
@@ -501,21 +505,121 @@ function renderOverview(shell: HTMLElement): void {
     grid.append(card);
   }
 
-  const createCard = document.createElement("button");
-  createCard.type = "button";
-  createCard.className = "rogatio-create-project";
-  createCard.dataset.createProject = "true";
-  const icon = document.createElement("span");
-  icon.className = "rogatio-create-icon";
-  icon.textContent = "+";
-  const createTitle = document.createElement("span");
-  createTitle.className = "rogatio-create-title";
-  createTitle.textContent = "Create New Project";
-  const hint = document.createElement("span");
-  hint.className = "rogatio-create-hint";
-  hint.textContent = "Setup a new environment for rules and mocks.";
-  createCard.append(icon, createTitle, hint);
-  grid.append(createCard);
+  const createNewCard = document.createElement("button");
+  createNewCard.type = "button";
+  createNewCard.className = "rogatio-create-project";
+  createNewCard.dataset.command = "create";
+  const createNewIcon = document.createElement("span");
+  createNewIcon.className = "rogatio-create-icon";
+  createNewIcon.textContent = "+";
+  const createNewTitle = document.createElement("span");
+  createNewTitle.className = "rogatio-create-title";
+  createNewTitle.textContent = "Create New Project";
+  const createNewHint = document.createElement("span");
+  createNewHint.className = "rogatio-create-hint";
+  createNewHint.textContent = "Start with a clean project for rules and mocks.";
+  createNewCard.append(createNewIcon, createNewTitle, createNewHint);
+  grid.append(createNewCard);
+
+  const importCard = document.createElement("button");
+  importCard.type = "button";
+  importCard.className = "rogatio-create-project";
+  importCard.dataset.command = "import";
+  const importIcon = document.createElement("span");
+  importIcon.className = "rogatio-create-icon";
+  importIcon.textContent = "↥";
+  const importTitle = document.createElement("span");
+  importTitle.className = "rogatio-create-title";
+  importTitle.textContent = "Import Project";
+  const importHint = document.createElement("span");
+  importHint.className = "rogatio-create-hint";
+  importHint.textContent = "Open a .rogatio.json project from your device.";
+  importCard.append(importIcon, importTitle, importHint);
+  grid.append(importCard);
+
+  const dashboardImportInput = document.createElement("input");
+  dashboardImportInput.type = "file";
+  dashboardImportInput.accept = ".json,.rogatio.json,application/json";
+  dashboardImportInput.hidden = true;
+  dashboardImportInput.dataset.importInput = "true";
+  overview.append(dashboardImportInput);
+
+  const aiCard = document.createElement("button");
+  aiCard.type = "button";
+  aiCard.className = "rogatio-create-project rogatio-create-ai";
+  aiCard.dataset.command = "ai-generate";
+  aiCard.disabled = !aiSupported;
+  aiCard.setAttribute("aria-describedby", "rogatio-ai-create-hint");
+  const aiIcon = document.createElement("span");
+  aiIcon.className = "rogatio-create-icon";
+  aiIcon.textContent = "✦";
+  const aiTitle = document.createElement("span");
+  aiTitle.className = "rogatio-create-title";
+  aiTitle.textContent = "Create using AI";
+  const aiHint = document.createElement("span");
+  aiHint.className = "rogatio-create-hint";
+  aiHint.id = "rogatio-ai-create-hint";
+  aiHint.textContent = aiSupported
+    ? "Describe the project you want to build."
+    : "Start the native runtime and configure AI to enable generation.";
+  aiCard.append(aiIcon, aiTitle, aiHint);
+  grid.append(aiCard);
+
+  if (aiPromptOpen) {
+    const composer = document.createElement("section");
+    composer.className = "rogatio-ai-composer";
+    composer.setAttribute("aria-labelledby", "rogatio-ai-heading");
+    const aiHeading = document.createElement("h3");
+    aiHeading.id = "rogatio-ai-heading";
+    aiHeading.textContent =
+      aiPreview === null ? "Describe your project" : "Review generated project";
+    composer.append(aiHeading);
+
+    if (aiPreview === null) {
+      const form = document.createElement("form");
+      form.dataset.aiForm = "true";
+      const label = document.createElement("label");
+      label.htmlFor = "rogatio-ai-prompt";
+      label.textContent = "What should Rogatio create?";
+      const prompt = document.createElement("textarea");
+      prompt.id = "rogatio-ai-prompt";
+      prompt.name = "prompt";
+      prompt.required = true;
+      prompt.maxLength = 4000;
+      prompt.rows = 4;
+      prompt.placeholder =
+        "For example: redirect example.com/docs to the new guide...";
+      const submit = document.createElement("button");
+      submit.type = "submit";
+      submit.disabled = aiBusy;
+      submit.textContent = aiBusy ? "Generating…" : "Generate preview";
+      const cancel = button("Cancel", "ai-cancel");
+      form.append(label, prompt, submit, cancel);
+      composer.append(form);
+    } else {
+      const preview = document.createElement("div");
+      preview.className = "rogatio-ai-preview";
+      const name = document.createElement("strong");
+      name.textContent = text(
+        isProjectRecord(aiPreview) ? aiPreview.name : undefined,
+        "Generated project",
+      );
+      const summary = document.createElement("p");
+      summary.textContent = `${countGroups(aiPreview)} groups, ${countRules(aiPreview)} rules. This preview has not been saved.`;
+      preview.append(name, summary);
+      const create = button("Create project", "ai-create");
+      const cancel = button("Cancel", "ai-cancel");
+      composer.append(preview, create, cancel);
+    }
+    if (aiMessage.length > 0) {
+      const message = document.createElement("p");
+      message.className = "rogatio-ai-message";
+      message.setAttribute("role", "status");
+      message.textContent = aiMessage;
+      composer.append(message);
+    }
+    overview.append(composer);
+  }
 
   overview.append(grid);
   shell.append(overview);
@@ -533,7 +637,8 @@ function renderShell(): void {
 
   const layout = document.createElement("div");
   layout.className = "rogatio-layout";
-  renderSidebar(layout);
+  layout.dataset.view = activeTab;
+  if (activeTab === "workspace") renderSidebar(layout);
 
   const main = document.createElement("main");
   main.className = "rogatio-main";
@@ -578,11 +683,15 @@ function renderShell(): void {
       renderShell();
       return;
     }
-    const command = target.dataset.command;
+    const commandTarget = target.closest<HTMLElement>("[data-command]");
+    const command = commandTarget?.dataset.command;
     if (command === "refresh") void refresh();
     if (command === "switch") void switchProject();
     if (command === "create") void createProject();
     if (command === "import") importInput().click();
+    if (command === "ai-generate") openAIComposer();
+    if (command === "ai-cancel") cancelAIComposer();
+    if (command === "ai-create") void createGeneratedProject();
     if (command === "copy-install-command") void copyInstallCommand();
     if (command === "review-permissions") void reviewPermissions();
     if (command === "grant-permissions") void grantPermissions();
@@ -601,6 +710,14 @@ function renderShell(): void {
       if (projectId) pendingProjectId = projectId;
       void removeProject();
     }
+  });
+
+  const aiForm = shell.querySelector<HTMLFormElement>("[data-ai-form]");
+  aiForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const prompt =
+      aiForm.querySelector<HTMLTextAreaElement>("textarea")?.value ?? "";
+    void generateProject(prompt);
   });
 
   const selector = shell.querySelector<HTMLSelectElement>(
@@ -707,6 +824,61 @@ function renderShell(): void {
       if (deepLinkGroup) editor.navigateToGroup(deepLinkGroup);
     }
   }
+}
+
+function openAIComposer(): void {
+  if (!aiSupported) return;
+  aiPromptOpen = true;
+  aiPreview = null;
+  aiMessage = "";
+  renderShell();
+  root.querySelector<HTMLTextAreaElement>("#rogatio-ai-prompt")?.focus();
+}
+
+function cancelAIComposer(): void {
+  aiPromptOpen = false;
+  aiBusy = false;
+  aiPreview = null;
+  aiMessage = "";
+  renderShell();
+}
+
+async function generateProject(prompt: string): Promise<void> {
+  aiBusy = true;
+  aiMessage = "";
+  renderShell();
+  const response = await client.send({
+    version: 1,
+    command: "generate-project",
+    prompt,
+  });
+  aiBusy = false;
+  if (response.ok === true && response.value !== undefined) {
+    aiPreview = response.value;
+    aiMessage = "Review the safe preview before saving it.";
+  } else {
+    aiMessage =
+      "AI could not generate a valid project. Check the runtime and try again.";
+  }
+  renderShell();
+}
+
+async function createGeneratedProject(): Promise<void> {
+  if (aiPreview === null) return;
+  const response = await client.send({
+    version: 1,
+    command: "import-project",
+    data: aiPreview,
+  });
+  if (response.ok === true) {
+    statusMessage = "AI project created.";
+    aiPromptOpen = false;
+    aiPreview = null;
+    aiMessage = "";
+  } else {
+    aiMessage = "The generated project could not be saved.";
+  }
+  await refresh();
 }
 
 function importInput(): HTMLInputElement {

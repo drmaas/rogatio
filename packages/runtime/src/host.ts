@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { createServer, type Server } from "node:http";
 import type { Readable, Writable } from "node:stream";
+import type { AIProviderConfig } from "./ai-client.js";
 import { parseEnvelope, serializeEnvelope } from "./envelope.js";
 import { createNativeRuntimeController } from "./lifecycle.js";
 import type {
@@ -14,6 +15,7 @@ export interface NativeHostOptions {
   readonly fileRoot?: string;
   /** Loopback port for the mock-body faucet (browser DNR redirect target). */
   readonly mockPort?: number;
+  readonly aiProviderConfig?: AIProviderConfig;
   readonly clock?: () => number;
 }
 
@@ -103,6 +105,9 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
     preset: options.preset,
     fileRoot: options.fileRoot,
     ...(options.mockPort !== undefined ? { mockPort: options.mockPort } : {}),
+    ...(options.aiProviderConfig !== undefined
+      ? { aiProviderConfig: options.aiProviderConfig }
+      : {}),
     ...(options.clock ? { clock: options.clock } : {}),
   });
 
