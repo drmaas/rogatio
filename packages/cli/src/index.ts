@@ -7,6 +7,13 @@ import { editCommand } from "./commands/edit.js";
 import { runRuntimeHostEntry, runtimeCommand } from "./commands/runtime.js";
 import { testCommand, testCommandNeedsStdin } from "./commands/test.js";
 import { verifyCommand } from "./commands/verify.js";
+import {
+  showAIHelp,
+  showEditHelp,
+  showRuntimeHelp,
+  showTestHelp,
+  showVerifyHelp,
+} from "./help.js";
 import { isDistBuild } from "./utils/asset-paths.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -124,8 +131,8 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
-  runtime <install|uninstall|host>  Native messaging runtime control and request-body trust management
-  runtime host [path]  Run the consolidated native-messaging runtime host
+  runtime <install|uninstall|host>  Native messaging runtime control
+  runtime host [path]  Run the native-messaging runtime host
 
 Global Options:
   --help, -h      Show help
@@ -133,127 +140,6 @@ Global Options:
 
 Run 'rogatio <command> --help' for command-specific help.`);
   return 0;
-}
-
-function showEditHelp(): void {
-  console.log(`Usage: rogatio edit [options] [path]
-
-Launch browser-based editor for .rogatio.json project file.
-
-Arguments:
-  path            Path to .rogatio.json (default: .rogatio.json in current directory)
-
-Options:
-  --port <n>      Fixed port for editor server (default: random)
-  --help, -h      Show this help
-
-The editor runs in your default browser and communicates with a local server
-bound to 127.0.0.1. Changes are saved atomically to the project file.`);
-}
-
-function showVerifyHelp(): void {
-  console.log(`Usage: rogatio verify [options] [path]
-
-Validate a .rogatio.json project file using schema and compiler.
-
-Arguments:
-  path            Path to .rogatio.json (default: .rogatio.json in current directory)
-                  Use '-' to read from stdin
-
-Options:
-  --json          Output diagnostics as JSON
-  --help, -h      Show this help
-
-Exit codes:
-  0  Valid (no diagnostics)
-  1  Invalid (diagnostics present)
-  2  Error (IO, parse, or unexpected failure)`);
-}
-
-function showRuntimeHelp(): void {
-  console.log(`Usage: rogatio runtime <command> [options]
-       rogatio runtime host [path]
-
-Native messaging runtime control for response-body and request-body rules. The
-runtime no longer serves an HTTP mock server; mock delivery happens in the
-consolidated native-messaging host (spec REQ-001..REQ-005).
-
-Request-body trust commands:
-  install   Install the native-messaging host manifest and (on capable
-            platforms) provision the device-local CA (requires --extension-id)
-  uninstall Remove the native-messaging host manifest and the device-local CA trust (idempotent)
-
-Native host command:
-  host [path]  Run the consolidated native-messaging runtime host. The browser
-               launches this process via the native-messaging manifest; it reads
-               pairing/authorization/mock envelopes from stdin and writes
-               responses to stdout.
-
-The lifecycle of the runtime (start/stop) is driven from the extension's
-Start/Stop controls, not the CLI. Run 'rogatio runtime install --extension-id
-<id>' once to register the host, then use the extension.
-
-Options:
-  --root <dir>    Root for confined file mocks (default: project directory)
-  --extension-id  Extension ID for native messaging manifest (required for install)
-  --help, -h      Show this help
-
-The device-local CA / PAC routing capability is invoked from the unified
-install command on capable platforms; it does not have a separate verb.
-
-Exit codes:
-  0  Stopped cleanly / success
-  1  Invalid project (diagnostics present) or file outside the root
-  2  Error (IO or usage)`);
-}
-
-function showTestHelp(): void {
-  console.log(`Usage: rogatio test [options] [path] [url...]
-
-Run offline dry-run tests against a .rogatio.json project file.
-
-Arguments:
-  path            Path to .rogatio.json (default: .rogatio.json in current directory)
-                   Use '-' to read project JSON from stdin
-  url...          URLs to test; when path is omitted, first URL is detected automatically
-
-Options:
-  --urls <list>        Comma-separated list of URLs to test
-  --urls-file <path>   Path to JSON file containing array of test cases
-                        Each case: { "url": "...", "method"?: "...", "resourceType"?: "..." }
-                        Use '-' to read from stdin
-  --method <m>         Default HTTP method for all test cases (GET, POST, etc.)
-  --resource-type <t>  Default resource type for all test cases
-  --max-cases <n>      Maximum number of test cases (default: 256)
-  --json               Output results as JSON
-  --help, -h           Show this help
-
-Test case format (JSON):
-  [
-    { "url": "https://example.com/", "method": "GET", "resourceType": "main_frame" },
-    { "url": "https://example.com/script.js" }
-  ]
-
-Exit codes:
-  0  Success (all valid, results may include non-matches)
-  1  Validation/compile/test errors
-  2  Usage error (invalid arguments, missing input)`);
-}
-
-function showAIHelp(): void {
-  console.log(`Usage: rogatio ai <command> [options]
-
-AI provider configuration commands.
-
-Commands:
-  setup      Interactively configure AI provider (URL, model, API key)
-  ls         List configured AI provider
-  show       Show current AI provider configuration (key redacted)
-  delete     Delete AI provider configuration
-  test       Test connection to AI provider
-
-Options:
-  --help, -h  Show this help`);
 }
 
 if (

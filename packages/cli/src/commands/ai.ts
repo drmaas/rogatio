@@ -6,22 +6,7 @@ import {
   readProviderConfig,
   writeProviderConfig,
 } from "@rogatio/runtime";
-
-function showAIHelp(): void {
-  console.log(`Usage: rogatio ai <command> [options]
-
-AI provider configuration commands.
-
-Commands:
-  setup      Interactively configure AI provider (URL, model, API key)
-  ls         List configured AI provider
-  show       Show current AI provider configuration (key redacted)
-  delete     Delete AI provider configuration
-  test       Test connection to AI provider
-
-Options:
-  --help, -h  Show this help`);
-}
+import { showAIHelp } from "../help.js";
 
 async function promptInput(prompt: string): Promise<string> {
   process.stdout.write(prompt);

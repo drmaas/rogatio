@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { createAIClient, readProviderConfig } from "@rogatio/runtime";
+import { showEditHelp } from "../help.js";
 import { createServer } from "../server/http.js";
 import {
   createRoutes,
@@ -41,10 +42,7 @@ export async function editCommand(
     } else if (!arg.startsWith("-")) {
       positionalArgs.push(arg);
     } else if (arg === "--help") {
-      console.log(`Usage: rogatio edit [options] [path]
-Options:
-  --port <n>    Fixed port (default: random)
-  --help        Show help`);
+      showEditHelp();
       return { exitCode: Promise.resolve(0), shutdown: () => {} };
     } else {
       console.error(`Error: Unknown option: ${arg}`);
