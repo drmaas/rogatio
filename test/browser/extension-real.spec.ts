@@ -59,6 +59,7 @@ test("drives the real extension page lifecycle and mounts the editor", async () 
 
     await page.setInputFiles('[data-import-input="true"]', projectFile);
     await expect(page.getByText("Project imported.")).toBeVisible();
+    await page.getByRole("button", { name: "Workspace", exact: true }).click();
     await page.getByRole("button", { name: "Review permissions" }).click();
     await expect(page.locator("[data-permission-summary]")).toContainText(
       "http://127.0.0.1:4173",
@@ -83,9 +84,10 @@ test("drives the real extension page lifecycle and mounts the editor", async () 
     expect(permissionState).toBe(false);
 
     await page.getByRole("button", { name: "Dashboard", exact: true }).click();
-    await page.locator("[data-create-project]").click();
+    await page.locator('[data-command="create"]').click();
     await page.waitForTimeout(100);
     await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Workspace", exact: true }).click();
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
   } finally {

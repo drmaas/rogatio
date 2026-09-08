@@ -16,7 +16,12 @@ export type ExtensionDiagnosticCode =
   | "extension.native-runtime-unavailable"
   | "extension.native-runtime-transition"
   | "extension.native-host-missing"
-  | "extension.request-body-needs-trust";
+  | "extension.request-body-needs-trust"
+  | "extension.ai-unavailable"
+  | "extension.ai-invalid-prompt"
+  | "extension.ai-generation-failed"
+  | "extension.ai-invalid-response"
+  | "extension.ai-invalid-project";
 
 export interface ExtensionDiagnostic {
   readonly code: ExtensionDiagnosticCode;
@@ -55,6 +60,15 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
     "The native runtime host is not installed or not detected. Run `rogatio runtime install --extension-id <extension ID>`, then reload the extension at chrome://extensions (click the circular-arrow reload button on the Rogatio card) and start the runtime again.",
   "extension.request-body-needs-trust":
     "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime install --extension-id <extension ID>` to register the host and (on capable platforms) trust the device-local CA, then restart Chrome and click Start runtime again. Mocks and response-body rules do not need trust.",
+  "extension.ai-unavailable":
+    "AI generation is unavailable until the native runtime is running and configured.",
+  "extension.ai-invalid-prompt":
+    "Enter an AI prompt between 1 and 4000 characters.",
+  "extension.ai-generation-failed":
+    "AI generation failed. Check the native runtime and provider configuration.",
+  "extension.ai-invalid-response": "AI returned an invalid project response.",
+  "extension.ai-invalid-project":
+    "AI returned a project that failed Rogatio validation.",
 };
 
 export function extensionDiagnostic(

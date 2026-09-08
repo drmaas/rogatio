@@ -8,7 +8,8 @@
       "!!playwright-report",
       "!!test-results",
       "!!test/fixtures",
-      "!!.opencode"
+      "!!.opencode",
+      "!!graphify-out"
     ]
   },
   "formatter": {

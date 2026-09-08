@@ -209,11 +209,69 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   await expect(firstCard.locator("[data-project-id-label]")).toHaveText(
     "ID: project-a",
   );
-  await expect(page.locator("[data-create-project]")).toBeVisible();
+  await expect(page.locator(".rogatio-sidebar")).toHaveCount(0);
+  await expect(page.locator('[data-dashboard-section="create"]')).toBeVisible();
+  await expect(
+    page.locator('[data-dashboard-section="projects"]'),
+  ).toBeVisible();
+  await expect(page.locator(".rogatio-topbar-actions")).toHaveCount(0);
+  const creationTiles = page.locator(
+    ".rogatio-creation-grid .rogatio-create-project",
+  );
+  await expect(creationTiles).toHaveCount(3);
+  const creationSectionBox = await page
+    .locator('[data-dashboard-section="create"]')
+    .boundingBox();
+  const creationGridBox = await page
+    .locator(".rogatio-creation-grid")
+    .boundingBox();
+  const projectsSectionBox = await page
+    .locator('[data-dashboard-section="projects"]')
+    .boundingBox();
+  expect(creationSectionBox?.width ?? 0).toBeGreaterThan(0);
+  expect(creationGridBox?.width ?? 0).toBeGreaterThan(
+    (creationSectionBox?.width ?? 0) * 0.9,
+  );
+  expect(projectsSectionBox?.width).toBe(creationSectionBox?.width);
+  const tileBoxes = await creationTiles.evaluateAll((tiles) =>
+    tiles.map((tile) => {
+      const rect = tile.getBoundingClientRect();
+      return { top: rect.top, left: rect.left, width: rect.width };
+    }),
+  );
+  expect(tileBoxes[0]?.top).toBe(tileBoxes[1]?.top);
+  expect(tileBoxes[1]?.top).toBe(tileBoxes[2]?.top);
+  expect(tileBoxes[0]?.left).toBeLessThan(tileBoxes[1]?.left ?? 0);
+  expect(tileBoxes[1]?.left).toBeLessThan(tileBoxes[2]?.left ?? 0);
+  expect(tileBoxes[0]?.width ?? 0).toBeGreaterThan(0);
+  expect(tileBoxes[0]?.width).toBeCloseTo(tileBoxes[1]?.width ?? 0, 1);
+  expect(tileBoxes[1]?.width).toBeCloseTo(tileBoxes[2]?.width ?? 0, 1);
+  await expect(page.locator('[data-command="create"]')).toBeVisible();
+  await expect(page.locator('[data-command="import"]')).toBeVisible();
+  await expect(page.locator('[data-command="ai-generate"]')).toBeVisible();
 
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.locator(".rogatio-sidebar")).toBeVisible();
+  await expect(page.locator("[data-project-selector]")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Switch project" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Import project" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Export project" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Remove project" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Dashboard", exact: true }).click();
   await page.locator("[data-project-card]").nth(1).click();
   await expect(page.getByText("Opened Project B.")).toBeVisible();
   await expect(page.locator("[data-overview]")).toBeHidden();
+  await expect(page.locator(".rogatio-sidebar")).toBeVisible();
   await expect(
     page.locator("[data-editor-root] [data-rogatio-editor]"),
   ).toBeVisible();

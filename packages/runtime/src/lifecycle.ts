@@ -543,7 +543,7 @@ export function createNativeRuntimeController(
           try {
             const result = await aiClient.complete({
               messages: [...meta.messages] as ChatMessage[],
-              model: meta.model,
+              model: meta.model || options.aiProviderConfig?.model || "",
               temperature: meta.temperature,
               responseFormat: meta.responseFormat,
             });
@@ -597,7 +597,7 @@ export function createNativeRuntimeController(
           try {
             for await (const chunk of aiClient.stream({
               messages: [...meta.messages] as ChatMessage[],
-              model: meta.model,
+              model: meta.model || options.aiProviderConfig?.model || "",
               temperature: meta.temperature,
             })) {
               // For streaming, we return each chunk as a separate envelope

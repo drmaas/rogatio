@@ -36,9 +36,14 @@ export {
   type MockRuntimeConnection,
 } from "./mock-runtime.js";
 export {
+  type AICompleteRequest,
+  type AICompleteResponse,
   buildNativePolicy,
+  checkAISupport,
   type NativeRuntimeConfig,
   type NativeSessionOptions,
+  requestAIComplete,
+  requestAIStream,
   startNativeSession,
   stopNativeSession,
 } from "./native-session.js";
