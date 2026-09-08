@@ -400,12 +400,11 @@ body {
   gap: 0.45rem;
   padding: 0.8rem;
 }
-.rogatio-sidebar .rogatio-project-card-title,
-.rogatio-sidebar .rogatio-project-status {
+.rogatio-sidebar :where(.rogatio-project-card-title, .rogatio-project-status) {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.rogatio-sidebar .rogatio-project-status {
+.rogatio-sidebar :where(.rogatio-project-status) {
   white-space: normal;
 }
 
