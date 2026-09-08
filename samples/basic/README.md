@@ -1,6 +1,6 @@
 # Sample Rules Project
 
-A minimal `.rogatio.json` that exercises all six Rogatio rule types so you can verify the
+A minimal `.rogatio.json` that exercises all five Rogatio rule types so you can verify the
 schema, compiler, CLI behavior, the Chrome extension, and each rule's live browser effect
 end-to-end.
 
@@ -13,10 +13,11 @@ end-to-end.
 | `header`          | `rule-header-set`   | Sets `X-Rogatio-Sample` request header     |
 | `header`          | `rule-header-remove`| Removes `X-Test-Header` response header    |
 | `request-body`    | `rule-request-body` | Replaces the POST body                  |
+| `response-body`   | `rule-response-body`| Replaces response body text             |
 
 The shipped sample targets `https://example.com`. `example.com` is a real, publicly
 reachable domain, which makes a few rules observable **live in the browser without any
-setup** (redirect, query, and mock). The remaining rule types are best validated live
+setup** (redirect and query). The remaining rule types are best validated live
 against a target you control — a tiny local server recipe is included below — or
 deterministically offline with `rogatio test`.
 
@@ -177,16 +178,6 @@ when Chrome authoritatively reports a match.
 1. Visit `https://example.com/page`.
 2. The address bar becomes `https://example.com/page?ref=rogatio` (the param is added only
    when missing; an existing `ref` value is replaced).
-
-## Mock (`rule-mock`)
-
-Mock rules have been removed from the unified runtime. Mock/rewrite/replacement behavior is covered by body rules (`request-body`, `response-body`) under the native host.
-
-1. With the runtime started and **Check and connect** done, open
-   `https://example.com/mock/anything` (or `fetch()` it from any page).
-2. The response body is `{"mocked":true}` with `Content-Type: application/json` and a ~100 ms
-   delay. The Network panel shows the mock status `200` and headers; no upstream request is
-   made.
 
 **Header — set request** (`rule-header-set`), **Header — remove response**
 (`rule-header-remove`), **Response-body** (`rule-response-body`), and **Request-body**

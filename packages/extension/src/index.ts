@@ -15,12 +15,8 @@ export {
 } from "./diagnostics.js";
 export {
   createDnrInstaller,
-  type DnrAllowRule,
-  type DnrInstallerOptions,
   type DnrRedirectRule,
   type DnrRule,
-  mockLoopProtectionRule,
-  translateMockToDnr,
   translateRedirectToDnr,
 } from "./dnr.js";
 export {
@@ -28,13 +24,6 @@ export {
   type ExtensionPageModel,
   type ExtensionPageModelOptions,
 } from "./extension-page.js";
-export {
-  createMockConnectionHolder,
-  DEFAULT_MOCK_PORT,
-  fetchMockConnection,
-  type MockConnectionHolder,
-  type MockRuntimeConnection,
-} from "./mock-runtime.js";
 export {
   type AICompleteRequest,
   type AICompleteResponse,

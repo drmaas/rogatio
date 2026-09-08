@@ -162,8 +162,7 @@ export async function buildNativePolicy(
       op.kind === "response-body" ||
       op.kind === "redirect" ||
       op.kind === "query" ||
-      op.kind === "header" ||
-      op.kind === "mock",
+      op.kind === "header",
   );
   const policy = {
     protocol: "v1",
@@ -275,90 +274,6 @@ export async function stopNativeSession(
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   await options.nativeRuntime.stop();
   return { ok: true };
-}
-
-/**
- * Establish mock delivery with the consolidated native host (spec REQ-003).
- * Sends a `mock.connect` envelope and returns the per-rule tokens, or null when
- * the host does not support the envelope protocol or the request fails.
- */
-export interface NativeMockConnection {
-  readonly port: number | null;
-  readonly mocks: readonly {
-    readonly ruleId: string;
-    readonly token: string;
-  }[];
-}
-
-/**
- * Establish mock delivery with the consolidated native host (spec REQ-003).
- * Sends a `mock.connect` envelope and returns the loopback faucet port plus the
- * per-rule tokens, or null when the host does not support the envelope protocol
- * or the request fails.
- */
-export async function connectNativeMock(
-  options: NativeSessionOptions,
-  presetDigest: string,
-): Promise<NativeMockConnection | null> {
-  const send = options.nativeRuntime.send;
-  if (!send) return null;
-  try {
-    const response = await send({
-      protocol: "v1",
-      type: "mock.connect",
-      timestamp: Date.now(),
-      metadata: { presetDigest },
-    });
-    const metadata = response.metadata as {
-      port?: number;
-      mocks?: readonly { ruleId: string; token: string }[];
-      error?: string;
-    };
-    if (metadata.error || !metadata.mocks) return null;
-    return { port: metadata.port ?? null, mocks: metadata.mocks };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Fetch a single mock response from the consolidated native host (spec REQ-003).
- * Resolves with the rendered response, or null when unavailable.
- */
-export async function requestNativeMock(
-  options: NativeSessionOptions,
-  token: string,
-  method?: string,
-): Promise<{
-  status: number;
-  headers: readonly (readonly [string, string])[];
-  bodyBytes: Uint8Array;
-} | null> {
-  const send = options.nativeRuntime.send;
-  if (!send) return null;
-  try {
-    const response = await send({
-      protocol: "v1",
-      type: "mock.request",
-      timestamp: Date.now(),
-      metadata: { token, ...(method !== undefined ? { method } : {}) },
-    });
-    const metadata = response.metadata as {
-      status: number;
-      headers?: readonly (readonly [string, string])[];
-      mockBody?: string;
-      error?: string;
-    };
-    if (metadata.error || typeof metadata.mockBody !== "string") return null;
-    const bodyBytes = base64ToBytes(metadata.mockBody);
-    return {
-      status: metadata.status,
-      headers: metadata.headers ?? [],
-      bodyBytes,
-    };
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -499,12 +414,4 @@ async function computeDigest(policy: unknown): Promise<string> {
   const bytes = new TextEncoder().encode(json);
   const hash = await createHash("sha256", bytes);
   return formatSha256(hash);
-}
-
-/** Browser-safe base64 decode (service workers have no `Buffer`). */
-function base64ToBytes(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-  return out;
 }

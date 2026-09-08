@@ -11,8 +11,6 @@ export type ExtensionDiagnosticCode =
   | "extension.invalid-header"
   | "extension.forbidden-header"
   | "extension.dnr-error"
-  | "extension.mock-token-missing"
-  | "extension.mock-check-in-progress"
   | "extension.native-runtime-unavailable"
   | "extension.native-runtime-transition"
   | "extension.native-host-missing"
@@ -49,17 +47,13 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.forbidden-header":
     "The header name is forbidden for the given direction.",
   "extension.dnr-error": "The declarativeNetRequest operation failed.",
-  "extension.mock-token-missing":
-    "The mock runtime has no token for this rule; restart rogatio runtime after changing the project.",
-  "extension.mock-check-in-progress":
-    "A mock runtime check is already in progress.",
   "extension.native-runtime-unavailable":
     "The runtime is unavailable on this platform.",
   "extension.native-runtime-transition": "The runtime could not change state.",
   "extension.native-host-missing":
     "The native runtime host is not installed or not detected. Run `rogatio runtime install --extension-id <extension ID>`, then reload the extension at chrome://extensions (click the circular-arrow reload button on the Rogatio card) and start the runtime again.",
   "extension.request-body-needs-trust":
-    "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime install --extension-id <extension ID>` to register the host and (on capable platforms) trust the device-local CA, then restart Chrome and click Start runtime again. Mocks and response-body rules do not need trust.",
+    "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime install --extension-id <extension ID>` to register the host and (on capable platforms) trust the device-local CA, then restart Chrome and click Start runtime again. Response-body rules do not need trust.",
   "extension.ai-unavailable":
     "AI generation is unavailable until the native runtime is running and configured.",
   "extension.ai-invalid-prompt":

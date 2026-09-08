@@ -97,7 +97,7 @@ Rule statuses derive from compiled operations, saved enablement, granted origins
 
 The extension adds a compact Chrome toolbar popup (`popup.html` + `popup.ts`) as `action.default_popup`, sitting in front of the existing management page (`index.html`, which remains tab-opened). The popup reads the same `get-state` envelope the management page uses and lists only the active project's persisted groups in source order, each row showing the group name, rule count, truthful per-group runtime status, one enablement switch, and a pencil control. There is no editor, search, proxy, permission, or rule-authoring surface in the popup, and no extension-wide or project-wide master toggle.
 
-The popup reuses the existing `set-group-enabled` lifecycle unchanged: toggling a group sends the same command the management page sends, and the service worker performs the identical enablement, permission-preserving, and DNR-install path. Per-group status is aggregated from the envelope's per-rule `ruleStatuses` with the precedence `error > needs proxy > needs permission > unsupported > active` (a disabled group is `disabled`; an enabled group with no rules is `active`). Because the popup reads only persisted state, unsaved editor drafts never appear, so every listed group is runtime-eligible and gets a toggle. "Open app" opens `index.html` (Overview); the pencil opens `index.html?group=<id>`, and the management page deep-links to that group via the additive `EditorController.navigateToGroup`. The popup adds no second editor and no popup-only persisted navigation state.
+The popup reuses the existing `set-group-enabled` lifecycle unchanged: toggling a group sends the same command the management page sends, and the service worker performs the identical enablement, permission-preserving, and DNR-install path. Per-group status is aggregated from the envelope's per-rule `ruleStatuses` with the precedence `error > needs permission > unsupported > active` (a disabled group is `disabled`; an enabled group with no rules is `active`). Because the popup reads only persisted state, unsaved editor drafts never appear, so every listed group is runtime-eligible and gets a toggle. "Open app" opens `index.html` (Overview); the pencil opens `index.html?group=<id>`, and the management page deep-links to that group via the additive `EditorController.navigateToGroup`. The popup adds no second editor and no popup-only persisted navigation state.
 
 Since F25 the popup also carries two project entry actions and a comfortable fixed width. **New project** expands an inline name form (no `window.prompt`, which is unavailable inside action popups) and sends the existing `create-project` command; **Import project** opens a file picker, parses the selected `.rogatio.json` file locally, and sends the existing `import-project` command. Both actions reuse the same validated service-worker lifecycle the management page uses — the popup never grants permissions, never activates groups, and performs no schema validation of its own (the repository fails closed on invalid data). A `role="status"` line reports the outcome. The popup body is a fixed 420px wide so rows stay readable, and the group list scrolls internally (bounded under Chrome's 600px popup height cap) when a project holds many groups. See `docs/specs/f25-popup-project-actions.md`.
 
@@ -857,11 +857,7 @@ The user experience is: register the native-messaging host once with
 **Start runtime** control. The separate
 Check-and-connect command and mock-connection state are superseded. The sidebar runtime
 status line sits directly beneath the Start/Stop controls.
-- **Statuses:** mock ops report `needs proxy` while the runtime is not connected;
-  `active` when connected and installed; a stable `error` diagnostic when connected but
-  the runtime has no token for the rule (project changed after start — directs
-  restarting `rogatio runtime`). In-memory mock runtime state resets to `disconnected`
-  on service-worker restart (per browser-core; the status represents the last check).
+- **Statuses:** mock ops were historically reported as `needs proxy` while the runtime was not connected; `active` when connected and installed. Mock rules have been removed — mock behavior is covered by response-body and request-body rules under the native host.
 
 ### Editor (editor package)
 

@@ -1,7 +1,6 @@
 import type {
   HeaderOperation,
   MatcherOperation,
-  MockOperation,
   NormalizedMatcher,
   QueryOperation,
   RedirectOperation,
@@ -82,14 +81,6 @@ function isRedirectOperation(value: unknown): value is RedirectOperation {
   if (!validateMatcherShape(value.matcher)) return false;
   const redirect = value.redirect;
   return isRecord(redirect) && typeof redirect.destination === "string";
-}
-
-function isMockOperation(value: unknown): value is MockOperation {
-  if (!isRecord(value) || value.kind !== "mock") return false;
-  if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
-    return false;
-  if (!validateMatcherShape(value.matcher)) return false;
-  return isRecord(value.mock) && typeof value.mock.status === "number";
 }
 
 function isResponseBodyOperation(
@@ -246,19 +237,6 @@ export function projectMatchers(
           },
         },
       };
-    } else if (isMockOperation(operation)) {
-      // Mock rules are installable, but their DNR redirect target depends on the
-      // runtime connection info, so no dnrRule is emitted at projection time.
-      matcher = {
-        urlRegex: { ...operation.matcher.urlRegex },
-        origins: [...operation.matcher.origins],
-        resourceTypes: [...operation.matcher.resourceTypes],
-        priority: operation.matcher.priority,
-        ...(operation.matcher.method !== undefined
-          ? { method: operation.matcher.method }
-          : {}),
-      };
-      installable = true;
     } else {
       throw new Error(extensionDiagnostic("extension.invalid-operation").code);
     }

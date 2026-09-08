@@ -204,9 +204,7 @@ export function createExtensionApplication(
 
   /**
    * The DNR-managed operation set for the active project. Browser-side
-   * redirect/query rules stay installed across start and stop; mock redirects
-   * exist only while the native host is serving the mock faucet, so stopping
-   * the runtime removes them again.
+   * redirect/query rules stay installed across start and stop.
    */
   function dnrManagedOps(
     operations: readonly RogatioOperation[],
@@ -624,8 +622,8 @@ export function createExtensionApplication(
           getGrantedOrigins: async () => [],
         });
         nativePhase = "stopped";
-        // Remove mock faucet redirects that belong to the stopped session;
-        // browser-side redirect/query rules stay installed.
+        // Reinstall browser-side redirect/query rules after stopping the
+        // native runtime.
         try {
           const stopCurrent = await repository.state();
           if (stopCurrent.ok && stopCurrent.value.activeProjectId) {
@@ -733,8 +731,6 @@ export function createExtensionApplication(
       // A permission change must move the installed rules with it: rules that
       // become permitted are installed immediately (covering the common
       // activate-then-grant sequence), and revoked origins stop being served.
-      // Proxy-backed mock redirects only stay when the runtime session is
-      // actually serving the mock faucet.
       const postGrantState = await repository.state();
       if (
         postGrantState.ok &&

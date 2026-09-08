@@ -1,6 +1,5 @@
 import type { RuleInstallerAdapter } from "@rogatio/browser-core";
 import type {
-  MockOperation,
   QueryOperation,
   RedirectOperation,
   RogatioOperation,
@@ -33,17 +32,7 @@ export interface DnrQueryRule {
   };
 }
 
-export interface DnrAllowRule {
-  id: number;
-  priority: number;
-  action: { type: "allow" };
-  condition: { urlFilter: string };
-}
-
-export type DnrRule = DnrRedirectRule | DnrQueryRule | DnrAllowRule;
-
-/** Stable high-priority id for the single loop-protection allow rule. */
-export const MOCK_ALLOW_RULE_ID = 3_000_001;
+export type DnrRule = DnrRedirectRule | DnrQueryRule;
 
 function hostnamesFromOrigins(origins: readonly string[]): string[] {
   const hosts: string[] = [];
@@ -103,41 +92,6 @@ export function translateQueryToDnr(
   };
 }
 
-export function translateMockToDnr(
-  operation: MockOperation,
-  id: number,
-  mockUrl: string,
-): DnrRedirectRule {
-  return {
-    id,
-    priority: operation.matcher.priority,
-    action: {
-      type: "redirect",
-      redirect: { url: mockUrl },
-    },
-    condition: {
-      regexFilter: operation.matcher.urlRegex.source,
-      resourceTypes: operation.matcher.resourceTypes,
-      initiatorDomains: hostnamesFromOrigins(operation.matcher.origins),
-    },
-  };
-}
-
-/**
- * Loop protection: Chrome DNR re-evaluates a redirected request as a new request,
- * so a broad rule (e.g. `.*`) would also match the mock server URL and loop. One
- * high-priority `allow` rule matching the mock URL substring prevents the
- * extension's own redirect rules from ever applying to the mock server.
- */
-export function mockLoopProtectionRule(port: number): DnrAllowRule {
-  return {
-    id: MOCK_ALLOW_RULE_ID,
-    priority: 1_000_000_000,
-    action: { type: "allow" },
-    condition: { urlFilter: `127.0.0.1:${port}/mock/` },
-  };
-}
-
 function ruleIdHash(ruleId: string): number {
   let hash = 0;
   for (let index = 0; index < ruleId.length; index += 1) {
@@ -146,21 +100,8 @@ function ruleIdHash(ruleId: string): number {
   return (Math.abs(hash) % 1_000_000) + 1;
 }
 
-export interface DnrInstallerOptions {
-  /**
-   * Resolves the mock redirect URL for a mock operation. Required for mock
-   * operations to be installed; mock ops without a resolvable URL are skipped.
-   */
-  readonly mockUrlResolver?: (operation: MockOperation) => string | null;
-}
-
-export function createDnrInstaller(
-  api: ChromeApi,
-  options: DnrInstallerOptions = {},
-): RuleInstallerAdapter {
-  // Maps the DNR rule id we assigned back to the RogatioOperation we installed.
+export function createDnrInstaller(api: ChromeApi): RuleInstallerAdapter {
   const tracked = new Map<number, RogatioOperation>();
-  let allowRuleId: number | null = null;
 
   return {
     async current(): Promise<readonly RogatioOperation[]> {
@@ -184,11 +125,9 @@ export function createDnrInstaller(
       operations: readonly RogatioOperation[],
     ): Promise<{ ok: true } | { ok: false; diagnostics: never[] }> {
       const removeRuleIds = [...tracked.keys()];
-      if (allowRuleId !== null) removeRuleIds.push(allowRuleId);
       const addRules: DnrRule[] = [];
       const added: Array<{ ruleId: number; operation: RogatioOperation }> = [];
       const usedIds = new Set<number>();
-      let mockPort: number | null = null;
       for (const operation of operations) {
         if (operation.kind === "redirect") {
           const redirect = operation as RedirectOperation;
@@ -204,28 +143,7 @@ export function createDnrInstaller(
           usedIds.add(id);
           addRules.push(translateQueryToDnr(query, id));
           added.push({ ruleId: id, operation: query });
-        } else if (operation.kind === "mock") {
-          const mock = operation as MockOperation;
-          const mockUrl = options.mockUrlResolver?.(mock);
-          if (mockUrl === null || mockUrl === undefined) continue;
-          let id = ruleIdHash(mock.ruleId);
-          while (usedIds.has(id)) id = (id % 1_000_000) + 1;
-          usedIds.add(id);
-          addRules.push(translateMockToDnr(mock, id, mockUrl));
-          added.push({ ruleId: id, operation: mock });
-          try {
-            const port = Number(new URL(mockUrl).port);
-            if (Number.isInteger(port) && port > 0) mockPort = port;
-          } catch {
-            // Unparsable mock URL: skip loop protection for this rule.
-          }
         }
-      }
-      let nextAllowRuleId: number | null = null;
-      if (mockPort !== null) {
-        const allow = mockLoopProtectionRule(mockPort);
-        addRules.push(allow);
-        nextAllowRuleId = allow.id;
       }
 
       const dnr = api.declarativeNetRequest;
@@ -241,7 +159,6 @@ export function createDnrInstaller(
 
       tracked.clear();
       for (const entry of added) tracked.set(entry.ruleId, entry.operation);
-      allowRuleId = nextAllowRuleId;
       return { ok: true };
     },
   };

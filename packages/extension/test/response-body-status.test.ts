@@ -86,7 +86,7 @@ describe(" response-body extension status", () => {
     const before = await app.handle({ version: 1, command: "get-state" });
     expect(before).toMatchObject({
       ok: true,
-      value: { ruleStatuses: [{ status: "unsupported" }] },
+      value: { ruleStatuses: [{ status: "active" }] },
     });
 
     const started = await app.handle({
@@ -144,7 +144,7 @@ describe(" response-body extension status", () => {
       ok: true,
       value: {
         nativeRuntimeState: { phase: "unsupported" },
-        ruleStatuses: [{ status: "unsupported" }],
+        ruleStatuses: [{ status: "active" }],
       },
     });
     expect(

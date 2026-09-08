@@ -401,8 +401,7 @@ function renderOverview(shell: HTMLElement): void {
   heading.textContent = "Projects";
   const subtitle = document.createElement("p");
   subtitle.className = "rogatio-overview-subtitle";
-  subtitle.textContent =
-    "Manage your active modification rules and mock environments.";
+  subtitle.textContent = "Manage your active modification rules.";
   overview.append(heading, subtitle);
 
   const ids = Object.keys(state.projects).sort();
@@ -503,7 +502,7 @@ function renderOverview(shell: HTMLElement): void {
   createNewTitle.textContent = "Create New Project";
   const createNewHint = document.createElement("span");
   createNewHint.className = "rogatio-create-hint";
-  createNewHint.textContent = "Start with a clean project for rules and mocks.";
+  createNewHint.textContent = "Start with a clean project for rules.";
   createNewCard.append(createNewIcon, createNewTitle, createNewHint);
   creationGrid.append(createNewCard);
 

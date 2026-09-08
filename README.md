@@ -221,9 +221,8 @@ rogatio runtime host .rogatio.json
 rogatio runtime host .rogatio.json --root ~/projects/demo
 ```
 
-Then open the extension, click **Start runtime**, and matched requests
-will be redirected to the configured mock response. Mock rules report
-`needs proxy` while the runtime is stopped and `active` when connected; the
+Then open the extension, click **Start runtime**, and response-body and
+request-body rules become active through the native host. The
 sidebar runtime status line shows the current phase next to the Start/Stop
 controls, with the browser-assigned extension ID shown beneath it. If the host
 manifest is not installed, starting shows the exact ready-to-run

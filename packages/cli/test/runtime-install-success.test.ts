@@ -1,5 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("node:fs/promises", async () => {
+  const actual =
+    await vi.importActual<typeof import("node:fs/promises")>(
+      "node:fs/promises",
+    );
+  return {
+    ...actual,
+    mkdir: async () => undefined,
+    writeFile: async () => undefined,
+    chmod: async () => undefined,
+  };
+});
+
 vi.mock("@rogatio/runtime", async () => {
   const actual =
     await vi.importActual<typeof import("@rogatio/runtime")>(
