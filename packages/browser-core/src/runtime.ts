@@ -1,6 +1,5 @@
 import { coreDiagnostic } from "./diagnostics.js";
 import type {
-  MockRuntimeState,
   NativeRuntimeState,
   RuntimeStates,
   RuntimeTransitionResult,
@@ -8,49 +7,19 @@ import type {
 
 export function initialRuntimeStates(): RuntimeStates {
   return {
-    mock: { phase: "disconnected", lastCheck: null },
     native: { phase: "stopped" },
   };
 }
 
 export class RuntimeStateController {
   private states: RuntimeStates;
-  private readonly now: () => number;
 
-  constructor(states?: RuntimeStates, now?: () => number) {
+  constructor(states?: RuntimeStates) {
     this.states = states ?? initialRuntimeStates();
-    this.now = now ?? (() => Date.now());
   }
 
   snapshot(): RuntimeStates {
     return structuredClone(this.states);
-  }
-
-  beginMockCheck(): RuntimeTransitionResult {
-    const mock = this.states.mock;
-    if (mock.phase === "checking") {
-      return this.reject(mock.phase, "checking");
-    }
-    return this.commit({
-      ...this.states,
-      mock: { phase: "checking", lastCheck: mock.lastCheck },
-    });
-  }
-
-  completeMockCheck(ok: boolean, message?: string): RuntimeTransitionResult {
-    const mock = this.states.mock;
-    if (mock.phase !== "checking") {
-      return this.reject(mock.phase, ok ? "connected" : "failed");
-    }
-    const lastCheck: MockRuntimeState["lastCheck"] = {
-      at: this.now(),
-      ok,
-      ...(message !== undefined ? { message } : {}),
-    };
-    return this.commit({
-      ...this.states,
-      mock: { phase: ok ? "connected" : "failed", lastCheck },
-    });
   }
 
   startNative(): RuntimeTransitionResult {

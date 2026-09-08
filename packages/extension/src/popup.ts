@@ -50,8 +50,6 @@ function statusLabel(status: string): string {
       return "Disabled";
     case "needs permission":
       return "Needs permission";
-    case "needs proxy":
-      return "Needs proxy";
     case "unsupported":
       return "Unsupported";
     case "error":

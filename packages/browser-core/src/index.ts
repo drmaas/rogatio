@@ -20,8 +20,6 @@ export type {
   EnvelopeMigrationResult,
   InstallOutcome,
   InstallResult,
-  MockRuntimePhase,
-  MockRuntimeState,
   NativeRuntimePhase,
   NativeRuntimeState,
   RuleInstallerAdapter,

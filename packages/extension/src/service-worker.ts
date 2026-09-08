@@ -18,10 +18,9 @@ import {
   extensionDiagnostic,
 } from "./diagnostics.js";
 import { installHeaderRules } from "./installer.js";
-import type { MockRuntimeConnection } from "./mock-runtime.js";
+
 import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
-  connectNativeMock,
   type NativeRuntimeConfig,
   requestAIComplete,
   startNativeSession,
@@ -48,10 +47,6 @@ export interface ExtensionApplicationOptions {
   readonly generateId?: () => string;
   readonly now?: () => number;
   readonly extensionId?: string;
-  /** Stores the native-host mock connection for the DNR mock-URL resolver. */
-  readonly mockConnection?: {
-    set(connection: MockRuntimeConnection | null): void;
-  };
   readonly nativeRuntime?: {
     start(config: NativeRuntimeConfig): Promise<{
       readonly state: NativeRuntimePhase | "unsupported";
@@ -115,8 +110,7 @@ function operationStatuses(
   installedRuleIds: readonly string[],
   enabledGroupIds: readonly string[],
   grantedOrigins: readonly string[],
-  mockTokens: ReadonlyMap<string, string>,
-  nativePhase: NativeRuntimePhase | "unsupported",
+  _nativePhase: NativeRuntimePhase | "unsupported",
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -152,13 +146,6 @@ function operationStatuses(
       return { ...status };
     }
     if (operation?.kind === "request-body") {
-      if (nativePhase === "unsupported" || nativePhase !== "started") {
-        return {
-          groupId: status.groupId,
-          ruleId: status.ruleId,
-          status: "needs proxy",
-        };
-      }
       if (status.status === "active" || status.status === "error")
         return {
           groupId: status.groupId,
@@ -168,13 +155,6 @@ function operationStatuses(
       return { ...status };
     }
     if (operation?.kind === "response-body") {
-      if (nativePhase === "unsupported" || nativePhase !== "started") {
-        return {
-          groupId: status.groupId,
-          ruleId: status.ruleId,
-          status: "needs proxy",
-        };
-      }
       if (status.status === "active" || status.status === "error")
         return {
           groupId: status.groupId,
@@ -183,39 +163,8 @@ function operationStatuses(
         };
       return { ...status };
     }
-    if (operation?.kind === "mock") {
-      // Per consolidated native-runtime spec: mock rules need the native
-      // host started; separate mock-phase tracking removed.
-      if (nativePhase !== "started") {
-        return {
-          groupId: status.groupId,
-          ruleId: status.ruleId,
-          status: "needs proxy",
-        };
-      }
-      if (!mockTokens.has(operation.ruleId)) {
-        return {
-          groupId: status.groupId,
-          ruleId: status.ruleId,
-          status: "error",
-          diagnostics: [
-            extensionDiagnostic("extension.mock-token-missing", {
-              ruleId: operation.ruleId,
-            }),
-          ],
-        };
-      }
-      if (status.status === "active") {
-        return {
-          groupId: status.groupId,
-          ruleId: status.ruleId,
-          status: "active",
-        };
-      }
-      return { ...status };
-    }
     // redirect and query operations are installable; pass through status
-    if (status.status === "active") {
+    if (status.status === "active" || status.status === "error") {
       return {
         groupId: status.groupId,
         ruleId: status.ruleId,
@@ -238,8 +187,6 @@ export function createExtensionApplication(
     generateId: options.generateId,
     now: options.now,
   });
-  let mockTokens = new Map<string, string>();
-  let mockConnected = false;
   let nativePhase: NativeRuntimePhase | "unsupported" = options.nativeRuntime
     ? "stopped"
     : "unsupported";
@@ -265,18 +212,10 @@ export function createExtensionApplication(
     operations: readonly RogatioOperation[],
     enabledGroupIds: readonly string[],
     granted: readonly string[],
-    withMocks: boolean,
   ): readonly RogatioOperation[] {
     const enabled = new Set(enabledGroupIds);
     const grantedSet = new Set(granted);
     return operations.filter((operation) => {
-      if (operation.kind === "mock") {
-        return (
-          withMocks &&
-          enabled.has(operation.groupId) &&
-          operation.matcher.origins.length > 0
-        );
-      }
       if (operation.kind === "redirect" || operation.kind === "query") {
         return (
           enabled.has(operation.groupId) &&
@@ -284,25 +223,23 @@ export function createExtensionApplication(
           operation.matcher.origins.every((origin) => grantedSet.has(origin))
         );
       }
+      // Header rules handled separately by installHeaderRules.
       return false;
     });
   }
 
-  async function projectState(
-    envelope: {
-      readonly activeProjectId: string | null;
-      readonly projects: Readonly<
-        Record<
-          string,
-          {
-            readonly data: unknown;
-            readonly enabledGroupIds: readonly string[];
-          }
-        >
-      >;
-    },
-    mockTokens: ReadonlyMap<string, string>,
-  ): Promise<StateProjection> {
+  async function projectState(envelope: {
+    readonly activeProjectId: string | null;
+    readonly projects: Readonly<
+      Record<
+        string,
+        {
+          readonly data: unknown;
+          readonly enabledGroupIds: readonly string[];
+        }
+      >
+    >;
+  }): Promise<StateProjection> {
     if (envelope.activeProjectId === null) {
       const badge = { text: "", attention: false };
       await options.badge?.(badge);
@@ -353,7 +290,6 @@ export function createExtensionApplication(
       installedRuleIds,
       project.enabledGroupIds,
       granted,
-      mockTokens,
       nativePhase,
     );
     const badgeStatuses = statuses.map((status) => ({
@@ -363,7 +299,6 @@ export function createExtensionApplication(
         | "active"
         | "disabled"
         | "needs permission"
-        | "needs proxy"
         | "unsupported"
         | "error",
     }));
@@ -393,7 +328,7 @@ export function createExtensionApplication(
   async function state(): Promise<ApplicationResponse> {
     const result = await repository.state();
     if (!result.ok) return failure("extension.storage-failed");
-    const projection = await projectState(result.value, mockTokens);
+    const projection = await projectState(result.value);
     return {
       ok: true,
       value: {
@@ -479,7 +414,7 @@ export function createExtensionApplication(
           : failure("extension.not-found");
       }
       pendingProjectId = projectId;
-      const projection = await projectState(result.value, mockTokens);
+      const projection = await projectState(result.value);
       return {
         ok: true,
         value: {
@@ -657,57 +592,15 @@ export function createExtensionApplication(
         }
 
         nativePhase = "started";
-        mockConnected = false;
-        mockTokens = new Map();
         const declared = declaredPermissionOrigins({
           operations: compileResult.operations,
         });
         const granted = await grantedOriginsFor(declared);
-        if (options.nativeRuntime.send) {
-          const connection = await connectNativeMock(
-            {
-              extensionId: options.extensionId,
-              nativeRuntime: options.nativeRuntime,
-              getProject: async () => ({
-                data: project.data,
-                enabledGroupIds: project.enabledGroupIds,
-              }),
-              getGrantedOrigins: async () => [],
-            },
-            "",
-          );
-          if (connection && connection.port !== null) {
-            mockTokens = new Map(
-              connection.mocks.map((mock) => [mock.ruleId, mock.token]),
-            );
-            mockConnected = true;
-            // Store the connection so the DNR installer's mock-URL resolver
-            // can translate mock operations into faucet redirect rules.
-            options.mockConnection?.set({
-              protocol: "v1",
-              port: connection.port,
-              presetDigest: sessionResult.policyDigest,
-              mocks: connection.mocks,
-            });
-            await options.installer.install(
-              dnrManagedOps(
-                compileResult.operations,
-                project.enabledGroupIds,
-                granted,
-                true,
-              ),
-            );
-            return state();
-          }
-        }
-        // No usable mock connection: make sure no stale mock redirects from a
-        // previous session survive, keeping only browser-side rules.
         await options.installer.install(
           dnrManagedOps(
             compileResult.operations,
             project.enabledGroupIds,
             granted,
-            false,
           ),
         );
         return state();
@@ -731,9 +624,6 @@ export function createExtensionApplication(
           getGrantedOrigins: async () => [],
         });
         nativePhase = "stopped";
-        mockConnected = false;
-        mockTokens = new Map();
-        options.mockConnection?.set(null);
         // Remove mock faucet redirects that belong to the stopped session;
         // browser-side redirect/query rules stay installed.
         try {
@@ -753,7 +643,6 @@ export function createExtensionApplication(
                     stopCompiled.operations,
                     stopProject.enabledGroupIds,
                     stopGranted,
-                    false,
                   ),
                 );
               }
@@ -811,7 +700,7 @@ export function createExtensionApplication(
         await syncStoredGrants(projectId, declared, grantedOrigins);
         const current = await repository.state();
         if (!current.ok) return failure("extension.storage-failed");
-        const projection = await projectState(current.value, mockTokens);
+        const projection = await projectState(current.value);
         return {
           ok: true,
           value: {
@@ -859,7 +748,6 @@ export function createExtensionApplication(
               postGrantCompiled.operations,
               activeProject.enabledGroupIds,
               currentGranted,
-              nativePhase === "started" && mockConnected,
             ),
           );
         }

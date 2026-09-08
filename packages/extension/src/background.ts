@@ -6,7 +6,7 @@ import {
   setBadge,
 } from "./chrome.js";
 import { createDnrInstaller } from "./dnr.js";
-import { createMockConnectionHolder } from "./mock-runtime.js";
+
 import type {
   NativeEnvelope,
   NativeEnvelopeInput,
@@ -203,17 +203,12 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
 }
 
 const api = chrome;
-const mockConnectionHolder = createMockConnectionHolder();
 const application = createExtensionApplication({
   storage: createStorageAdapter(api),
   permissions: createPermissionAdapter(api),
-  installer: createDnrInstaller(api, {
-    mockUrlResolver: (operation) =>
-      mockConnectionHolder.mockUrl(operation.ruleId),
-  }),
+  installer: createDnrInstaller(api),
   badge: (value) => setBadge(value, api),
   extensionId: api.runtime.id,
-  mockConnection: mockConnectionHolder,
   nativeRuntime: createNativeRuntimeAdapter(),
 });
 

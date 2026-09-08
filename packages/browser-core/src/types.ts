@@ -63,7 +63,6 @@ export type RuleStatusKind =
   | "active"
   | "disabled"
   | "needs permission"
-  | "needs proxy"
   | "unsupported"
   | "error";
 
@@ -104,21 +103,6 @@ export type EnvelopeMigrationResult =
   | { readonly ok: true; readonly envelope: StoredEnvelope }
   | { readonly ok: false; readonly diagnostic: CoreDiagnostic };
 
-export type MockRuntimePhase =
-  | "disconnected"
-  | "checking"
-  | "connected"
-  | "failed";
-
-export interface MockRuntimeState {
-  readonly phase: MockRuntimePhase;
-  readonly lastCheck: {
-    readonly at: number;
-    readonly ok: boolean;
-    readonly message?: string;
-  } | null;
-}
-
 export type NativeRuntimePhase = "stopped" | "starting" | "started" | "failed";
 
 export interface NativeRuntimeState {
@@ -127,7 +111,6 @@ export interface NativeRuntimeState {
 }
 
 export interface RuntimeStates {
-  readonly mock: MockRuntimeState;
   readonly native: NativeRuntimeState;
 }
 

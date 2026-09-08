@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "Sample Rules Project",
-  "description": "Exercises every Rogatio rule type: redirect, query, header, mock, response-body, and request-body.",
+  "description": "Exercises redirect, query, header, response-body, and request-body rule types.",
   "groups": [
     {
       "id": "grp-sample",
@@ -59,23 +59,7 @@
           "headerOperation": "remove",
           "headerName": "X-Test-Header"
         },
-        {
-          "id": "rule-mock",
-          "name": "Mock API response",
-          "urlRegex": "^https://example\\.com/mock/",
-          "origins": [],
-          "resourceTypes": ["xmlhttprequest"],
-          "priority": 400,
-          "type": "mock",
-          "mock": {
-            "status": 200,
-            "headers": [
-              { "name": "Content-Type", "value": "application/json" }
-            ],
-            "delayMs": 100,
-            "body": "{\"mocked\":true}"
-          }
-        },
+
         {
           "id": "rule-response-body",
           "name": "Rewrite response body",

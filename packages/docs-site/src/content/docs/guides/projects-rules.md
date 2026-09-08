@@ -37,7 +37,7 @@ Every rule can specify:
 - A **priority**.
 - Where supported, an HTTP **method**.
 
-Rules visibly report one of: `active`, `disabled`, `needs permission`, `needs proxy`,
+Rules visibly report one of: `active`, `disabled`, `needs permission`, `unsupported`,
 `unsupported`, or `error`. The toolbar badge reflects the count of successfully installed
 active rules.
 

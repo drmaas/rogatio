@@ -145,7 +145,7 @@ function runtimeStatusText(): string {
 /**
  * The blocking status behind the badge's attention flag, derived from the
  * actual rule statuses (REQ-GAV-004) with the shared f21 precedence
- * (error > needs proxy > needs permission > unsupported). The badge and the
+ * (error > unsupported > needs permission). The badge and the
  * sidebar note must describe what is actually blocking — never a canned
  * "grant access" hint when permissions are already granted.
  */
@@ -157,7 +157,6 @@ interface AttentionExplanation {
 
 const ATTENTION_PRECEDENCE: readonly string[] = [
   "error",
-  "needs proxy",
   "needs permission",
   "unsupported",
 ];
@@ -173,13 +172,6 @@ function attentionFromStatuses(): AttentionExplanation | null {
           "rules failed to install: re-activate the group or restart the runtime",
         explanation: "some rules failed to install.",
         fix: "Re-activate the group, or restart the native runtime.",
-      };
-    }
-    if (blocking === "needs proxy") {
-      return {
-        blocking: "needs runtime: start the native host",
-        explanation: "some rules need the native runtime.",
-        fix: "Click 'Start runtime'.",
       };
     }
     if (blocking === "needs permission") {

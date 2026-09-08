@@ -12,9 +12,7 @@ end-to-end.
 | `query`           | `rule-query`        | Adds `ref=rogatio` param                  |
 | `header`          | `rule-header-set`   | Sets `X-Rogatio-Sample` request header     |
 | `header`          | `rule-header-remove`| Removes `X-Test-Header` response header    |
-| `mock`            | `rule-mock`         | Returns mocked JSON with a 100 ms delay    |
-| `response-body`   | `rule-response-body`| Replaces `oldValue` with `newValue`        |
-| `request-body`    | `rule-request-body` | Replaces the POST body                    |
+| `request-body`    | `rule-request-body` | Replaces the POST body                  |
 
 The shipped sample targets `https://example.com`. `example.com` is a real, publicly
 reachable domain, which makes a few rules observable **live in the browser without any
@@ -87,16 +85,12 @@ Group activation is separate from permission grant.
 
 1. Toggle the **Sample Rules Group** enablement switch on.
 2. After activation, each rule shows a status in the management page and the toolbar popup:
-   `active`, `disabled`, `needs permission`, `needs proxy`, `unsupported`, or `error`.
-   Redirect, query, and header rules should read `active` once permission is granted. Mock,
-   response-body, and request-body rules read `needs proxy` until the runtime is connected
-   (next step).
+   `active`, `disabled`, `needs permission`, `unsupported`, or `error`.
+   Redirect, query, and header rules should read `active` once permission is granted.
 
-## 6. Start the runtime (mock, response-body, request-body)
+## 5. Start the runtime (response-body, request-body)
 
-Mock, response-body, and request-body rules need a local runtime. Response-body and
-request-body rules additionally use native messaging and (on capable platforms) a
-device-local CA.
+Response-body and request-body rules use the unified native runtime. First, register the native-messaging host once:
 
 First, register the native-messaging host once so Chrome can launch it. On macOS and other
 capable platforms, this same install command also provisions and trusts the device-local
@@ -108,9 +102,7 @@ rogatio runtime install --extension-id <your extension ID>
 # the extension's Workspace sidebar shows the extension ID
 ```
 
-Then, in the Rogatio management page's **Workspace** view, click **Start runtime**. The browser launches the
-host via the manifest; mock rules change from `needs proxy` to `active` once connected.
-Click **Stop runtime** to stop the session.
+Then, in the Rogatio management page's **Workspace** view, click **Start runtime**. Click **Stop runtime** to stop the session.
 
 If `install` reports `unsupported` on your platform, request-body interception cannot
 activate there — you can still verify, edit, import, export, and dry-run the rule.
@@ -186,7 +178,9 @@ when Chrome authoritatively reports a match.
 2. The address bar becomes `https://example.com/page?ref=rogatio` (the param is added only
    when missing; an existing `ref` value is replaced).
 
-**Mock** (`rule-mock`) — needs the runtime connected (step 6):
+## Mock (`rule-mock`)
+
+Mock rules have been removed from the unified runtime. Mock/rewrite/replacement behavior is covered by body rules (`request-body`, `response-body`) under the native host.
 
 1. With the runtime started and **Check and connect** done, open
    `https://example.com/mock/anything` (or `fetch()` it from any page).

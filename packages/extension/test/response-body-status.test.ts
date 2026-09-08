@@ -79,14 +79,14 @@ async function prepare(app: ReturnType<typeof createExtensionApplication>) {
 }
 
 describe(" response-body extension status", () => {
-  it("reports needs proxy before explicit start and active after start", async () => {
+  it("reports unsupported before explicit start and active after start", async () => {
     const { app, nativeRuntime } = harness();
     await prepare(app);
 
     const before = await app.handle({ version: 1, command: "get-state" });
     expect(before).toMatchObject({
       ok: true,
-      value: { ruleStatuses: [{ status: "needs proxy" }] },
+      value: { ruleStatuses: [{ status: "unsupported" }] },
     });
 
     const started = await app.handle({
@@ -144,7 +144,7 @@ describe(" response-body extension status", () => {
       ok: true,
       value: {
         nativeRuntimeState: { phase: "unsupported" },
-        ruleStatuses: [{ status: "needs proxy" }],
+        ruleStatuses: [{ status: "unsupported" }],
       },
     });
     expect(

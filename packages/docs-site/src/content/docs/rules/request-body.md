@@ -20,7 +20,7 @@ runtime-owned TLS proxy.
 ## Requirements and capabilities
 
 - Requires the native runtime to be started. Without the runtime, request-body rules
-  report `needs proxy`.
+  report `unsupported`.
 - Activation is **capability-based** and cannot compose with another controlling proxy,
   PAC, extension, or enterprise policy.
 - Where the required capabilities are absent, activation reports `unsupported`; Linux and
