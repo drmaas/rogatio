@@ -150,15 +150,7 @@ active route accented) while keeping its `data-desktop-route-rail` identity and
 accessibility semantics; it stays hidden at narrow widths where the existing mobile
 select navigation takes over. Cards, fieldsets, rule cards, test-result cards,
 badges (pills in JetBrains Mono), buttons (primary/secondary/inverted/outlined/
-danger/ghost), search, alerts, and dialogs follow the token system. The extension
-management page reorganizes into a top app bar (brand, Dashboard/Workspace tabs,
-Refresh/Export/Remove, badge pill) and a Workspace-only sidebar (active-project card,
-switch controls, runtime controls with the runtime status line placed directly beneath
-the Start/Stop controls, group activation switches, and permissions summary). Dashboard
-owns the project-cards home and the Create New Project, Import Project, and Create using
-AI entry tiles; the Overview keeps the existing explicit-switch invariant and every
-`data-*` attribute, role, label, and command name asserted by browser tests. The popup
-is restyled as a dark card and uses the "Rogatio" brand. All
+danger/ghost), search, alerts, and dialogs follow the token system. The extension management page reorganizes into a top app bar (brand, Dashboard/Workspace tabs, with workspace-only Refresh/Export/Remove actions and badge pill) and a Workspace-only sidebar (active-project card, runtime controls with the runtime status line placed directly beneath the Start/Stop controls, group activation switches, and permissions summary). Dashboard owns the project-cards home, the full-width project creation section, the full-width existing-project section, and the Create New Project, Import Project, and Create using AI entry tiles; project selection and explicit switching stay on Dashboard, while Workspace controls always target the committed active project. The Overview keeps the existing explicit-switch invariant and every `data-*` attribute, role, label, and command name asserted by browser tests. The popup is restyled as a dark card and uses the "Rogatio" brand. All
 Rogatio documents use the "Rogatio" brand; no other product name appears.
 
 ### Accessibility and offline constraints

@@ -237,23 +237,27 @@ function renderTopbar(shell: HTMLElement): void {
 
   const actions = document.createElement("div");
   actions.className = "rogatio-topbar-actions";
-  actions.append(
-    button("Refresh", "refresh"),
-    button("Export project", "export"),
-    button("Remove project", "remove"),
-  );
-  const badge = document.createElement("span");
-  badge.dataset.badgeState = "true";
-  badge.className = "rogatio-badge-pill";
-  const attention = attentionFromStatuses();
-  const attentionText = state.badge?.attention ? " (attention needed)" : "";
-  const attentionReason =
-    attention !== null && state.ruleStatuses ? ` — ${attention.blocking}` : "";
-  badge.textContent = state.badge
-    ? `Active rules: ${state.badge.text}${attentionText}${attentionReason}`
-    : `Active rules: 0${attentionText}${attentionReason}`;
-  actions.append(badge);
-  topbar.append(actions);
+  if (activeTab === "workspace") {
+    actions.append(
+      button("Refresh", "refresh"),
+      button("Export project", "export"),
+      button("Remove project", "remove"),
+    );
+    const badge = document.createElement("span");
+    badge.dataset.badgeState = "true";
+    badge.className = "rogatio-badge-pill";
+    const attention = attentionFromStatuses();
+    const attentionText = state.badge?.attention ? " (attention needed)" : "";
+    const attentionReason =
+      attention !== null && state.ruleStatuses
+        ? ` — ${attention.blocking}`
+        : "";
+    badge.textContent = state.badge
+      ? `Active rules: ${state.badge.text}${attentionText}${attentionReason}`
+      : `Active rules: 0${attentionText}${attentionReason}`;
+    actions.append(badge);
+    topbar.append(actions);
+  }
   shell.append(topbar);
 }
 
@@ -278,28 +282,9 @@ function renderSidebar(shell: HTMLElement): void {
     sidebar.append(projectCard);
   }
 
-  const selectorLabel = document.createElement("label");
-  selectorLabel.textContent = "Project to switch";
-  const selector = document.createElement("select");
-  selector.dataset.projectSelector = "true";
-  const ids = Object.keys(state.projects).sort();
-  for (const id of ids) {
-    const option = document.createElement("option");
-    option.value = id;
-    option.textContent = text(state.projects[id]?.name, id);
-    selector.append(option);
-  }
-  if (ids.length > 0) {
-    selector.value = pendingProjectId ?? state.activeProjectId ?? ids[0];
-  }
-  selectorLabel.append(selector);
-  sidebar.append(selectorLabel);
-
   const actions = document.createElement("div");
   actions.className = "rogatio-sidebar-actions";
   actions.append(
-    button("Switch project", "switch"),
-    button("Import project", "import"),
     button("Review permissions", "review-permissions"),
     button(
       permissionGranted ? "Access granted" : "Grant declared access",
@@ -348,12 +333,8 @@ function renderSidebar(shell: HTMLElement): void {
   extensionIdLine.textContent = `Extension ID: ${extensionId() || "unknown"}`;
   sidebar.append(extensionIdLine);
 
-  const importInput = document.createElement("input");
-  importInput.type = "file";
-  importInput.accept = ".json,.rogatio.json,application/json";
-  importInput.hidden = true;
-  importInput.dataset.importInput = "true";
-  sidebar.append(importInput);
+  // Project switching and import are dashboard actions. Workspace controls
+  // operate only on the committed active project.
 
   if (permissionOrigins.length > 0) {
     const permissionSummary = document.createElement("p");
@@ -432,9 +413,9 @@ function renderOverview(shell: HTMLElement): void {
     "Manage your active modification rules and mock environments.";
   overview.append(heading, subtitle);
 
+  const ids = Object.keys(state.projects).sort();
   const grid = document.createElement("div");
   grid.className = "rogatio-project-grid";
-  const ids = Object.keys(state.projects).sort();
   for (const id of ids) {
     const project = state.projects[id];
     if (!project) continue;
@@ -487,23 +468,24 @@ function renderOverview(shell: HTMLElement): void {
     projectId.dataset.projectIdLabel = "true";
     projectId.textContent = `ID: ${id}`;
     footer.append(projectId);
-    const actions = document.createElement("span");
-    actions.className = "rogatio-project-actions";
-    const exportAction = document.createElement("button");
-    exportAction.type = "button";
-    exportAction.textContent = "Export";
-    exportAction.dataset.command = "export";
-    exportAction.dataset.projectAction = id;
-    const removeAction = document.createElement("button");
-    removeAction.type = "button";
-    removeAction.textContent = "Remove";
-    removeAction.dataset.command = "remove";
-    removeAction.dataset.projectAction = id;
-    actions.append(exportAction, removeAction);
-    footer.append(actions);
     card.append(footer);
     grid.append(card);
   }
+
+  const creationGrid = document.createElement("div");
+  creationGrid.className = "rogatio-creation-grid";
+
+  const creationSection = document.createElement("section");
+  creationSection.className = "rogatio-dashboard-card rogatio-create-section";
+  creationSection.dataset.dashboardSection = "create";
+  const creationHeading = document.createElement("div");
+  creationHeading.className = "rogatio-dashboard-section-heading";
+  const creationTitle = document.createElement("h3");
+  creationTitle.textContent = "Start a project";
+  const creationHint = document.createElement("p");
+  creationHint.textContent = "Choose how you want to begin.";
+  creationHeading.append(creationTitle, creationHint);
+  creationSection.append(creationHeading, creationGrid);
 
   const createNewCard = document.createElement("button");
   createNewCard.type = "button";
@@ -519,7 +501,7 @@ function renderOverview(shell: HTMLElement): void {
   createNewHint.className = "rogatio-create-hint";
   createNewHint.textContent = "Start with a clean project for rules and mocks.";
   createNewCard.append(createNewIcon, createNewTitle, createNewHint);
-  grid.append(createNewCard);
+  creationGrid.append(createNewCard);
 
   const importCard = document.createElement("button");
   importCard.type = "button";
@@ -535,7 +517,7 @@ function renderOverview(shell: HTMLElement): void {
   importHint.className = "rogatio-create-hint";
   importHint.textContent = "Open a .rogatio.json project from your device.";
   importCard.append(importIcon, importTitle, importHint);
-  grid.append(importCard);
+  creationGrid.append(importCard);
 
   const dashboardImportInput = document.createElement("input");
   dashboardImportInput.type = "file";
@@ -563,7 +545,7 @@ function renderOverview(shell: HTMLElement): void {
     ? "Describe the project you want to build."
     : "Start the native runtime and configure AI to enable generation.";
   aiCard.append(aiIcon, aiTitle, aiHint);
-  grid.append(aiCard);
+  creationGrid.append(aiCard);
 
   if (aiPromptOpen) {
     const composer = document.createElement("section");
@@ -618,10 +600,45 @@ function renderOverview(shell: HTMLElement): void {
       message.textContent = aiMessage;
       composer.append(message);
     }
-    overview.append(composer);
+    creationSection.append(composer);
   }
 
-  overview.append(grid);
+  const projectsSection = document.createElement("section");
+  projectsSection.className = "rogatio-dashboard-card rogatio-projects-section";
+  projectsSection.dataset.dashboardSection = "projects";
+  const projectsHeading = document.createElement("div");
+  projectsHeading.className = "rogatio-dashboard-section-heading";
+  const projectsCopy = document.createElement("div");
+  const projectsTitle = document.createElement("h3");
+  projectsTitle.textContent = "Your projects";
+  const projectsHint = document.createElement("p");
+  projectsHint.textContent =
+    ids.length === 0
+      ? "Your saved projects will appear here."
+      : "Select a project to open it in Workspace.";
+  projectsCopy.append(projectsTitle, projectsHint);
+
+  const projectActions = document.createElement("div");
+  projectActions.className = "rogatio-dashboard-section-actions";
+  const selectorLabel = document.createElement("label");
+  selectorLabel.textContent = "Project to switch";
+  const selector = document.createElement("select");
+  selector.dataset.projectSelector = "true";
+  for (const id of ids) {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = text(state.projects[id]?.name, id);
+    selector.append(option);
+  }
+  if (ids.length > 0) {
+    selector.value = pendingProjectId ?? state.activeProjectId ?? ids[0];
+  }
+  selectorLabel.append(selector);
+  projectActions.append(selectorLabel, button("Switch project", "switch"));
+  projectsHeading.append(projectsCopy, projectActions);
+  projectsSection.append(projectsHeading, grid);
+
+  overview.append(creationSection, projectsSection);
   shell.append(overview);
 }
 

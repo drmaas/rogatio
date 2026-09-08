@@ -87,6 +87,7 @@ test("drives the real extension page lifecycle and mounts the editor", async () 
     await page.locator('[data-command="create"]').click();
     await page.waitForTimeout(100);
     await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Workspace", exact: true }).click();
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
   } finally {

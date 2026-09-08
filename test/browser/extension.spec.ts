@@ -76,7 +76,9 @@ test("keeps project selection separate from explicit switch", async ({
   });
   await page.goto("/extension/index.html");
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
-  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Dashboard", exact: true }),
+  ).toBeVisible();
   const selector = page.getByLabel("Project to switch");
   await selector.selectOption("project-b");
   await expect(page.getByText("Selected Project B.")).toBeVisible();

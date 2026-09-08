@@ -311,6 +311,11 @@ body {
 }
 
 /* Project cards (Overview / Dashboard) */
+.rogatio-overview {
+  width: 100%;
+  max-width: 96rem;
+  margin: 0 auto;
+}
 .rogatio-overview h2 {
   margin: 0 0 0.25rem;
   font-size: 1.5rem;
@@ -321,18 +326,72 @@ body {
   margin: 0 0 1rem;
   color: var(--rogatio-muted);
 }
+.rogatio-layout[data-view="dashboard"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.rogatio-dashboard-card {
+  display: grid;
+  gap: 1.25rem;
+  width: 100%;
+  margin-top: 1.25rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  background: rgba(22, 27, 34, 0.82);
+  padding: clamp(1rem, 2vw, 1.5rem);
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.12);
+}
+.rogatio-dashboard-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1.5rem;
+}
+.rogatio-dashboard-section-heading h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+.rogatio-dashboard-section-heading p {
+  margin: 0.2rem 0 0;
+  color: var(--rogatio-muted);
+  font-size: 0.875rem;
+}
+.rogatio-dashboard-section-actions {
+  display: flex;
+  align-items: end;
+  gap: 0.5rem;
+}
+.rogatio-dashboard-section-actions label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--rogatio-muted);
+  font-size: 0.8rem;
+}
+.rogatio-dashboard-section-actions select {
+  min-width: 12rem;
+}
+.rogatio-projects-section {
+  margin-top: 1.25rem;
+}
 .rogatio-project-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
 }
 .rogatio-project-card {
   display: grid;
-  gap: 0.75rem;
+  grid-template-columns:
+    minmax(12rem, 1.15fr)
+    minmax(8rem, 0.7fr)
+    minmax(15rem, 1fr)
+    minmax(9rem, auto);
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
   border: 1px solid var(--rogatio-border);
-  border-radius: var(--rogatio-radius);
-  background: var(--rogatio-surface);
-  padding: 1rem;
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-raised);
+  padding: 1rem 1.1rem;
   text-align: left;
   cursor: pointer;
 }
@@ -341,10 +400,7 @@ body {
   background: var(--rogatio-surface-raised);
 }
 .rogatio-project-card-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
+  min-width: 0;
   margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
@@ -370,14 +426,22 @@ body {
   background: var(--rogatio-primary);
 }
 .rogatio-project-stats {
-  display: grid;
-  gap: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  min-width: 0;
   border: 1px solid var(--rogatio-border);
   border-radius: var(--rogatio-radius-sm);
   background: var(--rogatio-surface-inset);
   padding: 0.6rem 0.75rem;
   color: var(--rogatio-muted);
   font-size: 0.85rem;
+}
+.rogatio-project-stats > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex: 1 1 5rem;
 }
 .rogatio-project-stats [data-project-groups],
 .rogatio-project-stats [data-project-rules],
@@ -386,13 +450,11 @@ body {
   font-family: var(--rogatio-font-mono);
 }
 .rogatio-project-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
+  min-width: 0;
   color: var(--rogatio-faint);
   font-family: var(--rogatio-font-mono);
   font-size: 0.72rem;
+  word-break: break-all;
 }
 .rogatio-project-actions {
   display: flex;
@@ -402,18 +464,30 @@ body {
   padding: 0.25rem 0.5rem;
   font-size: 0.78rem;
 }
+.rogatio-creation-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
 .rogatio-create-project {
   display: grid;
-  place-items: center;
-  gap: 0.5rem;
-  min-height: 11rem;
-  border: 1px dashed var(--rogatio-faint);
-  border-radius: var(--rogatio-radius);
-  background: transparent;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "icon title"
+    "icon hint";
+  align-items: center;
+  justify-content: start;
+  gap: 0.15rem 0.8rem;
+  min-width: 0;
+  min-height: 7.5rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-raised);
   color: var(--rogatio-muted);
   padding: 1rem;
   cursor: pointer;
-  text-align: center;
+  text-align: left;
 }
 .rogatio-create-project:hover:not(:disabled) {
   border-color: var(--rogatio-primary);
@@ -421,22 +495,25 @@ body {
   color: var(--rogatio-text);
 }
 .rogatio-create-project .rogatio-create-icon {
+  grid-area: icon;
   display: grid;
   place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.6rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.7rem;
   background: var(--rogatio-primary);
   color: var(--rogatio-text);
   font-size: 1.2rem;
   font-weight: 700;
 }
 .rogatio-create-project .rogatio-create-title {
+  grid-area: title;
   color: var(--rogatio-text);
   font-weight: 700;
 }
 .rogatio-create-project .rogatio-create-hint {
-  max-width: 16rem;
+  grid-area: hint;
+  max-width: none;
   font-size: 0.82rem;
 }
 .rogatio-create-ai {
@@ -493,8 +570,40 @@ body {
   }
 }
 
+@media (max-width: 64rem) {
+  .rogatio-project-card {
+    grid-template-columns:
+      minmax(10rem, 1fr)
+      minmax(8rem, 0.7fr)
+      minmax(12rem, 1fr);
+  }
+  .rogatio-project-footer {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 48rem) {
-  .rogatio-project-grid {
+  .rogatio-dashboard-section-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .rogatio-dashboard-section-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .rogatio-dashboard-section-actions select {
+    min-width: 0;
+  }
+  .rogatio-project-card {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  .rogatio-project-footer {
+    grid-column: auto;
+  }
+  .rogatio-project-grid,
+  .rogatio-creation-grid {
     grid-template-columns: 1fr;
   }
 }
