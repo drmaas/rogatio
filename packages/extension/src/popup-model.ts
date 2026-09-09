@@ -2,6 +2,7 @@ export type GroupStatus =
   | "active"
   | "disabled"
   | "needs permission"
+  | "needs runtime"
   | "unsupported"
   | "error";
 
@@ -59,6 +60,7 @@ export const MANAGEMENT_PAGE = "index.html";
 const STATUS_PRECEDENCE: readonly GroupStatus[] = [
   "error",
   "needs permission",
+  "needs runtime",
   "unsupported",
   "active",
 ];

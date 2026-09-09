@@ -24,8 +24,9 @@ to WebExtensions Declarative Net Request (DNR) rules and manages project lifecyc
 
 ## Rule status and badge
 
-Rules report `active`, `disabled`, `needs permission`, `unsupported`, or
-`error`. The toolbar badge reflects the successfully installed active rules. Actionless
+Rules report `active`, `disabled`, `needs permission`, `needs runtime`,
+`unsupported`, or `error`. Body rules report `needs runtime` until the native runtime
+is started. The toolbar badge reflects the successfully installed active rules. Actionless
 matcher operations are reported as `unsupported` and are not installed until a later
 action slice defines their DNR action.
 

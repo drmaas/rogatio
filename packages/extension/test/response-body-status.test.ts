@@ -78,16 +78,21 @@ async function prepare(app: ReturnType<typeof createExtensionApplication>) {
   });
 }
 
-describe(" response-body extension status", () => {
-  it("reports unsupported before explicit start and active after start", async () => {
-    const { app, nativeRuntime } = harness();
+describe("response-body extension status", () => {
+  it("reports enabled body rules as needing runtime before explicit start", async () => {
+    const { app } = harness();
     await prepare(app);
 
     const before = await app.handle({ version: 1, command: "get-state" });
     expect(before).toMatchObject({
       ok: true,
-      value: { ruleStatuses: [{ status: "active" }] },
+      value: { ruleStatuses: [{ status: "needs runtime" }] },
     });
+  });
+
+  it("reports body rules as active after the runtime starts", async () => {
+    const { app, nativeRuntime } = harness();
+    await prepare(app);
 
     const started = await app.handle({
       version: 1,
@@ -104,7 +109,6 @@ describe(" response-body extension status", () => {
   });
 
   it("reports unsupported without a native runtime adapter", async () => {
-    const { app } = harness();
     let unsupportedStored: unknown;
     const noAdapter = createExtensionApplication({
       storage: {
@@ -144,7 +148,7 @@ describe(" response-body extension status", () => {
       ok: true,
       value: {
         nativeRuntimeState: { phase: "unsupported" },
-        ruleStatuses: [{ status: "active" }],
+        ruleStatuses: [{ status: "unsupported" }],
       },
     });
     expect(
@@ -156,6 +160,5 @@ describe(" response-body extension status", () => {
       ok: false,
       diagnostic: { code: "extension.native-runtime-unavailable" },
     });
-    expect(app).toBeDefined();
   });
 });

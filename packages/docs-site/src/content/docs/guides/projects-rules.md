@@ -38,7 +38,8 @@ Every rule can specify:
 - Where supported, an HTTP **method**.
 
 Rules visibly report one of: `active`, `disabled`, `needs permission`,
-`unsupported`, or `error`. The toolbar badge reflects the count of successfully installed
+`needs runtime`, `unsupported`, or `error`. Runtime-dependent body rules report
+`needs runtime` until the native runtime is started. The toolbar badge reflects the count of successfully installed
 active rules.
 
 See the [rules reference](/rules/redirects/) for each rule type's behavior.

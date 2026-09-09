@@ -144,6 +144,9 @@ test("reports an actionable message and failed status when the native host is mi
   });
   await page.goto("/extension/index.html");
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.locator("[data-ai-status]")).toContainText(
+    "AI: needs runtime",
+  );
   await expect(
     page.getByRole("button", { name: "Start runtime" }),
   ).toBeVisible();
@@ -171,6 +174,74 @@ test("reports an actionable message and failed status when the native host is mi
   await expect(page.locator("[data-native-runtime-state]")).toContainText(
     "Runtime status: failed to start",
   );
+});
+
+test("shows AI needs runtime before start and ready after a successful start", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const state = {
+      version: 1,
+      projects: {
+        "project-a": {
+          id: "project-a",
+          name: "Project A",
+          data: { version: 1, name: "Project A", groups: [] },
+          revision: 1,
+          enabledGroupIds: [],
+          grantedOrigins: [],
+        },
+      },
+      activeProjectId: "project-a",
+      nativeRuntimeState: undefined as { phase: string } | undefined,
+    };
+    const runtime = {
+      lastError: undefined,
+      id: "b".repeat(32),
+      sendMessage(
+        message: { command?: string; type?: string },
+        callback: (value: unknown) => void,
+      ) {
+        if (message.command === "start-native-runtime") {
+          state.nativeRuntimeState = { phase: "started" };
+          callback({ ok: true, value: state });
+        } else if (message.type === "ai.complete") {
+          callback({
+            protocol: "v1",
+            type: "ai.complete",
+            timestamp: Date.now(),
+            metadata: { content: "{}" },
+          });
+        } else callback({ ok: true, value: state });
+      },
+      onMessage: { addListener() {} },
+    };
+    Object.defineProperty(window, "chrome", {
+      configurable: true,
+      value: {
+        storage: {
+          local: { get: async () => ({ rogatio: state }), set: async () => {} },
+        },
+        permissions: {
+          contains: async () => false,
+          request: async () => true,
+          remove: async () => true,
+        },
+        action: {
+          setBadgeText: async () => {},
+          setBadgeBackgroundColor: async () => {},
+        },
+        runtime,
+      },
+    });
+  });
+  await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.locator("[data-ai-status]")).toHaveText(
+    "AI: needs runtime",
+  );
+  await page.getByRole("button", { name: "Start runtime" }).click();
+  await expect(page.locator("[data-ai-status]")).toHaveText("AI: Ready");
 });
 
 test("keeps the platform-unavailable wording and truthful unsupported status", async ({

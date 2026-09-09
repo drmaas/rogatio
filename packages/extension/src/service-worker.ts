@@ -110,7 +110,7 @@ function operationStatuses(
   installedRuleIds: readonly string[],
   enabledGroupIds: readonly string[],
   grantedOrigins: readonly string[],
-  _nativePhase: NativeRuntimePhase | "unsupported",
+  nativePhase: NativeRuntimePhase | "unsupported",
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -135,6 +135,36 @@ function operationStatuses(
       }
       return { ...status };
     }
+    if (
+      operation?.kind === "request-body" ||
+      operation?.kind === "response-body"
+    ) {
+      if (status.status !== "active" && status.status !== "error") {
+        return { ...status };
+      }
+      if (nativePhase === "unsupported") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "unsupported",
+          diagnostics: [extensionDiagnostic("extension.unsupported")],
+        };
+      }
+      if (nativePhase !== "started") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "needs runtime",
+        };
+      }
+      return {
+        groupId: status.groupId,
+        ruleId: status.ruleId,
+        status: "active",
+      };
+    }
+    // redirect, query, and header operations are browser-native and remain
+    // active once their permissions and installation are satisfied.
     if (operation?.kind === "header") {
       if (status.status === "active") {
         return {
@@ -143,24 +173,6 @@ function operationStatuses(
           status: "active",
         };
       }
-      return { ...status };
-    }
-    if (operation?.kind === "request-body") {
-      if (status.status === "active" || status.status === "error")
-        return {
-          groupId: status.groupId,
-          ruleId: status.ruleId,
-          status: "active",
-        };
-      return { ...status };
-    }
-    if (operation?.kind === "response-body") {
-      if (status.status === "active" || status.status === "error")
-        return {
-          groupId: status.groupId,
-          ruleId: status.ruleId,
-          status: "active",
-        };
       return { ...status };
     }
     // redirect and query operations are installable; pass through status
@@ -297,6 +309,7 @@ export function createExtensionApplication(
         | "active"
         | "disabled"
         | "needs permission"
+        | "needs runtime"
         | "unsupported"
         | "error",
     }));
