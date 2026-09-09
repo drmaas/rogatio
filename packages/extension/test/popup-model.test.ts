@@ -42,13 +42,19 @@ describe("F21 popup group status aggregation", () => {
     expect(aggregateGroupStatus(true, [])).toBe("active");
   });
 
-  it("applies precedence error > unsupported > needs permission > unsupported > active", () => {
+  it("applies precedence error > needs permission > needs runtime > unsupported > active", () => {
     const statuses: PopupRuleStatus[] = [
       { groupId: "g", ruleId: "r1", status: "active" },
       { groupId: "g", ruleId: "r2", status: "needs permission" },
       { groupId: "g", ruleId: "r3", status: "unsupported" },
     ];
     expect(aggregateGroupStatus(true, statuses)).toBe("needs permission");
+    expect(
+      aggregateGroupStatus(true, [
+        { groupId: "g", ruleId: "r", status: "needs runtime" },
+        { groupId: "g", ruleId: "r2", status: "unsupported" },
+      ]),
+    ).toBe("needs runtime");
     expect(
       aggregateGroupStatus(true, [
         { groupId: "g", ruleId: "r", status: "unsupported" },

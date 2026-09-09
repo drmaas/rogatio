@@ -158,6 +158,7 @@ interface AttentionExplanation {
 const ATTENTION_PRECEDENCE: readonly string[] = [
   "error",
   "needs permission",
+  "needs runtime",
   "unsupported",
 ];
 
@@ -179,6 +180,13 @@ function attentionFromStatuses(): AttentionExplanation | null {
         blocking: "needs permission: grant declared access",
         explanation: "some rules need permission.",
         fix: "Click 'Grant declared access' after reviewing origins.",
+      };
+    }
+    if (blocking === "needs runtime") {
+      return {
+        blocking: "needs runtime: start the native runtime",
+        explanation: "some rules need the native runtime.",
+        fix: "Click 'Start runtime'.",
       };
     }
     return {
@@ -308,11 +316,15 @@ function renderSidebar(shell: HTMLElement): void {
   if (aiSupported) {
     aiStatus.textContent = "AI: Ready";
     aiStatus.className += " rogatio-ai-ready";
-  } else if (aiStatusChecked) {
+  } else if (state.nativeRuntimeState?.phase !== "started") {
+    aiStatus.textContent = "AI: needs runtime";
+    aiStatus.className += " rogatio-ai-needs-runtime";
+  } else if (state.nativeRuntimeState?.phase === "started" && aiStatusChecked) {
     aiStatus.textContent = "AI: Not configured";
     aiStatus.className += " rogatio-ai-not-configured";
   } else {
-    aiStatus.textContent = "AI: Checking...";
+    aiStatus.textContent = "AI: Not configured";
+    aiStatus.className += " rogatio-ai-not-configured";
   }
   sidebar.append(aiStatus);
 

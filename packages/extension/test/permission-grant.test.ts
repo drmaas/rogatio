@@ -226,6 +226,7 @@ describe("grant moves installed rules and statuses with it", () => {
               origins: [],
               resourceTypes: ["main_frame"],
               priority: 100,
+              method: "GET",
               type: "header",
               headerDirection: "request",
               headerOperation: "set",
@@ -236,7 +237,11 @@ describe("grant moves installed rules and statuses with it", () => {
         },
       ],
     } as const;
-    const dynamic = vi.fn(async () => {});
+    const dynamic = vi.fn(
+      async (_options: {
+        addRules: Array<{ condition: { requestMethods?: string[] } }>;
+      }) => {},
+    );
     const previousChrome = (globalThis as Record<string, unknown>).chrome;
     (globalThis as Record<string, unknown>).chrome = {
       declarativeNetRequest: { updateDynamicRules: dynamic },
@@ -266,6 +271,10 @@ describe("grant moves installed rules and statuses with it", () => {
 
       setGranted(true);
       const after = await app.handle({ version: 1, command: "get-state" });
+      expect(dynamic).toHaveBeenCalled();
+      expect(
+        dynamic.mock.calls.at(-1)?.[0].addRules[0]?.condition.requestMethods,
+      ).toEqual(["get"]);
       // The header rule installs through the DNR session API on every state
       // computation; the status must reflect the real installation (REQ-009)
       // instead of comparing numeric DNR ids against project rule ids.

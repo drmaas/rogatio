@@ -86,8 +86,8 @@ Group activation is separate from permission grant.
 
 1. Toggle the **Sample Rules Group** enablement switch on.
 2. After activation, each rule shows a status in the management page and the toolbar popup:
-   `active`, `disabled`, `needs permission`, `unsupported`, or `error`.
-   Redirect, query, and header rules should read `active` once permission is granted.
+   `active`, `disabled`, `needs permission`, `needs runtime`, `unsupported`, or `error`.
+   Redirect, query, and header rules should read `active` once permission is granted; response-body and request-body rules read `needs runtime` until the native runtime is started.
 
 ## 5. Start the runtime (response-body, request-body)
 

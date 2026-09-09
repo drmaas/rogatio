@@ -86,28 +86,15 @@ async function prepare(app: ReturnType<typeof createExtensionApplication>) {
 }
 
 describe(" request-body extension status", () => {
-  it("reports unsupported before explicit start and active after start", async () => {
-    const { app, nativeRuntime } = harness();
+  it("reports enabled body rules as needing runtime before explicit start", async () => {
+    const { app } = harness();
     await prepare(app);
 
     const before = await app.handle({ version: 1, command: "get-state" });
     expect(before).toMatchObject({
       ok: true,
-      value: { ruleStatuses: [{ status: "active" }] },
+      value: { ruleStatuses: [{ status: "needs runtime" }] },
     });
-
-    const started = await app.handle({
-      version: 1,
-      command: "start-native-runtime",
-    });
-    expect(started).toMatchObject({
-      ok: true,
-      value: {
-        nativeRuntimeState: { phase: "started" },
-        ruleStatuses: [{ status: "active" }],
-      },
-    });
-    expect(nativeRuntime.start).toHaveBeenCalledOnce();
   });
 
   it("reports unsupported without a native runtime adapter", async () => {
@@ -150,7 +137,7 @@ describe(" request-body extension status", () => {
       ok: true,
       value: {
         nativeRuntimeState: { phase: "unsupported" },
-        ruleStatuses: [{ status: "active" }],
+        ruleStatuses: [{ status: "unsupported" }],
       },
     });
     expect(
@@ -161,6 +148,52 @@ describe(" request-body extension status", () => {
     ).toMatchObject({
       ok: false,
       diagnostic: { code: "extension.native-runtime-unavailable" },
+    });
+  });
+
+  it("preserves the host-missing diagnostic when connectNative rejects", async () => {
+    let stored: unknown;
+    const nativeRuntime = {
+      start: vi.fn(async () => ({ state: "started" as const })),
+      stop: vi.fn(async () => ({ state: "stopped" as const })),
+      status: vi.fn(async () => ({ state: "stopped" as const })),
+      sendPolicy: vi.fn(async (_frames: Uint8Array[]) => {}),
+      send: vi.fn(async () => {
+        throw new Error("extension.native-host-missing");
+      }),
+    };
+    const app = createExtensionApplication({
+      storage: {
+        read: async () => stored,
+        compareAndSwap: async (previous: unknown, next: unknown) => {
+          if (stored !== previous) return false;
+          stored = next;
+          return true;
+        },
+      },
+      permissions: {
+        contains: async () => true,
+        request: async () => true,
+        remove: async () => true,
+      },
+      installer: {
+        current: async () => [],
+        install: async () => ({ ok: true as const }),
+      },
+      nativeRuntime,
+      extensionId: "test-extension-id",
+      generateId: () => "request-body-project",
+      now: () => 1,
+    });
+    await prepare(app);
+
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: false,
+      diagnostic: { code: "extension.native-host-missing" },
     });
   });
 

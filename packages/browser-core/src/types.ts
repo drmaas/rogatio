@@ -63,6 +63,7 @@ export type RuleStatusKind =
   | "active"
   | "disabled"
   | "needs permission"
+  | "needs runtime"
   | "unsupported"
   | "error";
 

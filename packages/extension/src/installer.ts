@@ -134,7 +134,7 @@ function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
           : undefined,
       requestMethods:
         projection.matcher.method !== undefined
-          ? [projection.matcher.method]
+          ? [projection.matcher.method.toLowerCase()]
           : undefined,
     },
   };

@@ -177,6 +177,15 @@ export async function buildNativePolicy(
   return { ok: true, value: policy };
 }
 
+function stableStartFailureReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("extension.native-host-missing"))
+    return "extension.native-host-missing";
+  if (message.includes("extension.request-body-needs-trust"))
+    return "extension.request-body-needs-trust";
+  return "extension.native-runtime-transition";
+}
+
 export async function startNativeSession(
   options: NativeSessionOptions,
 ): Promise<
@@ -241,7 +250,7 @@ export async function startNativeSession(
       }
     } catch (error) {
       console.log("[rogatio] project.set exception:", error);
-      return { ok: false, reason: String(error) };
+      return { ok: false, reason: stableStartFailureReason(error) };
     }
   }
 
