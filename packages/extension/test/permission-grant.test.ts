@@ -233,13 +233,32 @@ describe("grant moves installed rules and statuses with it", () => {
               headerName: "X-Custom-Header",
               headerValue: "test-value",
             },
+            {
+              id: "rule-header-remove",
+              name: "Remove response header",
+              urlRegex: "^https://example\\.com/",
+              origins: [],
+              resourceTypes: ["main_frame"],
+              priority: 101,
+              method: "GET",
+              type: "header",
+              headerDirection: "response",
+              headerOperation: "remove",
+              headerName: "X-Test-Header",
+            },
           ],
         },
       ],
     } as const;
     const dynamic = vi.fn(
       async (_options: {
-        addRules: Array<{ condition: { requestMethods?: string[] } }>;
+        addRules: Array<{
+          action: {
+            requestHeaders: Array<{ operation: string; value?: string }>;
+            responseHeaders: Array<{ operation: string; value?: string }>;
+          };
+          condition: { requestMethods?: string[]; regexFilter?: string };
+        }>;
       }) => {},
     );
     const previousChrome = (globalThis as Record<string, unknown>).chrome;
@@ -266,21 +285,44 @@ describe("grant moves installed rules and statuses with it", () => {
       const before = await app.handle({ version: 1, command: "get-state" });
       expect(before).toMatchObject({
         ok: true,
-        value: { ruleStatuses: [{ status: "needs permission" }] },
+        value: {
+          ruleStatuses: [
+            { ruleId: "rule-header", status: "needs permission" },
+            { ruleId: "rule-header-remove", status: "needs permission" },
+          ],
+        },
       });
 
       setGranted(true);
       const after = await app.handle({ version: 1, command: "get-state" });
       expect(dynamic).toHaveBeenCalled();
-      expect(
-        dynamic.mock.calls.at(-1)?.[0].addRules[0]?.condition.requestMethods,
-      ).toEqual(["get"]);
-      // The header rule installs through the DNR session API on every state
-      // computation; the status must reflect the real installation (REQ-009)
+      const latestRules = dynamic.mock.calls.at(-1)?.[0].addRules ?? [];
+      expect(latestRules).toHaveLength(2);
+      expect(latestRules[0]?.condition).toMatchObject({
+        requestMethods: ["get"],
+        regexFilter: "^https://example\\.com/",
+      });
+      expect(latestRules[0]?.action.requestHeaders[0]).toMatchObject({
+        operation: "set",
+        value: "test-value",
+      });
+      // A remove action must omit value entirely; Chrome rejects an undefined
+      // value in a modifyHeaders rule and rejects the whole atomic update.
+      expect(latestRules[1]?.action.responseHeaders[0]).toEqual({
+        header: "X-Test-Header",
+        operation: "remove",
+      });
+      // The header rules install through the DNR session API on every state
+      // computation; statuses must reflect the real installation (REQ-009)
       // instead of comparing numeric DNR ids against project rule ids.
       expect(after).toMatchObject({
         ok: true,
-        value: { ruleStatuses: [{ status: "active" }] },
+        value: {
+          ruleStatuses: [
+            { ruleId: "rule-header", status: "active" },
+            { ruleId: "rule-header-remove", status: "active" },
+          ],
+        },
       });
     } finally {
       (globalThis as Record<string, unknown>).chrome = previousChrome;

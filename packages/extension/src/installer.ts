@@ -9,7 +9,7 @@ export interface DnrHeaderRule {
     readonly responseHeaders: readonly DnrHeaderAction[];
   };
   readonly condition: {
-    readonly urlFilter: string;
+    readonly regexFilter: string;
     readonly resourceTypes?: readonly string[];
     readonly initiatorDomains?: readonly string[];
     readonly excludedInitiatorDomains?: readonly string[];
@@ -37,12 +37,6 @@ export interface DnrInstallError {
   readonly ruleId: number;
   readonly code: string;
   readonly message: string;
-}
-
-function toUrlFilter(source: string): string {
-  if (source.startsWith("^")) return source;
-  if (source.startsWith("*")) return source;
-  return `*${source}*`;
 }
 
 function toDnrResourceTypes(types: readonly string[]): string[] {
@@ -93,7 +87,7 @@ function toDnrHeaderAction(
   return {
     header: action.headerName,
     operation: action.operation,
-    value: action.headerValue,
+    ...(action.headerValue !== undefined ? { value: action.headerValue } : {}),
   };
 }
 
@@ -115,7 +109,8 @@ function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
           : [],
     },
     condition: {
-      urlFilter: toUrlFilter(projection.matcher.urlRegex.source),
+      // Header rules use the compiler's regular-expression matcher directly.
+      regexFilter: projection.matcher.urlRegex.source,
       resourceTypes:
         projection.matcher.resourceTypes.length > 0
           ? toDnrResourceTypes(projection.matcher.resourceTypes)
@@ -142,6 +137,7 @@ function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
 
 export async function installHeaderRules(
   projections: readonly HeaderProjection[],
+  removeRuleIds: readonly number[] = projections.map((rule) => rule.id),
 ): Promise<InstallResult> {
   const rules = projections.map(toDnrRule);
   const installed: number[] = [];
@@ -154,6 +150,7 @@ export async function installHeaderRules(
             removeRuleIds: number[];
             addRules: DnrHeaderRule[];
           }) => Promise<void>;
+          getDynamicRules?: () => Promise<Array<{ id: number }>>;
         };
       };
     }
@@ -168,9 +165,20 @@ export async function installHeaderRules(
     }
     return { installed, errors };
   }
+  let existingIds: readonly number[] = [];
+  if (dnr.getDynamicRules) {
+    try {
+      const current = await dnr.getDynamicRules();
+      const currentIds = new Set(current.map((rule) => rule.id));
+      existingIds = removeRuleIds.filter((id) => currentIds.has(id));
+    } catch {
+      // Do not issue removals we could not verify; still attempt the add.
+      existingIds = [];
+    }
+  }
   try {
     await dnr.updateDynamicRules({
-      removeRuleIds: rules.map((r) => r.id),
+      removeRuleIds: [...existingIds],
       addRules: rules,
     });
     installed.push(...rules.map((r) => r.id));
