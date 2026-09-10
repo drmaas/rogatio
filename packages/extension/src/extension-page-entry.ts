@@ -23,6 +23,7 @@ interface Envelope {
   readonly ruleStatuses?: readonly Record<string, unknown>[];
   readonly badge?: { readonly text: string; readonly attention: boolean };
   readonly nativeRuntimeState?: { readonly phase: string };
+  readonly nativeRuntimeError?: string | null;
 }
 
 interface ExtensionResponse {
@@ -80,6 +81,7 @@ let diagnosticsData: {
   extensionId: string | null;
   hostName: string;
   chromeError: string | null;
+  runtimeError: string | null;
   connectNativeAvailable: boolean;
   timestamp: number;
 } | null = null;
@@ -140,6 +142,24 @@ function runtimeStatusText(): string {
     default:
       return "stopped";
   }
+}
+
+function runtimeRecoveryText(): string {
+  const error = state.nativeRuntimeError?.toLowerCase() ?? "";
+  if (error.includes("native-host-missing") || error.includes("host")) {
+    return "Run the install command below once, reload Rogatio from chrome://extensions, then click Start runtime again.";
+  }
+  if (
+    error.includes("trust") ||
+    error.includes("certificate") ||
+    error.includes("ca")
+  ) {
+    return "Run the install command below to register the host and trust the device-local CA, then restart Chrome and click Start runtime again.";
+  }
+  if ((state.nativeRuntimeState?.phase ?? "stopped") === "unsupported") {
+    return "This device cannot provide the capabilities required by the selected runtime rules. You can still edit and verify the project.";
+  }
+  return "Open Show diagnostics for the concrete host error. After correcting it, click Start runtime again.";
 }
 
 /**
@@ -331,11 +351,30 @@ function renderSidebar(shell: HTMLElement): void {
   // The browser-assigned extension ID is what `rogatio runtime install` pins
   // in the native-messaging manifest; always show it so the install step
   // never requires hunting through chrome://extensions.
+  const extensionIdRow = document.createElement("div");
+  extensionIdRow.className = "rogatio-extension-id-row";
   const extensionIdLine = document.createElement("p");
   extensionIdLine.dataset.extensionId = "true";
   extensionIdLine.className = "rogatio-extension-id";
   extensionIdLine.textContent = `Extension ID: ${extensionId() || "unknown"}`;
-  sidebar.append(extensionIdLine);
+  const copyId = button("⧉", "copy-extension-id");
+  copyId.className = "rogatio-copy-icon";
+  copyId.setAttribute("aria-label", "Copy extension ID");
+  copyId.title = "Copy extension ID";
+  extensionIdRow.append(extensionIdLine, copyId);
+  sidebar.append(extensionIdRow);
+
+  const runtimeError = state.nativeRuntimeError;
+  if (
+    (runtimePhase === "failed" || runtimePhase === "unsupported") &&
+    runtimeError
+  ) {
+    const runtimeErrorLine = document.createElement("p");
+    runtimeErrorLine.dataset.runtimeError = "true";
+    runtimeErrorLine.className = "rogatio-runtime-error";
+    runtimeErrorLine.textContent = `Runtime error: ${runtimeError}`;
+    sidebar.append(runtimeErrorLine);
+  }
 
   // Project switching and import are dashboard actions. Workspace controls
   // operate only on the committed active project.
@@ -679,6 +718,36 @@ function renderShell(): void {
   status.setAttribute("role", "status");
   status.textContent = statusMessage;
   main.append(status);
+
+  const runtimePhase = state.nativeRuntimeState?.phase ?? "stopped";
+  if (
+    activeTab === "workspace" &&
+    (runtimePhase === "failed" || runtimePhase === "unsupported")
+  ) {
+    const guidance = document.createElement("section");
+    guidance.className = "rogatio-runtime-guidance";
+    guidance.dataset.runtimeGuidance = "true";
+    const guidanceTitle = document.createElement("h2");
+    guidanceTitle.textContent = "Runtime needs attention";
+    const guidanceError = document.createElement("p");
+    guidanceError.className = "rogatio-runtime-guidance-error";
+    guidanceError.textContent = state.nativeRuntimeError
+      ? `Error: ${state.nativeRuntimeError}`
+      : `Status: ${runtimeStatusText()}`;
+    const guidanceFix = document.createElement("p");
+    guidanceFix.textContent = runtimeRecoveryText();
+    guidance.append(guidanceTitle, guidanceError, guidanceFix);
+    if (installCommand) {
+      const guidanceCommand = document.createElement("code");
+      guidanceCommand.dataset.runtimeInstallCommand = "true";
+      guidanceCommand.textContent = installCommand;
+      guidance.append(
+        guidanceCommand,
+        button("Copy install command", "copy-install-command"),
+      );
+    }
+    main.append(guidance);
+  }
   if (installCommand) {
     const row = document.createElement("div");
     row.className = "rogatio-install-command";
@@ -725,6 +794,7 @@ function renderShell(): void {
     if (command === "ai-cancel") cancelAIComposer();
     if (command === "ai-create") void createGeneratedProject();
     if (command === "copy-install-command") void copyInstallCommand();
+    if (command === "copy-extension-id") void copyExtensionId();
     if (command === "review-permissions") void reviewPermissions();
     if (command === "grant-permissions") void grantPermissions();
     if (command === "start-native-runtime")
@@ -1051,6 +1121,13 @@ async function nativeRuntimeCommand(
 ): Promise<void> {
   const response = await client.send({ version: 1, command });
   const code = response?.diagnostic?.code;
+  const responseParams = response?.diagnostic as
+    | { readonly params?: Readonly<Record<string, unknown>> }
+    | undefined;
+  const responseReason =
+    typeof responseParams?.params?.reason === "string"
+      ? responseParams.params.reason
+      : null;
   installCommand = null;
   if (response?.ok === true) {
     statusMessage =
@@ -1074,10 +1151,23 @@ async function nativeRuntimeCommand(
   } else if (code === "extension.native-runtime-unavailable") {
     statusMessage = "Runtime action unavailable on this platform.";
   } else {
-    statusMessage =
-      "The runtime action failed. Check the runtime status in the sidebar and try again.";
+    statusMessage = [
+      "The runtime action failed.",
+      responseReason ? `Runtime error: ${responseReason}` : "",
+      "Open Show diagnostics for details.",
+    ]
+      .filter((part) => part.length > 0)
+      .join(" ");
   }
   await refresh();
+  if (response?.ok !== true && state.nativeRuntimeError) {
+    statusMessage = [
+      "The runtime action failed.",
+      `Runtime error: ${state.nativeRuntimeError}`,
+      "Fix: run the install command if the host is missing, then reload the extension and restart Chrome.",
+    ].join(" ");
+    renderShell();
+  }
 }
 
 async function copyInstallCommand(): Promise<void> {
@@ -1086,6 +1176,19 @@ async function copyInstallCommand(): Promise<void> {
     ? "Install command copied. Paste it in a terminal, run it, then click Start runtime again."
     : "Copying failed. Select the command text and copy it manually.";
   await refresh();
+}
+
+async function copyExtensionId(): Promise<void> {
+  const id = extensionId();
+  if (!id) {
+    statusMessage = "The extension ID is unavailable.";
+    renderShell();
+    return;
+  }
+  statusMessage = (await copyText(id))
+    ? "Extension ID copied to clipboard."
+    : "Copying failed. Select the extension ID and copy it manually.";
+  renderShell();
 }
 
 async function copyText(value: string): Promise<boolean> {
@@ -1177,6 +1280,7 @@ async function showDiagnostics(): Promise<void> {
       extensionId: string | null;
       hostName: string;
       chromeError: string | null;
+      runtimeError: string | null;
       connectNativeAvailable: boolean;
       timestamp: number;
     };
@@ -1193,6 +1297,7 @@ function formatDiagnosticsText(): string {
     `Host name: ${diagnosticsData.hostName}`,
     `connectNative available: ${diagnosticsData.connectNativeAvailable}`,
     `Chrome error: ${diagnosticsData.chromeError ?? "none"}`,
+    `Runtime error: ${diagnosticsData.runtimeError ?? "none"}`,
     `Timestamp: ${new Date(diagnosticsData.timestamp).toISOString()}`,
   ];
   return lines.join("\n");
@@ -1251,11 +1356,12 @@ function renderDiagnosticsModal(container: HTMLElement): void {
         diagnosticsData.connectNativeAvailable ? "available" : "missing",
       ),
       row("Chrome error", diagnosticsData.chromeError ?? "none"),
+      row("Runtime error", diagnosticsData.runtimeError ?? "none"),
     );
     const hint = document.createElement("p");
     hint.className = "rogatio-diag-hint";
     hint.textContent =
-      "If the Chrome error mentions a missing file or permission, re-run the install command and restart Chrome.";
+      "If the error mentions a missing host, file, or permission, copy the extension ID, run the install command, reload the extension, and restart Chrome.";
     body.append(table, hint);
   }
 

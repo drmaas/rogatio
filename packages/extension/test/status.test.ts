@@ -193,31 +193,29 @@ describe(" request-body extension status", () => {
     });
     expect(started).toMatchObject({
       ok: false,
-      diagnostic: { code: "extension.native-host-missing" },
+      diagnostic: {
+        code: "extension.native-host-missing",
+        params: { reason: "extension.native-host-missing" },
+      },
     });
-  });
-
-  it("reports the host-missing diagnostic and failed phase when the native host is not installed", async () => {
-    const { app, nativeRuntime } = harness(async () => ({
-      state: "unsupported" as const,
-      message: "extension.native-host-missing",
-    }));
-    await prepare(app);
-
-    const started = await app.handle({
-      version: 1,
-      command: "start-native-runtime",
-    });
-    expect(started).toMatchObject({
-      ok: false,
-      diagnostic: { code: "extension.native-host-missing" },
-    });
-    expect(nativeRuntime.start).toHaveBeenCalledOnce();
+    expect(nativeRuntime.start).not.toHaveBeenCalled();
 
     const state = await app.handle({ version: 1, command: "get-state" });
     expect(state).toMatchObject({
       ok: true,
-      value: { nativeRuntimeState: { phase: "failed" } },
+      value: {
+        nativeRuntimeState: { phase: "failed" },
+        nativeRuntimeError: "extension.native-host-missing",
+      },
+    });
+    expect(
+      await app.handle({ version: 1, command: "diagnose-native-runtime" }),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        phase: "failed",
+        runtimeError: "extension.native-host-missing",
+      },
     });
   });
 

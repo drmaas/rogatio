@@ -105,6 +105,7 @@ test("reports an actionable message and failed status when the native host is mi
       },
       activeProjectId: "project-a",
       nativeRuntimeState: undefined as { phase: string } | undefined,
+      nativeRuntimeError: undefined as string | undefined,
     };
     const runtime = {
       lastError: undefined,
@@ -115,9 +116,26 @@ test("reports an actionable message and failed status when the native host is mi
       ) {
         if (message.command === "start-native-runtime") {
           state.nativeRuntimeState = { phase: "failed" };
+          state.nativeRuntimeError = "Native host manifest was not found";
           callback({
             ok: false,
-            diagnostic: { code: "extension.native-host-missing" },
+            diagnostic: {
+              code: "extension.native-host-missing",
+              params: { reason: "Native host manifest was not found" },
+            },
+          });
+        } else if (message.command === "diagnose-native-runtime") {
+          callback({
+            ok: true,
+            value: {
+              phase: "failed",
+              extensionId: "a".repeat(32),
+              hostName: "com.rogatio.runtime",
+              chromeError: null,
+              runtimeError: "Native host manifest was not found",
+              connectNativeAvailable: true,
+              timestamp: Date.now(),
+            },
           });
         } else callback({ ok: true, value: state });
       },
@@ -151,9 +169,9 @@ test("reports an actionable message and failed status when the native host is mi
     page.getByRole("button", { name: "Start runtime" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Start runtime" }).click();
-  await expect(
-    page.getByText(/rogatio runtime install --extension-id/),
-  ).toBeVisible();
+  await expect(page.locator("[data-runtime-install-command]")).toHaveText(
+    /rogatio runtime install --extension-id/,
+  );
   // The page fills in its own browser-assigned extension ID, so the user
   // never has to hunt for it in chrome://extensions.
   await expect(page.locator("[data-install-command]")).toHaveText(
@@ -163,7 +181,10 @@ test("reports an actionable message and failed status when the native host is mi
     `Extension ID: ${"a".repeat(32)}`,
   );
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.getByRole("button", { name: "Copy install command" }).click();
+  await page
+    .locator("[data-runtime-guidance]")
+    .getByRole("button", { name: "Copy install command" })
+    .click();
   await expect(page.locator(".rogatio-status")).toContainText(
     "Install command copied",
   );
@@ -174,6 +195,25 @@ test("reports an actionable message and failed status when the native host is mi
   await expect(page.locator("[data-native-runtime-state]")).toContainText(
     "Runtime status: failed to start",
   );
+  await expect(page.locator("[data-runtime-guidance]")).toContainText(
+    "Native host manifest was not found",
+  );
+  await page.getByRole("button", { name: "Copy extension ID" }).click();
+  await expect(page.locator(".rogatio-status")).toContainText(
+    "Extension ID copied",
+  );
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+    "a".repeat(32),
+  );
+  await page.getByRole("button", { name: "Show diagnostics" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Runtime Diagnostics" }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".rogatio-diag-value").filter({
+      hasText: "Native host manifest was not found",
+    }),
+  ).toBeVisible();
 });
 
 test("shows AI needs runtime before start and ready after a successful start", async ({

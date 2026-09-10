@@ -275,12 +275,62 @@ body {
 .rogatio-runtime-starting::before {
   background: var(--rogatio-warning);
 }
+.rogatio-extension-id-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+}
 .rogatio-extension-id {
+  flex: 1 1 auto;
+  min-width: 0;
   font-family: var(--rogatio-font-mono);
   font-size: 0.75rem;
   color: var(--rogatio-faint);
   word-break: break-all;
   user-select: all;
+}
+.rogatio-copy-icon {
+  flex: none;
+  width: 1.8rem;
+  min-height: 1.8rem;
+  padding: 0.15rem;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.rogatio-runtime-error {
+  border-left: 2px solid var(--rogatio-danger);
+  background: var(--rogatio-danger-bg);
+  color: var(--rogatio-danger);
+  padding: 0.45rem 0.55rem;
+  overflow-wrap: anywhere;
+}
+.rogatio-runtime-guidance {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 0 1rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: var(--rogatio-radius-sm);
+  background: rgba(251, 191, 36, 0.08);
+  padding: 0.75rem 0.9rem;
+}
+.rogatio-runtime-guidance h2,
+.rogatio-runtime-guidance p {
+  margin: 0;
+}
+.rogatio-runtime-guidance h2 {
+  font-size: 1rem;
+}
+.rogatio-runtime-guidance-error {
+  color: var(--rogatio-danger);
+  overflow-wrap: anywhere;
+}
+.rogatio-runtime-guidance code {
+  display: block;
+  overflow-wrap: anywhere;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.8rem;
 }
 .rogatio-main {
   min-width: 0;
@@ -681,6 +731,12 @@ body {
   .rogatio-sidebar fieldset {
     border-color: ButtonText;
     background: Canvas;
+  }
+  .rogatio-runtime-guidance,
+  .rogatio-runtime-error {
+    border-color: ButtonText;
+    background: Canvas;
+    color: CanvasText;
   }
   .rogatio-shell button,
   .rogatio-shell input:not([type="checkbox"]),

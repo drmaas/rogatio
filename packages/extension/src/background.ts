@@ -58,6 +58,17 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
   let counter = 0;
   let lastConnectError: string | null = null;
   const pending = new Map<string, (envelope: NativeEnvelope) => void>();
+
+  function rememberConnectError(error: unknown): Error {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "string" && error.length > 0
+          ? error
+          : "Native messaging host disconnected before responding.";
+    lastConnectError = message;
+    return new Error(message);
+  }
   const rejected = new Map<string, (reason: Error) => void>();
 
   function ensurePort(): ChromePort {
@@ -79,7 +90,7 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       // error message so callers can distinguish missing manifest from missing
       // binary, permission denied, etc.
       console.log("[rogatio] ensurePort: connectNative FAILED:", error);
-      lastConnectError = error instanceof Error ? error.message : String(error);
+      rememberConnectError(error);
       throw new NativeHostMissingError();
     }
     next.onMessage.addListener((message: unknown) => {
@@ -106,11 +117,16 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       }
     });
     next.onDisconnect.addListener(() => {
-      console.log("[rogatio] port disconnected");
+      // Chrome exposes the native-host failure through runtime.lastError only
+      // while this callback is running. Preserve it for the diagnostics view.
+      const disconnectError = rememberConnectError(
+        api.runtime.lastError?.message ??
+          "Native messaging host disconnected before responding.",
+      );
+      console.log("[rogatio] port disconnected:", disconnectError.message);
       connected = false;
       port = null;
-      for (const reject of rejected.values())
-        reject(new Error("host disconnected"));
+      for (const reject of rejected.values()) reject(disconnectError);
       pending.clear();
       rejected.clear();
     });
@@ -185,13 +201,25 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       return new Promise<NativeEnvelope>((resolve, reject) => {
         pending.set(requestId, resolve);
         rejected.set(requestId, reject);
-        active.postMessage(full);
+        try {
+          active.postMessage(full);
+        } catch (error) {
+          const postError = rememberConnectError(error);
+          pending.delete(requestId);
+          rejected.delete(requestId);
+          reject(postError);
+          return;
+        }
         setTimeout(() => {
           if (pending.has(requestId)) {
             console.log("[rogatio] send timeout for", envelope.type);
             pending.delete(requestId);
             rejected.delete(requestId);
-            reject(new Error("native host timeout"));
+            reject(
+              rememberConnectError(
+                "Native messaging host timed out before responding.",
+              ),
+            );
           }
         }, 10000);
       });

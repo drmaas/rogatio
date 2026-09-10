@@ -67,6 +67,11 @@ type StateProjection = {
   readonly badge: { readonly text: string; readonly attention: boolean };
 };
 
+type HeaderInstallError = {
+  readonly ruleId: string;
+  readonly message: string;
+};
+
 type Success = { readonly ok: true; readonly value?: unknown };
 type Failure = {
   readonly ok: false;
@@ -111,6 +116,7 @@ function operationStatuses(
   enabledGroupIds: readonly string[],
   grantedOrigins: readonly string[],
   nativePhase: NativeRuntimePhase | "unsupported",
+  headerInstallErrors: readonly HeaderInstallError[] = [],
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -124,6 +130,20 @@ function operationStatuses(
         candidate.ruleId === status.ruleId &&
         candidate.groupId === status.groupId,
     );
+    const headerInstallError = headerInstallErrors.find(
+      (error) => error.ruleId === status.ruleId,
+    );
+    if (headerInstallError && status.status === "error") {
+      return {
+        ...status,
+        diagnostics: [
+          extensionDiagnostic("extension.dnr-error", {
+            ruleId: headerInstallError.ruleId,
+            reason: headerInstallError.message,
+          }),
+        ],
+      };
+    }
     if (operation?.kind === "matcher") {
       if (status.status === "active" || status.status === "error") {
         return {
@@ -202,6 +222,7 @@ export function createExtensionApplication(
   let nativePhase: NativeRuntimePhase | "unsupported" = options.nativeRuntime
     ? "stopped"
     : "unsupported";
+  let nativeRuntimeError: string | null = null;
   let pendingProjectId: string | null = null;
 
   async function grantedOriginsFor(
@@ -281,19 +302,35 @@ export function createExtensionApplication(
     } catch {
       installedRuleIds = [];
     }
+    let headerInstallErrors: HeaderInstallError[] = [];
     if (headerOps.length > 0) {
-      const headerProjections = projectHeaders(headerOps);
-      const result = await installHeaderRules(headerProjections);
-      // installHeaderRules reports numeric DNR rule ids, while the status
-      // computation matches project rule ids. Map each installed DNR id back
-      // to its header projection so installed header rules are recognized
-      // (REQ-009: active when enabled + granted + installed).
+      const allHeaderProjections = projectHeaders(headerOps);
+      const enabled = new Set(project.enabledGroupIds);
+      const headerProjections = allHeaderProjections.filter(
+        (projection) =>
+          enabled.has(projection.groupId) &&
+          projection.matcher.origins.every((origin) =>
+            granted.includes(origin),
+          ),
+      );
+      const result = await installHeaderRules(
+        headerProjections,
+        allHeaderProjections.map((projection) => projection.id),
+      );
       for (const installedId of result.installed) {
-        const projection = headerProjections.find(
+        const projection = allHeaderProjections.find(
           (candidate) => candidate.id === installedId,
         );
         if (projection !== undefined) installedRuleIds.push(projection.ruleId);
       }
+      headerInstallErrors = result.errors.flatMap((error) => {
+        const projection = allHeaderProjections.find(
+          (candidate) => candidate.id === error.ruleId,
+        );
+        return projection === undefined
+          ? []
+          : [{ ruleId: projection.ruleId, message: error.message }];
+      });
     }
     const statuses = operationStatuses(
       compiled.operations,
@@ -301,6 +338,7 @@ export function createExtensionApplication(
       project.enabledGroupIds,
       granted,
       nativePhase,
+      headerInstallErrors,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),
@@ -347,6 +385,7 @@ export function createExtensionApplication(
         ruleStatuses: projection.statuses,
         badge: projection.badge,
         nativeRuntimeState: { phase: nativePhase },
+        nativeRuntimeError,
       },
     };
   }
@@ -541,6 +580,7 @@ export function createExtensionApplication(
     ) {
       if (!options.nativeRuntime || !options.extensionId) {
         nativePhase = "unsupported";
+        nativeRuntimeError = "The native runtime adapter is unavailable.";
         return request.command === "get-native-runtime-status"
           ? { ok: true, value: { nativeRuntimeState: { phase: nativePhase } } }
           : failure("extension.native-runtime-unavailable");
@@ -573,36 +613,55 @@ export function createExtensionApplication(
           "[rogatio] starting native session, extensionId:",
           options.extensionId,
         );
-        const sessionResult = await startNativeSession({
-          extensionId: options.extensionId,
-          nativeRuntime: options.nativeRuntime,
-          getProject: async () => ({
-            data: project.data,
-            enabledGroupIds: project.enabledGroupIds,
-          }),
-          getGrantedOrigins: async () => {
-            return declaredPermissionOrigins({
-              operations: compileResult.operations,
-            });
-          },
-        });
+        let sessionResult: Awaited<ReturnType<typeof startNativeSession>>;
+        try {
+          sessionResult = await startNativeSession({
+            extensionId: options.extensionId,
+            nativeRuntime: options.nativeRuntime,
+            getProject: async () => ({
+              data: project.data,
+              enabledGroupIds: project.enabledGroupIds,
+            }),
+            getGrantedOrigins: async () => {
+              return declaredPermissionOrigins({
+                operations: compileResult.operations,
+              });
+            },
+          });
+        } catch (error) {
+          nativePhase = "failed";
+          nativeRuntimeError =
+            options.nativeRuntime.lastConnectError?.() ??
+            (error instanceof Error
+              ? error.message
+              : "The native runtime failed before it could start.");
+          return failure("extension.native-runtime-transition", {
+            reason: nativeRuntimeError,
+          });
+        }
 
         console.log("[rogatio] session result:", JSON.stringify(sessionResult));
         if (!sessionResult.ok) {
-          // A failed start must leave truthful state behind: the session did
-          // not open, so the phase is `failed`, and the reason is surfaced as
-          // a distinct diagnostic so the UI can tell the user what to do
-          // (for example, installing the missing native host or trusting
-          // the device-local CA for request-body rules).
+          // Preserve the concrete adapter error for both the workspace and
+          // diagnostics modal while keeping the public diagnostic code stable.
           nativePhase = "failed";
+          nativeRuntimeError =
+            options.nativeRuntime.lastConnectError?.() ?? sessionResult.reason;
           if (sessionResult.reason === "extension.native-host-missing")
-            return failure("extension.native-host-missing");
+            return failure("extension.native-host-missing", {
+              reason: nativeRuntimeError,
+            });
           if (sessionResult.reason === "extension.request-body-needs-trust")
-            return failure("extension.request-body-needs-trust");
-          return failure("extension.native-runtime-transition");
+            return failure("extension.request-body-needs-trust", {
+              reason: nativeRuntimeError,
+            });
+          return failure("extension.native-runtime-transition", {
+            reason: nativeRuntimeError,
+          });
         }
 
         nativePhase = "started";
+        nativeRuntimeError = null;
         const declared = declaredPermissionOrigins({
           operations: compileResult.operations,
         });
@@ -635,6 +694,7 @@ export function createExtensionApplication(
           getGrantedOrigins: async () => [],
         });
         nativePhase = "stopped";
+        nativeRuntimeError = null;
         // Reinstall browser-side redirect/query rules after stopping the
         // native runtime.
         try {
@@ -666,6 +726,7 @@ export function createExtensionApplication(
       }
       const result = await options.nativeRuntime.status();
       nativePhase = result.state;
+      if (nativePhase === "started") nativeRuntimeError = null;
       return {
         ok: true,
         value: { nativeRuntimeState: { phase: nativePhase } },
@@ -674,6 +735,7 @@ export function createExtensionApplication(
     if (request.command === "diagnose-native-runtime") {
       const chromeError = options.nativeRuntime?.lastConnectError?.() ?? null;
       const connectNativeAvailable =
+        typeof chrome !== "undefined" &&
         typeof chrome.runtime?.connectNative === "function";
       return {
         ok: true,
@@ -682,6 +744,7 @@ export function createExtensionApplication(
           extensionId: options.extensionId ?? null,
           hostName: "com.rogatio.runtime",
           chromeError,
+          runtimeError: nativeRuntimeError,
           connectNativeAvailable,
           timestamp: Date.now(),
         },
