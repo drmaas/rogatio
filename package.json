@@ -29,7 +29,7 @@
     "@types/node": "26.4.1",
     "esbuild": "0.28.2",
     "husky": "^9.1.7",
-    "playwright": "1.62.1",
+    "playwright": "1.63.0",
     "semantic-release": "25.0.9",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
