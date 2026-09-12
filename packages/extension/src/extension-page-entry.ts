@@ -6,7 +6,11 @@ import {
   type EditorController,
 } from "@rogatio/editor";
 import { validateProjectDetailed } from "./browser-schema.js";
-import { checkAISupport, type NativeSessionOptions } from "./native-session.js";
+import {
+  checkAISupport,
+  type NativeEnvelope,
+  type NativeSessionOptions,
+} from "./native-session.js";
 
 interface StoredProject {
   readonly id: string;
@@ -146,8 +150,11 @@ function runtimeStatusText(): string {
 
 function runtimeRecoveryText(): string {
   const error = state.nativeRuntimeError?.toLowerCase() ?? "";
-  if (error.includes("native-host-missing") || error.includes("host")) {
-    return "Run the install command below once, reload Rogatio from chrome://extensions, then click Start runtime again.";
+  if (error.includes("native-host-missing")) {
+    return "Install the host using the command below once, reload Rogatio from chrome://extensions, then click Start runtime again.";
+  }
+  if (error.includes("host")) {
+    return "Re-run the install command below once, reload Rogatio from chrome://extensions, then click Start runtime again.";
   }
   if (
     error.includes("trust") ||
@@ -737,25 +744,23 @@ function renderShell(): void {
     const guidanceFix = document.createElement("p");
     guidanceFix.textContent = runtimeRecoveryText();
     guidance.append(guidanceTitle, guidanceError, guidanceFix);
-    if (installCommand) {
-      const guidanceCommand = document.createElement("code");
-      guidanceCommand.dataset.runtimeInstallCommand = "true";
-      guidanceCommand.textContent = installCommand;
-      guidance.append(
-        guidanceCommand,
-        button("Copy install command", "copy-install-command"),
-      );
+    if (runtimePhase === "failed") {
+      const id = extensionId();
+      const cmd =
+        id.length > 0
+          ? `rogatio runtime install --extension-id ${id}`
+          : installCommand;
+      if (cmd) {
+        const guidanceCommand = document.createElement("code");
+        guidanceCommand.dataset.runtimeInstallCommand = "true";
+        guidanceCommand.textContent = cmd;
+        guidance.append(
+          guidanceCommand,
+          button("Copy install command", "copy-install-command"),
+        );
+      }
     }
     main.append(guidance);
-  }
-  if (installCommand) {
-    const row = document.createElement("div");
-    row.className = "rogatio-install-command";
-    const code = document.createElement("code");
-    code.dataset.installCommand = "true";
-    code.textContent = installCommand;
-    row.append(code, button("Copy install command", "copy-install-command"));
-    main.append(row);
   }
 
   if (activeTab === "dashboard") {
@@ -1171,8 +1176,15 @@ async function nativeRuntimeCommand(
 }
 
 async function copyInstallCommand(): Promise<void> {
-  if (!installCommand) return;
-  statusMessage = (await copyText(installCommand))
+  const id = extensionId();
+  const phase = state.nativeRuntimeState?.phase ?? "stopped";
+  const cmd =
+    installCommand ??
+    (phase === "failed" && id.length > 0
+      ? `rogatio runtime install --extension-id ${id}`
+      : null);
+  if (!cmd) return;
+  statusMessage = (await copyText(cmd))
     ? "Install command copied. Paste it in a terminal, run it, then click Start runtime again."
     : "Copying failed. Select the command text and copy it manually.";
   await refresh();
@@ -1237,9 +1249,25 @@ async function checkNativeAISupport(): Promise<void> {
                     message: error.message,
                     retryable: false,
                   },
-                } as any);
+                });
               } else {
-                resolve(response as any);
+                const extResponse = response as ExtensionResponse;
+                if (extResponse.ok && extResponse.value !== undefined) {
+                  resolve(extResponse.value as NativeEnvelope);
+                } else {
+                  resolve({
+                    protocol: "v1",
+                    type: "ai.error",
+                    timestamp: Date.now(),
+                    metadata: {
+                      code:
+                        extResponse.diagnostic?.code ??
+                        "extension.message-failed",
+                      message: "AI request failed",
+                      retryable: false,
+                    },
+                  });
+                }
               }
             });
           });

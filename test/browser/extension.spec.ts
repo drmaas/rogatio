@@ -174,7 +174,7 @@ test("reports an actionable message and failed status when the native host is mi
   );
   // The page fills in its own browser-assigned extension ID, so the user
   // never has to hunt for it in chrome://extensions.
-  await expect(page.locator("[data-install-command]")).toHaveText(
+  await expect(page.locator("[data-runtime-install-command]")).toHaveText(
     `rogatio runtime install --extension-id ${"a".repeat(32)}`,
   );
   await expect(page.locator("[data-extension-id]")).toContainText(
