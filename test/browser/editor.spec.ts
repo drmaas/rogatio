@@ -23,6 +23,7 @@ declare global {
       setSaveMode(mode: string): void;
       resolveSave(index: number, result: unknown): void;
     };
+    __promptValue?: string;
   }
 }
 
@@ -146,26 +147,56 @@ test("converts URLs without executing or mutating on invalid input", async ({
     .locator("[data-desktop-route-rail]")
     .getByRole("button", { name: "One", exact: true })
     .click();
+  await page.evaluate(() => {
+    window.__promptValue = "https://example.com/a.b?x=1";
+    Object.defineProperty(window, "prompt", {
+      value: () => window.__promptValue ?? null,
+      writable: true,
+      configurable: true,
+    });
+  });
   await page
-    .getByLabel("URL to match exactly for First rule")
-    .fill("https://example.com/a.b?x=1");
-  await page
-    .getByRole("button", { name: "Convert URL to exact regex for First rule" })
+    .locator('[data-rule-id="rule-one"][data-command="convert-url"]')
     .click();
   await expect(
     page.getByLabel("URL regular expression for First rule"),
   ).toHaveValue("^https://example\\.com/a\\.b\\?x=1$");
 
+  await page.evaluate(() => {
+    window.__promptValue = "https://example.com/#fragment";
+  });
   await page
-    .getByLabel("URL to match exactly for First rule")
-    .fill("https://example.com/#fragment");
-  await page
-    .getByRole("button", { name: "Convert URL to exact regex for First rule" })
+    .locator('[data-rule-id="rule-one"][data-command="convert-url"]')
     .click();
   await expect(page.getByRole("alert")).toContainText("valid request URL");
   await expect(
     page.getByLabel("URL regular expression for First rule"),
   ).toHaveValue("^https://example\\.com/a\\.b\\?x=1$");
+});
+
+test("aborts URL conversion when prompt is cancelled", async ({ page }) => {
+  await page
+    .locator("[data-desktop-route-rail]")
+    .getByRole("button", { name: "One", exact: true })
+    .click();
+  await page.evaluate(() => {
+    Object.defineProperty(window, "prompt", {
+      value: () => null,
+      writable: true,
+      configurable: true,
+    });
+  });
+  const before = await page.evaluate(
+    () => window.editorController.getDraft().name,
+  );
+  await page
+    .locator('[data-rule-id="rule-one"][data-command="convert-url"]')
+    .click();
+  await expect(page.getByRole("alert")).not.toBeVisible();
+  const after = await page.evaluate(
+    () => window.editorController.getDraft().name,
+  );
+  expect(before).toBe(after);
 });
 
 test("preserves draft on save failure and prevents pending-save races", async ({

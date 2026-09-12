@@ -284,12 +284,6 @@
   align-items: end;
   margin-bottom: 0.5rem;
 }
-.rogatio-editor [data-editor-url-row] {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.5rem;
-  align-items: end;
-}
 .rogatio-editor [data-editor-checks] {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
