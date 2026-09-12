@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  __resetRegexWorkerForTests,
   type RequestBodyInput,
   rewriteRequestBody,
 } from "../src/request-body.js";
@@ -133,6 +134,56 @@ describe(" request-body transform", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("runtime.request-body-replace-too-large");
+    }
+  });
+});
+
+describe(" request-body transform > slow worker boot", () => {
+  // Regression: the regex deadline used to start before the worker booted, so
+  // cold runners (observed on windows-latest) burned the whole deadline on
+  // startup and every success-path replace failed as a timeout.
+  it("still applies the replacement when worker boot is slow", async () => {
+    __resetRegexWorkerForTests(600);
+    try {
+      const start = Date.now();
+      const result = await rewriteRequestBody(input('{"n":"x1","m":"x2"}'), {
+        mode: "regex",
+        pattern: '"x(\\d)"',
+        replacement: '"y$1"',
+      });
+      const elapsed = Date.now() - start;
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(new TextDecoder().decode(result.value.body)).toBe(
+          '{"n":"y1","m":"y2"}',
+        );
+      }
+      expect(elapsed).toBeGreaterThanOrEqual(600);
+    } finally {
+      __resetRegexWorkerForTests();
+    }
+  });
+
+  it("starts the execution deadline only after the replace begins", async () => {
+    __resetRegexWorkerForTests(600);
+    try {
+      const start = Date.now();
+      const result = await rewriteRequestBody(input('{"a":1}'), {
+        mode: "regex",
+        pattern: "a",
+        replacement: "b",
+      });
+      const elapsed = Date.now() - start;
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(new TextDecoder().decode(result.value.body)).toBe('{"b":1}');
+      }
+      // The boot delay must be waited out, but the 250ms execution deadline
+      // must not be stacked on top of it.
+      expect(elapsed).toBeGreaterThanOrEqual(600);
+      expect(elapsed).toBeLessThan(2000);
+    } finally {
+      __resetRegexWorkerForTests();
     }
   });
 });
