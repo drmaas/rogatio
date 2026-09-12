@@ -530,7 +530,6 @@ class EditorControllerImpl implements EditorController {
   private errors: EditorDiagnostic[] = [];
   private readonly conversionDiagnostics = new Map<string, EditorDiagnostic>();
   private readonly extensionErrors = new Map<string, EditorDiagnostic>();
-  private readonly urlInputs = new Map<string, string>();
   private readonly controls = new Map<string, HTMLElement>();
   private readonly extensionControls = new Map<string, HTMLElement>();
   private extensionCleanups: Array<() => void> = [];
@@ -722,11 +721,6 @@ class EditorControllerImpl implements EditorController {
         target instanceof HTMLTextAreaElement
       )
     ) {
-      return;
-    }
-    if (target.dataset.urlSource !== undefined) {
-      const ruleId = target.dataset.ruleId;
-      if (ruleId) this.urlInputs.set(ruleId, target.value);
       return;
     }
     if (target.dataset.search !== undefined) {
@@ -1527,11 +1521,11 @@ class EditorControllerImpl implements EditorController {
   private convertUrl(groupId: string, ruleId: string): void {
     const rule = this.ruleById(groupId, ruleId);
     if (!rule || this.saving) return;
-    const input = this.host.querySelector<HTMLInputElement>(
-      `[data-url-source][data-rule-id="${CSS.escape(ruleId)}"]`,
-    );
-    const value = input?.value ?? this.urlInputs.get(ruleId) ?? "";
-    this.urlInputs.set(ruleId, value);
+    const value =
+      this.host.ownerDocument.defaultView?.prompt(
+        "Enter a URL to convert to regex:",
+      ) ?? null;
+    if (value === null) return;
     const result = urlToExactRegex(value);
     const rulePath = pointer(
       "groups",
@@ -2306,26 +2300,13 @@ class EditorControllerImpl implements EditorController {
       `${rulePath}/urlRegex`,
       regex,
     );
-    const urlRow = this.document.createElement("div");
-    urlRow.dataset.editorUrlRow = "true";
-    const urlLabel = this.document.createElement("label");
-    urlLabel.textContent = `URL to match exactly for ${ruleName}`;
-    const urlInput = this.document.createElement("input");
-    urlInput.type = "url";
-    urlInput.dataset.urlSource = "true";
-    urlInput.dataset.ruleId = ruleId;
-    urlInput.dataset.editorKey = `url-source:${ruleId}`;
-    urlInput.value = this.urlInputs.get(ruleId) ?? "";
-    urlInput.disabled = this.saving;
-    urlLabel.append(urlInput);
     const convert = this.createCommandButton(
-      `Convert URL to exact regex for ${ruleName}`,
+      "Convert to regex",
       "convert-url",
       this.saving,
       { groupId, ruleId },
     );
-    urlRow.append(urlLabel, convert);
-    grid.append(urlRow);
+    grid.append(convert);
     fields.append(grid);
     card.append(fields);
 
