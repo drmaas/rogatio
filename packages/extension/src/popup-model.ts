@@ -45,6 +45,14 @@ export interface PopupRuleRow {
   readonly enabled: boolean;
 }
 
+export interface PopupGroupRow {
+  readonly id: string;
+  readonly name: string;
+  readonly enabled: boolean;
+  readonly status: GroupStatus;
+  readonly ruleCount: number;
+}
+
 export interface ExtensionResponse {
   readonly ok?: boolean;
   readonly value?: unknown;
@@ -90,6 +98,8 @@ export interface PopupModel {
   readonly activeProjectId: string | null;
   readonly activeProjectName: string | null;
   readonly rows: () => readonly PopupRuleRow[];
+  readonly groups: () => readonly PopupGroupRow[];
+  readonly projects: readonly { id: string; name: string | null }[];
   readonly toggle: (groupId: string, enabled: boolean) => Promise<void>;
   /**
    * Creates an empty project through the existing `create-project` lifecycle.
@@ -153,6 +163,30 @@ export function createPopupModel(options: PopupModelOptions): PopupModel {
         });
       });
     },
+    groups() {
+      if (!activeProject) return [];
+      const projectGroups = Array.isArray(activeProject.data.groups)
+        ? activeProject.data.groups
+        : [];
+      return projectGroups.map((group) => {
+        const enabled = enabledGroupIds.has(group.id);
+        const rules = Array.isArray(group.rules) ? group.rules : [];
+        const groupRuleStatuses = ruleStatuses.filter(
+          (status) => status.groupId === group.id,
+        );
+        return {
+          id: group.id,
+          name: group.name,
+          enabled,
+          status: aggregateGroupStatus(enabled, groupRuleStatuses),
+          ruleCount: rules.length,
+        };
+      });
+    },
+    projects: Object.entries(envelope.projects).map(([id, project]) => ({
+      id,
+      name: typeof project.name === "string" ? project.name : null,
+    })),
     async toggle(groupId, enabled) {
       if (!activeProjectId || !groupId) return;
       await send({
