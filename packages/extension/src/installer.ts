@@ -91,7 +91,7 @@ function toDnrHeaderAction(
   };
 }
 
-function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
+export function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
   const { allowed: initiatorDomains, excluded: excludedInitiatorDomains } =
     toDnrDomains(projection.matcher.origins);
   return {
@@ -118,12 +118,6 @@ function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
       initiatorDomains:
         initiatorDomains.length > 0 ? initiatorDomains : undefined,
       excludedInitiatorDomains:
-        excludedInitiatorDomains.length > 0
-          ? excludedInitiatorDomains
-          : undefined,
-      requestDomains:
-        initiatorDomains.length > 0 ? initiatorDomains : undefined,
-      excludedRequestDomains:
         excludedInitiatorDomains.length > 0
           ? excludedInitiatorDomains
           : undefined,

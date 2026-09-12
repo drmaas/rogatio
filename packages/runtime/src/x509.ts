@@ -96,7 +96,7 @@ export async function signCertificate(
     subject: name,
     issuer: caCert.subjectName,
     publicKey: leafKeyPair.publicKey as PublicKeyType,
-    signingKey: caKey as any,
+    signingKey: caKey as unknown as CryptoKey,
     notBefore,
     notAfter,
     extensions: [],
