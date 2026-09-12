@@ -70,7 +70,7 @@ body {
   margin: 0;
   /* Fixed width so the action popup is comfortably wide in every project;
      Chrome clamps popups at 800x600, and the group list scrolls internally. */
-  width: 420px;
+  width: 600px;
   background-color: var(--rogatio-bg);
   background-image: radial-gradient(
     rgba(255, 255, 255, 0.05) 1px,
@@ -79,7 +79,7 @@ body {
   background-size: 24px 24px;
   color: var(--rogatio-text);
   font-family: var(--rogatio-font-body);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   line-height: 1.45;
 }
 .rogatio-popup,
@@ -188,7 +188,7 @@ body {
   list-style: none;
   /* Long projects scroll inside the list instead of exceeding Chrome's
      600px popup height cap. */
-  max-height: 25rem;
+  max-height: 30rem;
   overflow-y: auto;
 }
 .rogatio-popup li {
@@ -206,17 +206,12 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--rogatio-font-mono);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 600;
-}
-.rogatio-popup [data-rule-group] {
-  color: var(--rogatio-faint);
-  font-family: var(--rogatio-font-mono);
-  font-size: 0.72rem;
 }
 .rogatio-popup [data-group-status] {
   color: var(--rogatio-muted);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 .rogatio-popup a {
   color: var(--rogatio-primary);
@@ -239,6 +234,56 @@ body {
 .rogatio-popup a[data-group-edit] {
   margin-left: auto;
 }
+.rogatio-popup details[data-group] {
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-inset);
+}
+.rogatio-popup details[data-group] summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  cursor: pointer;
+  list-style: none;
+}
+.rogatio-popup details[data-group] summary::-webkit-details-marker {
+  display: none;
+}
+.rogatio-popup details[data-group] summary::marker {
+  content: "";
+}
+.rogatio-popup details[data-group] summary > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.rogatio-popup details[data-group] > ul {
+  margin: 0;
+  padding: 0 0.65rem 0.55rem;
+  list-style: none;
+}
+.rogatio-popup details[data-group] > ul li {
+  padding: 0.35rem 0.5rem;
+}
+.rogatio-popup details[data-group] > ul li > span:first-child {
+  font-size: 0.8rem;
+}
+.rogatio-popup [data-project-picker] {
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-inset);
+  color: var(--rogatio-text);
+  padding: 0.35rem 0.5rem;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  width: 100%;
+}
 .rogatio-popup :focus-visible {
   outline: 3px solid var(--rogatio-primary);
   outline-offset: 2px;
@@ -258,7 +303,10 @@ body {
   .rogatio-popup [data-project-actions] button,
   .rogatio-popup [data-create-form],
   .rogatio-popup [data-create-actions] button,
-  .rogatio-popup [data-create-form] input[type="text"] {
+  .rogatio-popup [data-create-form] input[type="text"],
+  .rogatio-popup details[data-group],
+  .rogatio-popup details[data-group] summary,
+  .rogatio-popup [data-project-picker] {
     border-color: ButtonText;
     background: Canvas;
   }

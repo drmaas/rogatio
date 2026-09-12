@@ -204,3 +204,103 @@ function model(): ReturnType<typeof createPopupModel> {
     send: vi.fn(async () => ({ ok: true })),
   });
 }
+
+describe("F21 popup groups accessor", () => {
+  it("returns group-level rows with aggregated status and rule counts", () => {
+    const m = createPopupModel({
+      envelope: envelope({
+        ruleStatuses: [
+          { groupId: "g1", ruleId: "r1", status: "active" },
+          { groupId: "g1", ruleId: "r2", status: "active" },
+          { groupId: "g3", ruleId: "r3", status: "needs permission" },
+        ],
+      }),
+      send: vi.fn(async () => ({ ok: true })),
+    });
+    const groups = m.groups();
+    expect(groups.map((g) => g.id)).toEqual(["g1", "g2", "g3"]);
+    expect(groups[0]).toMatchObject({
+      id: "g1",
+      name: "First",
+      enabled: true,
+      status: "active",
+      ruleCount: 2,
+    });
+    expect(groups[1]).toMatchObject({
+      id: "g2",
+      name: "Second",
+      enabled: false,
+      status: "disabled",
+      ruleCount: 0,
+    });
+    expect(groups[2]).toMatchObject({
+      id: "g3",
+      name: "Third",
+      enabled: true,
+      status: "needs permission",
+      ruleCount: 1,
+    });
+  });
+
+  it("returns empty when there is no active project", () => {
+    const m = createPopupModel({
+      envelope: { activeProjectId: null, projects: {}, ruleStatuses: [] },
+      send: vi.fn(async () => ({ ok: true })),
+    });
+    expect(m.groups()).toEqual([]);
+  });
+});
+
+describe("F21 popup projects accessor", () => {
+  it("returns all projects with id and name", () => {
+    const m = createPopupModel({
+      envelope: {
+        activeProjectId: "project-a",
+        projects: {
+          "project-a": {
+            name: "Alpha",
+            data: { groups: [] },
+            enabledGroupIds: [],
+          },
+          "project-b": {
+            name: "Beta",
+            data: { groups: [] },
+            enabledGroupIds: [],
+          },
+        },
+        ruleStatuses: [],
+      },
+      send: vi.fn(async () => ({ ok: true })),
+    });
+    expect(m.projects).toEqual([
+      { id: "project-a", name: "Alpha" },
+      { id: "project-b", name: "Beta" },
+    ]);
+  });
+
+  it("returns null name when project name is not a string", () => {
+    const m = createPopupModel({
+      envelope: {
+        activeProjectId: "p1",
+        projects: {
+          p1: {
+            name: 123 as unknown as string,
+            data: { groups: [] },
+            enabledGroupIds: [],
+          },
+        },
+        ruleStatuses: [],
+      },
+      send: vi.fn(async () => ({ ok: true })),
+    });
+    expect(m.projects).toEqual([{ id: "p1", name: null }]);
+  });
+
+  it("returns empty array when no projects exist", () => {
+    const m = createPopupModel({
+      envelope: { activeProjectId: null, projects: {}, ruleStatuses: [] },
+      send: vi.fn(async () => ({ ok: true })),
+    });
+    expect(m.projects).toEqual([]);
+  });
+});

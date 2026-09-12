@@ -204,18 +204,26 @@ function render(): void {
   const header = document.createElement("header");
   const title = document.createElement("h1");
   title.textContent = "Rogatio";
-  const project = document.createElement("p");
-  project.dataset.activeProject = "true";
-  project.textContent = current.activeProjectName
-    ? `Active project: ${current.activeProjectName}`
-    : "No active project";
+
+  const picker = document.createElement("select");
+  picker.dataset.projectPicker = "true";
+  picker.setAttribute("aria-label", "Active project");
+  for (const project of current.projects) {
+    const option = document.createElement("option");
+    option.value = project.id;
+    option.textContent = project.name ?? project.id;
+    if (project.id === current.activeProjectId) option.selected = true;
+    picker.append(option);
+  }
+  picker.disabled = true;
+
   const openApp = managementAnchor(
     "Open app",
     current.openAppUrl(),
     "Open the Rogatio management page",
   );
   openApp.dataset.openApp = "true";
-  header.append(title, project, openApp);
+  header.append(title, picker, openApp);
 
   const actions = document.createElement("div");
   actions.dataset.projectActions = "true";
@@ -241,50 +249,75 @@ function render(): void {
 
   const list = document.createElement("ul");
   list.dataset.groupList = "true";
-  const rows = current.rows();
-  if (rows.length === 0) {
+  const groups = current.groups();
+  if (!current.activeProjectId) {
+    const empty = document.createElement("li");
+    empty.textContent = "No active project";
+    list.append(empty);
+  } else if (groups.length === 0) {
     const empty = document.createElement("li");
     empty.textContent = "This project has no saved groups.";
     list.append(empty);
   }
-  for (const row of rows) {
-    const item = document.createElement("li");
-    item.dataset.ruleId = row.id;
-    item.dataset.groupId = row.groupId;
+  for (const group of groups) {
+    const details = document.createElement("details");
+    details.dataset.group = "true";
+
+    const summary = document.createElement("summary");
 
     const name = document.createElement("span");
-    name.textContent = row.name;
-
-    const group = document.createElement("span");
-    group.dataset.ruleGroup = "true";
-    group.textContent = row.groupId;
+    name.textContent = group.name;
 
     const status = document.createElement("span");
     status.dataset.groupStatus = "true";
-    status.textContent = statusLabel(row.status);
+    status.textContent = statusLabel(group.status);
 
     const toggle = document.createElement("input");
     toggle.type = "checkbox";
-    toggle.checked = row.enabled;
+    toggle.checked = group.enabled;
     toggle.dataset.groupToggle = "true";
     toggle.setAttribute(
       "aria-label",
-      `${row.enabled ? "Deactivate" : "Activate"} group ${row.name}`,
+      `${group.enabled ? "Deactivate" : "Activate"} group ${group.name}`,
     );
-    toggle.addEventListener("change", async () => {
-      await current.toggle(row.groupId, toggle.checked);
+    toggle.addEventListener("change", async (event) => {
+      event.stopPropagation();
+      await current.toggle(group.id, toggle.checked);
       await refresh();
     });
 
     const pencil = managementAnchor(
       "Edit group",
-      current.groupUrl(row.groupId),
-      `Open ${row.name} in the editor`,
+      current.groupUrl(group.id),
+      `Open ${group.name} in the editor`,
     );
     pencil.dataset.groupEdit = "true";
 
-    item.append(name, group, status, toggle, pencil);
-    list.append(item);
+    summary.append(name, status, toggle, pencil);
+
+    const ruleList = document.createElement("ul");
+    const rows = current.rows().filter((r) => r.groupId === group.id);
+    if (rows.length === 0) {
+      const emptyRule = document.createElement("li");
+      emptyRule.textContent = "No rules";
+      ruleList.append(emptyRule);
+    }
+    for (const row of rows) {
+      const ruleItem = document.createElement("li");
+
+      const ruleName = document.createElement("span");
+      ruleName.textContent = row.name;
+
+      const ruleStatus = document.createElement("span");
+      ruleStatus.dataset.groupStatus = "true";
+      ruleStatus.textContent = statusLabel(row.status);
+
+      ruleItem.append(ruleName, ruleStatus);
+      ruleList.append(ruleItem);
+    }
+
+    details.append(summary, ruleList);
+    list.append(details);
   }
 
   const parts: HTMLElement[] = [header, actions];

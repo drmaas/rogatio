@@ -292,7 +292,7 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
   await page.goto("/extension/popup.html");
 
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
-  await expect(page.getByText("Active project: Project A")).toBeVisible();
+  await expect(page.locator("[data-project-picker]")).toBeVisible();
   await expect(page.getByText("One")).toBeVisible();
   await expect(page.locator("[data-open-app]")).toBeVisible();
   await expect(page.locator("[data-group-toggle]")).toHaveCount(1);
