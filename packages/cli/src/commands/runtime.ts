@@ -14,7 +14,15 @@ import {
 } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { showRuntimeHelp } from "../help.js";
-import { createJsonFileProjectStorage } from "../utils/file.js";
+import {
+  createJsonFileProjectStorage,
+  type ProjectStorage,
+} from "../utils/file.js";
+
+export interface RuntimeCommandOptions {
+  stdinInput?: string;
+  storage?: ProjectStorage;
+}
 
 export interface RuntimeCommandResult {
   exitCode: Promise<number>;
@@ -276,7 +284,10 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
   }
 }
 
-async function runtimeHostCommand(args: string[]): Promise<number> {
+async function runtimeHostCommand(
+  args: string[],
+  options: RuntimeCommandOptions = {},
+): Promise<number> {
   let root: string | undefined;
   let mockPort: number | undefined;
   const positional: string[] = [];
@@ -329,7 +340,7 @@ async function runtimeHostCommand(args: string[]): Promise<number> {
   // Explicit project path mode: validate, compile, build preset, run host
   let filePath: string;
   let projectData: unknown;
-  const storage = createJsonFileProjectStorage();
+  const storage = options.storage ?? createJsonFileProjectStorage();
   try {
     if (inputPath === "-") {
       const chunks: string[] = [];
@@ -400,24 +411,24 @@ async function runtimeHostCommand(args: string[]): Promise<number> {
 
 export function runtimeCommand(
   args: ["install" | "uninstall" | "host", ...string[]],
-  options?: { stdinInput?: string },
+  options?: RuntimeCommandOptions,
 ): Promise<number>;
 export function runtimeCommand(
   args: ["--help" | "-h", ...string[]],
-  options?: { stdinInput?: string },
+  options?: RuntimeCommandOptions,
 ): Promise<number>;
 export function runtimeCommand(
   args: [string, ...string[]],
-  options?: { stdinInput?: string },
+  options?: RuntimeCommandOptions,
 ): Promise<number | RuntimeCommandResult>;
 export function runtimeCommand(
   args: string[],
-  options?: { stdinInput?: string },
+  options?: RuntimeCommandOptions,
 ): Promise<number | RuntimeCommandResult>;
 
 export async function runtimeCommand(
   args: string[],
-  _options: { stdinInput?: string } = {},
+  options: RuntimeCommandOptions = {},
 ): Promise<number | RuntimeCommandResult> {
   if (args.includes("--help") || args.includes("-h")) {
     showRuntimeHelp();
@@ -432,7 +443,7 @@ export async function runtimeCommand(
     first === "verify"
   )
     return trustRuntimeCommand(args);
-  if (first === "host") return runtimeHostCommand(args.slice(1));
+  if (first === "host") return runtimeHostCommand(args.slice(1), options);
 
   console.error(
     `Error: 'rogatio runtime' no longer starts or stops the runtime. Use 'rogatio runtime install|uninstall' to manage the host manifest and request-body trust, or 'rogatio runtime host [path]' to run the native-messaging host. Start/stop is driven from the extension's controls.`,

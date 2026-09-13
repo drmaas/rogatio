@@ -11,12 +11,14 @@ import { editorAssetPaths } from "../utils/asset-paths.js";
 import { launchBrowser } from "../utils/browser.js";
 import {
   createJsonFileProjectStorage,
+  type ProjectStorage,
   ProjectStorageError,
 } from "../utils/file.js";
 
-interface EditCommandOptions {
+export interface EditCommandOptions {
   launchBrowser?: (url: string) => Promise<boolean>;
   port?: number;
+  storage?: ProjectStorage;
 }
 
 export interface EditCommandResult {
@@ -29,7 +31,7 @@ export async function editCommand(
   options: EditCommandOptions = {},
 ): Promise<EditCommandResult> {
   const customLaunchBrowser = options.launchBrowser;
-  const storage = createJsonFileProjectStorage();
+  const storage = options.storage ?? createJsonFileProjectStorage();
 
   // Parse arguments
   const positionalArgs: string[] = [];

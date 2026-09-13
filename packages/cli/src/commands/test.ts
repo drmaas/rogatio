@@ -5,8 +5,15 @@ import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject, parseTestUrl } from "@rogatio/dry-run";
 import { validateProjectDetailed } from "@rogatio/schema";
-import { createJsonFileProjectStorage } from "../utils/file.js";
+import {
+  createJsonFileProjectStorage,
+  type ProjectStorage,
+} from "../utils/file.js";
 import { createMockPreviewAction } from "../utils/mock-preview.js";
+
+export interface TestCommandOptions {
+  storage?: ProjectStorage;
+}
 
 interface TestCaseInput {
   url: string;
@@ -183,6 +190,7 @@ async function testCommandImpl(
   args: string[],
   stdinInput: string | undefined,
   captureOutput: boolean,
+  options: TestCommandOptions = {},
 ): Promise<number | string> {
   let filePath = resolve(process.cwd(), ".rogatio.json");
   let jsonMode = false;
@@ -192,7 +200,7 @@ async function testCommandImpl(
   let defaultMethod: string | undefined;
   let defaultResourceType: string | undefined;
   let argumentError: string | undefined;
-  const storage = createJsonFileProjectStorage();
+  const storage = options.storage ?? createJsonFileProjectStorage();
 
   const positionalArgs: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -408,16 +416,20 @@ async function testCommandImpl(
 export async function testCommand(
   args: string[],
   stdinInput?: string,
+  captureOutput?: false,
+  options?: TestCommandOptions,
 ): Promise<number>;
 export async function testCommand(
   args: string[],
   stdinInput: string | undefined,
   captureOutput: true,
+  options?: TestCommandOptions,
 ): Promise<string>;
 export async function testCommand(
   args: string[],
   stdinInput?: string,
   captureOutput = false,
+  options: TestCommandOptions = {},
 ): Promise<number | string> {
-  return testCommandImpl(args, stdinInput, captureOutput);
+  return testCommandImpl(args, stdinInput, captureOutput, options);
 }
