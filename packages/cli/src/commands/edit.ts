@@ -14,6 +14,7 @@ import {
   type ProjectStorage,
   ProjectStorageError,
 } from "../utils/file.js";
+import { emptyProjectDocument } from "../utils/project-storage.js";
 
 export interface EditCommandOptions {
   launchBrowser?: (url: string) => Promise<boolean>;
@@ -93,9 +94,8 @@ export async function editCommand(
   } catch (e) {
     if (e instanceof ProjectStorageError && e.code === "not-found") {
       try {
-        const empty = { version: 1, name: "", groups: [] };
-        await storage.create({ id: filePath, data: empty });
-        projectData = empty;
+        await storage.create({ id: filePath });
+        projectData = emptyProjectDocument();
       } catch (createError) {
         console.error(`Error writing initial project: ${createError}`);
         return { exitCode: Promise.resolve(2), shutdown: () => {} };

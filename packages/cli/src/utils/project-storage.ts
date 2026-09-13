@@ -75,6 +75,18 @@ export interface ProjectStorage {
   delete(id: string): Promise<void>;
 }
 
+/**
+ * Fresh empty project document for create-without-data and edit bootstrap.
+ * Storage-module only — not re-exported from file.ts; not a schema API.
+ */
+export function emptyProjectDocument(): {
+  version: number;
+  name: string;
+  groups: [];
+} {
+  return { version: 1, name: "", groups: [] };
+}
+
 function isRogatioProjectFilename(name: string): boolean {
   return name === ".rogatio.json" || name.endsWith(".rogatio.json");
 }
@@ -249,9 +261,7 @@ export function createJsonFileProjectStorage(): ProjectStorage {
       }
 
       const data =
-        options?.data === undefined
-          ? { version: 1, name: "", groups: [] }
-          : options.data;
+        options?.data === undefined ? emptyProjectDocument() : options.data;
       await writeDocument(id, data);
       return { id, name: projectName(data) };
     },
