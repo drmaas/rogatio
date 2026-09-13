@@ -48,7 +48,7 @@ Implementer ticks tasks as they complete. Each phase maps to `PLAN.md` Phases. A
 
 **Proves:** `pnpm validate` in the worktree.
 
-- [ ] 4.1 Update `docs/architecture.md` CLI/`file.ts` notes for `ProjectStorage` (list/get/create/import/update/delete), JSON-file adapter, and that browser-core `ProjectRepository` remains a separate surface.
-- [ ] 4.2 Update `packages/cli/README.md` only if it documents storage helpers; otherwise record no README change needed.
-- [ ] 4.3 Do **not** amend local-first / no-hosted-endpoints product rules for hypothetical remote backends.
-- [ ] 4.4 Run `pnpm validate`; fix any failures in-scope for this feature.
+- [x] 4.1 Update `docs/architecture.md` CLI/`file.ts` notes for `ProjectStorage` (list/get/create/import/update/delete), JSON-file adapter, and that browser-core `ProjectRepository` remains a separate surface.
+- [x] 4.2 Update `packages/cli/README.md` only if it documents storage helpers; otherwise record no README change needed. — no README change needed (does not document storage helpers).
+- [x] 4.3 Do **not** amend local-first / no-hosted-endpoints product rules for hypothetical remote backends. — confirmed unchanged.
+- [x] 4.4 Run `pnpm validate`; fix any failures in-scope for this feature. — passed (format, lint, typecheck, build, 734 vitest, playwright).

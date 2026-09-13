@@ -400,7 +400,7 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 - Editor instantiates via `createEditor(root, options)` with HTTP-based callbacks (`validate`, `save`, `onCancel`)
 
 **5. Utilities (`src/utils/`)**
-- `file.ts`: read/write JSON with atomic write (temp + rename)
+- `file.ts`: CLI-owned `ProjectStorage` port (`list` / `get` / `create` / `import` / `update` / `delete`) plus the JSON-file adapter (`createJsonFileProjectStorage`). Path-as-id; atomic write (pretty JSON, mkdir, temp + rename). Production `edit` / `verify` / `test` / `runtime` and save use the port for file-backed I/O; compat `readProject` / `writeProject` wrappers remain for tests. This surface is separate from browser-core `ProjectRepository` / `StorageAdapter` (envelope store); the two are not unified.
 - `browser.ts`: cross-platform `open` with fallback handling
 
 ### Data Flow
