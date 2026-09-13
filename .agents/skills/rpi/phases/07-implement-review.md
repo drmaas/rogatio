@@ -1,6 +1,6 @@
 # Phase 7 — Implementation review (agent + human)
 
-Goal: a fresh-context subagent reviews the implementation of the just-completed phase against `PLAN.md`, revises where the agent is confident, then the user reviews.
+Goal: a fresh-context subagent reviews the implementation of the just-completed phase against `plan.md`, revises where the agent is confident, then the user reviews.
 
 ## Subagent prompt
 
@@ -10,13 +10,13 @@ Prompt template: `templates/implement-review-prompt.md`.
 
 The subagent must:
 
-- Read `docs/rpi/<feature>/PLAN.md`, `docs/rpi/<feature>/CHECKLIST.md`, and `docs/rpi/<feature>/RESEARCH.md`.
-- Read `## Implementation strategy` from `PLAN.md`. Verify the implementation actually followed it. TDD means tests exist for every acceptance criterion in the phase and were written before or alongside the production change with at least one recorded red state in the implementer's summary. Code first means tests exist for every acceptance criterion. Flag mismatches.
+- Read `docs/decisions/<feature>/plan.md`, `docs/decisions/<feature>/checklist.md`, and `docs/decisions/<feature>/research.md`.
+- Read `## Implementation strategy` from `plan.md`. Verify the implementation actually followed it. TDD means tests exist for every acceptance criterion in the phase and were written before or alongside the production change with at least one recorded red state in the implementer's summary. Code first means tests exist for every acceptance criterion. Flag mismatches.
 - Run `git diff <base-branch>..HEAD -- <files touched in the current phase>` to see the actual changes.
 - Run the repository's canonical validation command.
 - Review the diff as a senior engineer. Look for: type errors, missing tests, edge cases the plan called out that were missed, scope creep, off-plan refactors, dead code, leaked secrets or local settings.
 - Fix the issues it finds. Edit files in place. Do not create a separate review file.
-- Update `CHECKLIST.md` if it discovers tasks that were claimed complete but are not.
+- Update `checklist.md` if it discovers tasks that were claimed complete but are not.
 - Self-review once.
 - Return a numbered list of issues found, which were fixed, and any it could not fix safely.
 

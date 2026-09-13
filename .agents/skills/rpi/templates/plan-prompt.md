@@ -5,14 +5,14 @@ You are the planning subagent for an RPI workflow. Fresh context. No prior conve
 ## Inputs
 
 - User's problem statement: <problem-statement>
-- Research artifact: `docs/rpi/<feature>/RESEARCH.md`
+- Research artifact: `docs/decisions/<feature>/research.md`
 - Repository root: <repo-root>
 - Worktree: <worktree-path>
 
 ## Your task
 
-1. Read `RESEARCH.md`. Treat it as the source of truth for what the codebase or web research says.
-2. Write `docs/rpi/<feature>/PLAN.md` using the sections defined in the rpi skill's `artifacts.md`:
+1. Read `research.md`. Treat it as the source of truth for what the codebase or web research says.
+2. Write `docs/decisions/<feature>/plan.md` using the sections defined in the rpi skill's `artifacts.md`:
 
    - Goal (one paragraph)
    - Non-goals (what the change does not do)
@@ -21,7 +21,7 @@ You are the planning subagent for an RPI workflow. Fresh context. No prior conve
    - Risks (known unknowns, edge cases, performance/security concerns)
    - Acceptance criteria (observable conditions that must hold when the work is done)
 
-3. Write `docs/rpi/<feature>/CHECKLIST.md` with the initial phases and tasks. Use markdown checkboxes. The implementer will check items off as it works.
+3. Write `docs/decisions/<feature>/checklist.md` with the initial phases and tasks. Use markdown checkboxes. The implementer will check items off as it works.
 4. For each phase, specify what acceptance looks like and what tests prove it.
 5. Self-review once. Catch scope creep, missing acceptance criteria, phases that are too large to review in one human-gate pass.
 6. Return a one-paragraph summary plus both artifact paths.

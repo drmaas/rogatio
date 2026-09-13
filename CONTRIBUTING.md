@@ -89,9 +89,11 @@ file so these stay in sync:
 - `docs/architecture.md` — package boundaries and decisions.
 - `AGENTS.md` — agent workflow and tier rules.
 
-Spec and plan files under `docs/specs/` and `docs/plans/` are frozen decision history and
-must not be edited. If a feature is in flight, write its spec and plan under
-`docs/decisions/<feature>/`; on release they are moved into the frozen locations.
+Spec, plan, research, and workflow files under `docs/specs/`, `docs/plans/`,
+`docs/research/`, and `docs/workflows/` are frozen decision history and must not be
+edited. If a feature is in flight, write decision records under
+`docs/decisions/<feature>/` (lowercase filenames); on release they are moved into the
+frozen locations. There is no separate `docs/rpi/` tree.
 
 Raw brainstorm output is ephemeral and is not part of durable documentation.
 

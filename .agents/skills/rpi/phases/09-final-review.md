@@ -10,7 +10,7 @@ Prompt template: `templates/final-review-prompt.md`.
 
 The subagent must:
 
-- Read `docs/rpi/<feature>/PLAN.md`, `docs/rpi/<feature>/CHECKLIST.md`, and `docs/rpi/<feature>/RESEARCH.md`.
+- Read `docs/decisions/<feature>/plan.md`, `docs/decisions/<feature>/checklist.md`, and `docs/decisions/<feature>/research.md`.
 - Run `git diff <base-branch>..HEAD` to see every change on the branch.
 - Run the repository's canonical validation command.
 - Review the cumulative diff as a senior engineer. Look for: issues that only emerge when the pieces come together, inconsistencies between phases, missed acceptance criteria, scope drift, over-engineering that snuck in across phases, missing or weak tests.
@@ -30,6 +30,6 @@ Follow `human-gates.md`. Print the agent's numbered list and the file count chan
 ## Exit conditions
 
 - The user replied Approved.
-- All `CHECKLIST.md` items are complete or explicitly deferred.
+- All `checklist.md` items are complete or explicitly deferred.
 
 Move to `phases/10-refactor.md` (which always begins with the opt-in question).

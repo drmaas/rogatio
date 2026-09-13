@@ -1,22 +1,23 @@
 # Artifact convention
 
-All RPI artifacts live under `docs/rpi/<feature>/`.
+All RPI artifacts live under `docs/decisions/<feature>/` — the same active tree as SDD and doit. Filenames are lowercase.
 
 ## Path layout
 
 ```
-docs/rpi/<feature>/
-  RESEARCH.md     # produced in step 2
-  PLAN.md         # produced in step 4
-  CHECKLIST.md    # produced in step 4, updated throughout step 6
-  REFACTOR.md     # produced in step 11 (only if user opts in)
+docs/decisions/<feature>/
+  research.md     # produced in step 2
+  plan.md         # produced in step 4
+  checklist.md    # produced in step 4, updated throughout step 6
+  refactor.md     # produced in step 11 (only if user opts in)
+  workflow.md     # optional human-requested log
 ```
 
 `<feature>` is a kebab-case slug, lowercased, no spaces, no leading or trailing dashes. Examples: `f5-editor`, `runtime-command-gating`, `csv-export-v2`.
 
-If the directory does not exist, the subagent must create it before writing. Never write outside the feature directory.
+If the directory does not exist, the subagent must create it before writing. Never write outside the feature directory. Never use `docs/rpi/`.
 
-## RESEARCH.md
+## research.md
 
 Captures what the model found in the codebase or in web research. Sections:
 
@@ -26,9 +27,11 @@ Captures what the model found in the codebase or in web research. Sections:
 - **Constraints and invariants** — non-negotiables discovered in the code or stated by the user.
 - **Open questions** — anything the plan needs to resolve.
 
-Update protocol: the research-review subagent edits `RESEARCH.md` in place. The human gate does not edit the file; it approves or requests revisions.
+Update protocol: the research-review subagent edits `research.md` in place. The human gate does not edit the file; it approves or requests revisions.
 
-## PLAN.md
+On release: move to `docs/research/<feature>.md` and freeze.
+
+## plan.md
 
 Captures the implementation plan. Sections:
 
@@ -36,11 +39,13 @@ Captures the implementation plan. Sections:
 - **Goal** — one paragraph.
 - **Non-goals** — what the change explicitly does not do.
 - **Architecture** — design choices and rationale.
-- **Phases** — ordered list. Each phase has a one-paragraph description and points to a checklist range in `CHECKLIST.md`.
+- **Phases** — ordered list. Each phase has a one-paragraph description and points to a checklist range in `checklist.md`.
 - **Risks** — known unknowns, edge cases, performance/security concerns.
 - **Acceptance criteria** — observable conditions that must hold when the work is done.
 
-## CHECKLIST.md
+On release: move to `docs/plans/<feature>.md` and freeze.
+
+## checklist.md
 
 Implementation tracker. Markdown checklist with phases and tasks. Example:
 
@@ -52,11 +57,13 @@ Implementation tracker. Markdown checklist with phases and tasks. Example:
   - [ ] Task 2.1
 ```
 
-Update protocol: the implementer subagent checks off tasks as it completes them. The implementation-review subagent reads the checklist to see what was actually done.
+Update protocol: the implementer subagent checks off tasks as they complete. The implementation-review subagent reads the checklist to see what was actually done.
 
-The plan-review subagent writes the initial checklist when it writes `PLAN.md`.
+The plan-review subagent writes the initial checklist when it writes `plan.md`.
 
-## REFACTOR.md
+On release: **delete** (not durable).
+
+## refactor.md
 
 Only created if the user opts into step 11. Sections:
 
@@ -68,8 +75,10 @@ Only created if the user opts into step 11. Sections:
 
 The refactor subagent writes the file. The user reviews the candidates and approves the ones worth pursuing. The user, not the agent, decides which candidates are in scope.
 
+On release: move to `docs/plans/<feature>-refactor.md` and freeze.
+
 ## File hygiene
 
 - Never commit artifacts automatically. The user reviews and commits them as part of a phase commit.
-- Never delete artifacts. If a phase is abandoned, leave the file in place with a "ABANDONED — superseded by `<new feature>`" note at the top.
+- Never delete artifacts during an active feature without asking. If a phase is abandoned, leave the file in place with a "ABANDONED — superseded by `<new feature>`" note at the top. On release, `checklist.md` is intentionally deleted as part of freeze.
 - Never reference artifacts from outside the feature directory by hardcoded path. Use the slug.

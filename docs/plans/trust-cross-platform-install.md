@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # PLAN — trust-cross-platform-install
 
 **Worktree:** `/home/drmaas/.local/share/opencode/worktree/rogatio/feature-trust-cross-platform-install`

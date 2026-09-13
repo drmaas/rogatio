@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # Implementation review
 
 > **Implementation review (2026-09-03, free tier `openrouter/thinkingmachines/inkling-small:free`).** Verdict: **READY WITH MINOR FLAGS**. All five locked decisions are honored; the install order at `packages/runtime/src/trust.ts:249-319` matches the issue body verbatim; the five new AC tests at `packages/runtime/test/trust.test.ts:219-335` cover the AC list; the 15 frozen-doc footers across four files are all present and byte-identical bodies are preserved; the eleven live-doc files describe the unified install consistently; the locked success message and the locked full-length extension UI wording are in place. One small deviation: `packages/cli/src/commands/runtime.ts:317-321` retains `first === "trust"` in the dispatch (the plan said it was already absent at the base, but the base kept it) — functionally inert because the inner switch's `default:` branch handles `trust` identically. The `runCaTrust()` extraction in `trust.ts` adds one layer of indirection but is not a substantive deviation. No over-engineering, no new exports, no new dependencies, no new packages. Commit hygiene clean.

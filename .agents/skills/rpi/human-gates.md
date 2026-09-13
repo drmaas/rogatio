@@ -5,7 +5,7 @@ After every agent review phase, the skill pauses and surfaces the agent's findin
 ## Where the gates fire
 
 - After research review (phase 2 in `phases/02-research-review.md`).
-- After plan review (phase 5 in `phases/04-plan-review.md`). The plan-review gate also surfaces the agent-chosen implementation strategy (TDD or Code first) read from `PLAN.md` `## Implementation strategy`. The user can override by editing `PLAN.md` before clicking Approved, or by selecting **Revise** and naming the desired strategy.
+- After plan review (phase 5 in `phases/04-plan-review.md`). The plan-review gate also surfaces the agent-chosen implementation strategy (TDD or Code first) read from `plan.md` `## Implementation strategy`. The user can override by editing `plan.md` before clicking Approved, or by selecting **Revise** and naming the desired strategy.
 - After each implementation review (phase 8 in `phases/07-implement-review.md`).
 - After final review (phase 10 in `phases/09-final-review.md`).
 
@@ -24,7 +24,7 @@ The commit step is also a gate (phase 9 in `phases/08-commit.md`), but it asks a
    === end gate ===
    ```
 
-   On the plan-review gate, the `Implementation strategy` line shows the value from `PLAN.md` `## Implementation strategy`. The user may override by editing `PLAN.md` before clicking Approved, or by selecting **Revise** and naming the desired strategy.
+   On the plan-review gate, the `Implementation strategy` line shows the value from `plan.md` `## Implementation strategy`. The user may override by editing `plan.md` before clicking Approved, or by selecting **Revise** and naming the desired strategy.
 
 2. By default, the skill does not dump the full diff. If the user wants detail, the skill prints the diff on demand.
 
@@ -35,7 +35,7 @@ The commit step is also a gate (phase 9 in `phases/08-commit.md`), but it asks a
    - **Ignore points** — user lists specific findings to disregard; the skill returns to the subagent with both the user's notes and the ignore list.
    - **Abort** — stop the workflow; record the abort reason in conversation state.
 
-4. The skill records the user's reply and the resulting action in conversation state. The skill does not write a workflow log file by default; if the user wants one, it goes under `docs/rpi/<feature>/workflow.md`.
+4. The skill records the user's reply and the resulting action in conversation state. The skill does not write a workflow log file by default; if the user wants one, it goes under `docs/decisions/<feature>/workflow.md`.
 
 ## Diff on demand
 

@@ -50,4 +50,4 @@ If anything looks off, stop and surface it to the user before asking to commit.
 - The user replied Commit, Commit with my message, Skip, or Abort.
 - If Commit or Commit with my message: the commit succeeded; the next phase reads the new HEAD.
 
-After Commit: return to phase 5 for the next phase, or move to phase 9 if all phases in `CHECKLIST.md` are done.
+After Commit: return to phase 5 for the next phase, or move to phase 9 if all phases in `checklist.md` are done.

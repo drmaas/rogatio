@@ -45,8 +45,16 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 
 ## Durable Documentation
 
-- The code is the source of truth for what the system does. Decision records (specs, plans, workflow logs) describe *why* a feature is the way it is, *what was rejected*, and *what was approved* — not what the system currently does.
-- New decision records go under `docs/decisions/<feature>/` (`spec.md`, `plan.md`, `workflow.md`). On release or supersession they are moved (not copied, not edited) to `docs/specs/<feature>.md`, `docs/plans/<feature>.md`, or `docs/workflows/<feature>-workflow.md` and frozen. Once frozen, they are read-only; if a record goes stale, write a new one with a `> Superseded by:` footer.
+- The code is the source of truth for what the system does. Decision records (research, specs, plans, workflow logs) describe *why* a feature is the way it is, *what was rejected*, and *what was approved* — not what the system currently does.
+- **One active tree for every workflow** (`sdd`, `rpi`, `doit`): `docs/decisions/<feature>/` with lowercase filenames (`research.md`, `spec.md`, `plan.md`, `workflow.md`, `checklist.md`, `refactor.md` as applicable). There is no separate `docs/rpi/` tree.
+- **On release or supersession**, move durable files (not copy, not edit) and remove the feature folder:
+  - `research.md` → `docs/research/<feature>.md`
+  - `spec.md` → `docs/specs/<feature>.md`
+  - `plan.md` → `docs/plans/<feature>.md`
+  - `workflow.md` → `docs/workflows/<feature>-workflow.md`
+  - `refactor.md` → `docs/plans/<feature>-refactor.md`
+  - `checklist.md` is retired (deleted; not durable)
+- Frozen files are read-only; if a record goes stale, write a new one with a `> Superseded by:` footer.
 - Only `docs/architecture.md`, `README.md`, `packages/*/README.md`, and `packages/docs-site/` describe current behavior and must be kept in sync with the code. Decision records are append-only and do not require synchronization on behavior changes.
 - Raw brainstorm output is ephemeral; do not create or retain brainstorm documents. Prompt before deleting existing brainstorm files.
 
@@ -127,7 +135,7 @@ When a claim about the system conflicts across sources, trust them in this order
 2. The tests in `packages/*/test/`, `packages/*/src/**/__tests__/`, and the workspace test scripts.
 3. `docs/architecture.md` — package boundaries, per-package decisions, and rejected alternatives.
 4. `README.md` and `packages/*/README.md` — user-facing overview and usage.
-5. Decision records under `docs/specs/`, `docs/plans/`, `docs/workflows/`, and `docs/decisions/` — what was decided, by whom, when, and what was rejected. They describe the decision, not the system.
+5. Decision records under `docs/specs/`, `docs/plans/`, `docs/workflows/`, `docs/research/`, and `docs/decisions/` — what was decided, by whom, when, and what was rejected. They describe the decision, not the system.
 
 Do not use a decision record to answer "what does the system do?" Use it to answer "why is it this way?" and "what was rejected?" If a decision record and the code disagree, the code wins; the disagreement is captured on the next review by adding a `Superseded by` footer to the frozen record.
 

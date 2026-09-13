@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # PLAN.md — Matcher DNR + Mock/Proxy Removal
 
 **Feature:** unified-mock-dnr

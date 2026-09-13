@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # PLAN — storage-adapter
 
 **Worktree:** `/home/drmaas/.local/share/opencode/worktree/rogatio/storage-adapter`

@@ -19,11 +19,11 @@ Prompt template: `templates/refactor-prompt.md`.
 
 The subagent must:
 
-- Read `docs/rpi/<feature>/PLAN.md`, `docs/rpi/<feature>/CHECKLIST.md`, and `docs/rpi/<feature>/RESEARCH.md`.
+- Read `docs/decisions/<feature>/plan.md`, `docs/decisions/<feature>/checklist.md`, and `docs/decisions/<feature>/research.md`.
 - Run `git diff <base-branch>..HEAD` to see every change.
 - Identify high-leverage refactoring opportunities. Look for: duplicated logic introduced across phases, awkward type signatures, ad-hoc error handling that should be unified, missed abstractions that would make the next change cheaper, patterns that diverge from the rest of the codebase.
 - For each candidate, document: what to refactor, expected benefit, risk, scope, test plan.
-- Do not implement. Write `docs/rpi/<feature>/REFACTOR.md` only.
+- Do not implement. Write `docs/decisions/<feature>/refactor.md` only.
 - Self-review once. Reject candidates whose expected benefit is small or whose risk is high.
 - Return a numbered list of candidates and a recommendation per candidate.
 
