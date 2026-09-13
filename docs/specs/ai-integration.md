@@ -4,7 +4,6 @@
 
 # AI Integration Specification (Revised)
 
-> Status: DRAFT — pending human review (Stage 4)
 > Updated per user guidance: self-contained edit, cross-platform config, shared AI modules.
 
 ## 1. Problem Statement & Goals
