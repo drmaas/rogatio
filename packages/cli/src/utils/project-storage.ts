@@ -6,6 +6,7 @@ import {
   readdir,
   readFile,
   rename,
+  stat,
   unlink,
   writeFile,
 } from "node:fs/promises";
@@ -162,22 +163,44 @@ async function readDocument(id: string): Promise<unknown> {
   }
 }
 
+async function isDirectoryPath(id: string): Promise<boolean> {
+  try {
+    return (await stat(id)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 async function writeDocument(id: string, data: unknown): Promise<void> {
   const tempName = `.${basename(dirname(id))}.${randomBytes(8).toString("hex")}.tmp`;
   const tempPath = join(dirname(id), tempName);
 
   try {
+    // Windows rename/write onto a directory often yields EPERM/EACCES, not EISDIR.
+    if (await isDirectoryPath(id)) {
+      throw new ProjectFileError(
+        "is-directory",
+        id,
+        "Target path is a directory",
+      );
+    }
+
     await mkdir(dirname(id), { recursive: true });
     await writeFile(tempPath, JSON.stringify(data, null, 2), "utf-8");
     await rename(tempPath, id);
   } catch (e) {
+    if (e instanceof ProjectFileError) throw e;
+
     try {
       await unlink(tempPath);
     } catch {
       // Ignore cleanup errors
     }
 
-    if ((e as NodeJS.ErrnoException).code === "EISDIR") {
+    if (
+      (e as NodeJS.ErrnoException).code === "EISDIR" ||
+      (await isDirectoryPath(id))
+    ) {
       throw new ProjectFileError(
         "is-directory",
         id,
