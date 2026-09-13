@@ -14,6 +14,7 @@ describe("API routes", () => {
   let context: RouteContext;
   let handler: ReturnType<typeof createRoutes>;
   let updateMock: ReturnType<typeof vi.fn<ProjectStorage["update"]>>;
+  let storage: ProjectStorage;
 
   const validProject = {
     version: 1,
@@ -42,11 +43,19 @@ describe("API routes", () => {
   beforeEach(() => {
     const csrfToken = "test-csrf-token";
     updateMock = vi.fn<ProjectStorage["update"]>().mockResolvedValue(undefined);
+    storage = {
+      list: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      import: vi.fn(),
+      update: updateMock,
+      delete: vi.fn(),
+    };
     context = {
       project: { ...validProject },
       filePath: "/test/.rogatio.json",
       csrfToken,
-      update: updateMock,
+      storage,
       shutdown: vi.fn(),
       editorHtml: "<!DOCTYPE html><html></html>",
       editorBundlePath: "/dev/null",
@@ -180,6 +189,8 @@ describe("API routes", () => {
         "/test/.rogatio.json",
         validProject,
       );
+      expect(storage.get).not.toHaveBeenCalled();
+      expect(storage.create).not.toHaveBeenCalled();
       const endCall = vi.mocked(res.end).mock.calls[0][0];
       const data = JSON.parse(endCall);
       expect(data.ok).toBe(true);

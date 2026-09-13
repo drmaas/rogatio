@@ -15,7 +15,7 @@ export interface RouteContext {
   project: unknown;
   filePath: string;
   csrfToken: string;
-  update: ProjectStorage["update"];
+  storage: ProjectStorage;
   shutdown: () => void;
   /** HTML document served at GET /editor.html. */
   editorHtml: string;
@@ -366,7 +366,7 @@ export function createRoutes(context: RouteContext) {
       }
 
       try {
-        await context.update(context.filePath, body);
+        await context.storage.update(context.filePath, body);
         context.project = body;
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true }));

@@ -120,7 +120,7 @@ export async function editCommand(
     project: projectData,
     filePath,
     csrfToken,
-    update: storage.update.bind(storage),
+    storage,
     shutdown: () => {
       shutdown();
     },
