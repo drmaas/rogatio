@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # RESEARCH: storage-adapter
 
 ## Problem restatement

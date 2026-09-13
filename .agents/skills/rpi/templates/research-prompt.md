@@ -19,7 +19,7 @@ Worktree: <worktree-path>
 
 1. Read the problem statement. Do not invent requirements beyond it.
 2. Investigate the repository. Cite every claim with a file path and line number. For greenfield work, do web research and cite URLs.
-3. Capture findings in `docs/rpi/<feature>/RESEARCH.md` using the sections defined in the rpi skill's `artifacts.md`:
+3. Capture findings in `docs/decisions/<feature>/research.md` using the sections defined in the rpi skill's `artifacts.md`:
 
    - Problem restatement (verbatim from the user).
    - Codebase findings (file paths, function signatures, current behavior, edge cases).

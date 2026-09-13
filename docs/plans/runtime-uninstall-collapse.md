@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # PLAN — feat/runtime-uninstall-collapse
 
 **Worktree:** `/home/drmaas/.local/share/opencode/worktree/rogatio/feat/runtime-uninstall-collapse`

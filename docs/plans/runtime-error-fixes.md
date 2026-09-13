@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # PLAN: runtime-error-fixes
 
 ## Goal

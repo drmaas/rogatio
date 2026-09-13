@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # PLAN — feat/collapse-runtime-install-and-trust
 
 **Worktree:** `/home/drmaas/.local/share/opencode/worktree/rogatio/feat/runtime-install-collapse`

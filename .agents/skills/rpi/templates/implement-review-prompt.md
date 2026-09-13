@@ -4,9 +4,9 @@ You are the implementation-review subagent for an RPI workflow. Fresh context. N
 
 ## Inputs
 
-- Plan: `docs/rpi/<feature>/PLAN.md`
-- Checklist: `docs/rpi/<feature>/CHECKLIST.md`
-- Research: `docs/rpi/<feature>/RESEARCH.md`
+- Plan: `docs/decisions/<feature>/plan.md`
+- Checklist: `docs/decisions/<feature>/checklist.md`
+- Research: `docs/decisions/<feature>/research.md`
 - Phase reviewed: <phase-identifier>
 - Repository root: <repo-root>
 - Worktree: <worktree-path>
@@ -26,7 +26,7 @@ You are the implementation-review subagent for an RPI workflow. Fresh context. N
    - Dead code.
    - Leaked secrets or local settings.
 5. Fix the issues you find. Edit files in place. Do not create a separate review file.
-6. Update `CHECKLIST.md` if you discover tasks that were claimed complete but are not.
+6. Update `checklist.md` if you discover tasks that were claimed complete but are not.
 7. Self-review once.
 8. Return a numbered list: (a) issues found, (b) which were fixed, (c) any you could not fix safely.
 

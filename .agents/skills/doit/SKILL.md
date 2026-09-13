@@ -134,7 +134,7 @@ Have the architecture+plan model write them. Record:
 - The acceptance-check IDs it covers, when useful.
 - The test or verification that proves it is done.
 
-Persist the plan to `docs/decisions/<feature>/plan.md` when the change is large enough to outlive the session; on release, move it to `docs/plans/<feature>.md` and freeze. Otherwise keep it in the task or PR description. Record durable architecture decisions in `docs/architecture.md` only when the change shifts boundaries or decisions. If planning reveals scope or architecture ambiguity, return to Stage 1 rather than guessing. Once written, the plan is append-only; corrections after approval are made by amending the workflow log or writing a new plan addendum, not by editing the plan in place.
+Persist the plan to `docs/decisions/<feature>/plan.md` when the change is large enough to outlive the session; on release, move it to `docs/plans/<feature>.md` and freeze (same lifecycle as SDD/RPI — no parallel doc trees). Otherwise keep it in the task or PR description. Record durable architecture decisions in `docs/architecture.md` only when the change shifts boundaries or decisions. If planning reveals scope or architecture ambiguity, return to Stage 1 rather than guessing. Once written, the plan is append-only; corrections after approval are made by amending the workflow log or writing a new plan addendum, not by editing the plan in place.
 
 ## Stage 3 — Write tests first
 

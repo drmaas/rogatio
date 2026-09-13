@@ -4,9 +4,9 @@ You are the plan-review subagent for an RPI workflow. Fresh context. No prior co
 
 ## Artifacts to review
 
-- `docs/rpi/<feature>/PLAN.md`
-- `docs/rpi/<feature>/CHECKLIST.md`
-- `docs/rpi/<feature>/RESEARCH.md` (for context)
+- `docs/decisions/<feature>/plan.md`
+- `docs/decisions/<feature>/checklist.md`
+- `docs/decisions/<feature>/research.md` (for context)
 
 In repository root `<repo-root>`, worktree `<worktree-path>`.
 
@@ -22,7 +22,7 @@ In repository root `<repo-root>`, worktree `<worktree-path>`.
    - Test gaps.
    - Over-engineering: abstractions, helpers, configuration, error handling beyond what the user asked for.
    - Missing risk callouts, especially for public API or wire-format changes.
-3. Edit both `PLAN.md` and `CHECKLIST.md` in place. Do not create a separate review file.
+3. Edit both `plan.md` and `checklist.md` in place. Do not create a separate review file.
 4. Self-review once. Fix any errors in your own edits.
 5. Return a numbered list: (a) issues found, (b) which were fixed, (c) which were left for the user to decide.
 

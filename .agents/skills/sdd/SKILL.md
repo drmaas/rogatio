@@ -95,7 +95,7 @@ Use the repository's established locations when they exist. Otherwise use these 
 - Workflow log: `docs/decisions/<feature>/workflow.md` — running record of stage status, review rounds, findings, and verification results. On feature completion the file is moved to `docs/workflows/<feature>-workflow.md` and frozen.
 - Tests: mapped to acceptance-criterion IDs where practical.
 
-Decision records under `docs/specs/`, `docs/plans/`, and `docs/workflows/` are **frozen decision history**: do not edit them. If a record goes stale, write a new one with a `> Superseded by:` footer pointing to the replacement. The code is the source of truth for current behavior; decision records describe the decision, not the system. See `AGENTS.md` "Source-of-truth priority".
+Decision records under `docs/specs/`, `docs/plans/`, `docs/workflows/`, and `docs/research/` are **frozen decision history**: do not edit them. If a record goes stale, write a new one with a `> Superseded by:` footer pointing to the replacement. The code is the source of truth for current behavior; decision records describe the decision, not the system. See `AGENTS.md` "Source-of-truth priority".
 
 Prefer durable documents for the architecture, specification, and plan when the change is large enough that another engineer will need to implement or review it. For a small change, the same information may be kept in the task or PR description, but still pass through every gate. If old brainstorm files exist, treat them as disposable working artifacts and prompt before deleting them.
 
@@ -271,7 +271,7 @@ A change is complete only when:
 - [ ] The canonical validation command was rerun after implementation and after later fixes; CI runs the same authoritative validation.
 - [ ] Fresh-context review passed within three rounds, or unresolved findings were escalated.
 - [ ] Documentation this change touches is updated (architecture, README, AGENTS as applicable).
-- [ ] On feature release, `docs/decisions/<feature>/{spec,plan,workflow}.md` are moved to `docs/specs/`, `docs/plans/`, and `docs/workflows/` respectively and frozen.
+- [ ] On feature release, `docs/decisions/<feature>/{spec,plan,workflow,research}.md` (whichever exist) are moved to `docs/specs/`, `docs/plans/`, `docs/workflows/`, and `docs/research/` respectively and frozen; the decisions folder is removed.
 - [ ] The user approved commit/push/PR actions before they were performed.
 - [ ] The final release audit covered staged, unstaged, tracked, and untracked files; the commit and PR contain only intended changes and include verification evidence.
 - [ ] After merge, release/status documentation, the default branch, worktrees, local branches, and remote refs were reconciled and verified.

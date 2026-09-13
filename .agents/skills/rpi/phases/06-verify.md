@@ -2,7 +2,7 @@
 
 Goal: close the loop after each implementation iteration so the implementation reviewer always sees a green tree. The verify subagent runs the repository's validation pipeline and fixes mechanical failures in place.
 
-This phase repeats for every phase in `CHECKLIST.md`, immediately after `phases/05-implement.md` and before `phases/07-implement-review.md`.
+This phase repeats for every phase in `checklist.md`, immediately after `phases/05-implement.md` and before `phases/07-implement-review.md`.
 
 ## Subagent prompt
 
@@ -12,7 +12,7 @@ Prompt template: `templates/verify-prompt.md`, parameterized with the current ph
 
 The subagent must:
 
-- Read `docs/rpi/<feature>/PLAN.md`, `docs/rpi/<feature>/CHECKLIST.md`, and `docs/rpi/<feature>/RESEARCH.md`. No other context.
+- Read `docs/decisions/<feature>/plan.md`, `docs/decisions/<feature>/checklist.md`, and `docs/decisions/<feature>/research.md`. No other context.
 - Run the repository's canonical validation command (look it up in `package.json` or `AGENTS.md`).
 - Run the validation steps in this order: format → lint → typecheck → unit tests. If a step fails, stop the chain and fix the failures from that step before proceeding.
 - Edit files in place to fix mechanical failures: formatting, lint (including lint suppressions only when the rule is wrong), type errors that have no semantic change, and test fixture or assertion tweaks that do not weaken the test.
@@ -25,7 +25,7 @@ The subagent must:
 - The verifier may not change behavior. Production logic changes belong in the implement phase.
 - If a test failure implies a production bug, stop and report. Do not paper over it.
 - Do not start the next implementation phase.
-- Do not amend `PLAN.md` or `CHECKLIST.md`.
+- Do not amend `plan.md` or `checklist.md`.
 
 ## Human gate
 

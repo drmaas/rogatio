@@ -4,9 +4,9 @@ You are the refactor-proposal subagent for an RPI workflow. Fresh context. No pr
 
 ## Inputs
 
-- Plan: `docs/rpi/<feature>/PLAN.md`
-- Checklist: `docs/rpi/<feature>/CHECKLIST.md`
-- Research: `docs/rpi/<feature>/RESEARCH.md`
+- Plan: `docs/decisions/<feature>/plan.md`
+- Checklist: `docs/decisions/<feature>/checklist.md`
+- Research: `docs/decisions/<feature>/research.md`
 - Repository root: <repo-root>
 - Worktree: <worktree-path>
 - Base branch: <base-branch>
@@ -21,7 +21,7 @@ You are the refactor-proposal subagent for an RPI workflow. Fresh context. No pr
    - Ad-hoc error handling that should be unified.
    - Missed abstractions that would make the next change cheaper.
    - Patterns that diverge from the rest of the codebase.
-4. For each candidate, document in `docs/rpi/<feature>/REFACTOR.md`:
+4. For each candidate, document in `docs/decisions/<feature>/refactor.md`:
    - What to refactor and why.
    - Expected benefit.
    - Risk (what could break).

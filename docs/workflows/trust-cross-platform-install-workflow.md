@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # Workflow — trust-cross-platform-install
 
 ## Summary

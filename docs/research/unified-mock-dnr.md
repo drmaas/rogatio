@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # RESEARCH.md — Matcher DNR + Mock/Proxy Removal
 
 **Feature slug:** unified-mock-dnr
