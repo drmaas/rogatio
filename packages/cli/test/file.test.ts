@@ -42,11 +42,11 @@ describe("file utilities", () => {
       const project = { version: 1, name: "Test", groups: [] };
       await writeProject(testFile, project);
 
-      // No temp files should remain
+      // No temp files should remain (temps are sibling `.<dir>.<hex>.tmp` files)
       const entries = await import("node:fs/promises").then((fs) =>
         fs.readdir(testDir),
       );
-      const tempFiles = entries.filter((e) => e.startsWith(".rogatio.json."));
+      const tempFiles = entries.filter((e) => e.endsWith(".tmp"));
       expect(tempFiles).toHaveLength(0);
     });
 
