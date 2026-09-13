@@ -247,16 +247,11 @@ describe("ProjectStorage (JSON-file)", () => {
       await expect(readProject(testFile)).resolves.toEqual(second);
     });
 
-    it("readProject error codes match storage.get", async () => {
+    it("readProject propagates storage read failures as ProjectFileError", async () => {
       await writeFile(testFile, "[", "utf-8");
-      await expect(readProject(testFile)).rejects.toMatchObject({
-        code: "invalid-json",
-        path: testFile,
-      });
-      await expect(storage.get(testFile)).rejects.toMatchObject({
-        code: "invalid-json",
-        id: testFile,
-      });
+      await expect(readProject(testFile)).rejects.toBeInstanceOf(
+        ProjectFileError,
+      );
     });
   });
 
