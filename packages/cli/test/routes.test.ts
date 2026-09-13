@@ -8,11 +8,13 @@ import {
   generateCsrfToken,
   type RouteContext,
 } from "../src/server/routes.js";
+import type { ProjectStorage } from "../src/utils/file.js";
 
 describe("API routes", () => {
   let context: RouteContext;
   let handler: ReturnType<typeof createRoutes>;
-  let writeProjectMock: ReturnType<typeof vi.fn>;
+  let updateMock: ReturnType<typeof vi.fn<ProjectStorage["update"]>>;
+  let storage: ProjectStorage;
 
   const validProject = {
     version: 1,
@@ -40,15 +42,20 @@ describe("API routes", () => {
 
   beforeEach(() => {
     const csrfToken = "test-csrf-token";
-    writeProjectMock = vi.fn().mockResolvedValue(undefined);
+    updateMock = vi.fn<ProjectStorage["update"]>().mockResolvedValue(undefined);
+    storage = {
+      list: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      import: vi.fn(),
+      update: updateMock,
+      delete: vi.fn(),
+    };
     context = {
       project: { ...validProject },
       filePath: "/test/.rogatio.json",
       csrfToken,
-      writeProject: writeProjectMock as (
-        path: string,
-        data: unknown,
-      ) => Promise<void>,
+      storage,
       shutdown: vi.fn(),
       editorHtml: "<!DOCTYPE html><html></html>",
       editorBundlePath: "/dev/null",
@@ -178,10 +185,12 @@ describe("API routes", () => {
       expect(res.writeHead).toHaveBeenCalledWith(200, {
         "Content-Type": "application/json",
       });
-      expect(writeProjectMock).toHaveBeenCalledWith(
+      expect(updateMock).toHaveBeenCalledWith(
         "/test/.rogatio.json",
         validProject,
       );
+      expect(storage.get).not.toHaveBeenCalled();
+      expect(storage.create).not.toHaveBeenCalled();
       const endCall = vi.mocked(res.end).mock.calls[0][0];
       const data = JSON.parse(endCall);
       expect(data.ok).toBe(true);
@@ -202,7 +211,7 @@ describe("API routes", () => {
     });
 
     it("returns error on write failure", async () => {
-      writeProjectMock.mockRejectedValueOnce(new Error("Permission denied"));
+      updateMock.mockRejectedValueOnce(new Error("Permission denied"));
       const req = createMockReq(
         "POST",
         "/api/save",

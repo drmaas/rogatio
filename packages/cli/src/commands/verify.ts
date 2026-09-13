@@ -1,15 +1,24 @@
 import { resolve } from "node:path";
 import { compileProject } from "@rogatio/compiler";
 import { validateProjectDetailed } from "@rogatio/schema";
-import { readProject } from "../utils/file.js";
+import {
+  createJsonFileProjectStorage,
+  type ProjectStorage,
+} from "../utils/file.js";
+
+export interface VerifyCommandOptions {
+  storage?: ProjectStorage;
+}
 
 async function verifyCommandImpl(
   args: string[],
   stdinInput: string | undefined,
   captureOutput: boolean,
+  options: VerifyCommandOptions = {},
 ): Promise<number | string> {
   let filePath: string;
   let jsonOutput = false;
+  const storage = options.storage ?? createJsonFileProjectStorage();
 
   // Parse arguments
   const positionalArgs: string[] = [];
@@ -49,7 +58,7 @@ async function verifyCommandImpl(
       if (!stdinInput) throw new Error("No stdin input provided");
       projectData = JSON.parse(stdinInput);
     } else {
-      projectData = await readProject(filePath);
+      projectData = await storage.get(filePath);
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
@@ -120,16 +129,20 @@ async function verifyCommandImpl(
 export async function verifyCommand(
   args: string[],
   stdinInput?: string,
+  captureOutput?: false,
+  options?: VerifyCommandOptions,
 ): Promise<number>;
 export async function verifyCommand(
   args: string[],
   stdinInput: string | undefined,
   captureOutput: true,
+  options?: VerifyCommandOptions,
 ): Promise<string>;
 export async function verifyCommand(
   args: string[],
   stdinInput?: string,
   captureOutput = false,
+  options: VerifyCommandOptions = {},
 ): Promise<number | string> {
-  return verifyCommandImpl(args, stdinInput, captureOutput);
+  return verifyCommandImpl(args, stdinInput, captureOutput, options);
 }

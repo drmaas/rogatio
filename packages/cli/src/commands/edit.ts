@@ -9,11 +9,17 @@ import {
 } from "../server/routes.js";
 import { editorAssetPaths } from "../utils/asset-paths.js";
 import { launchBrowser } from "../utils/browser.js";
-import { ProjectFileError, readProject, writeProject } from "../utils/file.js";
+import {
+  createJsonFileProjectStorage,
+  type ProjectStorage,
+  ProjectStorageError,
+} from "../utils/file.js";
+import { emptyProjectDocument } from "../utils/project-storage.js";
 
-interface EditCommandOptions {
+export interface EditCommandOptions {
   launchBrowser?: (url: string) => Promise<boolean>;
   port?: number;
+  storage?: ProjectStorage;
 }
 
 export interface EditCommandResult {
@@ -26,6 +32,7 @@ export async function editCommand(
   options: EditCommandOptions = {},
 ): Promise<EditCommandResult> {
   const customLaunchBrowser = options.launchBrowser;
+  const storage = options.storage ?? createJsonFileProjectStorage();
 
   // Parse arguments
   const positionalArgs: string[] = [];
@@ -80,27 +87,21 @@ export async function editCommand(
     // File doesn't exist, will be created
   }
 
-  // Read or create project
+  // Read or create project via ProjectStorage
   let projectData: unknown;
-  let isNewFile = false;
   try {
-    projectData = await readProject(filePath);
+    projectData = await storage.get(filePath);
   } catch (e) {
-    if (e instanceof ProjectFileError && e.code === "not-found") {
-      projectData = { version: 1, name: "", groups: [] };
-      isNewFile = true;
+    if (e instanceof ProjectStorageError && e.code === "not-found") {
+      try {
+        await storage.create({ id: filePath });
+        projectData = emptyProjectDocument();
+      } catch (createError) {
+        console.error(`Error writing initial project: ${createError}`);
+        return { exitCode: Promise.resolve(2), shutdown: () => {} };
+      }
     } else {
       console.error(`Error: ${e}`);
-      return { exitCode: Promise.resolve(2), shutdown: () => {} };
-    }
-  }
-
-  // Write initial project for new files
-  if (isNewFile) {
-    try {
-      await writeProject(filePath, projectData);
-    } catch (e) {
-      console.error(`Error writing initial project: ${e}`);
       return { exitCode: Promise.resolve(2), shutdown: () => {} };
     }
   }
@@ -119,7 +120,7 @@ export async function editCommand(
     project: projectData,
     filePath,
     csrfToken,
-    writeProject,
+    storage,
     shutdown: () => {
       shutdown();
     },
