@@ -1,4 +1,12 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -248,6 +256,159 @@ describe("ProjectStorage (JSON-file)", () => {
       await expect(storage.get(testFile)).rejects.toMatchObject({
         code: "invalid-json",
         id: testFile,
+      });
+    });
+  });
+
+  describe("import", () => {
+    it("creates a new project when id is missing", async () => {
+      const data = { version: 1, name: "Imported", groups: [] };
+      const ref = await storage.import(data, { id: testFile });
+
+      expect(ref).toEqual({ id: testFile, name: "Imported" });
+      await expect(storage.get(testFile)).resolves.toEqual(data);
+    });
+
+    it("replaces an existing project at the same id", async () => {
+      await storage.create({
+        id: testFile,
+        data: { version: 1, name: "Original", groups: [] },
+      });
+      const replacement = { version: 1, name: "Replaced", groups: [] };
+      const ref = await storage.import(replacement, { id: testFile });
+
+      expect(ref).toEqual({ id: testFile, name: "Replaced" });
+      await expect(storage.get(testFile)).resolves.toEqual(replacement);
+    });
+
+    it("fails with invalid-id when id is omitted or empty", async () => {
+      await expect(
+        storage.import({ version: 1, name: "x", groups: [] }),
+      ).rejects.toMatchObject({ code: "invalid-id" });
+      await expect(
+        storage.import({ version: 1, name: "x", groups: [] }, {}),
+      ).rejects.toMatchObject({ code: "invalid-id" });
+      await expect(
+        storage.import({ version: 1, name: "x", groups: [] }, { id: "" }),
+      ).rejects.toMatchObject({ code: "invalid-id", id: "" });
+    });
+
+    it("persists provided data only (no network I/O)", async () => {
+      const data = {
+        version: 1,
+        name: "LocalOnly",
+        groups: [],
+        note: "caller-supplied",
+      };
+      await storage.import(data, { id: testFile });
+      await expect(storage.get(testFile)).resolves.toEqual(data);
+    });
+  });
+
+  describe("list", () => {
+    it("returns an empty list when scope is omitted", async () => {
+      await expect(storage.list()).resolves.toEqual([]);
+    });
+
+    it("returns an empty list when scope has no matching files", async () => {
+      await writeFile(join(testDir, "readme.txt"), "nope", "utf-8");
+      await writeFile(join(testDir, "other.json"), "{}", "utf-8");
+      await expect(storage.list(testDir)).resolves.toEqual([]);
+    });
+
+    it("lists .rogatio.json and *.rogatio.json non-recursively", async () => {
+      const rootExact = join(testDir, ".rogatio.json");
+      const rootNamed = join(testDir, "app.rogatio.json");
+      const nestedDir = join(testDir, "nested");
+      await mkdir(nestedDir);
+      const nestedExact = join(nestedDir, ".rogatio.json");
+      const nestedNamed = join(nestedDir, "deep.rogatio.json");
+
+      await storage.create({
+        id: rootExact,
+        data: { version: 1, name: "RootExact", groups: [] },
+      });
+      await storage.create({
+        id: rootNamed,
+        data: { version: 1, name: "RootNamed", groups: [] },
+      });
+      await storage.create({
+        id: nestedExact,
+        data: { version: 1, name: "NestedExact", groups: [] },
+      });
+      await storage.create({
+        id: nestedNamed,
+        data: { version: 1, name: "NestedNamed", groups: [] },
+      });
+      await writeFile(join(testDir, "skip.json"), "{}", "utf-8");
+
+      const refs = await storage.list(testDir);
+      expect(refs).toEqual(
+        expect.arrayContaining([
+          { id: rootExact, name: "RootExact" },
+          { id: rootNamed, name: "RootNamed" },
+        ]),
+      );
+      expect(refs).toHaveLength(2);
+      expect(refs.map((r) => r.id)).not.toContain(nestedExact);
+      expect(refs.map((r) => r.id)).not.toContain(nestedNamed);
+    });
+
+    it("uses empty name when document name is missing or non-string", async () => {
+      const noName = join(testDir, "noname.rogatio.json");
+      const badName = join(testDir, "badname.rogatio.json");
+      await writeFile(
+        noName,
+        JSON.stringify({ version: 1, groups: [] }),
+        "utf-8",
+      );
+      await writeFile(
+        badName,
+        JSON.stringify({ version: 1, name: 42, groups: [] }),
+        "utf-8",
+      );
+      const refs = await storage.list(testDir);
+      expect(refs).toContainEqual({ id: noName, name: "" });
+      expect(refs).toContainEqual({ id: badName, name: "" });
+    });
+
+    it("skips directories whose names match the project filename pattern", async () => {
+      await mkdir(join(testDir, "dir.rogatio.json"));
+      await storage.create({
+        id: join(testDir, "file.rogatio.json"),
+        data: { version: 1, name: "File", groups: [] },
+      });
+      const refs = await storage.list(testDir);
+      expect(refs).toEqual([
+        { id: join(testDir, "file.rogatio.json"), name: "File" },
+      ]);
+    });
+
+    it("returns an empty list when scope is an empty string", async () => {
+      await expect(storage.list("")).resolves.toEqual([]);
+    });
+  });
+
+  describe("delete", () => {
+    it("unlinks an existing project file", async () => {
+      await storage.create({
+        id: testFile,
+        data: { version: 1, name: "Gone", groups: [] },
+      });
+      await storage.delete(testFile);
+      await expect(access(testFile)).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(storage.get(testFile)).rejects.toMatchObject({
+        code: "not-found",
+        id: testFile,
+      });
+    });
+
+    it("fails with not-found when the id is missing", async () => {
+      await expect(
+        storage.delete(join(testDir, "missing.json")),
+      ).rejects.toMatchObject({
+        code: "not-found",
+        id: join(testDir, "missing.json"),
       });
     });
   });

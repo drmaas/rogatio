@@ -1,7 +1,9 @@
 import { randomBytes } from "node:crypto";
+import type { Dirent } from "node:fs";
 import {
   access,
   mkdir,
+  readdir,
   readFile,
   rename,
   unlink,
@@ -17,6 +19,7 @@ export type ProjectStorageErrorCode =
   | "invalid-format"
   | "read-failed"
   | "write-failed"
+  | "delete-failed"
   | "is-directory";
 
 export class ProjectStorageError extends Error {
@@ -59,13 +62,21 @@ export interface ProjectRef {
 }
 
 /**
- * Application-facing project lifecycle persistence (Phase 1: get/create/update).
+ * Application-facing project lifecycle persistence.
  * Groups/rules are nested inside each project document — not separate resources.
+ * `id` is backend-defined (filesystem path for JSON-file; uuid/URI for future backends).
  */
 export interface ProjectStorage {
+  list(scope?: string): Promise<readonly ProjectRef[]>;
   get(id: string): Promise<unknown>;
   create(options?: { id?: string; data?: unknown }): Promise<ProjectRef>;
+  import(data: unknown, options?: { id?: string }): Promise<ProjectRef>;
   update(id: string, data: unknown): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
+function isRogatioProjectFilename(name: string): boolean {
+  return name === ".rogatio.json" || name.endsWith(".rogatio.json");
 }
 
 function projectName(data: unknown): string {
@@ -168,6 +179,45 @@ async function writeDocument(id: string, data: unknown): Promise<void> {
 
 export function createJsonFileProjectStorage(): ProjectStorage {
   return {
+    async list(scope?: string): Promise<readonly ProjectRef[]> {
+      if (scope === undefined || scope === "") {
+        return [];
+      }
+
+      let entries: Dirent[];
+      try {
+        entries = await readdir(scope, { withFileTypes: true });
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+          return [];
+        }
+        throw new ProjectFileError(
+          "read-failed",
+          scope,
+          "Failed to list project files",
+          e as Error,
+        );
+      }
+
+      const refs: ProjectRef[] = [];
+      for (const entry of entries) {
+        // Files and symlinks only — skip directories that happen to match the name pattern.
+        if (entry.isDirectory() || !isRogatioProjectFilename(entry.name)) {
+          continue;
+        }
+        const id = join(scope, entry.name);
+        let name = "";
+        try {
+          const data = await readDocument(id);
+          name = projectName(data);
+        } catch {
+          name = "";
+        }
+        refs.push({ id, name });
+      }
+      return refs;
+    },
+
     async get(id: string): Promise<unknown> {
       return readDocument(id);
     },
@@ -201,11 +251,48 @@ export function createJsonFileProjectStorage(): ProjectStorage {
       return { id, name: projectName(data) };
     },
 
+    async import(
+      data: unknown,
+      options?: { id?: string },
+    ): Promise<ProjectRef> {
+      const id = options?.id;
+      if (id === undefined || id === "") {
+        throw new ProjectFileError(
+          "invalid-id",
+          id ?? "",
+          "JSON-file project storage requires an id (filesystem path)",
+        );
+      }
+      await writeDocument(id, data);
+      return { id, name: projectName(data) };
+    },
+
     async update(id: string, data: unknown): Promise<void> {
       if (!(await pathExists(id))) {
         throw new ProjectFileError("not-found", id, "Project file not found");
       }
       await writeDocument(id, data);
+    },
+
+    async delete(id: string): Promise<void> {
+      try {
+        await unlink(id);
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+          throw new ProjectFileError(
+            "not-found",
+            id,
+            "Project file not found",
+            e as Error,
+          );
+        }
+        throw new ProjectFileError(
+          "delete-failed",
+          id,
+          "Failed to delete project file",
+          e as Error,
+        );
+      }
     },
   };
 }

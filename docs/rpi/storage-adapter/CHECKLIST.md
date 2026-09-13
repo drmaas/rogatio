@@ -24,10 +24,10 @@ Implementer ticks tasks as they complete. Each phase maps to `PLAN.md` Phases. A
 
 **Proves:** same storage unit test module as Phase 1.
 
-- [ ] 2.1 **(TDD red)** Tests for `import` (create + replace), `list` (no scope → `[]`; scope with/without `.rogatio.json` / `*.rogatio.json`, non-recursive), `delete` (success + `not-found`).
-- [ ] 2.2 Widen `ProjectStorage` with `import` / `list` / `delete` and implement them on `createJsonFileProjectStorage()` per PLAN semantics (add error codes `delete-failed` as needed).
-- [ ] 2.3 Confirm import does not perform network I/O; it only persists provided `data`.
-- [ ] 2.4 **(TDD green)** Phase 2 tests pass; TypeScript shows the full port on the factory return type.
+- [x] 2.1 **(TDD red)** Tests for `import` (create + replace), `list` (no scope → `[]`; scope with/without `.rogatio.json` / `*.rogatio.json`, non-recursive), `delete` (success + `not-found`).
+- [x] 2.2 Widen `ProjectStorage` with `import` / `list` / `delete` and implement them on `createJsonFileProjectStorage()` per PLAN semantics (add error codes `delete-failed` as needed).
+- [x] 2.3 Confirm import does not perform network I/O; it only persists provided `data`.
+- [x] 2.4 **(TDD green)** Phase 2 tests pass; TypeScript shows the full port on the factory return type.
 
 ## Phase 3 — Inject storage at CLI call sites
 
