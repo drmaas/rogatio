@@ -91,8 +91,9 @@ export async function editCommand(
   } catch (e) {
     if (e instanceof ProjectStorageError && e.code === "not-found") {
       try {
-        await storage.create({ id: filePath });
-        projectData = await storage.get(filePath);
+        const empty = { version: 1, name: "", groups: [] };
+        await storage.create({ id: filePath, data: empty });
+        projectData = empty;
       } catch (createError) {
         console.error(`Error writing initial project: ${createError}`);
         return { exitCode: Promise.resolve(2), shutdown: () => {} };

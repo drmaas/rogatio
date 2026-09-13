@@ -98,7 +98,12 @@ async function pathExists(path: string): Promise<boolean> {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") {
       return false;
     }
-    throw e;
+    throw new ProjectFileError(
+      "read-failed",
+      path,
+      "Failed to access project path",
+      e as Error,
+    );
   }
 }
 
