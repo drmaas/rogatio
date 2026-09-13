@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # AI Integration Implementation Plan
 
 > Based on approved spec at `docs/decisions/ai-integration/spec.md`

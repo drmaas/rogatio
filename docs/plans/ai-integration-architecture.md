@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # AI Integration Architecture (Revised)
 
 > Updated per user guidance: self-contained `rogatio edit`, cross-platform config, shared AI modules.

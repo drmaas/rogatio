@@ -1,3 +1,7 @@
+> Status: frozen 2026-09-13
+>
+> Shipped in #83; prior DRAFT banner superseded by merge.
+
 # AI Integration Specification (Revised)
 
 > Status: DRAFT — pending human review (Stage 4)

@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-13
+
 # Fix #98: Dashboard status/activation
 
 Tier: FREE (openrouter only). Worktree: feature/fix-98-dashboard.
