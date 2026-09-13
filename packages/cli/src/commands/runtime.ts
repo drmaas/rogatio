@@ -14,7 +14,7 @@ import {
 } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { showRuntimeHelp } from "../help.js";
-import { readProject } from "../utils/file.js";
+import { createJsonFileProjectStorage } from "../utils/file.js";
 
 export interface RuntimeCommandResult {
   exitCode: Promise<number>;
@@ -329,6 +329,7 @@ async function runtimeHostCommand(args: string[]): Promise<number> {
   // Explicit project path mode: validate, compile, build preset, run host
   let filePath: string;
   let projectData: unknown;
+  const storage = createJsonFileProjectStorage();
   try {
     if (inputPath === "-") {
       const chunks: string[] = [];
@@ -339,7 +340,7 @@ async function runtimeHostCommand(args: string[]): Promise<number> {
       projectData = JSON.parse(chunks.join(""));
     } else {
       filePath = resolve(inputPath);
-      projectData = await readProject(filePath);
+      projectData = await storage.get(filePath);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

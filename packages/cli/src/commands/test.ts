@@ -5,7 +5,7 @@ import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject, parseTestUrl } from "@rogatio/dry-run";
 import { validateProjectDetailed } from "@rogatio/schema";
-import { readProject } from "../utils/file.js";
+import { createJsonFileProjectStorage } from "../utils/file.js";
 import { createMockPreviewAction } from "../utils/mock-preview.js";
 
 interface TestCaseInput {
@@ -192,6 +192,7 @@ async function testCommandImpl(
   let defaultMethod: string | undefined;
   let defaultResourceType: string | undefined;
   let argumentError: string | undefined;
+  const storage = createJsonFileProjectStorage();
 
   const positionalArgs: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -313,7 +314,7 @@ async function testCommandImpl(
       if (!stdinInput) throw new Error("No stdin input provided");
       projectData = JSON.parse(stdinInput);
     } else {
-      projectData = await readProject(filePath);
+      projectData = await storage.get(filePath);
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";

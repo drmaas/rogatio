@@ -35,12 +35,12 @@ Implementer ticks tasks as they complete. Each phase maps to `PLAN.md` Phases. A
 
 **Proves:** `packages/cli/test/routes.test.ts`, `edit.test.ts`, `verify.test.ts`, runtime command tests; grep that production commands/routes do not call `readProject`/`writeProject`. No new `test` command unit suite.
 
-- [ ] 3.1 **(TDD red)** Update mocks/tests so injected write satisfies `ProjectStorage["update"]` (or store injection).
-- [ ] 3.2 Type `RouteContext` for storage update (or `ProjectStorage`); save still validates/compiles then updates.
-- [ ] 3.3 Wire `edit.ts`: `get` → on `not-found` `create` → inject update for save; preserve directory `stat` check.
-- [ ] 3.4 Wire `verify.ts`, `test.ts`, `runtime.ts` file-backed loads via `get`; leave stdin (`-`) unchanged.
-- [ ] 3.5 Grep/confirm: production command/route modules do not call compat wrappers and have no leftover project `fs` I/O outside the adapter module (tests may use wrappers as fixtures).
-- [ ] 3.6 **(TDD green)** Listed command/route tests pass; no command-structure refactors beyond the storage seam; no new list/import/delete CLI commands.
+- [x] 3.1 **(TDD red)** Update mocks/tests so injected write satisfies `ProjectStorage["update"]` (or store injection).
+- [x] 3.2 Type `RouteContext` for storage update (or `ProjectStorage`); save still validates/compiles then updates.
+- [x] 3.3 Wire `edit.ts`: `get` → on `not-found` `create` → inject update for save; preserve directory `stat` check.
+- [x] 3.4 Wire `verify.ts`, `test.ts`, `runtime.ts` file-backed loads via `get`; leave stdin (`-`) unchanged.
+- [x] 3.5 Grep/confirm: production command/route modules do not call compat wrappers and have no leftover project `fs` I/O outside the adapter module (tests may use wrappers as fixtures).
+- [x] 3.6 **(TDD green)** Listed command/route tests pass; no command-structure refactors beyond the storage seam; no new list/import/delete CLI commands.
 
 ## Phase 4 — Docs sync + validation
 
