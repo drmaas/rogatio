@@ -65,12 +65,12 @@ Acceptance: Response body form offers replace vs regex. New rules default to `{ 
 
 Proof: `packages/editor/test/response-body.test.ts` (and editor add-rule if needed).
 
-- [ ] Phase 5: Editor response-body replace UI
-  - [ ] 5.1 Mode select like request-body; label “Response body”; `defaultAction` replace.
-  - [ ] 5.2 Replace: body textarea. Regex: existing replacement rows. Untagged payload treated as regex.
-  - [ ] 5.3 Validate both modes (bounds, regex compile).
-  - [ ] 5.4 Docs-site rule-type pages if they still describe response-body as rewrite-only.
-  - [ ] 5.5 Tests including add on a rule with no prior `responseBody`. `pnpm validate`.
+- [x] Phase 5: Editor response-body replace UI
+  - [x] 5.1 Mode select like request-body; label “Response body”; `defaultAction` replace.
+  - [x] 5.2 Replace: body textarea. Regex: existing replacement rows. Untagged payload treated as regex.
+  - [x] 5.3 Validate both modes (bounds, regex compile).
+  - [x] 5.4 Docs-site rule-type pages if they still describe response-body as rewrite-only.
+  - [x] 5.5 Tests including add on a rule with no prior `responseBody`. `pnpm validate`.
 
 ## Phase 6: Remove mock
 

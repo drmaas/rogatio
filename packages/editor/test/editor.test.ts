@@ -228,9 +228,7 @@ describe("@rogatio/editor rule type selection", () => {
       unknown
     >;
     expect(rule.type).toBe("response-body");
-    expect(rule.responseBody).toEqual({
-      replacements: [{ pattern: "", replacement: "" }],
-    });
+    expect(rule.responseBody).toEqual({ mode: "replace", body: "" });
   });
 
   it("clears stale header fields when switching to query", () => {
@@ -261,9 +259,7 @@ describe("@rogatio/editor rule type selection", () => {
       unknown
     >;
     expect(rule.requestBody).toBeUndefined();
-    expect(rule.responseBody).toEqual({
-      replacements: [{ pattern: "", replacement: "" }],
-    });
+    expect(rule.responseBody).toEqual({ mode: "replace", body: "" });
     selectRuleType(root, "header");
     rule = editor.getDraft().groups[0]?.rules[0] as unknown as Record<
       string,
