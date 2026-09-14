@@ -78,6 +78,9 @@ let aiPromptOpen = false;
 let aiBusy = false;
 let aiPreview: unknown | null = null;
 let aiMessage = "";
+/** Selected failed rule for the sidebar error card. */
+let selectedErrorRule: { groupId: string; ruleId: string } | null = null;
+
 /** Diagnostics modal state */
 let diagnosticsOpen = false;
 let diagnosticsData: {
@@ -104,6 +107,114 @@ function safeProjectData(): unknown {
 
 function text(value: unknown, fallback: string): string {
   return typeof value === "string" && value.length > 0 ? value : fallback;
+}
+
+const RULE_ERROR_REASON_FALLBACK = "The rule failed to install.";
+
+interface ErrorRuleRef {
+  readonly groupId: string;
+  readonly ruleId: string;
+}
+
+interface ResolvedRuleError {
+  readonly code: string;
+  readonly reason: string;
+}
+
+/** Own-property read that never invokes inherited or throwing accessors. */
+function readOwnValue(record: object, key: string): unknown {
+  try {
+    if (!Object.hasOwn(record, key)) return undefined;
+    return (record as Record<string, unknown>)[key];
+  } catch {
+    return undefined;
+  }
+}
+
+function readOwnString(record: object, key: string): string | null {
+  const value = readOwnValue(record, key);
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) return null;
+  return value as Record<string, unknown>;
+}
+
+function resolveRuleErrorReason(record: Record<string, unknown>): string {
+  const params = asRecord(readOwnValue(record, "params"));
+  const reason = params === null ? null : readOwnString(params, "reason");
+  if (reason !== null) return reason;
+  return readOwnString(record, "message") ?? RULE_ERROR_REASON_FALLBACK;
+}
+
+function pickRuleErrorDiagnostic(
+  diagnostics: unknown,
+): ResolvedRuleError | null {
+  if (!Array.isArray(diagnostics)) return null;
+  let firstUsable: ResolvedRuleError | null = null;
+  for (const entry of diagnostics) {
+    const record = asRecord(entry);
+    if (record === null) continue;
+    const code = readOwnString(record, "code");
+    if (code === null) continue;
+    const resolved: ResolvedRuleError = {
+      code,
+      reason: resolveRuleErrorReason(record),
+    };
+    if (code === "extension.dnr-error") return resolved;
+    if (firstUsable === null) firstUsable = resolved;
+  }
+  return firstUsable;
+}
+
+function collectErrorRuleRefs(): ErrorRuleRef[] {
+  const refs: ErrorRuleRef[] = [];
+  for (const ruleStatus of state.ruleStatuses ?? []) {
+    if (text(ruleStatus.status, "error") !== "error") continue;
+    refs.push({
+      groupId: text(ruleStatus.groupId, "unknown group"),
+      ruleId: text(ruleStatus.ruleId, "unknown rule"),
+    });
+  }
+  return refs;
+}
+
+function reconcileSelectedErrorRule(): ErrorRuleRef | null {
+  const errors = collectErrorRuleRefs();
+  if (errors.length === 0) {
+    selectedErrorRule = null;
+    return null;
+  }
+  if (selectedErrorRule !== null) {
+    const current = errors.find(
+      (entry) =>
+        entry.groupId === selectedErrorRule?.groupId &&
+        entry.ruleId === selectedErrorRule?.ruleId,
+    );
+    if (current !== undefined) return current;
+  }
+  const first = errors[0];
+  if (first === undefined) return null;
+  selectedErrorRule = first;
+  return first;
+}
+
+function ruleErrorReasonFor(groupId: string, ruleId: string): string {
+  for (const ruleStatus of state.ruleStatuses ?? []) {
+    if (text(ruleStatus.status, "error") !== "error") continue;
+    if (
+      text(ruleStatus.groupId, "unknown group") !== groupId ||
+      text(ruleStatus.ruleId, "unknown rule") !== ruleId
+    ) {
+      continue;
+    }
+    return (
+      pickRuleErrorDiagnostic(readOwnValue(ruleStatus, "diagnostics"))
+        ?.reason ?? RULE_ERROR_REASON_FALLBACK
+    );
+  }
+  return RULE_ERROR_REASON_FALLBACK;
 }
 
 function button(label: string, command: string): HTMLButtonElement {
@@ -442,10 +553,45 @@ function renderSidebar(shell: HTMLElement): void {
     const groupId = text(ruleStatus.groupId, "unknown group");
     const ruleId = text(ruleStatus.ruleId, "unknown rule");
     const statusValue = text(ruleStatus.status, "error");
-    item.textContent = `${groupId}/${ruleId}: ${statusValue}`;
+    if (statusValue === "error") {
+      item.append(document.createTextNode(`${groupId}/${ruleId}: `));
+      const link = document.createElement("button");
+      link.type = "button";
+      link.dataset.ruleErrorLink = "true";
+      link.dataset.groupId = groupId;
+      link.dataset.ruleId = ruleId;
+      link.textContent = statusValue;
+      link.setAttribute(
+        "aria-label",
+        `Show error details for ${groupId}/${ruleId}`,
+      );
+      item.append(link);
+    } else {
+      item.textContent = `${groupId}/${ruleId}: ${statusValue}`;
+    }
     ruleStatuses.append(item);
   }
   sidebar.append(ruleStatuses);
+
+  const selectedError = reconcileSelectedErrorRule();
+  if (selectedError !== null) {
+    const card = document.createElement("section");
+    card.className = "rogatio-rule-error-card";
+    card.dataset.ruleErrorCard = "true";
+    const heading = document.createElement("h2");
+    heading.textContent = "Rule install error";
+    const identity = document.createElement("p");
+    identity.className = "rogatio-rule-error-card-identity";
+    identity.textContent = `${selectedError.groupId}/${selectedError.ruleId}`;
+    const reason = document.createElement("p");
+    reason.className = "rogatio-rule-error-card-reason";
+    reason.textContent = ruleErrorReasonFor(
+      selectedError.groupId,
+      selectedError.ruleId,
+    );
+    card.append(heading, identity, reason);
+    sidebar.append(card);
+  }
 
   shell.append(sidebar);
 }
@@ -787,6 +933,25 @@ function renderShell(): void {
   shell.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    const errorLink = target.closest<HTMLElement>("[data-rule-error-link]");
+    if (errorLink) {
+      const groupId = errorLink.dataset.groupId ?? "";
+      const ruleId = errorLink.dataset.ruleId ?? "";
+      if (groupId.length > 0 && ruleId.length > 0) {
+        selectedErrorRule = { groupId, ruleId };
+        activeTab = "workspace";
+        renderShell();
+        editor?.navigateToGroup(groupId);
+        const ruleCard = document.getElementById(
+          `rogatio-rule-${groupId}-${ruleId}`,
+        );
+        if (ruleCard) {
+          ruleCard.scrollIntoView({ block: "start", behavior: "smooth" });
+          ruleCard.focus({ preventScroll: true });
+        }
+      }
+      return;
+    }
     const tab = target.dataset.tab;
     if (tab === "dashboard" || tab === "workspace") {
       activeTab = tab;
