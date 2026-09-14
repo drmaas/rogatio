@@ -751,13 +751,17 @@ function renderShell(): void {
           ? `rogatio runtime install --extension-id ${id}`
           : installCommand;
       if (cmd) {
+        const installCommandRow = document.createElement("div");
+        installCommandRow.className = "rogatio-install-command";
         const guidanceCommand = document.createElement("code");
         guidanceCommand.dataset.runtimeInstallCommand = "true";
         guidanceCommand.textContent = cmd;
-        guidance.append(
-          guidanceCommand,
-          button("Copy install command", "copy-install-command"),
-        );
+        const copyInstall = button("⧉", "copy-install-command");
+        copyInstall.className = "rogatio-copy-icon";
+        copyInstall.setAttribute("aria-label", "Copy install command");
+        copyInstall.title = "Copy install command";
+        installCommandRow.append(guidanceCommand, copyInstall);
+        guidance.append(installCommandRow);
       }
     }
     main.append(guidance);
