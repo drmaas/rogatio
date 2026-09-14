@@ -1022,3 +1022,157 @@ test("reconciles stale error selection after refresh and removes the card when e
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(page.locator("[data-rule-error-card]")).toHaveCount(0);
 });
+
+const navigationErrorProject = {
+  ...errorSurfaceProject,
+  projects: {
+    "project-a": {
+      id: "project-a",
+      name: "Project A",
+      data: {
+        version: 1,
+        name: "Project A",
+        groups: [
+          {
+            id: "group-a",
+            name: "Group A",
+            origins: ["https://example.com"],
+            rules: [
+              {
+                id: "rule-one",
+                name: "Rule one",
+                urlRegex: "^https://example\\.com/a",
+                origins: [],
+                resourceTypes: ["main_frame"],
+                priority: 100,
+              },
+            ],
+          },
+          {
+            id: "group-b",
+            name: "Group B",
+            origins: ["https://example.com"],
+            rules: [
+              {
+                id: "rule-two",
+                name: "Rule two",
+                urlRegex: "^https://example\\.com/b",
+                origins: [],
+                resourceTypes: ["main_frame"],
+                priority: 100,
+              },
+            ],
+          },
+        ],
+      },
+      revision: 1,
+      enabledGroupIds: ["group-a", "group-b"],
+      grantedOrigins: ["https://example.com"],
+    },
+  },
+};
+
+test("activates the error link by keyboard and focuses the failing rule card", async ({
+  page,
+}) => {
+  const reason = "Header batch install rejected";
+  await installExtensionChromeMock(page, {
+    ...navigationErrorProject,
+    ruleStatuses: [
+      {
+        groupId: "group-b",
+        ruleId: "rule-two",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: { ruleId: "rule-two", reason },
+          },
+        ],
+      },
+    ],
+  });
+  await openWorkspace(page);
+  await expect(
+    page.locator("[data-editor-root] [data-rogatio-editor]"),
+  ).toBeVisible();
+  const errorLink = page.getByRole("button", {
+    name: "Show error details for group-b/rule-two",
+  });
+  await errorLink.focus();
+  await expect(errorLink).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.locator('[data-editor-key="route:group:group-b"]'),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#rogatio-rule-group-b-rule-two")).toBeFocused();
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    "group-b/rule-two",
+  );
+  await expect(page.locator("[data-rule-error-card]")).toContainText(reason);
+});
+
+test("updates the error card without throwing when the rule card is missing", async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const missingRuleReason =
+    "Install failed for a rule no longer in the project";
+  const missingGroupReason = "Install failed for an unknown group";
+  await installExtensionChromeMock(page, {
+    ...navigationErrorProject,
+    ruleStatuses: [
+      {
+        groupId: "group-a",
+        ruleId: "rule-missing",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: { ruleId: "rule-missing", reason: missingRuleReason },
+          },
+        ],
+      },
+      {
+        groupId: "group-z",
+        ruleId: "rule-one",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: { ruleId: "rule-one", reason: missingGroupReason },
+          },
+        ],
+      },
+    ],
+  });
+  await openWorkspace(page);
+  await page
+    .getByRole("button", {
+      name: "Show error details for group-a/rule-missing",
+    })
+    .click();
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    "group-a/rule-missing",
+  );
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    missingRuleReason,
+  );
+  expect(pageErrors).toEqual([]);
+  await page
+    .getByRole("button", {
+      name: "Show error details for group-z/rule-one",
+    })
+    .click();
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    "group-z/rule-one",
+  );
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    missingGroupReason,
+  );
+  expect(pageErrors).toEqual([]);
+});

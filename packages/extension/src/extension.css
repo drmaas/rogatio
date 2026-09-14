@@ -332,6 +332,19 @@ body {
   font-family: var(--rogatio-font-mono);
   font-size: 0.8rem;
 }
+.rogatio-shell button[data-rule-error-link] {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+  color: var(--rogatio-danger);
+  font-weight: 600;
+  text-decoration: underline;
+}
+.rogatio-shell button[data-rule-error-link]:hover:not(:disabled) {
+  background: none;
+  border-color: transparent;
+}
 .rogatio-rule-error-card {
   display: grid;
   gap: 0.35rem;

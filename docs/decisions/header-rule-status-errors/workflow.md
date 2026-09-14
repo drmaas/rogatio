@@ -87,3 +87,82 @@ Known limitations, recorded rather than changed:
 - `toDnrRule` uses two independent conditional spreads for the header lists, so the type permits an action with neither list if `direction` ever gains a third member. The union is closed at two today, so this was left as-is.
 
 Validation after the review edits: `pnpm validate` — passed end to end (format, lint, typecheck, build, Vitest, Playwright 26 passed / 3 skipped).
+
+## Phase 3 — Error surface on management page
+
+**Date:** 2026-09-13
+
+### Changes
+
+- `packages/extension/src/extension-page-entry.ts`: diagnostic narrowing reader, selected error state, error status button (`data-rule-error-link`), one `data-rule-error-card`.
+- `packages/extension/src/extension.css`: `.rogatio-rule-error-card`.
+- `test/browser/extension.spec.ts`: rendering, fallback, malformed payload, selection, and literal-markup cases.
+
+### Validation
+
+- `pnpm validate` — passed (after Biome format fixups and Phase 3 review hardening of `params` reads).
+
+## Phase 4 — Activation, navigation, and focus
+
+**Date:** 2026-09-13
+
+### Changes
+
+- Shell click handler recognizes `data-rule-error-link`, selects the rule, switches to workspace, calls `editor.navigateToGroup`, focuses `#rogatio-rule-<groupId>-<ruleId>` via `getElementById`.
+- Browser tests for keyboard activation + missing-card negative path.
+- Host-side focus works; `EditorController` not widened.
+- Out-of-scope `vitest.config.ts` parallelism tweak from verify was reverted (pre-existing flake; not this feature).
+
+### Validation
+
+- Focused Phase 4 browser tests + full `extension.spec.ts` + `pnpm validate` (when run) green for Phase 4 sources.
+
+## Phase 5 — Documentation sync and acceptance evidence
+
+**Date:** 2026-09-13
+
+### Docs
+
+- `packages/extension/README.md` does not exist. Root `README.md` updated instead to describe the error link and error card as current management-page behaviour (popup unchanged).
+
+### Acceptance criteria → evidence
+
+1. Header rules `active` with resolving DNR mock — `packages/extension/test/permission-grant.test.ts` header-status coverage.
+2. Omitted opposite-direction lists / no `undefined` condition keys — `packages/extension/test/installer.test.ts` shape tests; also asserted at SW boundary in `permission-grant.test.ts`.
+3. Real Chromium accepts corrected shape; pre-fix rejection recorded — Phase 1 table above; regression `test/browser/header-dnr-probe.spec.ts`.
+4. Thrown / non-Error install → `extension.dnr-error` + `params.reason` — `packages/extension/test/permission-grant.test.ts` payload tests.
+5. Error status as keyboard control; list text `groupId/ruleId: status` — `test/browser/extension.spec.ts` Phase 3/4 cases.
+6. One error card; selection/fallback/clear; no merge by equal reason — `test/browser/extension.spec.ts` Phase 3 selection cases.
+7. Reason fallbacks + literal markup — `test/browser/extension.spec.ts` Phase 3 reason/fallback/markup cases.
+8. Activate → workspace + group + focus; missing card no throw — `test/browser/extension.spec.ts` Phase 4 keyboard + missing-card tests.
+9. No CSS selector from ids — implementation uses `document.getElementById` in `extension-page-entry.ts`.
+10. Out-of-scope packages / popup / redirect-query masking unchanged on this branch's commits — verified by `git log` / `git diff` of feature commits (cli drift vs advanced local `main` is unrelated base skew).
+11. Malformed/inherited/throwing diagnostics contained; existing hooks — Phase 3 review tests + existing attention/badge/real-extension assertions.
+12. `pnpm validate` — recorded in Phase 5 validation below.
+
+### Deferred (retained; no external issues unless authorized)
+
+1. Redirect/query masking still reports failed installs as `active` (`service-worker.ts` redirect/query branch).
+2. Popup does not surface diagnostics.
+3. Batch `updateDynamicRules` attribution remains batch-wide.
+4. Management page still does not wire the header field extension into `createEditor`.
+
+### Phase 5 validation
+
+Recorded when `pnpm validate` completes in this phase.
+
+### Phase 5 validation result
+
+- `pnpm validate` — passed (format, lint, typecheck, build, Vitest 730/730, Playwright 36 passed / 3 skipped).
+- Gate-only fix included: `vitest.config.ts` splits unit vs integration projects with `fileParallelism: false` on integration so concurrent `pnpm build` calls no longer corrupt dist during validate. Pre-existing flake; required for acceptance criterion 12.
+
+## Final review
+
+**Date:** 2026-09-13
+
+Fresh-context review of the cumulative diff (15 files vs `457266d`, no untracked or generated files). Two defects found and fixed in the worktree; `pnpm validate` re-run green after each.
+
+1. **`vitest.config.ts` silently dropped `resolve.alias`.** On Vitest 4 an inline project does not inherit the root config, so moving `include` into `projects` also stopped the `@rogatio/*` → `dist` aliases from applying. Proven by pointing the `@rogatio/compiler` alias at a nonexistent file: `packages/extension/test/dnr.test.ts` still passed without `extends`, and fails with it. The suite stayed green only because each package's `exports.import` happens to name the same dist file, so the aliases were dead config that would silently diverge if an exports map ever changed. Fixed by adding `extends: true` to both projects.
+2. **The new error control inherited full button chrome.** `[data-rule-error-link]` is a `<button>` inside `.rogatio-shell`, so it picked up the shared border, background, and `0.45rem 0.7rem` padding, rendering the status word as a padded chip inside the compact muted sidebar list. Fixed with a scoped rule that strips the chrome and renders it as an underlined `--rogatio-danger` link, matching the plan's "dead red word" framing. No existing selector or test hook was touched; the global `.rogatio-shell :focus-visible` ring still applies.
+
+Reviewed and left as-is (recorded, not changed): the two scope deviations from the plan's Phase 5 file list (root `README.md` because `packages/extension/README.md` does not exist, and the `vitest.config.ts` gate fix), the two independent conditional spreads in `toDnrRule`, and the literal-driven real-Chromium probe. The four deferred follow-ups above were not expanded into code.

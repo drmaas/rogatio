@@ -107,6 +107,12 @@ actions that reuse the management page's create/import lifecycle. The popup reus
 existing group-enablement lifecycle; it contains no editor, search, proxy, permission, or
 rule-authoring controls.
 
+On the management page, each rule reports `active`, `disabled`, `needs permission`,
+`needs runtime`, `unsupported`, or `error`. When a rule fails to install, the status word
+`error` is an activatable control that opens that rule in the workspace editor, and a
+distinct error card shows the concrete install failure reason (Chrome's Declarative Net
+Request message when available). The popup continues to show status labels only.
+
 ## Quick start
 
 ```sh

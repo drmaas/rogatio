@@ -41,19 +41,19 @@ All edits happen in the worktree. Each phase ends at a human gate.
 
 ## Phase 4 — Wire activation to navigation and focus
 
-- [ ] 25. Write browser tests: the native button is focusable and Enter-activatable; after activation the editor shows the failing group, `document.activeElement` is the expected rule card, and the error card shows that rule's message.
-- [ ] 26. Write a browser test: activating a link whose group or rule card does not exist updates the card subject and logs no uncaught page error.
-- [ ] 27. Extend the delegated shell `click` handler at `packages/extension/src/extension-page-entry.ts:783-820` to recognise `data-rule-error-link` via `closest`.
-- [ ] 28. On activation, set the selected group/rule pair, set `activeTab = "workspace"`, and re-render.
-- [ ] 29. After re-render, call `editor.navigateToGroup(groupId)` guarded on `editor` being defined.
-- [ ] 30. Look up the card with `document.getElementById(\`rogatio-rule-${groupId}-${ruleId}\`)` — no CSS selector built from ids — then `scrollIntoView` and `focus({ preventScroll: true })`, matching `packages/editor/src/editor.ts:1770-1774`.
-- [ ] 31. Handle missing-editor, missing-group, and missing-card cases by leaving the selection and card in place without throwing.
-- [ ] 32. Run the focused browser cases. **Gate:** if host-side focus proves unreliable, stop and raise widening `EditorController`.
+- [x] 25. Write browser tests: the native button is focusable and Enter-activatable; after activation the editor shows the failing group, `document.activeElement` is the expected rule card, and the error card shows that rule's message.
+- [x] 26. Write a browser test: activating a link whose group or rule card does not exist updates the card subject and logs no uncaught page error.
+- [x] 27. Extend the delegated shell `click` handler at `packages/extension/src/extension-page-entry.ts:783-820` to recognise `data-rule-error-link` via `closest`.
+- [x] 28. On activation, set the selected group/rule pair, set `activeTab = "workspace"`, and re-render.
+- [x] 29. After re-render, call `editor.navigateToGroup(groupId)` guarded on `editor` being defined.
+- [x] 30. Look up the card with `document.getElementById(\`rogatio-rule-${groupId}-${ruleId}\`)` — no CSS selector built from ids — then `scrollIntoView` and `focus({ preventScroll: true })`, matching `packages/editor/src/editor.ts:1770-1774`.
+- [x] 31. Handle missing-editor, missing-group, and missing-card cases by leaving the selection and card in place without throwing.
+- [x] 32. Run the focused browser cases. **Gate:** if host-side focus proves unreliable, stop and raise widening `EditorController`.
 
 ## Phase 5 — Documentation sync, evidence, and gate
 
-- [ ] 33. Update `packages/extension/README.md` to describe the error link and the error card as current behaviour.
-- [ ] 34. Record in `docs/decisions/header-rule-status-errors/workflow.md` the evidence for each of the 12 plan acceptance criteria, naming the test that proves each; retain the four deferred items there without creating external issues unless separately authorized.
-- [ ] 35. Run `pnpm validate` and confirm typecheck, Vitest, and Playwright all pass.
-- [ ] 36. Audit staged, unstaged, tracked, and untracked files for unrelated changes, generated output, local settings, and secrets; confirm `docs/architecture.md` and out-of-scope packages are unchanged.
-- [ ] 37. Confirm or create the referenced issue number with the user, then propose the Conventional Commits message. **Gate.**
+- [x] 33. Update docs for the error link and error card as current behaviour. (`packages/extension/README.md` absent → root `README.md` updated; noted in workflow.md.)
+- [x] 34. Record in `docs/decisions/header-rule-status-errors/workflow.md` the evidence for each of the 12 plan acceptance criteria, naming the test that proves each; retain the four deferred items there without creating external issues unless separately authorized.
+- [x] 35. Run `pnpm validate` and confirm typecheck, Vitest, and Playwright all pass.
+- [x] 36. Audit staged, unstaged, tracked, and untracked files for unrelated changes, generated output, local settings, and secrets; confirm `docs/architecture.md` and out-of-scope packages are unchanged on this branch's commits. (Reverted out-of-scope `vitest.config.ts` verify tweak.)
+- [x] 37. Issue `#142` confirmed; Conventional Commits messages proposed at commit gates. **Gate.**

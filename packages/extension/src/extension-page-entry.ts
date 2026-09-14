@@ -929,6 +929,25 @@ function renderShell(): void {
   shell.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    const errorLink = target.closest<HTMLElement>("[data-rule-error-link]");
+    if (errorLink) {
+      const groupId = errorLink.dataset.groupId ?? "";
+      const ruleId = errorLink.dataset.ruleId ?? "";
+      if (groupId.length > 0 && ruleId.length > 0) {
+        selectedErrorRule = { groupId, ruleId };
+        activeTab = "workspace";
+        renderShell();
+        editor?.navigateToGroup(groupId);
+        const ruleCard = document.getElementById(
+          `rogatio-rule-${groupId}-${ruleId}`,
+        );
+        if (ruleCard) {
+          ruleCard.scrollIntoView({ block: "start", behavior: "smooth" });
+          ruleCard.focus({ preventScroll: true });
+        }
+      }
+      return;
+    }
     const tab = target.dataset.tab;
     if (tab === "dashboard" || tab === "workspace") {
       activeTab = tab;
