@@ -29,7 +29,7 @@ The subagent must:
 
 ## Human gate after the proposal
 
-Follow `human-gates.md`. Print the agent's numbered list of refactor candidates. Then `question` with options:
+Follow `human-gates.md`. Print the **refactor** phase summary (numbered candidates from `refactor.md`) plus any agent notes. Then `question` with options:
 
 - **Approved as proposed** — proceed to implement every candidate.
 - **Approve some** — user lists the candidates to implement.

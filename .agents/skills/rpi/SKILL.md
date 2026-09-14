@@ -83,7 +83,7 @@ The diagram from the source article, transcribed:
 - Before editing with multiple worktrees, verify `git rev-parse --show-toplevel`, the current branch, `git worktree list`, and repository status; use the confirmed root for absolute paths.
 - Every phase runs in a fresh-context subagent (no carry-over from prior phases). The user-visible summary is composed in the main thread, not the subagent.
 - Agent review always happens before the human review gate. The agent must self-revise the artifact first; the human only reads when obvious problems are already addressed.
-- Human gates are mandatory after research review, plan review, per-phase implementation review, and final review. The skill pauses and surfaces the agent's findings; it does not auto-proceed.
+- Human gates are mandatory after research review, plan review, per-phase implementation review, and final review. The skill pauses and surfaces a **phase content summary** (research / plan / code / final / refactor as relevant) plus the agent's findings; it does not auto-proceed. See `human-gates.md`.
 - The skill never commits, pushes, opens a PR, or deletes files without explicit per-action user authorization.
 - Artifacts live at `docs/decisions/<feature>/[research|plan|checklist|refactor].md` while the feature is active. On release: `research.md` → `docs/research/<feature>.md`, `plan.md` → `docs/plans/<feature>.md`, `refactor.md` → `docs/plans/<feature>-refactor.md`, optional `workflow.md` → `docs/workflows/<feature>-workflow.md`; `checklist.md` is deleted; the `docs/decisions/<feature>/` folder is removed.
 - `checklist.md` is the implementation tracker; the implementer updates it as work progresses.
@@ -127,7 +127,7 @@ On **cursor**, walk primary → alt → **cross-pool** when a usage pool is maxe
 1. If no problem statement yet, ask for one and stop until the user provides it. Derive `<feature>` slug from that statement (do not ask). Then `question` for base branch and provider tier (`cursor` | `free` | `normal` | `freebuff`). Record all three in conversation state.
 2. Run `worktree.md` to create the worktree. Refuse to proceed in the main checkout.
 3. Read `artifacts.md` to confirm path layout, then `phases/01-research.md` to begin.
-4. After every agent review, follow `human-gates.md`: print the agent's summary, then `question` for approved / revise / ignore-points / abort.
+4. After every agent review, follow `human-gates.md`: print the gate-specific **phase summary** and the agent's review findings, then `question` for approved / revise / ignore-points / abort.
 5. At the commit step (9), follow `phases/08-commit.md`: never commit; ask first and use the user's exact command.
 6. After step 11, follow `phases/10-refactor.md`: ask the user whether to refactor; only proceed on yes.
 

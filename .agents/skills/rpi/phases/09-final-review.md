@@ -20,7 +20,7 @@ The subagent must:
 
 ## Human gate
 
-Follow `human-gates.md`. Print the agent's numbered list and the file count changed since the start of the workflow. By default, do not print the full diff. Then `question` with options:
+Follow `human-gates.md`. Print the **final** phase summary (outcome vs plan, checklist state, change-set overview) plus the agent's numbered list and the file count changed since the start of the workflow. By default, do not print the full diff. Then `question` with options:
 
 - Approved
 - Revise

@@ -22,7 +22,7 @@ The subagent must:
 
 ## Human gate
 
-Follow `human-gates.md`. Print the agent's numbered list and the list of files touched. By default, do not print the full diff. The user can request it. Then `question` with options:
+Follow `human-gates.md`. Print the **implementation** phase summary (checklist phase, what was built, tests, verify result, files touched) plus the agent's numbered list. By default, do not print the full diff. The user can request it. Then `question` with options:
 
 - Approved
 - Revise

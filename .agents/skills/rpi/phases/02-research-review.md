@@ -21,7 +21,7 @@ The subagent must:
 
 ## Human gate
 
-Follow `human-gates.md`. Print the gate header, the agent's summary, the list of files touched, and the self-revisions applied. Then `question` with options:
+Follow `human-gates.md`. Print the **research** phase summary (from `research.md`) plus the agent's review summary, files touched, and self-revisions. Then `question` with options:
 
 - Approved
 - Revise (user provides notes)
