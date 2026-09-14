@@ -88,10 +88,11 @@ function isResponseBodyOperation(
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
     return false;
   if (!validateMatcherShape(value.matcher)) return false;
-  return (
-    isRecord(value.responseBody) &&
-    Array.isArray(value.responseBody.replacements)
-  );
+  const responseBody = value.responseBody;
+  if (!isRecord(responseBody)) return false;
+  if (responseBody.mode === "replace")
+    return typeof responseBody.body === "string";
+  return Array.isArray(responseBody.replacements);
 }
 
 function isQueryOperation(value: unknown): value is QueryOperation {

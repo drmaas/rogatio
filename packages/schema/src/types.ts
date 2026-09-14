@@ -94,9 +94,26 @@ export interface ResponseBodyReplacement {
   replacement: string;
 }
 
-export interface ResponseBodyAction {
+export type ResponseBodyMode = "replace" | "regex";
+
+export interface ResponseBodyReplaceAction {
+  mode: "replace";
+  body: string;
+}
+
+export interface ResponseBodyRegexAction {
+  mode: "regex";
   replacements: ResponseBodyReplacement[];
 }
+
+export interface ResponseBodyUntaggedRegexAction {
+  replacements: ResponseBodyReplacement[];
+}
+
+export type ResponseBodyAction =
+  | ResponseBodyReplaceAction
+  | ResponseBodyRegexAction
+  | ResponseBodyUntaggedRegexAction;
 
 export type RequestBodyMode = "replace" | "regex";
 

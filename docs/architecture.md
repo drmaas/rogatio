@@ -61,6 +61,8 @@ The schema is draft 2020-12 with strict additional-property rejection. Ajv compi
 
 Origin validation accepts only explicit `http` and `https` origins with a hostname and optional valid port. Credentials, paths, query strings, fragments, wildcard hosts, and other schemes are rejected. Bounds and browser-neutral resource/method enumerations are exported from the package. Request and response forbidden-header lists are frozen and matched case-insensitively for later header-rule slices.
 
+Response-body rules use a strict `responseBody` union: `{ mode: "replace"; body }`, `{ mode: "regex"; replacements }`, or untagged `{ replacements }` (compat alias for regex). Replace mode bounds the authored body with `maxResponseBodyBytes` (4 194 304). Regex modes require at least one compilable replacement. Execution is native-runtime fetch-then-transform; it preserves upstream status and headers and is not a mock response.
+
 The verified schema distribution target is a Node ESM artifact because Ajv compiles its validator at module initialization. Browser and MV3 consumers must receive a later approved standalone/browser packaging strategy rather than loading this runtime-compiled entry under an extension CSP.
 
 ## Compiler Architecture

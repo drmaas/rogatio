@@ -39,8 +39,9 @@ expression, resource types, priority, and (where supported) an HTTP method.
   immutable forbidden-header lists.
 - **Mocks** — return a configured status, headers, optional delay, and an inline body or a
   single approved local file snapshot. Mocks never contact upstream.
-- **Response-body rewriting** — fetch an authorized public GET and perform bounded
-  replacement through a local runtime.
+- **Response body** — fetch an authorized public GET, then either replace the entire
+  body or apply bounded regex rewrites through a local runtime. Upstream status and
+  headers are preserved; this is not a mock response.
 - **Request-body modification** — replace or apply bounded regex replacement to eligible
   POST/PUT/PATCH XHR bodies, via native messaging to a local runtime.
 

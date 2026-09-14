@@ -19,6 +19,22 @@ export type ProjectValidationResult =
   | { valid: true; data: RogatioProject }
   | { valid: false; errors: ValidationIssue[] };
 
+function hasLoneSurrogate(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      if (i + 1 >= value.length) return true;
+      const next = value.charCodeAt(i + 1);
+      if (next < 0xdc00 || next > 0xdfff) return true;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      if (i === 0) return true;
+      const prev = value.charCodeAt(i - 1);
+      if (prev < 0xd800 || prev > 0xdbff) return true;
+    }
+  }
+  return false;
+}
+
 const ajv = new Ajv2020({
   allErrors: true,
   coerceTypes: false,
@@ -350,48 +366,75 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
       if (rule.type === "response-body") {
         const action = rule.responseBody;
         const actionPath = `${rulePath}/responseBody`;
-        if (
-          !action ||
-          !Array.isArray(action.replacements) ||
-          action.replacements.length === 0
-        ) {
+        if (!action) {
           issues.push({
-            instancePath: `${actionPath}/replacements`,
-            keyword: "response-body-replacements",
-            message:
-              "A response-body rule must define at least one replacement.",
+            instancePath: actionPath,
+            keyword: "response-body-action",
+            message: "A response-body rule must define a responseBody action.",
             params: {},
           });
-        } else {
-          for (let index = 0; index < action.replacements.length; index += 1) {
-            const replacement = action.replacements[index];
-            if (compileUrlRegex(replacement.pattern) === null) {
-              issues.push({
-                instancePath: `${actionPath}/replacements/${index}/pattern`,
-                keyword: "response-body-pattern",
-                message:
-                  "Response-body replacement patterns must be valid regular expressions.",
-                params: {},
-              });
+        } else if ("mode" in action && action.mode === "replace") {
+          if (typeof action.body !== "string") {
+            issues.push({
+              instancePath: `${actionPath}/body`,
+              keyword: "response-body-replace-body",
+              message: "Replace mode requires a body string.",
+              params: {},
+            });
+          } else if (action.body.length > LIMITS.maxResponseBodyBytes) {
+            issues.push({
+              instancePath: `${actionPath}/body`,
+              keyword: "response-body-replace-body",
+              message: `Replace body exceeds the maximum size of ${LIMITS.maxResponseBodyBytes} bytes.`,
+              params: { limit: LIMITS.maxResponseBodyBytes },
+            });
+          } else if (hasLoneSurrogate(action.body)) {
+            issues.push({
+              instancePath: `${actionPath}/body`,
+              keyword: "response-body-lone-surrogate",
+              message: "Replace body must not contain lone UTF-16 surrogates.",
+              params: {},
+            });
+          }
+        } else if (
+          "replacements" in action &&
+          Array.isArray(action.replacements)
+        ) {
+          if (action.replacements.length === 0) {
+            issues.push({
+              instancePath: `${actionPath}/replacements`,
+              keyword: "response-body-replacements",
+              message:
+                "A response-body rule must define at least one replacement.",
+              params: {},
+            });
+          } else {
+            for (
+              let index = 0;
+              index < action.replacements.length;
+              index += 1
+            ) {
+              const replacement = action.replacements[index];
+              if (compileUrlRegex(replacement.pattern) === null) {
+                issues.push({
+                  instancePath: `${actionPath}/replacements/${index}/pattern`,
+                  keyword: "response-body-pattern",
+                  message:
+                    "Response-body replacement patterns must be valid regular expressions.",
+                  params: {},
+                });
+              }
             }
           }
+        } else {
+          issues.push({
+            instancePath: actionPath,
+            keyword: "response-body-mode",
+            message:
+              "responseBody must be replace mode, regex mode, or untagged replacements.",
+            params: {},
+          });
         }
-      }
-
-      function hasLoneSurrogate(value: string): boolean {
-        for (let i = 0; i < value.length; i += 1) {
-          const code = value.charCodeAt(i);
-          if (code >= 0xd800 && code <= 0xdbff) {
-            if (i + 1 >= value.length) return true;
-            const next = value.charCodeAt(i + 1);
-            if (next < 0xdc00 || next > 0xdfff) return true;
-          } else if (code >= 0xdc00 && code <= 0xdfff) {
-            if (i === 0) return true;
-            const prev = value.charCodeAt(i - 1);
-            if (prev < 0xd800 || prev > 0xdbff) return true;
-          }
-        }
-        return false;
       }
 
       if (rule.type === "request-body") {

@@ -352,7 +352,33 @@ const projectSchemaDefinition = {
         },
       },
     },
-    responseBodyAction: {
+    responseBodyReplaceAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mode", "body"],
+      properties: {
+        mode: { const: "replace" },
+        body: {
+          type: "string",
+          maxLength: LIMITS.maxResponseBodyBytes,
+        },
+      },
+    },
+    responseBodyRegexAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mode", "replacements"],
+      properties: {
+        mode: { const: "regex" },
+        replacements: {
+          type: "array",
+          minItems: 1,
+          maxItems: LIMITS.maxResponseBodyReplacements,
+          items: { $ref: "#/$defs/responseBodyReplacement" },
+        },
+      },
+    },
+    responseBodyUntaggedRegexAction: {
       type: "object",
       additionalProperties: false,
       required: ["replacements"],
@@ -364,6 +390,13 @@ const projectSchemaDefinition = {
           items: { $ref: "#/$defs/responseBodyReplacement" },
         },
       },
+    },
+    responseBodyAction: {
+      oneOf: [
+        { $ref: "#/$defs/responseBodyReplaceAction" },
+        { $ref: "#/$defs/responseBodyRegexAction" },
+        { $ref: "#/$defs/responseBodyUntaggedRegexAction" },
+      ],
     },
     requestBodyReplaceAction: {
       type: "object",

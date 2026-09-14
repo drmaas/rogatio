@@ -50,14 +50,14 @@ Acceptance: `{ mode: "replace", body }` validates and compiles. Untagged `{ repl
 
 Proof: `packages/schema/test/` response-body cases; compiler response-body tests; `packages/runtime/test/response-body.test.ts`; extension browser-schema tests.
 
-- [ ] Phase 4: Response-body replace wire
-  - [ ] 4.1 Types (`replace` | `regex`) + `LIMITS.maxResponseBodyBytes` (4 194 304). JSON Schema `oneOf` replace / tagged regex / untagged `{ replacements }` (untagged = regex).
-  - [ ] 4.2 Semantic validation: replace needs `body`; regex/untagged still need ≥1 compilable replacement.
-  - [ ] 4.3 Compiler copies union onto `ResponseBodyOperation` (missing `mode` + `replacements` ⇒ regex; no new operation kind).
-  - [ ] 4.4 Runtime: branch `fetchAndRewriteAuthorizedResponse` (or equivalent) for `mode === "replace"` — encode configured UTF-8 body after fetch, preserve status/headers, bound authored body by `maxResponseBodyBytes`; regex/untagged still use `rewriteResponseBody`.
-  - [ ] 4.5 Browser-schema union + bounds.
-  - [ ] 4.6 Overview/architecture: response-body is replace or regex rewrite, still native-runtime, not a mock.
-  - [ ] 4.7 Tests (replace + untagged regex compat; replace body over limit rejected). Packaged CLI verify on `samples/basic/.rogatio.json`. `pnpm validate`.
+- [x] Phase 4: Response-body replace wire
+  - [x] 4.1 Types (`replace` | `regex`) + `LIMITS.maxResponseBodyBytes` (4 194 304). JSON Schema `oneOf` replace / tagged regex / untagged `{ replacements }` (untagged = regex).
+  - [x] 4.2 Semantic validation: replace needs `body`; regex/untagged still need ≥1 compilable replacement.
+  - [x] 4.3 Compiler copies union onto `ResponseBodyOperation` (missing `mode` + `replacements` ⇒ regex; no new operation kind).
+  - [x] 4.4 Runtime: branch `fetchAndRewriteAuthorizedResponse` (or equivalent) for `mode === "replace"` — encode configured UTF-8 body after fetch, preserve status/headers, bound authored body by `maxResponseBodyBytes`; regex/untagged still use `rewriteResponseBody`.
+  - [x] 4.5 Browser-schema union + bounds.
+  - [x] 4.6 Overview/architecture: response-body is replace or regex rewrite, still native-runtime, not a mock.
+  - [x] 4.7 Tests (replace + untagged regex compat; replace body over limit rejected). Packaged CLI verify on `samples/basic/.rogatio.json`. `pnpm validate`.
 
 ## Phase 5: Editor response-body replace UI
 
