@@ -303,7 +303,13 @@ function setValueAtPath(root: unknown, path: string, value: unknown): boolean {
     finalSegment !== "type" &&
     finalSegment !== "action" &&
     finalSegment !== "redirect" &&
-    finalSegment !== "mock"
+    finalSegment !== "mock" &&
+    finalSegment !== "requestBody" &&
+    finalSegment !== "responseBody" &&
+    finalSegment !== "headerDirection" &&
+    finalSegment !== "headerOperation" &&
+    finalSegment !== "headerName" &&
+    finalSegment !== "headerValue"
   ) {
     return false;
   }
@@ -398,13 +404,27 @@ function isValidExtensionName(name: string): boolean {
   );
 }
 
-const ACTION_FIELDS = ["redirect", "action", "mock"] as const;
+const ACTION_FIELDS = [
+  "redirect",
+  "action",
+  "mock",
+  "requestBody",
+  "responseBody",
+  "headerDirection",
+  "headerOperation",
+  "headerName",
+  "headerValue",
+] as const;
 
-function clearActionFields(rule: unknown, keep?: string): boolean {
+function clearActionFields(
+  rule: unknown,
+  keep?: string,
+  keepFields?: ReadonlySet<string>,
+): boolean {
   if (!isRecord(rule)) return false;
   let changed = false;
   for (const field of ACTION_FIELDS) {
-    if (field === keep) continue;
+    if (field === keep || keepFields?.has(field)) continue;
     if (Object.hasOwn(rule, field)) {
       delete rule[field];
       changed = true;
@@ -1140,16 +1160,32 @@ class EditorControllerImpl implements EditorController {
       return;
     }
     const extension = this.extensions.find((entry) => entry.id === typeId);
-    if (!extension?.defaultAction) return;
-    const actionField = extension.actionField ?? "action";
+    if (!extension?.defaultAction && !extension?.defaultFields) return;
     const changedType = setValueAtPath(this.draft, `${rulePath}/type`, typeId);
-    const changedAction = setValueAtPath(
-      this.draft,
-      `${rulePath}/${actionField}`,
-      extension.defaultAction(),
-    );
-    const cleared = clearActionFields(ruleContainer, actionField);
-    if (changedType || changedAction || cleared) {
+    let changedPayload = false;
+    let keep: string | undefined;
+    let keepFields: ReadonlySet<string> | undefined;
+    if (extension.defaultFields) {
+      const fields = extension.defaultFields();
+      keepFields = new Set(Object.keys(fields));
+      for (const [key, value] of Object.entries(fields)) {
+        if (setValueAtPath(this.draft, `${rulePath}/${key}`, value)) {
+          changedPayload = true;
+        }
+      }
+    } else {
+      const defaultAction = extension.defaultAction;
+      if (defaultAction) {
+        keep = extension.actionField ?? "action";
+        if (
+          setValueAtPath(this.draft, `${rulePath}/${keep}`, defaultAction())
+        ) {
+          changedPayload = true;
+        }
+      }
+    }
+    const cleared = clearActionFields(ruleContainer, keep, keepFields);
+    if (changedType || changedPayload || cleared) {
       this.markChanged();
       this.render();
     }

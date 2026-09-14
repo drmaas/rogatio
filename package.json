@@ -28,6 +28,7 @@
     "@semantic-release/changelog": "7.0.0",
     "@types/node": "26.5.0",
     "esbuild": "0.28.2",
+    "happy-dom": "^20.14.5",
     "husky": "^9.1.7",
     "playwright": "1.63.0",
     "semantic-release": "25.0.9",

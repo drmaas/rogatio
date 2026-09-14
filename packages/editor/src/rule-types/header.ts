@@ -75,6 +75,14 @@ const HEADER_OPERATIONS: ReadonlyArray<HeaderOperationKind> = [
   "append",
   "remove",
 ];
+const HEADER_EDITOR_OPERATIONS = Object.freeze(["set", "remove"] as const);
+
+function operationOptions(current: HeaderOperationKind): ReadonlyArray<string> {
+  if (current === "append") {
+    return ["set", "append", "remove"];
+  }
+  return HEADER_EDITOR_OPERATIONS;
+}
 
 function createSelect(
   document: Document,
@@ -115,6 +123,14 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
     matches(rule) {
       return rule.type === "header";
     },
+    defaultFields() {
+      return {
+        headerDirection: "request",
+        headerOperation: "set",
+        headerName: "",
+        headerValue: "",
+      };
+    },
     mount(context: RuleTypeFieldContext): RuleTypeFieldMount {
       const document = context.document;
       const fieldset = document.createElement("fieldset");
@@ -140,14 +156,29 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
 
       const operationLabel = document.createElement("label");
       operationLabel.textContent = "Operation";
-      const operationValue =
+      let operationValue =
         (context.getField("headerOperation") as HeaderOperationKind) ?? "set";
+
+      const valueLabel = document.createElement("label");
+      valueLabel.textContent = "Header value";
+
+      const syncValueVisibility = (): void => {
+        const showValue =
+          operationValue === "set" || operationValue === "append";
+        valueLabel.hidden = !showValue;
+      };
+
       const operationSelect = createSelect(
         document,
-        HEADER_OPERATIONS,
+        operationOptions(operationValue),
         operationValue,
         (value) => {
+          operationValue = value as HeaderOperationKind;
           context.setField("headerOperation", value);
+          if (value === "remove") {
+            context.deleteField("headerValue");
+          }
+          syncValueVisibility();
         },
       );
       context.registerControl("/headerOperation", operationSelect);
@@ -169,8 +200,6 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
       nameLabel.append(nameInput);
       fieldset.append(nameLabel);
 
-      const valueLabel = document.createElement("label");
-      valueLabel.textContent = "Header value";
       const valueValue = (context.getField("headerValue") as string) ?? "";
       const valueInput = createInput(
         document,
@@ -183,6 +212,7 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
       context.registerControl("/headerValue", valueInput);
       valueLabel.append(valueInput);
       fieldset.append(valueLabel);
+      syncValueVisibility();
 
       context.container.append(fieldset);
 
