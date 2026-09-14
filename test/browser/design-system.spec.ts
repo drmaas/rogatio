@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 type MockProject = {
   id: string;
@@ -157,6 +157,20 @@ function installChromeMock(seed: MockEnvelope): void {
       },
     },
   });
+}
+
+/** Toolbar: Open app under [data-project-actions] with New/Import; not in header. */
+async function expectProjectActions(page: Page): Promise<void> {
+  const actions = page.locator("[data-project-actions]");
+  await expect(actions).toBeVisible();
+  await expect(actions.locator("[data-create-project]")).toBeVisible();
+  await expect(actions.locator("[data-import-project]")).toBeVisible();
+  await expect(actions.locator("[data-open-app]")).toBeVisible();
+  await expect(page.locator("header [data-open-app]")).toHaveCount(0);
+}
+
+async function expectPickerAbsent(page: Page): Promise<void> {
+  await expect(page.locator("[data-project-picker]")).toHaveCount(0);
 }
 
 test("editor renders the dark design system with navigation at the top", async ({
@@ -349,6 +363,29 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
   await expect(page.getByText("One")).toBeVisible();
   await expect(page.locator("[data-group-toggle]")).toHaveCount(1);
 
+  // F25: the popup is a fixed, comfortable width and exposes project entry
+  // actions next to the group list.
+  const popupCard = page.locator(".rogatio-popup");
+  const cardBox = await popupCard.boundingBox();
+  expect(cardBox?.width ?? 0).toBeGreaterThan(400);
+
+  await expectProjectActions(page);
+  // Picker sits on its own row above the action row.
+  const pickerBeforeActions = await page.evaluate(() => {
+    const p = document.querySelector("[data-project-picker]");
+    const a = document.querySelector("[data-project-actions]");
+    if (!p || !a) return false;
+    return Boolean(
+      p.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+  expect(pickerBeforeActions).toBe(true);
+});
+
+test("popup group card chrome", async ({ page }) => {
+  await page.addInitScript(installChromeMock, defaultEnvelope());
+  await page.goto("/extension/popup.html");
+
   // Phase 2: muted project subtitle under group name; groups collapsed;
   // CSS chevron affordance; expand reveals rules.
   const groupCard = page.locator("details[data-group]");
@@ -417,31 +454,11 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
     return details.open;
   });
   expect(openAfterToggleClick).toBe(true);
+});
 
-  // F25: the popup is a fixed, comfortable width and exposes project entry
-  // actions next to the group list.
-  const popupCard = page.locator(".rogatio-popup");
-  const cardBox = await popupCard.boundingBox();
-  expect(cardBox?.width ?? 0).toBeGreaterThan(400);
-
-  // Toolbar: Open app lives under [data-project-actions] with New and Import;
-  // header stays brand (+ optional picker), not the old Open-app pill.
-  const actions = page.locator("[data-project-actions]");
-  await expect(actions).toBeVisible();
-  await expect(actions.locator("[data-create-project]")).toBeVisible();
-  await expect(actions.locator("[data-import-project]")).toBeVisible();
-  await expect(actions.locator("[data-open-app]")).toBeVisible();
-  await expect(page.locator("header [data-open-app]")).toHaveCount(0);
-  // Picker sits on its own row above the action row.
-  const pickerBeforeActions = await page.evaluate(() => {
-    const p = document.querySelector("[data-project-picker]");
-    const a = document.querySelector("[data-project-actions]");
-    if (!p || !a) return false;
-    return Boolean(
-      p.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING,
-    );
-  });
-  expect(pickerBeforeActions).toBe(true);
+test("popup create and import projects", async ({ page }) => {
+  await page.addInitScript(installChromeMock, defaultEnvelope());
+  await page.goto("/extension/popup.html");
 
   await page.locator("[data-create-project]").click();
   const createForm = page.locator("[data-create-form]");
@@ -474,13 +491,8 @@ test("popup hides project picker when there are zero projects", async ({
   await page.goto("/extension/popup.html");
 
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
-  await expect(page.locator("[data-project-picker]")).toHaveCount(0);
-
-  const actions = page.locator("[data-project-actions]");
-  await expect(actions.locator("[data-create-project]")).toBeVisible();
-  await expect(actions.locator("[data-import-project]")).toBeVisible();
-  await expect(actions.locator("[data-open-app]")).toBeVisible();
-  await expect(page.locator("header [data-open-app]")).toHaveCount(0);
+  await expectPickerAbsent(page);
+  await expectProjectActions(page);
   await expect(page.getByText("No active project")).toBeVisible();
   // Empty-state rows must not invent a project subtitle.
   await expect(page.locator("[data-active-project]")).toHaveCount(0);
@@ -493,13 +505,8 @@ test("popup hides project picker when there is one project", async ({
   await page.goto("/extension/popup.html");
 
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
-  await expect(page.locator("[data-project-picker]")).toHaveCount(0);
-
-  const actions = page.locator("[data-project-actions]");
-  await expect(actions.locator("[data-create-project]")).toBeVisible();
-  await expect(actions.locator("[data-import-project]")).toBeVisible();
-  await expect(actions.locator("[data-open-app]")).toBeVisible();
-  await expect(page.locator("header [data-open-app]")).toHaveCount(0);
+  await expectPickerAbsent(page);
+  await expectProjectActions(page);
   await expect(page.getByText("One")).toBeVisible();
   await expect(
     page.locator("details[data-group] [data-active-project]"),
