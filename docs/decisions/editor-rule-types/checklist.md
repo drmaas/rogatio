@@ -78,13 +78,13 @@ Acceptance: `type: "mock"` fails schema. Dropdown has no Mock response. Hosts do
 
 Proof: schema enum tests (mock rejected); editor builtin id list; deleted or failing-on-purpose old `packages/editor/test/mock.test.ts` / `packages/schema/test/mock.test.ts` / `packages/compiler/test/mock.test.ts`; CLI/runtime tests that built mock configs updated or removed; docs-site platforms table.
 
-- [ ] Phase 6: Remove mock
-  - [ ] 6.1 Schema: drop `"mock"` from `RuleType`, `mock` on `RogatioRule`, `$defs.mock*`, semantic allowed-values, schema tests.
-  - [ ] 6.2 Compiler: drop `MockOperation`, compile branch, `selector.ts` mock kind, compiler mock tests.
-  - [ ] 6.3 Editor: drop `createMockRuleType`, builtin entry, exports, mock tests.
-  - [ ] 6.4 Hosts: CLI `edit.ts` and extension page stop passing mock/redirect/response-body overrides (`createMockRuleType`, redundant `createRedirectRuleType`, `createResponseBodyRuleType`); builtins alone supply the dropdown.
-  - [ ] 6.5 CLI: delete or gut `createMockPreviewAction` / `buildMockConfigs` mock kind; dry-run `previewAction` wiring compiles without `MockOperation`.
-  - [ ] 6.6 Runtime: stop `kind === "mock"` config intake in `lifecycle.ts`. Do not redesign `mock.connect` unless typecheck forces a delete.
-  - [ ] 6.7 Browser-schema + `RuleProposal.kind` + runtime `ai-prompt.ts` / `ai-assist.ts` unions drop `"mock"`.
-  - [ ] 6.8 Durable docs that describe current behavior: `rogatio-overview.md`, `README.md`, `docs/architecture.md` (note mock authoring removed; do not rewrite frozen F13 records), `packages/*/README.md` as needed, `packages/docs-site/` (platforms + rule-type index). Frozen `docs/specs/` / `docs/plans/` stay; no migrator.
-  - [ ] 6.9 `pnpm validate`.
+- [x] Phase 6: Remove mock
+  - [x] 6.1 Schema: drop `"mock"` from `RuleType`, `mock` on `RogatioRule`, `$defs.mock*`, semantic allowed-values, schema tests.
+  - [x] 6.2 Compiler: drop `MockOperation`, compile branch, `selector.ts` mock kind, compiler mock tests.
+  - [x] 6.3 Editor: drop `createMockRuleType`, builtin entry, exports, mock tests.
+  - [x] 6.4 Hosts: CLI `edit.ts` and extension page stop passing mock/redirect/response-body overrides (`createMockRuleType`, redundant `createRedirectRuleType`, `createResponseBodyRuleType`); builtins alone supply the dropdown.
+  - [x] 6.5 CLI: delete or gut `createMockPreviewAction` / `buildMockConfigs` mock kind; dry-run `previewAction` wiring compiles without `MockOperation`.
+  - [x] 6.6 Runtime: stop `kind === "mock"` config intake in `lifecycle.ts`. Do not redesign `mock.connect` unless typecheck forces a delete.
+  - [x] 6.7 Browser-schema + `RuleProposal.kind` + runtime `ai-prompt.ts` / `ai-assist.ts` unions drop `"mock"`.
+  - [x] 6.8 Durable docs that describe current behavior: `rogatio-overview.md`, `README.md`, `docs/architecture.md` (note mock authoring removed; do not rewrite frozen F13 records), `packages/*/README.md` as needed, `packages/docs-site/` (platforms + rule-type index). Frozen `docs/specs/` / `docs/plans/` stay; no migrator.
+  - [x] 6.9 `pnpm validate`.

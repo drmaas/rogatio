@@ -1,6 +1,5 @@
 import type { ErrorObject, ValidateFunction } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { hasControl } from "./control.js";
 import { type HeaderDirection, isForbiddenHeader } from "./headers.js";
 import { LIMITS } from "./limits.js";
 import { isSiteOrigin, normalizeSiteOrigin } from "./origins.js";
@@ -232,7 +231,6 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
         rule.type !== "redirect" &&
         rule.type !== "query" &&
         rule.type !== "header" &&
-        rule.type !== "mock" &&
         rule.type !== "response-body" &&
         rule.type !== "request-body"
       ) {
@@ -240,13 +238,12 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
           instancePath: `${rulePath}/type`,
           keyword: "enum",
           message:
-            'must be "redirect", "query", "header", "mock", "response-body", or "request-body"',
+            'must be "redirect", "query", "header", "response-body", or "request-body"',
           params: {
             allowedValues: [
               "redirect",
               "query",
               "header",
-              "mock",
               "response-body",
               "request-body",
             ],
@@ -564,44 +561,6 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
             message:
               'Request-body rules require exactly one resource type: "xmlhttprequest".',
             params: { resourceTypes },
-          });
-        }
-      }
-
-      if (rule.type === "mock") {
-        const mock = rule.mock;
-        const mockPath = `${rulePath}/mock`;
-        const bodySet = mock?.body !== undefined;
-        const fileSet = mock?.file !== undefined;
-        if (bodySet === fileSet) {
-          issues.push({
-            instancePath: mockPath,
-            keyword: "mock-body-source",
-            message: "A mock rule must set exactly one of body or file.",
-            params: {},
-          });
-        }
-        if (mock?.headers !== undefined) {
-          for (let h = 0; h < mock.headers.length; h += 1) {
-            const header = mock.headers[h];
-            if (header === undefined) continue;
-            if (hasControl(header.name) || header.name.includes(":")) {
-              issues.push({
-                instancePath: `${mockPath}/headers/${h}/name`,
-                keyword: "mock-header-name",
-                message:
-                  "Mock header names must not contain control characters or ':'.",
-                params: {},
-              });
-            }
-          }
-        }
-        if (mock?.file !== undefined && hasControl(mock.file)) {
-          issues.push({
-            instancePath: `${mockPath}/file`,
-            keyword: "mock-file-path",
-            message: "Mock file paths must not contain control characters.",
-            params: {},
           });
         }
       }

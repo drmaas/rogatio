@@ -152,12 +152,11 @@ describe("@rogatio/editor URL conversion", () => {
 });
 
 describe("@rogatio/editor built-in rule types", () => {
-  it("registers header, redirect, query, mock, request-body, and response-body", () => {
+  it("registers header, redirect, query, request-body, and response-body", () => {
     expect(builtInRuleTypes.map((extension) => extension.id)).toEqual([
       "header",
       "redirect",
       "query",
-      "mock",
       "response-body",
       "request-body",
     ]);
@@ -178,7 +177,6 @@ describe("@rogatio/editor rule type selection", () => {
       "header",
       "redirect",
       "query",
-      "mock",
       "response-body",
       "request-body",
     ]);

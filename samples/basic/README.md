@@ -118,7 +118,7 @@ There are two complementary paths:
   your browser, and confirms every rule's regex/origin/method/resource-type match. Run this
   first.
 - **Live browser check** — proves the rule actually changes a request or response in Chrome.
-  Redirect, query, and mock are observable against `https://example.com` with no extra
+  Redirect and query are observable against `https://example.com` with no extra
   setup. Header, response-body, and request-body checks use a small local server you control
   (recipe below).
 
@@ -140,9 +140,6 @@ rogatio test samples/basic/.rogatio.json --urls "https://example.com/api/users" 
 
 # header — remove response (main_frame)
 rogatio test samples/basic/.rogatio.json --urls "https://example.com/api/page" --resource-type main_frame --method GET --json
-
-# mock (xmlhttprequest, GET)
-rogatio test samples/basic/.rogatio.json --urls "https://example.com/mock/things" --resource-type xmlhttprequest --method GET --json
 
 # response-body (main_frame, GET)
 rogatio test samples/basic/.rogatio.json --urls "https://example.com/data.json" --resource-type main_frame --method GET --json
@@ -235,7 +232,7 @@ Edit `samples/basic/.rogatio.json` (or use `rogatio edit`) so the group `origins
 
 - `"origins": ["https://example.com"]` → `"origins": ["http://localhost:8080"]`
 - `"^https://example\\.com/old/"` → `"^http://localhost:8080/old/"`
-- and so on for `/page\?`, `/api/`, `/mock/`, `/data\.json`, `/submit`.
+- and so on for `/page\?`, `/api/`, `/data\.json`, `/submit`.
 
 Re-import the modified file (or **Update** the project in the extension), re-grant
 `http://localhost:8080/*`, and re-activate the group. Then:
@@ -270,7 +267,7 @@ Re-import the modified file (or **Update** the project in the extension), re-gra
 
 ```
 samples/basic/
-├── .rogatio.json          # canonical source of truth (all six rule types)
+├── .rogatio.json          # canonical source of truth (all five rule types)
 ├── README.md              # this file
 └── validate-server.mjs    # optional local target for live header/body checks
 ```

@@ -442,7 +442,6 @@ const RULE_KEYS = [
   "headerOperation",
   "headerName",
   "headerValue",
-  "mock",
   "responseBody",
   "requestBody",
 ] as const;
@@ -668,7 +667,6 @@ export function validateProjectDetailed(
         rule.type !== "redirect" &&
         rule.type !== "query" &&
         rule.type !== "header" &&
-        rule.type !== "mock" &&
         rule.type !== "response-body" &&
         rule.type !== "request-body"
       )

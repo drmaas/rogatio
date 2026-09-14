@@ -38,7 +38,6 @@ export type RuleType =
   | "redirect"
   | "query"
   | "header"
-  | "mock"
   | "response-body"
   | "request-body";
 
@@ -70,23 +69,6 @@ export interface HeaderAction {
   headerOperation: HeaderOperationKind;
   headerName: string;
   headerValue?: string;
-}
-
-export interface MockHeader {
-  name: string;
-  value: string;
-}
-
-export interface MockAction {
-  /** HTTP status to serve, integer in [200, 599]. */
-  status: number;
-  headers?: MockHeader[];
-  /** Bounded artificial delay in milliseconds before the response. */
-  delayMs?: number;
-  /** Inline UTF-8 response body. Exactly one of `body`/`file` is set. */
-  body?: string;
-  /** Relative logical path of one approved local file snapshot. */
-  file?: string;
 }
 
 export interface ResponseBodyReplacement {
@@ -159,8 +141,6 @@ export interface RogatioRule {
   headerName?: string;
   headerValue?: string;
 
-  /** Required iff type === "mock". */
-  mock?: MockAction;
   /** Required iff type === "response-body". */
   responseBody?: ResponseBodyAction;
   /** Required iff type === "request-body". */

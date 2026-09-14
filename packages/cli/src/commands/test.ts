@@ -9,8 +9,6 @@ import {
   createJsonFileProjectStorage,
   type ProjectStorage,
 } from "../utils/file.js";
-import { createMockPreviewAction } from "../utils/mock-preview.js";
-
 export interface TestCommandOptions {
   storage?: ProjectStorage;
 }
@@ -116,13 +114,9 @@ function addDefaults(
   );
 }
 
-function resultOptions(
-  maxCases: number | undefined,
-  operations: readonly RogatioOperation[],
-): DryRunOptions {
+function resultOptions(maxCases: number | undefined): DryRunOptions {
   const options: DryRunOptions = {};
   if (maxCases !== undefined) options.maxCases = maxCases;
-  options.previewAction = createMockPreviewAction(operations);
   return options;
 }
 
@@ -374,7 +368,7 @@ async function testCommandImpl(
   const dryRunResult = dryRunProject(
     toMatcherOperations(compileResult.operations),
     testCases,
-    resultOptions(maxCases, compileResult.operations),
+    resultOptions(maxCases),
   );
 
   if (jsonMode) {

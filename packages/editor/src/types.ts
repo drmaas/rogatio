@@ -121,7 +121,6 @@ export interface RuleProposal {
     | "redirect"
     | "query"
     | "header"
-    | "mock"
     | "response-body"
     | "request-body";
   readonly groupId: string;
@@ -159,8 +158,8 @@ export interface RuleTypeFieldExtension {
    */
   readonly defaultFields?: () => Readonly<Record<string, unknown>>;
   /**
-   * Rule field the default action writes to (default "action"). Payload types
-   * such as mock live at a named top-level field instead.
+   * Rule field the default action writes to (default "action"). Nested payloads
+   * such as redirect live at a named top-level field instead.
    */
   readonly actionField?: string;
 }

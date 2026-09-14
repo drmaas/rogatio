@@ -303,7 +303,6 @@ function setValueAtPath(root: unknown, path: string, value: unknown): boolean {
     finalSegment !== "type" &&
     finalSegment !== "action" &&
     finalSegment !== "redirect" &&
-    finalSegment !== "mock" &&
     finalSegment !== "requestBody" &&
     finalSegment !== "responseBody" &&
     finalSegment !== "headerDirection" &&
@@ -407,7 +406,6 @@ function isValidExtensionName(name: string): boolean {
 const ACTION_FIELDS = [
   "redirect",
   "action",
-  "mock",
   "requestBody",
   "responseBody",
   "headerDirection",
@@ -1115,7 +1113,7 @@ class EditorControllerImpl implements EditorController {
         const ruleContainer = valueAtPath(this.draft, ruleContainerPath);
         clearActionFields(
           ruleContainer,
-          rawValue === "redirect" || rawValue === "mock" ? rawValue : undefined,
+          rawValue === "redirect" ? rawValue : undefined,
         );
         this.markChanged();
       }
@@ -1477,9 +1475,7 @@ class EditorControllerImpl implements EditorController {
 
       // Set the action based on rule kind
       const actionField =
-        ruleProposal.kind === "redirect" || ruleProposal.kind === "mock"
-          ? ruleProposal.kind
-          : "action";
+        ruleProposal.kind === "redirect" ? ruleProposal.kind : "action";
 
       rule[actionField] = ruleProposal.action;
 

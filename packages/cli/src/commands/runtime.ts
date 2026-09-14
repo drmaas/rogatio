@@ -1,5 +1,5 @@
 import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import {
@@ -7,7 +7,6 @@ import {
   defaultTrustInstallRoot,
   normalizeRuntimePreset,
   RUNTIME_LIMITS,
-  type RuntimeMockConfig,
   readProviderConfig,
   runNativeHost,
   selectTrustPlatformAdapter,
@@ -38,46 +37,6 @@ function toMatcherOperations(
     ruleId,
     matcher,
   }));
-}
-
-function resolveMockFile(root: string, filePath: string): string | null {
-  if (filePath.includes("\0")) return null;
-  const absolute = isAbsolute(filePath) ? filePath : resolve(root, filePath);
-  const rel = relative(root, absolute);
-  if (rel.startsWith("..") || isAbsolute(rel)) return null;
-  const logical = rel.split(sep).join("/");
-  return logical.length === 0 ? null : logical;
-}
-
-function buildMockConfigs(
-  operations: readonly RogatioOperation[],
-  root: string,
-): { ok: true; value: RuntimeMockConfig[] } | { ok: false; message: string } {
-  const configs: RuntimeMockConfig[] = [];
-  for (const operation of operations) {
-    if (operation.kind !== "mock") continue;
-    const mock = operation.mock;
-    let file: string | undefined;
-    if (mock.file !== undefined) {
-      const resolved = resolveMockFile(root, mock.file);
-      if (resolved === null) {
-        return {
-          ok: false,
-          message: `Mock rule "${operation.ruleId}" file "${mock.file}" resolves outside the configured root (${root}).`,
-        };
-      }
-      file = resolved;
-    }
-    configs.push({
-      ruleId: operation.ruleId,
-      status: mock.status,
-      ...(mock.headers !== undefined ? { headers: mock.headers } : {}),
-      ...(mock.delayMs !== undefined ? { delayMs: mock.delayMs } : {}),
-      ...(mock.body !== undefined ? { body: mock.body } : {}),
-      ...(file !== undefined ? { file } : {}),
-    });
-  }
-  return { ok: true, value: configs };
 }
 
 /**
@@ -380,18 +339,12 @@ async function runtimeHostCommand(
 
   const rootDir =
     root ?? (inputPath === "-" ? process.cwd() : dirname(filePath));
-  const mocksResult = buildMockConfigs(compileResult.operations, rootDir);
-  if (!mocksResult.ok) {
-    console.error(`Error: ${mocksResult.message}`);
-    return 1;
-  }
 
   const normalized = normalizeRuntimePreset({
     version: 1,
     limits: RUNTIME_LIMITS,
     matchers: toMatcherOperations(compileResult.operations),
     grants: [],
-    ...(mocksResult.value.length > 0 ? { mocks: mocksResult.value } : {}),
   });
   if (!normalized.ok) {
     console.error("Error: Failed to build runtime preset");

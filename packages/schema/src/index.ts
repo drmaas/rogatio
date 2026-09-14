@@ -17,8 +17,6 @@ export { projectSchema } from "./schema.js";
 export type {
   HeaderAction,
   HttpMethod,
-  MockAction,
-  MockHeader,
   QueryParamOperation,
   RedirectAction,
   RequestBodyAction,

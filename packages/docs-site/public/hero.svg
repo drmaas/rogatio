@@ -40,7 +40,7 @@
       <rect x="0" y="0" width="352" height="46" rx="10" fill="#16242f"/>
       <circle cx="22" cy="23" r="7" fill="#ffd43b"/>
       <text x="42" y="20" font-family="monospace" font-size="12" fill="#cfe8f0">POST /api/order</text>
-      <text x="42" y="36" font-family="monospace" font-size="10" fill="#7fa6b8">→ header + mock</text>
+      <text x="42" y="36" font-family="monospace" font-size="10" fill="#7fa6b8">→ header + body</text>
       <path d="M300 23 h30" stroke="url(#arrow)" stroke-width="3" stroke-linecap="round"/>
       <path d="M324 16 l10 7 -10 7" stroke="url(#arrow)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     </g>

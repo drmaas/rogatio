@@ -59,7 +59,6 @@ export default defineConfig({
             { label: "Redirects", link: "/rules/redirects/" },
             { label: "Query parameters", link: "/rules/query-params/" },
             { label: "Request & response headers", link: "/rules/headers/" },
-            { label: "Mocks", link: "/rules/mocks/" },
             { label: "Response body", link: "/rules/response-body/" },
             { label: "Request-body replacement", link: "/rules/request-body/" },
           ],

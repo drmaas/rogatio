@@ -14,7 +14,6 @@ import type {
   CompileResult,
   HeaderOperation,
   MatcherOperation,
-  MockOperation,
   NormalizedMatcher,
   QueryOperation,
   RedirectOperation,
@@ -251,15 +250,6 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
               ? { value: rule.headerValue }
               : {}),
           },
-        };
-        operations.push(operation);
-      } else if (rule.type === "mock") {
-        const operation: MockOperation = {
-          kind: "mock",
-          groupId: group.id,
-          ruleId: rule.id,
-          matcher,
-          mock: rule.mock ?? { status: 200, body: "" },
         };
         operations.push(operation);
       } else if (rule.type === "response-body") {

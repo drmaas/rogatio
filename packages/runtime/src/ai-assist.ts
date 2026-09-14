@@ -81,13 +81,7 @@ export interface AIAssistRequest {
 }
 
 export interface RuleProposal {
-  kind:
-    | "redirect"
-    | "query"
-    | "header"
-    | "mock"
-    | "response-body"
-    | "request-body";
+  kind: "redirect" | "query" | "header" | "response-body" | "request-body";
   groupId: string;
   name: string;
   urlRegex: string;

@@ -94,11 +94,6 @@ describe("ai-prompt", () => {
       expect(prompt).toContain("direction");
     });
 
-    it("includes mock with action schema", () => {
-      expect(prompt).toContain("mock");
-      expect(prompt).toContain("status");
-    });
-
     it("includes response-body with action schema", () => {
       expect(prompt).toContain("response-body");
       expect(prompt).toContain("replacement");

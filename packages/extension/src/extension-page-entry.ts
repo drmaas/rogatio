@@ -1,10 +1,4 @@
-import {
-  createEditor,
-  createMockRuleType,
-  createRedirectRuleType,
-  createResponseBodyRuleType,
-  type EditorController,
-} from "@rogatio/editor";
+import { createEditor, type EditorController } from "@rogatio/editor";
 import { validateProjectDetailed } from "./browser-schema.js";
 import {
   checkAISupport,
@@ -1064,11 +1058,6 @@ function renderShell(): void {
     if (editorRoot) {
       editor = createEditor({
         root: editorRoot,
-        ruleTypes: [
-          createRedirectRuleType(),
-          createMockRuleType(),
-          createResponseBodyRuleType(),
-        ],
         initialProject: safeProjectData(),
         validate(value) {
           const result = validateProjectDetailed(value);
