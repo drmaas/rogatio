@@ -36,7 +36,7 @@ rogatio <command> [options]
 
 | Command | Description |
 | --- | --- |
-| `rogatio edit [path]` | Launch the browser editor for `.rogatio.json`. |
+| `rogatio edit [path]` | Launch the browser editor for `.rogatio.json`. `--port <n>` fixes the port; `--no-open` skips opening a browser. |
 | `rogatio verify [path]` | Validate a `.rogatio.json` file (schema + compiler). |
 | `rogatio test [path] [url...]` | Run offline dry-run tests against `.rogatio.json`. |
 | `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |

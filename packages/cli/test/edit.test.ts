@@ -99,4 +99,21 @@ describe("edit command", () => {
     const code = await result.exitCode;
     expect(code).toBe(0);
   });
+
+  it("skips browser launch when --no-open is set", async () => {
+    const launch = vi.fn().mockResolvedValue(true);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const { exitCode, shutdown } = await editCommand([testFile, "--no-open"], {
+      launchBrowser: launch,
+    });
+    expect(launch).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^Editor available at: http:\/\/127\.0\.0\.1:\d+\/editor\.html$/u,
+      ),
+    );
+    shutdown();
+    await expect(exitCode).resolves.toBe(0);
+    log.mockRestore();
+  });
 });
