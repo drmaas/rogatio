@@ -113,6 +113,11 @@ export interface PopupModel {
    * the command; the repository validates the data and fails closed.
    */
   readonly importProject: (data: unknown) => Promise<boolean>;
+  /**
+   * Switches the active project through the existing `switch-project`
+   * lifecycle. Returns whether the service worker accepted the command.
+   */
+  readonly switchProject: (projectId: string) => Promise<boolean>;
   readonly openAppUrl: () => string;
   readonly groupUrl: (groupId: string) => string;
 }
@@ -212,6 +217,14 @@ export function createPopupModel(options: PopupModelOptions): PopupModel {
         version: 1,
         command: "import-project",
         data,
+      });
+      return response?.ok === true;
+    },
+    async switchProject(projectId) {
+      const response = await send({
+        version: 1,
+        command: "switch-project",
+        projectId,
       });
       return response?.ok === true;
     },

@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { withRepoBuildLock } from "./repo-build-lock.js";
 
 const execFileAsync = promisify(execFile);
 const require = createRequire(import.meta.url);
@@ -54,7 +55,7 @@ async function run(command: string, args: string[], cwd: string) {
 
 describe(" packaged CLI integration", () => {
   it("packs, installs offline, and executes the real CLI binary", async () => {
-    const build = await run(pnpm, ["build"], root);
+    const build = await withRepoBuildLock(() => run(pnpm, ["build"], root));
     expect(build.code, build.stderr).toBe(0);
     const temp = await mkdtemp(join(tmpdir(), "rogatio-packaged-"));
     const tarballs = join(temp, "tarballs");

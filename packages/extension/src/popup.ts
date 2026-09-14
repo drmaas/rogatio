@@ -204,26 +204,26 @@ function render(): void {
   const header = document.createElement("header");
   const title = document.createElement("h1");
   title.textContent = "Rogatio";
+  header.append(title);
 
-  const picker = document.createElement("select");
-  picker.dataset.projectPicker = "true";
-  picker.setAttribute("aria-label", "Active project");
-  for (const project of current.projects) {
-    const option = document.createElement("option");
-    option.value = project.id;
-    option.textContent = project.name ?? project.id;
-    if (project.id === current.activeProjectId) option.selected = true;
-    picker.append(option);
+  // Show the picker only when there are at least two projects to choose from.
+  if (current.projects.length >= 2) {
+    const picker = document.createElement("select");
+    picker.dataset.projectPicker = "true";
+    picker.setAttribute("aria-label", "Active project");
+    for (const project of current.projects) {
+      const option = document.createElement("option");
+      option.value = project.id;
+      option.textContent = project.name ?? project.id;
+      if (project.id === current.activeProjectId) option.selected = true;
+      picker.append(option);
+    }
+    picker.addEventListener("change", async () => {
+      await current.switchProject(picker.value);
+      await refresh();
+    });
+    header.append(picker);
   }
-  picker.disabled = true;
-
-  const openApp = managementAnchor(
-    "Open app",
-    current.openAppUrl(),
-    "Open the Rogatio management page",
-  );
-  openApp.dataset.openApp = "true";
-  header.append(title, picker, openApp);
 
   const actions = document.createElement("div");
   actions.dataset.projectActions = "true";
@@ -245,7 +245,13 @@ function render(): void {
   importProject.addEventListener("click", () => {
     container.querySelector<HTMLInputElement>("[data-import-input]")?.click();
   });
-  actions.append(newProject, importProject);
+  const openApp = managementAnchor(
+    "Open app",
+    current.openAppUrl(),
+    "Open the Rogatio management page",
+  );
+  openApp.dataset.openApp = "true";
+  actions.append(newProject, importProject, openApp);
 
   const list = document.createElement("ul");
   list.dataset.groupList = "true";
@@ -265,8 +271,22 @@ function render(): void {
 
     const summary = document.createElement("summary");
 
+    const identity = document.createElement("span");
+    identity.dataset.groupIdentity = "true";
+
     const name = document.createElement("span");
+    name.dataset.groupName = "true";
     name.textContent = group.name;
+    identity.append(name);
+
+    const projectLabel =
+      current.activeProjectName ?? current.activeProjectId ?? null;
+    if (projectLabel !== null) {
+      const project = document.createElement("span");
+      project.dataset.activeProject = "true";
+      project.textContent = projectLabel;
+      identity.append(project);
+    }
 
     const status = document.createElement("span");
     status.dataset.groupStatus = "true";
@@ -293,7 +313,7 @@ function render(): void {
     );
     pencil.dataset.groupEdit = "true";
 
-    summary.append(name, status, toggle, pencil);
+    summary.append(identity, status, toggle, pencil);
 
     const ruleList = document.createElement("ul");
     const rows = current.rows().filter((r) => r.groupId === group.id);

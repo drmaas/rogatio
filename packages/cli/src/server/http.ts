@@ -1,4 +1,3 @@
-import { randomInt } from "node:crypto";
 import {
   createServer as createHttpServer,
   type IncomingMessage,
@@ -47,6 +46,17 @@ export function createServer(
     });
   }
 
+  function boundPort(): number {
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      throw new HttpServerError(
+        "listen-failed",
+        "Failed to resolve bound port after listen",
+      );
+    }
+    return address.port;
+  }
+
   return {
     get port() {
       if (port === null)
@@ -72,40 +82,21 @@ export function createServer(
         }
       }
 
-      const maxRetries = 8;
-      let lastError: Error | null = null;
-
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        const candidatePort = randomInt(1024, 65535);
-
-        try {
-          await listenOn(candidatePort);
-          port = candidatePort;
-          started = true;
-          return;
-        } catch (e) {
-          lastError = e as Error;
-          const code = (e as NodeJS.ErrnoException).code;
-          // Windows reserves chunks of the dynamic port range (Hyper-V / WSL
-          // excluded port ranges), so a random candidate can fail to bind
-          // with EACCES just like a busy port fails with EADDRINUSE. Both are
-          // environmental and resolved by trying another random port.
-          if (code !== "EADDRINUSE" && code !== "EACCES") {
-            throw new HttpServerError(
-              "listen-failed",
-              `Failed to start server: ${e}`,
-              e as Error,
-            );
-          }
-          // Port in use or reserved, retry with a different random port
-        }
+      // Use OS ephemeral assignment (port 0). Random high ports can land on
+      // WHATWG/undici blocked ports (e.g. 6000), which Node accepts but fetch()
+      // rejects with "bad port".
+      try {
+        await listenOn(0);
+        port = boundPort();
+        started = true;
+      } catch (e) {
+        if (e instanceof HttpServerError) throw e;
+        throw new HttpServerError(
+          "listen-failed",
+          `Failed to start server: ${e}`,
+          e as Error,
+        );
       }
-
-      throw new HttpServerError(
-        "port-exhausted",
-        `Failed to bind to port after ${maxRetries} attempts`,
-        lastError ?? undefined,
-      );
     },
 
     async stop(): Promise<void> {

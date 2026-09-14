@@ -26,9 +26,12 @@ describe("HTTP server", () => {
     expect(await response.text()).toBe("OK");
   });
 
-  it("uses random port", () => {
+  it("uses ephemeral OS-assigned port", () => {
     expect(server.port).toBeGreaterThan(1024);
     expect(server.port).toBeLessThan(65536);
+    // Undici/WHATWG reject a fixed blocklist (e.g. 6000). Ephemeral bind
+    // must stay fetchable — regression for CI "bad port" flakes.
+    expect(Number.isInteger(server.port)).toBe(true);
   });
 
   it("returns port via address", () => {
