@@ -1981,31 +1981,25 @@ class EditorControllerImpl implements EditorController {
     const group = this.groupById(this.route.groupId);
     if (!group) return;
     const index = this.groupIndex(this.route.groupId);
-    const name = displayName(group.name, "Unnamed group");
     this.commandBar.append(
       this.createCommandButton("Add rule", "add-rule", this.saving, {
         groupId: this.route.groupId,
       }),
       this.createCommandButton(
-        `Move group ${name} up`,
+        "Move group up",
         "move-group-up",
         this.saving || index <= 0,
         { groupId: this.route.groupId },
       ),
       this.createCommandButton(
-        `Move group ${name} down`,
+        "Move group down",
         "move-group-down",
         this.saving || index >= this.draft.groups.length - 1,
         { groupId: this.route.groupId },
       ),
-      this.createCommandButton(
-        `Remove group ${name}`,
-        "remove-group",
-        this.saving,
-        {
-          groupId: this.route.groupId,
-        },
-      ),
+      this.createCommandButton("Remove group", "remove-group", this.saving, {
+        groupId: this.route.groupId,
+      }),
     );
   }
 
@@ -2267,7 +2261,9 @@ class EditorControllerImpl implements EditorController {
     card.id = `rogatio-rule-${groupId}-${ruleId}`;
     card.tabIndex = -1;
     const heading = this.document.createElement("h3");
+    heading.id = `${this.instanceId}-rule-title-${groupIndex}-${ruleIndex}`;
     heading.textContent = ruleName;
+    card.setAttribute("aria-labelledby", heading.id);
     card.append(heading);
 
     const fields = this.document.createElement("fieldset");
@@ -2280,23 +2276,18 @@ class EditorControllerImpl implements EditorController {
     id.type = "text";
     id.maxLength = 64;
     id.value = safeText(rule.id);
-    this.renderField(grid, `Rule ID for ${ruleName}`, `${rulePath}/id`, id);
+    this.renderField(grid, "Rule ID", `${rulePath}/id`, id);
     const name = this.document.createElement("input");
     name.type = "text";
     name.maxLength = 100;
     name.value = safeText(rule.name);
-    this.renderField(
-      grid,
-      `Rule name for ${ruleName}`,
-      `${rulePath}/name`,
-      name,
-    );
+    this.renderField(grid, "Rule name", `${rulePath}/name`, name);
     const regex = this.document.createElement("textarea");
     regex.maxLength = F2_MAX_URL_REGEX_LENGTH;
     regex.value = safeText(rule.urlRegex);
     this.renderField(
       grid,
-      `URL regular expression for ${ruleName}`,
+      "URL regular expression",
       `${rulePath}/urlRegex`,
       regex,
     );
@@ -2320,7 +2311,7 @@ class EditorControllerImpl implements EditorController {
       groupIndex,
       ruleIndex,
     );
-    this.renderResourceTypes(card, rule, rulePath, ruleName);
+    this.renderResourceTypes(card, rule, rulePath);
     const matcherFields = this.document.createElement("fieldset");
     const matcherLegend = this.document.createElement("legend");
     matcherLegend.textContent = "Request constraints";
@@ -2336,12 +2327,7 @@ class EditorControllerImpl implements EditorController {
       typeof rule.priority === "number" && Number.isFinite(rule.priority)
         ? String(rule.priority)
         : safeText(rule.priority);
-    this.renderField(
-      matcherGrid,
-      `Priority for ${ruleName}`,
-      `${rulePath}/priority`,
-      priority,
-    );
+    this.renderField(matcherGrid, "Priority", `${rulePath}/priority`, priority);
     const method = this.document.createElement("select");
     const anyMethod = this.document.createElement("option");
     anyMethod.value = "";
@@ -2354,12 +2340,7 @@ class EditorControllerImpl implements EditorController {
       method.append(option);
     }
     method.value = safeText(rule.method);
-    this.renderField(
-      matcherGrid,
-      `Method for ${ruleName}`,
-      `${rulePath}/method`,
-      method,
-    );
+    this.renderField(matcherGrid, "Method", `${rulePath}/method`, method);
     matcherFields.append(matcherGrid);
     card.append(matcherFields);
 
@@ -2370,7 +2351,7 @@ class EditorControllerImpl implements EditorController {
         )?.id ?? safeText(rule.type);
       const typeFieldset = this.document.createElement("fieldset");
       const typeLegend = this.document.createElement("legend");
-      typeLegend.textContent = `Rule type for ${ruleName}`;
+      typeLegend.textContent = "Rule type";
       const typeField = this.document.createElement("div");
       typeField.dataset.editorField = "true";
       const typeLabel = this.document.createElement("label");
@@ -2410,26 +2391,21 @@ class EditorControllerImpl implements EditorController {
     actions.dataset.ruleActions = "true";
     actions.append(
       this.createCommandButton(
-        `Move rule ${ruleName} up`,
+        "Move rule up",
         "move-rule-up",
         this.saving || ruleIndex <= 0,
         { groupId, ruleId },
       ),
       this.createCommandButton(
-        `Move rule ${ruleName} down`,
+        "Move rule down",
         "move-rule-down",
         this.saving || ruleIndex >= group.rules.length - 1,
         { groupId, ruleId },
       ),
-      this.createCommandButton(
-        `Remove rule ${ruleName}`,
-        "remove-rule",
-        this.saving,
-        {
-          groupId,
-          ruleId,
-        },
-      ),
+      this.createCommandButton("Remove rule", "remove-rule", this.saving, {
+        groupId,
+        ruleId,
+      }),
     );
     card.append(actions);
     return card;
@@ -2493,11 +2469,10 @@ class EditorControllerImpl implements EditorController {
     parent: HTMLElement,
     rule: DraftRule,
     rulePath: string,
-    ruleName: string,
   ): void {
     const fieldset = this.document.createElement("fieldset");
     const legend = this.document.createElement("legend");
-    legend.textContent = `Resource types for ${ruleName}`;
+    legend.textContent = "Resource types";
     fieldset.append(legend);
     const checks = this.document.createElement("div");
     checks.dataset.editorChecks = "true";
