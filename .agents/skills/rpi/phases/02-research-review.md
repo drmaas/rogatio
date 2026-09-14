@@ -4,7 +4,7 @@ Goal: a fresh-context subagent reviews `research.md` for accuracy and completene
 
 ## Subagent prompt
 
-Spawn a fresh subagent via the `task` tool with `subagent_type: general-purpose`. Prefix the model ID from `models.md` (Research review row).
+Spawn a fresh subagent via the `task` tool with `subagent_type: generalPurpose` (or `general-purpose` if that is the harness name). Select the model for role `adversarial` via `../shared/models.md` (phase → role → active tier). For **cursor**, pass `model: <slug>` (primary → alt → cross-pool); for other tiers, prefix the prompt with `[model: <id>]`.
 
 Prompt template: `templates/research-review-prompt.md`.
 
@@ -21,7 +21,7 @@ The subagent must:
 
 ## Human gate
 
-Follow `human-gates.md`. Print the gate header, the agent's summary, the list of files touched, and the self-revisions applied. Then `question` with options:
+Follow `human-gates.md`. Print the **research** phase summary (from `research.md`) plus the agent's review summary, files touched, and self-revisions. Then `question` with options:
 
 - Approved
 - Revise (user provides notes)

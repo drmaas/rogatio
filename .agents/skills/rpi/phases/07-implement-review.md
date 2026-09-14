@@ -4,7 +4,7 @@ Goal: a fresh-context subagent reviews the implementation of the just-completed 
 
 ## Subagent prompt
 
-Spawn a fresh subagent via the `task` tool with `subagent_type: general-purpose`. Prefix the model ID from `models.md` (Implementation review row).
+Spawn a fresh subagent via the `task` tool with `subagent_type: generalPurpose` (or `general-purpose` if that is the harness name). Select the model for role `review` via `../shared/models.md` (phase → role → active tier). For **cursor**, pass `model: <slug>` (primary → alt → cross-pool); for other tiers, prefix the prompt with `[model: <id>]`.
 
 Prompt template: `templates/implement-review-prompt.md`.
 
@@ -22,7 +22,7 @@ The subagent must:
 
 ## Human gate
 
-Follow `human-gates.md`. Print the agent's numbered list and the list of files touched. By default, do not print the full diff. The user can request it. Then `question` with options:
+Follow `human-gates.md`. Print the **implementation** phase summary (checklist phase, what was built, tests, verify result, files touched) plus the agent's numbered list. By default, do not print the full diff. The user can request it. Then `question` with options:
 
 - Approved
 - Revise

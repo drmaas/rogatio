@@ -15,6 +15,8 @@ docs/decisions/<feature>/
 
 `<feature>` is a kebab-case slug, lowercased, no spaces, no leading or trailing dashes. Examples: `f5-editor`, `runtime-command-gating`, `csv-export-v2`.
 
+The skill derives `<feature>` from the user's problem statement at workflow start. Do not ask the user for a slug. Compress to a short intent label (nouns/verbs that name the change), drop filler, keep it stable for the life of the feature. Only re-ask if the derived path collides with an existing `docs/decisions/<feature>/` or worktree.
+
 If the directory does not exist, the subagent must create it before writing. Never write outside the feature directory. Never use `docs/rpi/`.
 
 ## research.md

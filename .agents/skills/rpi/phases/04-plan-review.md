@@ -4,7 +4,7 @@ Goal: a fresh-context subagent reviews `plan.md` and `checklist.md` as a senior 
 
 ## Subagent prompt
 
-Spawn a fresh subagent via the `task` tool with `subagent_type: general-purpose`. Prefix the model ID from `models.md` (Plan review row).
+Spawn a fresh subagent via the `task` tool with `subagent_type: generalPurpose` (or `general-purpose` if that is the harness name). Select the model for role `adversarial` via `../shared/models.md` (phase → role → active tier). For **cursor**, pass `model: <slug>` (primary → alt → cross-pool); for other tiers, prefix the prompt with `[model: <id>]`.
 
 Prompt template: `templates/plan-review-prompt.md`.
 
@@ -19,7 +19,7 @@ The subagent must:
 
 ## Human gate
 
-Follow `human-gates.md`. Print the agent's numbered list, the list of files touched, the self-revisions applied, and the chosen implementation strategy (read from `plan.md` `## Implementation strategy`). The user can override by editing `plan.md` before clicking Approved, or by selecting **Revise** and naming the desired strategy. Then `question` with options:
+Follow `human-gates.md`. Print the **plan** phase summary (from `plan.md` + `checklist.md`) plus the agent's numbered list, files touched, self-revisions, and the chosen implementation strategy (read from `plan.md` `## Implementation strategy`). The user can override by editing `plan.md` before clicking Approved, or by selecting **Revise** and naming the desired strategy. Then `question` with options:
 
 - Approved
 - Revise

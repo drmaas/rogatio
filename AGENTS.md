@@ -41,7 +41,7 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 - `docs/architecture.md` — package boundaries, per-package decisions, and rejected alternatives.
 - `README.md` and `packages/*/README.md` — user-facing overview and usage.
 - `CONTRIBUTING.md` — setup, branching, coding standards, commit/issue policy, and validation workflow.
-- `.agents/skills/` — operational workflows (`sdd`, `doit`, `rpi`).
+- `.agents/skills/` — operational workflows (`sdd`, `doit`, `rpi`) and shared model routing (`.agents/skills/shared/models.md`).
 
 ## Durable Documentation
 
@@ -60,52 +60,18 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 
 ## Agent Model Tiers
 
-Every workflow must choose one agent tier at the start and use it for every delegated role. If the user did not specify `free` or `normal`, ask them to choose before delegating work:
+Canonical catalogs, Cursor pool exhaustion, free/normal chains, and phase→role maps: [`.agents/skills/shared/models.md`](.agents/skills/shared/models.md).
 
-- **Free:** Route each phase to its documented primary model, falling back to the documented fallback only when the primary is unavailable. Never silently substitute an unlisted free model, a paid model, or the session model; the free catalog spans both OpenCode Zen free and OpenRouter free. If both primary and fallback are unavailable, stop and ask the user to switch tiers or explicitly approve a replacement.
-- **Normal:** Use the existing role-specific model chains below. Before using a paid normal model, check whether the exact model or a clearly equivalent free OpenCode Zen model is available; prefer that free equivalent. Do not substitute a merely convenient or unrelated free model and call it equivalent. Normal mode may fall back through its existing provider chain and finally the session model.
+Every workflow (`sdd`, `doit`, `rpi`) picks one provider tier at start and uses it for every delegated role:
 
-The free catalog spans the current OpenCode Zen free provider and OpenRouter free models:
+- **cursor** — preferred in Cursor sessions; primary → alt → cross-pool when a usage pool is maxed.
+- **free** — OpenCode Zen + OpenRouter free (aliases: `opencode-zen`, `openrouter`). Preferred outside Cursor.
+- **normal** — paid OpenCode Go chains (alias: `opencode-go`).
+- **freebuff** — freebuff harness when requested.
 
-OpenCode Zen free:
+If the user did not specify a tier, ask before delegating. Map each workflow stage to a shared role (`reasoning`, `adversarial`, `plan`, `coding`, `verify`, `review`, `docs`), then resolve the model from that file. Do not fork model tables into skill files or duplicate them here.
 
-- `opencode/x-preview-f-free` (Ox Alpha Free)
-- `opencode/nemotron-3-ultra-free` (Nemotron 3 Ultra Free)
-- `opencode/nemotron-3.5-lightning-free` (Nemotron 3.5 Lightning Free)
-- `opencode/muse-spark-1.2-contributor-free` (Muse Spark 1.2 Free)
-- `opencode/hy3-free` (Hy3 Free)
-- `opencode/mimo-v2.5-free` (MiMo V2.5 Free)
-- `opencode/big-pickle` (Big Pickle)
-
-OpenRouter free:
-
-- `openrouter/poolside/laguna-s-2.1:free` (Laguna S 2.1)
-- `openrouter/thinkingmachines/inkling-small:free` (Inkling Small)
-- `openrouter/dots-studio/dots-3-note-preview:free` (Dots3-Note Preview)
-
-Free mode routes each phase to a primary model with a documented fallback. If the primary is unavailable, use the fallback rather than the session model or a paid provider; never silently substitute an unlisted model. Phase-to-model routing is defined per workflow in the `sdd` and `doit` skills. The canonical phase routing is:
-
-| Phase | Primary | Fallback |
-| --- | --- | --- |
-| Brainstorm / architecture | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Specification | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Plan | `opencode/hy3-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Tests authoring | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Implementation (code) | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Verification / debug loop | `opencode/nemotron-3.5-lightning-free` | `openrouter/poolside/laguna-s-2.1:free` |
-| Independent review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Documentation | `opencode/hy3-free` | `openrouter/dots-studio/dots-3-note-preview:free` |
-
-Normal-tier role chains remain:
-
-- Primary brainstorm, architecture, SDD specification, tests, and coding: `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → session model.
-- Adversarial brainstorm: `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `openrouter/anthropic/claude-opus-5` → session model.
-- Implementation plans and independent review: `opencode-go/glm-5.3` → `opencode-go/glm-5.2` → `openrouter/anthropic/claude-sonnet-5` → session model.
-- Verification and documentation: `opencode/hy3-free` → `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model.
-
-Verify model availability once at workflow start with `opencode models` or the session's provider list. Record the selected tier and the model that served each role; record normal-tier fallbacks as notes, while free-tier unavailability pauses the workflow. A missing preferred model is never an excuse to silently widen scope or skip a stage. Under a single-model session, keep the role passes distinct and use a fresh-context self-review.
-
-The `sdd` and `doit` skills repeat the operational tier-selection rules and role defaults so they remain usable when loaded independently.
+Verify availability once at workflow start (Cursor Task allowlist, or `opencode models` / harness list). Record tier, per-role model, fallbacks, and any exhausted Cursor pools. A model report is not verification evidence. Under a single-model session, keep role passes distinct and use a fresh-context self-review.
 
 ## Repository Rules
 

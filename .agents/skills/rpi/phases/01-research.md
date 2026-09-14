@@ -4,13 +4,15 @@ Goal: produce `docs/decisions/<feature>/research.md` capturing what the codebase
 
 ## Entry conditions
 
-- `<feature>` slug and provider tier captured.
+- Problem statement captured (asked for if missing; never invented).
+- `<feature>` slug derived from the problem statement (never asked).
+- Provider tier and base branch captured.
 - Worktree created and shell is operating in it.
-- The user has supplied a problem statement and any pointers (file paths, reference docs, examples).
+- Optional pointers from the user (file paths, reference docs, examples).
 
 ## Subagent prompt
 
-Use the `task` tool with `subagent_type: general-purpose`. Prefix the prompt with the model ID from `models.md` (Research row, primary).
+Use the `task` tool with `subagent_type: generalPurpose` (or `general-purpose` if that is the harness name). Select the model for role `reasoning` via `../shared/models.md` (phase → role → active tier). For **cursor**, pass `model: <slug>` (primary → alt → cross-pool); for other tiers, prefix the prompt with `[model: <id>]`.
 
 Prompt template: `templates/research-prompt.md`, parameterized with `<feature>`, `<repo-root>`, `<worktree-path>`, `<problem-statement>`.
 

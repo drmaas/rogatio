@@ -6,7 +6,7 @@ This phase repeats for every phase in `checklist.md`. Each iteration is its own 
 
 ## Subagent prompt
 
-Spawn a fresh subagent via the `task` tool with `subagent_type: general-purpose`. Prefix the model ID from `models.md` (Implementation row).
+Spawn a fresh subagent via the `task` tool with `subagent_type: generalPurpose` (or `general-purpose` if that is the harness name). Select the model for role `coding` via `../shared/models.md` (phase → role → active tier). For **cursor**, pass `model: <slug>` (primary → alt → cross-pool); for other tiers, prefix the prompt with `[model: <id>]`.
 
 Prompt template: `templates/implement-prompt.md`, parameterized with the current phase identifier (e.g. "Phase 1" or "Phase 2").
 
