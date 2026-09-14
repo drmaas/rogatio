@@ -503,3 +503,522 @@ test("reports the highest-precedence blocking status as the attention reason", a
     "failed to install",
   );
 });
+
+const RULE_ERROR_REASON_FALLBACK = "The rule failed to install.";
+const DNR_ERROR_MESSAGE = "The declarativeNetRequest operation failed.";
+
+async function installExtensionChromeMock(
+  page: import("@playwright/test").Page,
+  initialState: Record<string, unknown>,
+) {
+  await page.addInitScript((seed) => {
+    const state = structuredClone(seed);
+    const runtime = {
+      lastError: undefined,
+      sendMessage(
+        _message: { command?: string },
+        callback: (value: unknown) => void,
+      ) {
+        callback({ ok: true, value: state });
+      },
+      onMessage: { addListener() {} },
+    };
+    Object.defineProperty(window, "chrome", {
+      configurable: true,
+      value: {
+        storage: {
+          local: { get: async () => ({ rogatio: state }), set: async () => {} },
+        },
+        permissions: {
+          contains: async () => false,
+          request: async () => true,
+          remove: async () => true,
+        },
+        action: {
+          setBadgeText: async () => {},
+          setBadgeBackgroundColor: async () => {},
+        },
+        runtime,
+      },
+    });
+  }, initialState);
+}
+
+const errorSurfaceProject = {
+  version: 1,
+  projects: {
+    "project-a": {
+      id: "project-a",
+      name: "Project A",
+      data: {
+        version: 1,
+        name: "Project A",
+        groups: [
+          {
+            id: "group-a",
+            name: "Group A",
+            origins: ["https://example.com"],
+            rules: [
+              {
+                id: "rule-one",
+                name: "Rule one",
+                urlRegex: "^https://example\\.com/",
+                origins: [],
+                resourceTypes: ["main_frame"],
+                priority: 100,
+                type: "redirect",
+                redirectUrl: "https://example.com/next",
+              },
+            ],
+          },
+        ],
+      },
+      revision: 1,
+      enabledGroupIds: ["group-a"],
+      grantedOrigins: ["https://example.com"],
+    },
+  },
+  activeProjectId: "project-a",
+  badge: { text: "1", attention: true },
+};
+
+async function openWorkspace(page: import("@playwright/test").Page) {
+  await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+}
+
+test("renders the DNR error reason in the rule error card", async ({
+  page,
+}) => {
+  await installExtensionChromeMock(page, {
+    ...errorSurfaceProject,
+    ruleStatuses: [
+      {
+        groupId: "group-a",
+        ruleId: "rule-one",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: {
+              ruleId: "rule-one",
+              reason: "Rule with id 2000001 cannot have an empty list",
+            },
+          },
+        ],
+      },
+    ],
+  });
+  await openWorkspace(page);
+  const card = page.locator("[data-rule-error-card]");
+  await expect(card).toHaveCount(1);
+  await expect(card).toContainText("group-a/rule-one");
+  await expect(card).toContainText(
+    "Rule with id 2000001 cannot have an empty list",
+  );
+  await expect(
+    page.getByRole("button", {
+      name: "Show error details for group-a/rule-one",
+    }),
+  ).toBeVisible();
+  await expect(page.locator("[data-rule-statuses] li")).toHaveText(
+    "group-a/rule-one: error",
+  );
+});
+
+test("falls back to the stable diagnostic message when params.reason is absent", async ({
+  page,
+}) => {
+  await installExtensionChromeMock(page, {
+    ...errorSurfaceProject,
+    ruleStatuses: [
+      {
+        groupId: "group-a",
+        ruleId: "rule-one",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: { ruleId: "rule-one" },
+          },
+        ],
+      },
+    ],
+  });
+  await openWorkspace(page);
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    DNR_ERROR_MESSAGE,
+  );
+});
+
+test("falls back to the page-owned constant when diagnostics are absent", async ({
+  page,
+}) => {
+  await installExtensionChromeMock(page, {
+    ...errorSurfaceProject,
+    ruleStatuses: [
+      {
+        groupId: "group-a",
+        ruleId: "rule-one",
+        status: "error",
+      },
+    ],
+  });
+  await openWorkspace(page);
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    RULE_ERROR_REASON_FALLBACK,
+  );
+});
+
+test("renders markup in the reason as literal text without creating elements", async ({
+  page,
+}) => {
+  const markup = '<img src=x onerror="alert(1)">';
+  await installExtensionChromeMock(page, {
+    ...errorSurfaceProject,
+    ruleStatuses: [
+      {
+        groupId: "group-a",
+        ruleId: "rule-one",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: { ruleId: "rule-one", reason: markup },
+          },
+        ],
+      },
+    ],
+  });
+  await openWorkspace(page);
+  const card = page.locator("[data-rule-error-card]");
+  await expect(card).toContainText(markup);
+  await expect(card.locator("img")).toHaveCount(0);
+});
+
+test("tolerates malformed, inherited, and throwing diagnostic payloads", async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    const inheritedReason = "inherited reason must not run";
+    const proto = {
+      code: "extension.dnr-error",
+      message: inheritedReason,
+      get params() {
+        throw new Error("prototype params accessor");
+      },
+    };
+    const inheritedDiagnostic = Object.create(proto);
+    inheritedDiagnostic.params = {
+      reason: inheritedReason,
+    };
+    const throwingDiagnostic: Record<string, unknown> = {};
+    Object.defineProperty(throwingDiagnostic, "code", {
+      enumerable: true,
+      get() {
+        throw new Error("throwing code accessor");
+      },
+    });
+    const throwingParamsDiagnostic: Record<string, unknown> = {
+      code: "extension.rule-install-failed",
+      message: "throwing params message",
+    };
+    Object.defineProperty(throwingParamsDiagnostic, "params", {
+      enumerable: true,
+      get() {
+        throw new Error("throwing params accessor");
+      },
+    });
+    const state = {
+      version: 1,
+      projects: {
+        "project-a": {
+          id: "project-a",
+          name: "Project A",
+          data: { version: 1, name: "Project A", groups: [] },
+          revision: 1,
+          enabledGroupIds: [],
+          grantedOrigins: [],
+        },
+      },
+      activeProjectId: "project-a",
+      badge: { text: "0", attention: true },
+      ruleStatuses: [
+        {
+          groupId: "group-a",
+          ruleId: "rule-safe",
+          status: "error",
+          diagnostics: [
+            "not-an-object",
+            inheritedDiagnostic,
+            throwingDiagnostic,
+            throwingParamsDiagnostic,
+            {
+              code: "extension.dnr-error",
+              message: "The declarativeNetRequest operation failed.",
+              params: { ruleId: "rule-safe", reason: "safe own reason" },
+            },
+          ],
+        },
+      ],
+    };
+    const runtime = {
+      lastError: undefined,
+      sendMessage(
+        _message: { command?: string },
+        callback: (value: unknown) => void,
+      ) {
+        callback({ ok: true, value: state });
+      },
+      onMessage: { addListener() {} },
+    };
+    Object.defineProperty(window, "chrome", {
+      configurable: true,
+      value: {
+        storage: {
+          local: { get: async () => ({ rogatio: state }), set: async () => {} },
+        },
+        permissions: {
+          contains: async () => false,
+          request: async () => true,
+          remove: async () => true,
+        },
+        action: {
+          setBadgeText: async () => {},
+          setBadgeBackgroundColor: async () => {},
+        },
+        runtime,
+      },
+    });
+  });
+  await openWorkspace(page);
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    "safe own reason",
+  );
+  await expect(page.locator("[data-rule-error-card]")).not.toContainText(
+    "inherited reason must not run",
+  );
+  expect(pageErrors).toEqual([]);
+});
+
+test("ignores an inherited params record when resolving the reason", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const proto = { params: { reason: "inherited reason must not run" } };
+    const diagnostic = Object.create(proto);
+    diagnostic.code = "extension.dnr-error";
+    diagnostic.message = "The declarativeNetRequest operation failed.";
+    const state = {
+      version: 1,
+      projects: {
+        "project-a": {
+          id: "project-a",
+          name: "Project A",
+          data: { version: 1, name: "Project A", groups: [] },
+          revision: 1,
+          enabledGroupIds: [],
+          grantedOrigins: [],
+        },
+      },
+      activeProjectId: "project-a",
+      badge: { text: "0", attention: true },
+      ruleStatuses: [
+        {
+          groupId: "group-a",
+          ruleId: "rule-one",
+          status: "error",
+          diagnostics: [diagnostic],
+        },
+      ],
+    };
+    const runtime = {
+      lastError: undefined,
+      sendMessage(
+        _message: { command?: string },
+        callback: (value: unknown) => void,
+      ) {
+        callback({ ok: true, value: state });
+      },
+      onMessage: { addListener() {} },
+    };
+    Object.defineProperty(window, "chrome", {
+      configurable: true,
+      value: {
+        storage: {
+          local: { get: async () => ({ rogatio: state }), set: async () => {} },
+        },
+        permissions: {
+          contains: async () => false,
+          request: async () => true,
+          remove: async () => true,
+        },
+        action: {
+          setBadgeText: async () => {},
+          setBadgeBackgroundColor: async () => {},
+        },
+        runtime,
+      },
+    });
+  });
+  await openWorkspace(page);
+  const card = page.locator("[data-rule-error-card]");
+  await expect(card).toContainText(DNR_ERROR_MESSAGE);
+  await expect(card).not.toContainText("inherited reason must not run");
+});
+
+test("keys the error card by group and rule id instead of merging equal reasons", async ({
+  page,
+}) => {
+  const sharedReason = "Batch install failed for every header rule";
+  await installExtensionChromeMock(page, {
+    ...errorSurfaceProject,
+    ruleStatuses: [
+      {
+        groupId: "group-a",
+        ruleId: "rule-one",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: { ruleId: "rule-one", reason: sharedReason },
+          },
+        ],
+      },
+      {
+        groupId: "group-b",
+        ruleId: "rule-one",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: { ruleId: "rule-one", reason: sharedReason },
+          },
+        ],
+      },
+    ],
+  });
+  await openWorkspace(page);
+  await expect(page.locator("[data-rule-error-card]")).toHaveCount(1);
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    "group-a/rule-one",
+  );
+  await expect(page.locator("[data-rule-error-card]")).not.toContainText(
+    "group-b/rule-one",
+  );
+  await expect(page.locator("[data-rule-statuses] li")).toHaveText([
+    "group-a/rule-one: error",
+    "group-b/rule-one: error",
+  ]);
+});
+
+test("reconciles stale error selection after refresh and removes the card when errors clear", async ({
+  page,
+}) => {
+  await page.addInitScript(
+    (seed) => {
+      const state = structuredClone(seed) as {
+        ruleStatuses: Array<Record<string, unknown>>;
+      };
+      let refreshes = 0;
+      const runtime = {
+        lastError: undefined,
+        sendMessage(
+          message: { command?: string },
+          callback: (value: unknown) => void,
+        ) {
+          if (message.command === "refresh") {
+            refreshes += 1;
+            if (refreshes > 1 && refreshes === 2) {
+              state.ruleStatuses = [
+                {
+                  groupId: "group-b",
+                  ruleId: "rule-two",
+                  status: "error",
+                  diagnostics: [
+                    {
+                      code: "extension.dnr-error",
+                      message: "The declarativeNetRequest operation failed.",
+                      params: { ruleId: "rule-two", reason: "second failure" },
+                    },
+                  ],
+                },
+              ];
+            } else if (refreshes > 2) {
+              state.ruleStatuses = [];
+            }
+          }
+          callback({ ok: true, value: state });
+        },
+        onMessage: { addListener() {} },
+      };
+      Object.defineProperty(window, "chrome", {
+        configurable: true,
+        value: {
+          storage: {
+            local: {
+              get: async () => ({ rogatio: state }),
+              set: async () => {},
+            },
+          },
+          permissions: {
+            contains: async () => false,
+            request: async () => true,
+            remove: async () => true,
+          },
+          action: {
+            setBadgeText: async () => {},
+            setBadgeBackgroundColor: async () => {},
+          },
+          runtime,
+        },
+      });
+    },
+    {
+      ...errorSurfaceProject,
+      ruleStatuses: [
+        {
+          groupId: "group-a",
+          ruleId: "rule-one",
+          status: "error",
+          diagnostics: [
+            {
+              code: "extension.dnr-error",
+              message: DNR_ERROR_MESSAGE,
+              params: { ruleId: "rule-one", reason: "first failure" },
+            },
+          ],
+        },
+        {
+          groupId: "group-b",
+          ruleId: "rule-two",
+          status: "error",
+          diagnostics: [
+            {
+              code: "extension.dnr-error",
+              message: DNR_ERROR_MESSAGE,
+              params: { ruleId: "rule-two", reason: "second failure" },
+            },
+          ],
+        },
+      ],
+    },
+  );
+  await openWorkspace(page);
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    "group-a/rule-one",
+  );
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.locator("[data-rule-error-card]")).toContainText(
+    "group-b/rule-two",
+  );
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.locator("[data-rule-error-card]")).toHaveCount(0);
+});

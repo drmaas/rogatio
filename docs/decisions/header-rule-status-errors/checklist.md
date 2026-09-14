@@ -29,15 +29,15 @@ All edits happen in the worktree. Each phase ends at a human gate.
 
 ## Phase 3 — Render the error surface on the management page
 
-- [ ] 16. Write browser tests in `test/browser/extension.spec.ts`: injected `params.reason`; stable-message fallback; page-constant fallback; literal markup; malformed diagnostics; inherited fields ignored; and throwing accessors contained without executing inherited behavior.
-- [ ] 17. Write browser tests proving selection is keyed by group and rule id, equal reason strings do not merge statuses, stale selection falls back to the first current error after refresh, and no card remains when errors disappear.
-- [ ] 18. Add a private narrowing reader in `packages/extension/src/extension-page-entry.ts` that returns code plus optional reason and message, prefers `extension.dnr-error`, and uses guarded own-property reads.
-- [ ] 19. Implement reason resolution order: own string `params.reason`, then own string diagnostic `message`, then a page-owned constant fallback.
-- [ ] 20. Add module-level page state for the selected `{ groupId, ruleId }`, reconciling it to the first current `error` status when absent or stale.
-- [ ] 21. For `error` statuses only, render the status word as `<button type="button" data-rule-error-link>` carrying `data-group-id` and `data-rule-id`, with an accessible name naming group and rule; keep each list item's text exactly `groupId/ruleId: status`.
-- [ ] 22. Render exactly one `data-rule-error-card` section with a heading, the selected group/rule identity, and the reason via `textContent`; render no card when no errors exist.
-- [ ] 23. Add minimal `.rogatio-rule-error-card` styles in `packages/extension/src/extension.css` alongside the existing runtime-guidance card rules, without modifying `.rogatio-runtime-guidance*` or `.rogatio-attention-note`.
-- [ ] 24. Confirm the existing assertions at `test/browser/extension.spec.ts:421-433` and `:497-504` and `test/browser/extension-real.spec.ts:68-72` still pass. **Gate.**
+- [x] 16. Write browser tests in `test/browser/extension.spec.ts`: injected `params.reason`; stable-message fallback; page-constant fallback; literal markup; malformed diagnostics; inherited fields ignored; and throwing accessors contained without executing inherited behavior.
+- [x] 17. Write browser tests proving selection is keyed by group and rule id, equal reason strings do not merge statuses, stale selection falls back to the first current error after refresh, and no card remains when errors disappear.
+- [x] 18. Add a private narrowing reader in `packages/extension/src/extension-page-entry.ts` that returns code plus optional reason and message, prefers `extension.dnr-error`, and uses guarded own-property reads.
+- [x] 19. Implement reason resolution order: own string `params.reason`, then own string diagnostic `message`, then a page-owned constant fallback.
+- [x] 20. Add module-level page state for the selected `{ groupId, ruleId }`, reconciling it to the first current `error` status when absent or stale.
+- [x] 21. For `error` statuses only, render the status word as `<button type="button" data-rule-error-link>` carrying `data-group-id` and `data-rule-id`, with an accessible name naming group and rule; keep each list item's text exactly `groupId/ruleId: status`.
+- [x] 22. Render exactly one `data-rule-error-card` section with a heading, the selected group/rule identity, and the reason via `textContent`; render no card when no errors exist.
+- [x] 23. Add minimal `.rogatio-rule-error-card` styles in `packages/extension/src/extension.css` alongside the existing runtime-guidance card rules, without modifying `.rogatio-runtime-guidance*` or `.rogatio-attention-note`.
+- [x] 24. Confirm the existing assertions at `test/browser/extension.spec.ts:421-433` and `:497-504` and `test/browser/extension-real.spec.ts:68-72` still pass. **Gate.**
 
 ## Phase 4 — Wire activation to navigation and focus
 
