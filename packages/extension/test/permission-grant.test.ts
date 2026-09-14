@@ -254,8 +254,8 @@ describe("grant moves installed rules and statuses with it", () => {
       async (_options: {
         addRules: Array<{
           action: {
-            requestHeaders: Array<{ operation: string; value?: string }>;
-            responseHeaders: Array<{ operation: string; value?: string }>;
+            requestHeaders?: Array<{ operation: string; value?: string }>;
+            responseHeaders?: Array<{ operation: string; value?: string }>;
           };
           condition: { requestMethods?: string[]; regexFilter?: string };
         }>;
@@ -302,13 +302,17 @@ describe("grant moves installed rules and statuses with it", () => {
         requestMethods: ["get"],
         regexFilter: "^https://example\\.com/",
       });
-      expect(latestRules[0]?.action.requestHeaders[0]).toMatchObject({
+      expect(latestRules[0]?.action.requestHeaders?.[0]).toMatchObject({
         operation: "set",
         value: "test-value",
       });
+      // Chrome rejects an empty modify-header list, so the opposite direction's
+      // list must be absent rather than empty on the rules actually submitted.
+      expect(latestRules[0]?.action).not.toHaveProperty("responseHeaders");
+      expect(latestRules[1]?.action).not.toHaveProperty("requestHeaders");
       // A remove action must omit value entirely; Chrome rejects an undefined
       // value in a modifyHeaders rule and rejects the whole atomic update.
-      expect(latestRules[1]?.action.responseHeaders[0]).toEqual({
+      expect(latestRules[1]?.action.responseHeaders?.[0]).toEqual({
         header: "X-Test-Header",
         operation: "remove",
       });
@@ -321,6 +325,158 @@ describe("grant moves installed rules and statuses with it", () => {
           ruleStatuses: [
             { ruleId: "rule-header", status: "active" },
             { ruleId: "rule-header-remove", status: "active" },
+          ],
+        },
+      });
+    } finally {
+      (globalThis as Record<string, unknown>).chrome = previousChrome;
+    }
+  });
+
+  it("surfaces thrown header install errors as extension.dnr-error with the reason", async () => {
+    const headerProject = {
+      version: 1,
+      name: "Header error project",
+      groups: [
+        {
+          id: "group-a",
+          name: "Group A",
+          origins: ["https://example.com"],
+          rules: [
+            {
+              id: "rule-header-fail",
+              name: "Header rule",
+              urlRegex: "^https://example\\.com/",
+              origins: [],
+              resourceTypes: ["main_frame"],
+              priority: 100,
+              method: "GET",
+              type: "header",
+              headerDirection: "request",
+              headerOperation: "set",
+              headerName: "X-Custom-Header",
+              headerValue: "test-value",
+            },
+          ],
+        },
+      ],
+    } as const;
+    const updateDynamicRules = vi.fn(async () => {
+      throw new Error("Rule with id 2000001 cannot have an empty list");
+    });
+    const previousChrome = (globalThis as Record<string, unknown>).chrome;
+    (globalThis as Record<string, unknown>).chrome = {
+      declarativeNetRequest: { updateDynamicRules },
+    };
+    try {
+      const { app } = grantHarness(true);
+      await app.handle({
+        version: 1,
+        command: "create-project",
+        data: headerProject,
+      });
+      await app.handle({
+        version: 1,
+        command: "set-group-enabled",
+        projectId: "project-g",
+        groupId: "group-a",
+        enabled: true,
+      });
+
+      const state = await app.handle({ version: 1, command: "get-state" });
+      expect(state).toMatchObject({
+        ok: true,
+        value: {
+          ruleStatuses: [
+            {
+              ruleId: "rule-header-fail",
+              status: "error",
+              diagnostics: [
+                {
+                  code: "extension.dnr-error",
+                  params: {
+                    ruleId: "rule-header-fail",
+                    reason: "Rule with id 2000001 cannot have an empty list",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      });
+    } finally {
+      (globalThis as Record<string, unknown>).chrome = previousChrome;
+    }
+  });
+
+  it("surfaces non-Error header install rejections with the stable fallback reason", async () => {
+    const headerProject = {
+      version: 1,
+      name: "Header non-error project",
+      groups: [
+        {
+          id: "group-a",
+          name: "Group A",
+          origins: ["https://example.com"],
+          rules: [
+            {
+              id: "rule-header-fail",
+              name: "Header rule",
+              urlRegex: "^https://example\\.com/",
+              origins: [],
+              resourceTypes: ["main_frame"],
+              priority: 100,
+              method: "GET",
+              type: "header",
+              headerDirection: "request",
+              headerOperation: "set",
+              headerName: "X-Custom-Header",
+              headerValue: "test-value",
+            },
+          ],
+        },
+      ],
+    } as const;
+    const updateDynamicRules = vi.fn(async () => {
+      throw "not-an-error";
+    });
+    const previousChrome = (globalThis as Record<string, unknown>).chrome;
+    (globalThis as Record<string, unknown>).chrome = {
+      declarativeNetRequest: { updateDynamicRules },
+    };
+    try {
+      const { app } = grantHarness(true);
+      await app.handle({
+        version: 1,
+        command: "create-project",
+        data: headerProject,
+      });
+      await app.handle({
+        version: 1,
+        command: "set-group-enabled",
+        projectId: "project-g",
+        groupId: "group-a",
+        enabled: true,
+      });
+
+      const state = await app.handle({ version: 1, command: "get-state" });
+      expect(state).toMatchObject({
+        ok: true,
+        value: {
+          ruleStatuses: [
+            {
+              ruleId: "rule-header-fail",
+              status: "error",
+              diagnostics: [
+                {
+                  code: "extension.dnr-error",
+                  params: {
+                    ruleId: "rule-header-fail",
+                    reason: "Failed to install header rule",
+                  },
+                },
+              ],
+            },
           ],
         },
       });

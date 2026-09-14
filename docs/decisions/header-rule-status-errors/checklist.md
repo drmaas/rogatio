@@ -16,16 +16,16 @@ All edits happen in the worktree. Each phase ends at a human gate.
 
 ## Phase 2 — Fix the emitted DNR shape and pin the error payload
 
-- [ ] 6. Convert the Phase 1 probe into a failing regression assertion that real Chromium accepts the corrected shape for both sample header rules, retaining `finally` cleanup.
-- [ ] 7. Write a failing unit test: a request-direction projection yields a rule with no `responseHeaders` key and a populated `requestHeaders` entry.
-- [ ] 8. Write a failing unit test: a response-direction `remove` projection yields no `requestHeaders` key, and its header action has no `value` key.
-- [ ] 9. Write a failing unit test: a projection with no resource types, no origins, and no method yields a `condition` whose only key is `regexFilter`.
-- [ ] 10. Write a service-worker test: a thrown `updateDynamicRules` error surfaces as `status: "error"` with `diagnostics[0].code === "extension.dnr-error"` and `params.reason` equal to the thrown message.
-- [ ] 11. Write a service-worker test: a non-`Error` rejection yields the stable fallback message `Failed to install header rule` in `params.reason`.
-- [ ] 12. Make `DnrHeaderRule.action.requestHeaders` and `action.responseHeaders` optional in `packages/extension/src/installer.ts`.
-- [ ] 13. Emit only the direction-matching header list in `toDnrRule`, using the conditional-spread idiom already used at `packages/extension/src/installer.ts:90`.
-- [ ] 14. Omit `resourceTypes`, `initiatorDomains`, `excludedInitiatorDomains`, and `requestMethods` from `condition` instead of assigning `undefined`.
-- [ ] 15. Confirm the existing header-status coverage at `packages/extension/test/permission-grant.test.ts:212-329` still reports both header rules `active`; run `pnpm exec vitest run` and `pnpm test:browser`. **Gate.**
+- [x] 6. Convert the Phase 1 probe into a failing regression assertion that real Chromium accepts the corrected shape for both sample header rules, retaining `finally` cleanup.
+- [x] 7. Write a failing unit test: a request-direction projection yields a rule with no `responseHeaders` key and a populated `requestHeaders` entry.
+- [x] 8. Write a failing unit test: a response-direction `remove` projection yields no `requestHeaders` key, and its header action has no `value` key.
+- [x] 9. Write a failing unit test: a projection with no resource types, no origins, and no method yields a `condition` whose only key is `regexFilter`.
+- [x] 10. Write a service-worker test: a thrown `updateDynamicRules` error surfaces as `status: "error"` with `diagnostics[0].code === "extension.dnr-error"` and `params.reason` equal to the thrown message.
+- [x] 11. Write a service-worker test: a non-`Error` rejection yields the stable fallback message `Failed to install header rule` in `params.reason`.
+- [x] 12. Make `DnrHeaderRule.action.requestHeaders` and `action.responseHeaders` optional in `packages/extension/src/installer.ts`.
+- [x] 13. Emit only the direction-matching header list in `toDnrRule`, using the conditional-spread idiom already used at `packages/extension/src/installer.ts:90`.
+- [x] 14. Omit `resourceTypes`, `initiatorDomains`, `excludedInitiatorDomains`, and `requestMethods` from `condition` instead of assigning `undefined`.
+- [x] 15. Confirm the existing header-status coverage at `packages/extension/test/permission-grant.test.ts:212-329` still reports both header rules `active`; run `pnpm exec vitest run` and `pnpm test:browser`. **Gate.**
 
 ## Phase 3 — Render the error surface on the management page
 

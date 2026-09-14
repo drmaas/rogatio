@@ -1,29 +1,7 @@
-import { createHash } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { rm } from "node:fs/promises";
 import type { Page } from "@playwright/test";
-import { chromium, expect, test } from "@playwright/test";
-
-async function extensionContext() {
-  const profile = await mkdtemp(join(tmpdir(), "rogatio-browser-"));
-  const extensionPath = join(process.cwd(), "packages/extension/dist");
-  const digest = createHash("sha256").update(extensionPath).digest();
-  let extensionId = "";
-  for (let i = 0; i < 16; i += 1) {
-    extensionId += String.fromCharCode(97 + (digest[i] >> 4));
-    extensionId += String.fromCharCode(97 + (digest[i] & 0x0f));
-  }
-  const context = await chromium.launchPersistentContext(profile, {
-    channel: "chromium",
-    headless: true,
-    args: [
-      `--disable-extensions-except=${extensionPath}`,
-      `--load-extension=${extensionPath}`,
-    ],
-  });
-  return { context, profile, extensionId };
-}
+import { expect, test } from "@playwright/test";
+import { extensionContext } from "./extension-context.js";
 
 type ProbeKind = "rule-header-set" | "rule-header-remove";
 
@@ -33,10 +11,9 @@ type ProbeOutcome = {
   message: string | null;
 };
 
-// The rule literals below mirror what `toDnrRule` currently emits for the
-// `rule-header-set` and `rule-header-remove` rules of `samples/basic/.rogatio.json`,
-// including `initiatorDomains` derived from the group origin and the `condition`
-// keys emitted as present-with-`undefined`.
+// Corrected rule literals mirror what `toDnrRule` emits after Phase 2: only the
+// direction-matching header list is present, and condition keys with no value are
+// omitted rather than set to `undefined`.
 async function probeUpdateDynamicRules(
   page: Page,
   id: number,
@@ -62,13 +39,11 @@ async function probeUpdateDynamicRules(
                     value: "enabled",
                   },
                 ],
-                responseHeaders: [],
               },
               condition: {
                 regexFilter: "^https://example\\.com/api/",
                 resourceTypes: ["xmlhttprequest"],
                 initiatorDomains: ["example.com"],
-                excludedInitiatorDomains: undefined,
                 requestMethods: ["get"],
               },
             }
@@ -77,7 +52,6 @@ async function probeUpdateDynamicRules(
               priority: 310,
               action: {
                 type: "modifyHeaders",
-                requestHeaders: [],
                 responseHeaders: [
                   { header: "X-Test-Header", operation: "remove" },
                 ],
@@ -86,8 +60,6 @@ async function probeUpdateDynamicRules(
                 regexFilter: "^https://example\\.com/api/",
                 resourceTypes: ["main_frame"],
                 initiatorDomains: ["example.com"],
-                excludedInitiatorDomains: undefined,
-                requestMethods: undefined,
               },
             };
 
@@ -130,7 +102,7 @@ async function removeProbeRule(page: Page, id: number): Promise<void> {
   }, id);
 }
 
-test("records accept/reject for current toDnrRule sample header shapes", async () => {
+test("real Chromium accepts corrected toDnrRule sample header shapes", async () => {
   const testInfo = test.info();
   const baseId = 9_000_000 + testInfo.parallelIndex * 100;
   const setRuleId = baseId + 1;
@@ -154,17 +126,10 @@ test("records accept/reject for current toDnrRule sample header shapes", async (
       }
     }
 
-    // Evidence only: the accept/reject outcome is recorded, never asserted, so
-    // this spec never depends on Chrome's wording.
-    expect(outcomes.map((outcome) => outcome.rule)).toEqual([
-      "rule-header-set",
-      "rule-header-remove",
+    expect(outcomes).toEqual([
+      { rule: "rule-header-set", accepted: true, message: null },
+      { rule: "rule-header-remove", accepted: true, message: null },
     ]);
-
-    testInfo.annotations.push({
-      type: "header-dnr-probe",
-      description: JSON.stringify(outcomes),
-    });
   } finally {
     await context.close();
     await rm(profile, { recursive: true, force: true });

@@ -34,8 +34,65 @@ describe("installer.ts — header DNR rules", () => {
     expect(rule.condition).not.toHaveProperty("requestDomains");
     expect(rule.condition).not.toHaveProperty("excludedRequestDomains");
     expect(rule.condition).toHaveProperty("initiatorDomains");
-    expect(rule.condition).toHaveProperty("excludedInitiatorDomains");
+    expect(rule.condition).not.toHaveProperty("excludedInitiatorDomains");
     expect(rule.condition.initiatorDomains).toEqual(["example.com"]);
+  });
+
+  it("toDnrRule omits responseHeaders for request-direction projections", () => {
+    const projection = makeProjection({
+      action: {
+        direction: "request",
+        operation: "set",
+        headerName: "X-Custom-Header",
+        headerValue: "test-value",
+      },
+    });
+    const rule = toDnrRule(projection);
+
+    expect(rule.action).not.toHaveProperty("responseHeaders");
+    expect(rule.action.requestHeaders).toEqual([
+      {
+        header: "X-Custom-Header",
+        operation: "set",
+        value: "test-value",
+      },
+    ]);
+  });
+
+  it("toDnrRule omits requestHeaders and value for response-direction remove projections", () => {
+    const projection = makeProjection({
+      action: {
+        direction: "response",
+        operation: "remove",
+        headerName: "X-Test-Header",
+      },
+    });
+    const rule = toDnrRule(projection);
+
+    expect(rule.action).not.toHaveProperty("requestHeaders");
+    expect(rule.action.responseHeaders).toEqual([
+      { header: "X-Test-Header", operation: "remove" },
+    ]);
+    expect(rule.action.responseHeaders?.[0]).not.toHaveProperty("value");
+  });
+
+  it("toDnrRule omits optional condition keys when unset", () => {
+    const projection = makeProjection({
+      matcher: {
+        urlRegex: { source: "^https://example\\.com/", flags: "" },
+        origins: [],
+        resourceTypes: [],
+        priority: 100,
+      },
+    });
+    const rule = toDnrRule(projection);
+
+    expect(rule.condition).toEqual({
+      regexFilter: "^https://example\\.com/",
+    });
+    for (const value of Object.values(rule.condition)) {
+      expect(value).not.toBeUndefined();
+    }
   });
 
   it("toDnrRule preserves initiatorDomains and excludedInitiatorDomains from origins", () => {

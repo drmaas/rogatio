@@ -5,8 +5,8 @@ export interface DnrHeaderRule {
   readonly priority: number;
   readonly action: {
     readonly type: "modifyHeaders";
-    readonly requestHeaders: readonly DnrHeaderAction[];
-    readonly responseHeaders: readonly DnrHeaderAction[];
+    readonly requestHeaders?: readonly DnrHeaderAction[];
+    readonly responseHeaders?: readonly DnrHeaderAction[];
   };
   readonly condition: {
     readonly regexFilter: string;
@@ -94,37 +94,36 @@ function toDnrHeaderAction(
 export function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
   const { allowed: initiatorDomains, excluded: excludedInitiatorDomains } =
     toDnrDomains(projection.matcher.origins);
+  const resourceTypes =
+    projection.matcher.resourceTypes.length > 0
+      ? toDnrResourceTypes(projection.matcher.resourceTypes)
+      : undefined;
+  const requestMethods =
+    projection.matcher.method !== undefined
+      ? [projection.matcher.method.toLowerCase()]
+      : undefined;
+
   return {
     id: projection.id,
     priority: projection.matcher.priority,
     action: {
       type: "modifyHeaders",
-      requestHeaders:
-        projection.action.direction === "request"
-          ? [toDnrHeaderAction(projection.action)]
-          : [],
-      responseHeaders:
-        projection.action.direction === "response"
-          ? [toDnrHeaderAction(projection.action)]
-          : [],
+      ...(projection.action.direction === "request"
+        ? { requestHeaders: [toDnrHeaderAction(projection.action)] }
+        : {}),
+      ...(projection.action.direction === "response"
+        ? { responseHeaders: [toDnrHeaderAction(projection.action)] }
+        : {}),
     },
     condition: {
       // Header rules use the compiler's regular-expression matcher directly.
       regexFilter: projection.matcher.urlRegex.source,
-      resourceTypes:
-        projection.matcher.resourceTypes.length > 0
-          ? toDnrResourceTypes(projection.matcher.resourceTypes)
-          : undefined,
-      initiatorDomains:
-        initiatorDomains.length > 0 ? initiatorDomains : undefined,
-      excludedInitiatorDomains:
-        excludedInitiatorDomains.length > 0
-          ? excludedInitiatorDomains
-          : undefined,
-      requestMethods:
-        projection.matcher.method !== undefined
-          ? [projection.matcher.method.toLowerCase()]
-          : undefined,
+      ...(resourceTypes !== undefined ? { resourceTypes } : {}),
+      ...(initiatorDomains.length > 0 ? { initiatorDomains } : {}),
+      ...(excludedInitiatorDomains.length > 0
+        ? { excludedInitiatorDomains }
+        : {}),
+      ...(requestMethods !== undefined ? { requestMethods } : {}),
     },
   };
 }

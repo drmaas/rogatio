@@ -1,28 +1,7 @@
-import { createHash } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { chromium, expect, test } from "@playwright/test";
-
-async function extensionContext() {
-  const profile = await mkdtemp(join(tmpdir(), "rogatio-browser-"));
-  const extensionPath = join(process.cwd(), "packages/extension/dist");
-  const digest = createHash("sha256").update(extensionPath).digest();
-  let extensionId = "";
-  for (let i = 0; i < 16; i += 1) {
-    extensionId += String.fromCharCode(97 + (digest[i] >> 4));
-    extensionId += String.fromCharCode(97 + (digest[i] & 0x0f));
-  }
-  const context = await chromium.launchPersistentContext(profile, {
-    channel: "chromium",
-    headless: true,
-    args: [
-      `--disable-extensions-except=${extensionPath}`,
-      `--load-extension=${extensionPath}`,
-    ],
-  });
-  return { context, profile, extensionId };
-}
+import { expect, test } from "@playwright/test";
+import { extensionContext } from "./extension-context.js";
 
 const project = {
   version: 1,
