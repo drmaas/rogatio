@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-14
+
 # Popup UX Fix — Refactor candidates
 
 Proposal only. No behavior change. Conservative: surface candidates that make the next popup change cheaper without new frameworks or shared toolbar extracted across surfaces (plan non-goals still hold).

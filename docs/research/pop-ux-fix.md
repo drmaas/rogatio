@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-14
+
 # Popup UX Fix — Research
 
 ## Problem restatement
