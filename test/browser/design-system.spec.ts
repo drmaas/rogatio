@@ -31,112 +31,101 @@ type MockEnvelope = {
   activeProjectId: string | null;
 };
 
-const projectA: MockProject = {
+type MockRule = MockProject["data"]["groups"][number]["rules"][number];
+type MockGroup = MockProject["data"]["groups"][number];
+
+function makeRule(overrides: Partial<MockRule> = {}): MockRule {
+  return {
+    id: "rule-one",
+    name: "First rule",
+    urlRegex: "^https://one\\.example/first$",
+    origins: [],
+    resourceTypes: ["main_frame"],
+    priority: 100,
+    ...overrides,
+  };
+}
+
+function makeGroup(overrides: Partial<MockGroup> = {}): MockGroup {
+  return {
+    id: "group-one",
+    name: "One",
+    origins: ["https://one.example"],
+    rules: [makeRule()],
+    ...overrides,
+  };
+}
+
+function makeProject(
+  overrides: Partial<MockProject> & Pick<MockProject, "id" | "name">,
+): MockProject {
+  const { id, name, data: dataOverrides, ...rest } = overrides;
+  return {
+    id,
+    name,
+    data: {
+      version: 1,
+      name,
+      groups: [],
+      ...dataOverrides,
+    },
+    revision: 1,
+    enabledGroupIds: [],
+    grantedOrigins: [],
+    ...rest,
+  };
+}
+
+const projectA: MockProject = makeProject({
   id: "project-a",
   name: "Project A",
   data: {
     version: 1,
     name: "Project A",
-    groups: [
-      {
-        id: "group-one",
-        name: "One",
-        origins: ["https://one.example"],
-        rules: [
-          {
-            id: "rule-one",
-            name: "First rule",
-            urlRegex: "^https://one\\.example/first$",
-            origins: [],
-            resourceTypes: ["main_frame"],
-            priority: 100,
-          },
-        ],
-      },
-    ],
+    groups: [makeGroup()],
   },
-  revision: 1,
   enabledGroupIds: ["group-one"],
   grantedOrigins: ["https://one.example"],
-};
+});
 
-/** Optional seed is serialized by addInitScript; default lives inside the fn. */
-function installChromeMock(seed?: MockEnvelope): void {
-  // Note: this function is serialized by addInitScript, so the default envelope
-  // must be defined here rather than captured from the module closure.
-  type Envelope = {
-    version: number;
-    projects: Record<
-      string,
-      {
-        id: string;
-        name: string;
-        data: {
-          version: number;
-          name: string;
-          groups: Array<{
-            id: string;
-            name: string;
-            origins: string[];
-            rules: Array<{
-              id: string;
-              name: string;
-              urlRegex: string;
-              origins: string[];
-              resourceTypes: string[];
-              priority: number;
-            }>;
-          }>;
-        };
-        revision: number;
-        enabledGroupIds: string[];
-        grantedOrigins: string[];
-      }
-    >;
-    activeProjectId: string | null;
+const projectB: MockProject = makeProject({
+  id: "project-b",
+  name: "Project B",
+});
+
+const emptyGroupsProject: MockProject = makeProject({
+  id: "project-empty",
+  name: "Empty Project",
+});
+
+function emptyEnvelope(): MockEnvelope {
+  return { version: 1, projects: {}, activeProjectId: null };
+}
+
+function oneProjectEnvelope(project: MockProject = projectA): MockEnvelope {
+  return {
+    version: 1,
+    projects: { [project.id]: project },
+    activeProjectId: project.id,
   };
-  const state: Envelope = seed ?? {
+}
+
+function defaultEnvelope(): MockEnvelope {
+  return {
     version: 1,
     projects: {
-      "project-a": {
-        id: "project-a",
-        name: "Project A",
-        data: {
-          version: 1,
-          name: "Project A",
-          groups: [
-            {
-              id: "group-one",
-              name: "One",
-              origins: ["https://one.example"],
-              rules: [
-                {
-                  id: "rule-one",
-                  name: "First rule",
-                  urlRegex: "^https://one\\.example/first$",
-                  origins: [],
-                  resourceTypes: ["main_frame"],
-                  priority: 100,
-                },
-              ],
-            },
-          ],
-        },
-        revision: 1,
-        enabledGroupIds: ["group-one"],
-        grantedOrigins: ["https://one.example"],
-      },
-      "project-b": {
-        id: "project-b",
-        name: "Project B",
-        data: { version: 1, name: "Project B", groups: [] },
-        revision: 1,
-        enabledGroupIds: [],
-        grantedOrigins: [],
-      },
+      "project-a": projectA,
+      "project-b": projectB,
     },
     activeProjectId: "project-a",
   };
+}
+
+/** Seed is serialized by addInitScript; always pass a module-level envelope. */
+function installChromeMock(seed: MockEnvelope): void {
+  // Note: this function is serialized by addInitScript, so it must not close
+  // over module bindings — only the passed seed is available in-page.
+  const state = seed;
   Object.defineProperty(window, "chrome", {
     configurable: true,
     value: {
@@ -245,7 +234,7 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   expect(shellCssResponse.ok()).toBe(true);
   expect(shellCssResponse.headers()["content-type"]).toContain("text/css");
 
-  await page.addInitScript(installChromeMock);
+  await page.addInitScript(installChromeMock, defaultEnvelope());
   await page.goto("/extension/index.html");
 
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
@@ -349,7 +338,7 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
   expect(popupCssResponse.ok()).toBe(true);
   expect(popupCssResponse.headers()["content-type"]).toContain("text/css");
 
-  await page.addInitScript(installChromeMock);
+  await page.addInitScript(installChromeMock, defaultEnvelope());
   await page.goto("/extension/popup.html");
 
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
@@ -481,11 +470,7 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
 test("popup hides project picker when there are zero projects", async ({
   page,
 }) => {
-  await page.addInitScript(installChromeMock, {
-    version: 1,
-    projects: {},
-    activeProjectId: null,
-  } satisfies MockEnvelope);
+  await page.addInitScript(installChromeMock, emptyEnvelope());
   await page.goto("/extension/popup.html");
 
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
@@ -504,11 +489,7 @@ test("popup hides project picker when there are zero projects", async ({
 test("popup hides project picker when there is one project", async ({
   page,
 }) => {
-  await page.addInitScript(installChromeMock, {
-    version: 1,
-    projects: { "project-a": projectA },
-    activeProjectId: "project-a",
-  } satisfies MockEnvelope);
+  await page.addInitScript(installChromeMock, oneProjectEnvelope());
   await page.goto("/extension/popup.html");
 
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
@@ -527,20 +508,10 @@ test("popup hides project picker when there is one project", async ({
 });
 
 test("popup empty-groups state omits project subtitle", async ({ page }) => {
-  await page.addInitScript(installChromeMock, {
-    version: 1,
-    projects: {
-      "project-empty": {
-        id: "project-empty",
-        name: "Empty Project",
-        data: { version: 1, name: "Empty Project", groups: [] },
-        revision: 1,
-        enabledGroupIds: [],
-        grantedOrigins: [],
-      },
-    },
-    activeProjectId: "project-empty",
-  } satisfies MockEnvelope);
+  await page.addInitScript(
+    installChromeMock,
+    oneProjectEnvelope(emptyGroupsProject),
+  );
   await page.goto("/extension/popup.html");
 
   await expect(
@@ -554,7 +525,7 @@ test("popup empty-groups state omits project subtitle", async ({ page }) => {
 test("popup project picker switches active project via switch-project", async ({
   page,
 }) => {
-  await page.addInitScript(installChromeMock);
+  await page.addInitScript(installChromeMock, defaultEnvelope());
   await page.goto("/extension/popup.html");
 
   const picker = page.locator("[data-project-picker]");
@@ -587,7 +558,7 @@ test("popup project picker switches active project via switch-project", async ({
 test("popup Open app href stays management page after project switch", async ({
   page,
 }) => {
-  await page.addInitScript(installChromeMock);
+  await page.addInitScript(installChromeMock, defaultEnvelope());
   await page.goto("/extension/popup.html");
 
   const openApp = page.locator("[data-open-app]");
