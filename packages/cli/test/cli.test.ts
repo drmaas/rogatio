@@ -8,6 +8,9 @@ describe("CLI entry point", () => {
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining("Usage: rogatio edit"),
     );
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("--no-open"),
+    );
     consoleSpy.mockRestore();
   });
 

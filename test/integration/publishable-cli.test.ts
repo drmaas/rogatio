@@ -215,7 +215,7 @@ describe("publishable CLI tarball", () => {
       const port = 18991;
       editServer = execFileAsync(
         process.execPath,
-        [bin, "edit", project, "--port", String(port)],
+        [bin, "edit", project, "--port", String(port), "--no-open"],
         { cwd: consumer },
       );
 

@@ -10,6 +10,8 @@ The public CLI consists exactly of `edit`, `verify`, `test`, and `runtime`.
 Starts a local editor server (bound to `127.0.0.1`, random port) and opens the shared
 editor in your browser. Edits are validated and saved back to the `.rogatio.json` file.
 The session is local-only and short-lived; file access is confined to the target path.
+Use `--port <n>` to fix the port and `--no-open` to start the server without launching
+a browser (prints the editor URL instead).
 
 ## `rogatio verify [path]`
 

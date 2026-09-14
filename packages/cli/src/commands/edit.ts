@@ -37,6 +37,7 @@ export async function editCommand(
   // Parse arguments
   const positionalArgs: string[] = [];
   let port: number | undefined;
+  let noOpen = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -46,6 +47,8 @@ export async function editCommand(
         console.error("Error: Invalid port number");
         return { exitCode: Promise.resolve(2), shutdown: () => {} };
       }
+    } else if (arg === "--no-open") {
+      noOpen = true;
     } else if (!arg.startsWith("-")) {
       positionalArgs.push(arg);
     } else if (arg === "--help") {
@@ -171,13 +174,17 @@ export async function editCommand(
     server.stop();
   }
 
-  // Launch browser
-  const browserLaunched = await (customLaunchBrowser ?? launchBrowser)(
-    editorUrl,
-  );
-  if (!browserLaunched) {
+  // Launch browser unless --no-open (integration tests / headless hosts)
+  if (!noOpen) {
+    const browserLaunched = await (customLaunchBrowser ?? launchBrowser)(
+      editorUrl,
+    );
+    if (!browserLaunched) {
+      console.log(`Editor available at: ${editorUrl}`);
+      console.log("Open this URL in your browser to edit the project.");
+    }
+  } else {
     console.log(`Editor available at: ${editorUrl}`);
-    console.log("Open this URL in your browser to edit the project.");
   }
 
   // Wait for shutdown signal

@@ -8,6 +8,7 @@ Arguments:
 
 Options:
   --port <n>      Fixed port for editor server (default: random)
+  --no-open       Start the editor server without opening a browser
   --help, -h      Show this help
 
 The editor runs in your default browser and communicates with a local server
