@@ -167,7 +167,10 @@ test("reports an actionable message and failed status when the native host is mi
   );
   await expect(
     page.getByRole("button", { name: "Start runtime" }),
-  ).toBeVisible();
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Stop runtime" }),
+  ).toBeDisabled();
   await page.getByRole("button", { name: "Start runtime" }).click();
   await expect(page.locator("[data-runtime-install-command]")).toHaveText(
     /rogatio runtime install --extension-id/,
@@ -206,6 +209,12 @@ test("reports an actionable message and failed status when the native host is mi
   await expect(page.locator("[data-native-runtime-state]")).toContainText(
     "Runtime status: failed to start",
   );
+  await expect(
+    page.getByRole("button", { name: "Start runtime" }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Stop runtime" }),
+  ).toBeDisabled();
   await expect(page.locator("[data-runtime-guidance]")).toContainText(
     "Native host manifest was not found",
   );
@@ -291,8 +300,17 @@ test("shows AI needs runtime before start and ready after a successful start", a
   await expect(page.locator("[data-ai-status]")).toHaveText(
     "AI: needs runtime",
   );
+  await expect(
+    page.getByRole("button", { name: "Stop runtime" }),
+  ).toBeDisabled();
   await page.getByRole("button", { name: "Start runtime" }).click();
   await expect(page.locator("[data-ai-status]")).toHaveText("AI: Ready");
+  await expect(
+    page.getByRole("button", { name: "Start runtime" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Stop runtime" }),
+  ).toBeEnabled();
 });
 
 test("keeps the platform-unavailable wording and truthful unsupported status", async ({

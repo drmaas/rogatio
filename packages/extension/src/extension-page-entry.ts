@@ -11,6 +11,7 @@ import {
   type NativeEnvelope,
   type NativeSessionOptions,
 } from "./native-session.js";
+import { runtimeControlDisabled } from "./runtime-controls.js";
 
 interface StoredProject {
   readonly id: string;
@@ -422,14 +423,20 @@ function renderSidebar(shell: HTMLElement): void {
 
   const actions = document.createElement("div");
   actions.className = "rogatio-sidebar-actions";
+  const runtimePhaseForControls = state.nativeRuntimeState?.phase ?? "stopped";
+  const controlsDisabled = runtimeControlDisabled(runtimePhaseForControls);
+  const startRuntime = button("Start runtime", "start-native-runtime");
+  startRuntime.disabled = controlsDisabled.start;
+  const stopRuntime = button("Stop runtime", "stop-native-runtime");
+  stopRuntime.disabled = controlsDisabled.stop;
   actions.append(
     button("Review permissions", "review-permissions"),
     button(
       permissionGranted ? "Access granted" : "Grant declared access",
       "grant-permissions",
     ),
-    button("Start runtime", "start-native-runtime"),
-    button("Stop runtime", "stop-native-runtime"),
+    startRuntime,
+    stopRuntime,
   );
   sidebar.append(actions);
 
