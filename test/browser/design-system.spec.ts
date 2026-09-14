@@ -360,6 +360,75 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
   await expect(page.getByText("One")).toBeVisible();
   await expect(page.locator("[data-group-toggle]")).toHaveCount(1);
 
+  // Phase 2: muted project subtitle under group name; groups collapsed;
+  // CSS chevron affordance; expand reveals rules.
+  const groupCard = page.locator("details[data-group]");
+  await expect(groupCard).toHaveCount(1);
+  await expect(groupCard).not.toHaveAttribute("open");
+  const activeProject = groupCard.locator("[data-active-project]");
+  await expect(activeProject).toHaveText("Project A");
+  const subtitleUnderName = await groupCard.evaluate((details) => {
+    const summary = details.querySelector("summary");
+    if (!summary) return false;
+    const nameSpan = Array.from(summary.querySelectorAll("span")).find(
+      (el) =>
+        el.textContent === "One" && !el.hasAttribute("data-active-project"),
+    );
+    const subtitle = summary.querySelector("[data-active-project]");
+    if (!nameSpan || !subtitle) return false;
+    const nameBox = nameSpan.getBoundingClientRect();
+    const subBox = subtitle.getBoundingClientRect();
+    return subBox.top >= nameBox.bottom - 1;
+  });
+  expect(subtitleUnderName).toBe(true);
+  const chevron = await groupCard.locator("summary").evaluate((summary) => {
+    const before = getComputedStyle(summary, "::before");
+    const content = before.content;
+    const hasContent =
+      content !== "none" && content !== "normal" && content !== '""';
+    const width = Number.parseFloat(before.width);
+    const height = Number.parseFloat(before.height);
+    const border =
+      Number.parseFloat(before.borderRightWidth) +
+      Number.parseFloat(before.borderBottomWidth);
+    return {
+      visible:
+        before.display !== "none" &&
+        before.visibility !== "hidden" &&
+        (hasContent || width > 0 || height > 0 || border > 0),
+      content,
+    };
+  });
+  expect(chevron.visible).toBe(true);
+  const chevronTransformClosed = await groupCard
+    .locator("summary")
+    .evaluate((summary) => getComputedStyle(summary, "::before").transform);
+  await expect(page.getByText("First rule")).toBeHidden();
+  await groupCard.locator("summary").click();
+  await expect(groupCard).toHaveAttribute("open", "");
+  await expect(page.getByText("First rule")).toBeVisible();
+  // Poll: chevron transform animates 120ms; under parallel load a single
+  // read can still see the closed matrix.
+  await expect
+    .poll(async () =>
+      groupCard
+        .locator("summary")
+        .evaluate((summary) => getComputedStyle(summary, "::before").transform),
+    )
+    .not.toBe(chevronTransformClosed);
+  // Checkbox stopPropagation: sync click must not toggle details open/closed.
+  const openAfterToggleClick = await groupCard.evaluate((el) => {
+    const details = el as HTMLDetailsElement;
+    const toggle = details.querySelector<HTMLInputElement>(
+      "[data-group-toggle]",
+    );
+    if (!toggle) return null;
+    details.open = true;
+    toggle.click();
+    return details.open;
+  });
+  expect(openAfterToggleClick).toBe(true);
+
   // F25: the popup is a fixed, comfortable width and exposes project entry
   // actions next to the group list.
   const popupCard = page.locator(".rogatio-popup");
@@ -428,6 +497,8 @@ test("popup hides project picker when there are zero projects", async ({
   await expect(actions.locator("[data-open-app]")).toBeVisible();
   await expect(page.locator("header [data-open-app]")).toHaveCount(0);
   await expect(page.getByText("No active project")).toBeVisible();
+  // Empty-state rows must not invent a project subtitle.
+  await expect(page.locator("[data-active-project]")).toHaveCount(0);
 });
 
 test("popup hides project picker when there is one project", async ({
@@ -449,4 +520,33 @@ test("popup hides project picker when there is one project", async ({
   await expect(actions.locator("[data-open-app]")).toBeVisible();
   await expect(page.locator("header [data-open-app]")).toHaveCount(0);
   await expect(page.getByText("One")).toBeVisible();
+  await expect(
+    page.locator("details[data-group] [data-active-project]"),
+  ).toHaveText("Project A");
+  await expect(page.locator("details[data-group]")).not.toHaveAttribute("open");
+});
+
+test("popup empty-groups state omits project subtitle", async ({ page }) => {
+  await page.addInitScript(installChromeMock, {
+    version: 1,
+    projects: {
+      "project-empty": {
+        id: "project-empty",
+        name: "Empty Project",
+        data: { version: 1, name: "Empty Project", groups: [] },
+        revision: 1,
+        enabledGroupIds: [],
+        grantedOrigins: [],
+      },
+    },
+    activeProjectId: "project-empty",
+  } satisfies MockEnvelope);
+  await page.goto("/extension/popup.html");
+
+  await expect(
+    page.getByText("This project has no saved groups."),
+  ).toBeVisible();
+  await expect(page.locator("details[data-group]")).toHaveCount(0);
+  // Empty-state rows must not invent a project subtitle.
+  await expect(page.locator("[data-active-project]")).toHaveCount(0);
 });

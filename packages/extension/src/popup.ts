@@ -268,8 +268,20 @@ function render(): void {
 
     const summary = document.createElement("summary");
 
+    const identity = document.createElement("span");
+
     const name = document.createElement("span");
     name.textContent = group.name;
+    identity.append(name);
+
+    const projectLabel =
+      current.activeProjectName ?? current.activeProjectId ?? null;
+    if (projectLabel !== null) {
+      const project = document.createElement("span");
+      project.dataset.activeProject = "true";
+      project.textContent = projectLabel;
+      identity.append(project);
+    }
 
     const status = document.createElement("span");
     status.dataset.groupStatus = "true";
@@ -296,7 +308,7 @@ function render(): void {
     );
     pencil.dataset.groupEdit = "true";
 
-    summary.append(name, status, toggle, pencil);
+    summary.append(identity, status, toggle, pencil);
 
     const ruleList = document.createElement("ul");
     const rows = current.rows().filter((r) => r.groupId === group.id);

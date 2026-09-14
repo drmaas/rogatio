@@ -23,13 +23,13 @@ Strategy: **TDD** (see `plan.md` → Implementation strategy). Write failing tes
 
 **Proving tests:** `test/browser/design-system.spec.ts` (subtitle + chevron + default collapsed).
 
-- [ ] 2.1 Update browser test: group card shows active project name (fixture “Project A”) via `[data-active-project]` under group name
-- [ ] 2.2 Update browser test: expand affordance visible (CSS marker/chevron); `details[data-group]` not open on first paint; click summary reveals rules
-- [ ] 2.3 In `popup.ts`, append muted `[data-active-project]` subtitle under group name using `activeProjectName` with id fallback; omit when both null
-- [ ] 2.4 In `popup.css`, add chevron/marker for `summary` / `details[open]` (CSS-only; no DOM chevron node unless CSS proof fails); keep list-style overrides coherent
-- [ ] 2.5 Extend forced-colors / prefers-reduced-motion rules for the chevron
-- [ ] 2.6 Verify checkbox `stopPropagation` still prevents accidental details toggle
-- [ ] 2.7 Run affected browser tests; fix until green
+- [x] 2.1 Update browser test: group card shows active project name (fixture “Project A”) via `[data-active-project]` under group name
+- [x] 2.2 Update browser test: expand affordance visible (CSS marker/chevron); `details[data-group]` not open on first paint; click summary reveals rules
+- [x] 2.3 In `popup.ts`, append muted `[data-active-project]` subtitle under group name using `activeProjectName` with id fallback; omit when both null
+- [x] 2.4 In `popup.css`, add chevron/marker for `summary` / `details[open]` (CSS-only; no DOM chevron node unless CSS proof fails); keep list-style overrides coherent
+- [x] 2.5 Extend forced-colors / prefers-reduced-motion rules for the chevron
+- [x] 2.6 Verify checkbox `stopPropagation` still prevents accidental details toggle
+- [x] 2.7 Run affected browser tests; fix until green
 
 ## Phase 3: Wire picker to `switch-project`
 
