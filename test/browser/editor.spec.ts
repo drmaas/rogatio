@@ -492,6 +492,6 @@ test("selects the Query parameters rule type and round-trips the action through 
   const saved = await page.evaluate(() => window.editorTest.saveCalls.at(-1));
   expect(saved?.groups?.[0]?.rules?.[0]?.action).toEqual({
     type: "query",
-    params: [{ name: "utm_source", value: "rogatio" }],
+    params: [{ name: "utm_source", operation: "set", value: "rogatio" }],
   });
 });

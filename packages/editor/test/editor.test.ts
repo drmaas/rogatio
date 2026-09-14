@@ -248,7 +248,7 @@ describe("@rogatio/editor rule type selection", () => {
     expect(rule.headerValue).toBeUndefined();
     expect(rule.action).toEqual({
       type: "query",
-      params: [{ name: "", value: "" }],
+      params: [{ name: "", operation: "set", value: "" }],
     });
   });
 
@@ -331,12 +331,18 @@ describe("@rogatio/editor query rule type ()", () => {
     expect(builtInRuleTypes.map((e) => e.id)).toContain("query");
   });
 
-  it("matches only a rule carrying a query action", () => {
+  it("matches only rules whose type is query", () => {
     expect(
-      queryRuleType.matches({ action: { type: "query", params: [] } }),
+      queryRuleType.matches({
+        type: "query",
+        action: { type: "query", params: [{ name: "a", value: "1" }] },
+      }),
     ).toBe(true);
     expect(
-      queryRuleType.matches({ action: { type: "redirect", params: [] } }),
+      queryRuleType.matches({
+        type: "redirect",
+        action: { type: "query", params: [{ name: "a", value: "1" }] },
+      }),
     ).toBe(false);
     expect(queryRuleType.matches({})).toBe(false);
   });

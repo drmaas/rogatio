@@ -37,12 +37,12 @@ Acceptance: query rows have set/remove. Remove hides/clears value. Sample `rule-
 
 Proof: `packages/editor/test/editor.test.ts` query cases and/or `packages/editor/test/query.test.ts` if split out.
 
-- [ ] Phase 3: Editor query set/remove UI
-  - [ ] 3.1 Per-param Operation select; defaultAction includes `operation: "set"`.
-  - [ ] 3.2 Remove: hide value input, omit `value` from the param object.
-  - [ ] 3.3 `matches(rule)` ⇒ `rule.type === "query"` (stop matching leftover `action`).
-  - [ ] 3.4 Validate: value required for set, forbidden for remove; keep unique-name / bounds checks.
-  - [ ] 3.5 Tests. `pnpm validate`.
+- [x] Phase 3: Editor query set/remove UI
+  - [x] 3.1 Per-param Operation select; defaultAction includes `operation: "set"`.
+  - [x] 3.2 Remove: hide value input, omit `value` from the param object.
+  - [x] 3.3 `matches(rule)` ⇒ `rule.type === "query"` (stop matching leftover `action`).
+  - [x] 3.4 Validate: value required for set, forbidden for remove; keep unique-name / bounds checks.
+  - [x] 3.5 Tests. `pnpm validate`.
 
 ## Phase 4: Response-body replace wire
 
