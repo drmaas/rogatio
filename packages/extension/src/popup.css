@@ -114,9 +114,11 @@ body {
 }
 .rogatio-popup [data-project-actions] {
   display: flex;
+  align-items: stretch;
   gap: 0.5rem;
 }
 .rogatio-popup [data-project-actions] button,
+.rogatio-popup [data-project-actions] a[data-open-app],
 .rogatio-popup [data-create-actions] button {
   flex: 1 1 0;
   min-width: 0;
@@ -129,14 +131,18 @@ body {
   font: inherit;
   font-weight: 600;
   font-size: 0.85rem;
+  text-align: center;
+  text-decoration: none;
   transition:
     background-color 120ms ease,
     border-color 120ms ease;
 }
 .rogatio-popup [data-project-actions] button:hover,
+.rogatio-popup [data-project-actions] a[data-open-app]:hover,
 .rogatio-popup [data-create-actions] button[data-create-cancel]:hover {
   background: var(--rogatio-surface-raised);
   border-color: rgba(148, 163, 184, 0.28);
+  text-decoration: none;
 }
 .rogatio-popup [data-create-form] {
   display: grid;
@@ -220,7 +226,6 @@ body {
 .rogatio-popup a:hover {
   text-decoration: underline;
 }
-.rogatio-popup a[data-open-app],
 .rogatio-popup a[data-group-edit] {
   border: 1px solid var(--rogatio-border);
   border-radius: 999px;
@@ -230,8 +235,6 @@ body {
   cursor: pointer;
   font-weight: 500;
   font-size: 0.8rem;
-}
-.rogatio-popup a[data-group-edit] {
   margin-left: auto;
 }
 .rogatio-popup details[data-group] {
@@ -298,9 +301,9 @@ body {
     background: Canvas;
   }
   .rogatio-popup li,
-  .rogatio-popup a[data-open-app],
   .rogatio-popup a[data-group-edit],
   .rogatio-popup [data-project-actions] button,
+  .rogatio-popup [data-project-actions] a[data-open-app],
   .rogatio-popup [data-create-form],
   .rogatio-popup [data-create-actions] button,
   .rogatio-popup [data-create-form] input[type="text"],

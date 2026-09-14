@@ -1,8 +1,69 @@
 import { expect, test } from "@playwright/test";
 
-function installChromeMock(): void {
-  // Note: this function is serialized by addInitScript, so the envelope must be
-  // defined here rather than captured from the module closure.
+type MockProject = {
+  id: string;
+  name: string;
+  data: {
+    version: number;
+    name: string;
+    groups: Array<{
+      id: string;
+      name: string;
+      origins: string[];
+      rules: Array<{
+        id: string;
+        name: string;
+        urlRegex: string;
+        origins: string[];
+        resourceTypes: string[];
+        priority: number;
+      }>;
+    }>;
+  };
+  revision: number;
+  enabledGroupIds: string[];
+  grantedOrigins: string[];
+};
+
+type MockEnvelope = {
+  version: number;
+  projects: Record<string, MockProject>;
+  activeProjectId: string | null;
+};
+
+const projectA: MockProject = {
+  id: "project-a",
+  name: "Project A",
+  data: {
+    version: 1,
+    name: "Project A",
+    groups: [
+      {
+        id: "group-one",
+        name: "One",
+        origins: ["https://one.example"],
+        rules: [
+          {
+            id: "rule-one",
+            name: "First rule",
+            urlRegex: "^https://one\\.example/first$",
+            origins: [],
+            resourceTypes: ["main_frame"],
+            priority: 100,
+          },
+        ],
+      },
+    ],
+  },
+  revision: 1,
+  enabledGroupIds: ["group-one"],
+  grantedOrigins: ["https://one.example"],
+};
+
+/** Optional seed is serialized by addInitScript; default lives inside the fn. */
+function installChromeMock(seed?: MockEnvelope): void {
+  // Note: this function is serialized by addInitScript, so the default envelope
+  // must be defined here rather than captured from the module closure.
   type Envelope = {
     version: number;
     projects: Record<
@@ -34,7 +95,7 @@ function installChromeMock(): void {
     >;
     activeProjectId: string | null;
   };
-  const state: Envelope = {
+  const state: Envelope = seed ?? {
     version: 1,
     projects: {
       "project-a": {
@@ -292,9 +353,11 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
   await page.goto("/extension/popup.html");
 
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
-  await expect(page.locator("[data-project-picker]")).toBeVisible();
+  // ≥2 projects: picker visible with the active option selected.
+  const picker = page.locator("[data-project-picker]");
+  await expect(picker).toBeVisible();
+  await expect(picker).toHaveValue("project-a");
   await expect(page.getByText("One")).toBeVisible();
-  await expect(page.locator("[data-open-app]")).toBeVisible();
   await expect(page.locator("[data-group-toggle]")).toHaveCount(1);
 
   // F25: the popup is a fixed, comfortable width and exposes project entry
@@ -302,9 +365,25 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
   const popupCard = page.locator(".rogatio-popup");
   const cardBox = await popupCard.boundingBox();
   expect(cardBox?.width ?? 0).toBeGreaterThan(400);
-  await expect(page.locator("[data-project-actions]")).toBeVisible();
-  await expect(page.locator("[data-create-project]")).toBeVisible();
-  await expect(page.locator("[data-import-project]")).toBeVisible();
+
+  // Toolbar: Open app lives under [data-project-actions] with New and Import;
+  // header stays brand (+ optional picker), not the old Open-app pill.
+  const actions = page.locator("[data-project-actions]");
+  await expect(actions).toBeVisible();
+  await expect(actions.locator("[data-create-project]")).toBeVisible();
+  await expect(actions.locator("[data-import-project]")).toBeVisible();
+  await expect(actions.locator("[data-open-app]")).toBeVisible();
+  await expect(page.locator("header [data-open-app]")).toHaveCount(0);
+  // Picker sits on its own row above the action row.
+  const pickerBeforeActions = await page.evaluate(() => {
+    const p = document.querySelector("[data-project-picker]");
+    const a = document.querySelector("[data-project-actions]");
+    if (!p || !a) return false;
+    return Boolean(
+      p.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+  expect(pickerBeforeActions).toBe(true);
 
   await page.locator("[data-create-project]").click();
   const createForm = page.locator("[data-create-form]");
@@ -328,4 +407,46 @@ test("popup renders the dark Rogatio card", async ({ page, request }) => {
   await expect(page.locator("[data-popup-status]")).toHaveText(
     "Project imported.",
   );
+});
+
+test("popup hides project picker when there are zero projects", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, {
+    version: 1,
+    projects: {},
+    activeProjectId: null,
+  } satisfies MockEnvelope);
+  await page.goto("/extension/popup.html");
+
+  await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
+  await expect(page.locator("[data-project-picker]")).toHaveCount(0);
+
+  const actions = page.locator("[data-project-actions]");
+  await expect(actions.locator("[data-create-project]")).toBeVisible();
+  await expect(actions.locator("[data-import-project]")).toBeVisible();
+  await expect(actions.locator("[data-open-app]")).toBeVisible();
+  await expect(page.locator("header [data-open-app]")).toHaveCount(0);
+  await expect(page.getByText("No active project")).toBeVisible();
+});
+
+test("popup hides project picker when there is one project", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, {
+    version: 1,
+    projects: { "project-a": projectA },
+    activeProjectId: "project-a",
+  } satisfies MockEnvelope);
+  await page.goto("/extension/popup.html");
+
+  await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
+  await expect(page.locator("[data-project-picker]")).toHaveCount(0);
+
+  const actions = page.locator("[data-project-actions]");
+  await expect(actions.locator("[data-create-project]")).toBeVisible();
+  await expect(actions.locator("[data-import-project]")).toBeVisible();
+  await expect(actions.locator("[data-open-app]")).toBeVisible();
+  await expect(page.locator("header [data-open-app]")).toHaveCount(0);
+  await expect(page.getByText("One")).toBeVisible();
 });
