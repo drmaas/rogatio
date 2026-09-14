@@ -550,3 +550,50 @@ test("popup empty-groups state omits project subtitle", async ({ page }) => {
   // Empty-state rows must not invent a project subtitle.
   await expect(page.locator("[data-active-project]")).toHaveCount(0);
 });
+
+test("popup project picker switches active project via switch-project", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock);
+  await page.goto("/extension/popup.html");
+
+  const picker = page.locator("[data-project-picker]");
+  await expect(picker).toBeVisible();
+  await expect(picker).toBeEnabled();
+  await expect(picker).toHaveValue("project-a");
+  await expect(page.getByText("One")).toBeVisible();
+  await expect(
+    page.locator("details[data-group] [data-active-project]"),
+  ).toHaveText("Project A");
+
+  await picker.selectOption("project-b");
+  await expect(picker).toHaveValue("project-b");
+  await expect(picker.locator("option:checked")).toHaveText("Project B");
+  await expect(
+    page.getByText("This project has no saved groups."),
+  ).toBeVisible();
+  await expect(page.locator("details[data-group]")).toHaveCount(0);
+  // Empty-state list has no group-card subtitle; picker label tracks B.
+  await expect(page.locator("[data-active-project]")).toHaveCount(0);
+
+  await picker.selectOption("project-a");
+  await expect(picker).toHaveValue("project-a");
+  await expect(page.getByText("One")).toBeVisible();
+  await expect(
+    page.locator("details[data-group] [data-active-project]"),
+  ).toHaveText("Project A");
+});
+
+test("popup Open app href stays management page after project switch", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock);
+  await page.goto("/extension/popup.html");
+
+  const openApp = page.locator("[data-open-app]");
+  await expect(openApp).toHaveAttribute("href", "index.html");
+
+  await page.locator("[data-project-picker]").selectOption("project-b");
+  await expect(page.locator("[data-project-picker]")).toHaveValue("project-b");
+  await expect(openApp).toHaveAttribute("href", "index.html");
+});

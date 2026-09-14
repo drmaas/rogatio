@@ -218,7 +218,10 @@ function render(): void {
       if (project.id === current.activeProjectId) option.selected = true;
       picker.append(option);
     }
-    picker.disabled = true;
+    picker.addEventListener("change", async () => {
+      await current.switchProject(picker.value);
+      await refresh();
+    });
     header.append(picker);
   }
 

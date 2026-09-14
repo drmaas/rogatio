@@ -37,10 +37,10 @@ Strategy: **TDD** (see `plan.md` → Implementation strategy). Write failing tes
 
 **Proving tests:** `packages/extension/test/popup-model.test.ts`; `test/browser/design-system.spec.ts` (select switch).
 
-- [ ] 3.1 Write failing unit test: `PopupModel.switchProject(projectId)` send shape `{ version: 1, command: "switch-project", projectId }` and ok/false — **public API change on `PopupModel`**
-- [ ] 3.2 Implement `switchProject` returning `response?.ok === true` (same pattern as `createProject`)
-- [ ] 3.3 Write failing browser test: select `project-b` → empty groups / subtitle “Project B” / selected value `project-b`; select `project-a` → restore
-- [ ] 3.4 Enable picker when rendered; on `change`, `await switchProject` then `await refresh()` (sequential, like toggle)
-- [ ] 3.5 Browser test: `[data-open-app]` href is management page (`index.html`); no management-page deep-link edits
-- [ ] 3.6 Confirm SW / protocol untouched unless a real blocker (prefer none)
-- [ ] 3.7 Run unit + browser tests for this surface; `pnpm validate` before phase done
+- [x] 3.1 Write failing unit test: `PopupModel.switchProject(projectId)` send shape `{ version: 1, command: "switch-project", projectId }` and ok/false — **public API change on `PopupModel`**
+- [x] 3.2 Implement `switchProject` returning `response?.ok === true` (same pattern as `createProject`)
+- [x] 3.3 Write failing browser test: select `project-b` → empty groups / subtitle “Project B” / selected value `project-b`; select `project-a` → restore
+- [x] 3.4 Enable picker when rendered; on `change`, `await switchProject` then `await refresh()` (sequential, like toggle)
+- [x] 3.5 Browser test: `[data-open-app]` href is management page (`index.html`); no management-page deep-link edits
+- [x] 3.6 Confirm SW / protocol untouched unless a real blocker (prefer none)
+- [x] 3.7 Run unit + browser tests for this surface; `pnpm validate` before phase done

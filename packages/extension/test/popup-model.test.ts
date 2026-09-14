@@ -196,6 +196,26 @@ describe("F25 popup project actions", () => {
     const model = createPopupModel({ envelope: envelope(), send });
     expect(await model.importProject({ version: 1 })).toBe(false);
   });
+
+  it("switches project through the existing switch-project lifecycle", async () => {
+    const send = vi.fn(async () => ({ ok: true }));
+    const model = createPopupModel({ envelope: envelope(), send });
+    expect(await model.switchProject("project-b")).toBe(true);
+    expect(send).toHaveBeenCalledWith({
+      version: 1,
+      command: "switch-project",
+      projectId: "project-b",
+    });
+  });
+
+  it("reports a failed switch truthfully", async () => {
+    const send = vi.fn(async () => ({
+      ok: false,
+      diagnostic: { code: "extension.storage-failed" },
+    }));
+    const model = createPopupModel({ envelope: envelope(), send });
+    expect(await model.switchProject("project-b")).toBe(false);
+  });
 });
 
 function model(): ReturnType<typeof createPopupModel> {
