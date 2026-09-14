@@ -32,8 +32,9 @@ expression, resource types, priority, and (where supported) an HTTP method.
 
 - **Redirects** — send matching HTTP(S) requests to an absolute destination, including
   regular-expression capture substitution.
-- **Query parameters** — add missing parameters and replace existing values for configured
-  names while preserving everything else.
+- **Query parameters** — set or remove configured names. Set adds missing parameters and
+  replaces existing values; remove drops configured names. Unrelated parameters and the
+  rest of the URL stay intact.
 - **Headers** — set, append, or remove a named request/response header, subject to
   immutable forbidden-header lists.
 - **Mocks** — return a configured status, headers, optional delay, and an inline body or a

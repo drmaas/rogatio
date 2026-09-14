@@ -19,6 +19,7 @@ export type {
   HttpMethod,
   MockAction,
   MockHeader,
+  QueryParamOperation,
   RedirectAction,
   RequestBodyAction,
   RequestBodyMode,

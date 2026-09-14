@@ -8,7 +8,11 @@ export type {
 export { compileProject } from "./compile.js";
 export { diagnosticMessages } from "./diagnostics.js";
 export { validateMatcherShape } from "./matcher.js";
-export { applyQueryTransform, queryParamsToDNR } from "./query.js";
+export {
+  applyQueryTransform,
+  type DnrQueryTransform,
+  queryActionToDNR,
+} from "./query.js";
 export {
   type RuleMatchContext,
   selectWinningOperation,

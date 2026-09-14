@@ -228,12 +228,15 @@ const projectSchemaDefinition = {
     queryParam: {
       type: "object",
       additionalProperties: false,
-      required: ["name", "value"],
+      required: ["name"],
       properties: {
         name: {
           type: "string",
           minLength: 1,
           maxLength: LIMITS.maxQueryNameLength,
+        },
+        operation: {
+          enum: ["set", "remove"],
         },
         value: {
           type: "string",
@@ -241,6 +244,35 @@ const projectSchemaDefinition = {
           maxLength: LIMITS.maxQueryValueLength,
         },
       },
+      allOf: [
+        {
+          if: {
+            anyOf: [
+              { not: { required: ["operation"] } },
+              {
+                properties: { operation: { const: "set" } },
+                required: ["operation"],
+              },
+            ],
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["value"],
+          },
+        },
+        {
+          if: {
+            properties: { operation: { const: "remove" } },
+            required: ["operation"],
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            properties: {
+              value: false,
+            },
+          },
+        },
+      ],
     },
     queryAction: {
       type: "object",

@@ -9,7 +9,7 @@ Rogatio is a local-first tool for creating, reviewing, and running browser reque
 Rules belong to named groups. Groups can define shared site origins, while individual rules can add origins and specify a stable ID, case-sensitive URL regular expression, resource types, priority, and—where supported—an HTTP method.
 
 - **Redirects:** Send matching HTTP(S) requests to an absolute destination, including controlled regular-expression capture substitution.
-- **Query parameters:** Add missing configured parameters and replace all existing values for configured names while preserving unrelated parameters, scheme, authority, path, and fragment.
+- **Query parameters:** Set or remove configured parameter names per rule. Set adds missing names and replaces all existing values for configured names; remove drops configured names from the query string. Unrelated parameters, scheme, authority, path, and fragment are preserved.
 - **Request and response headers:** Set, append, or remove a named header, subject to immutable forbidden-header lists and browser limitations.
 - **Mocks:** Return a configured status, headers, optional delay, and either an inline body or a live UTF-8 snapshot of one approved local filename. Mocks never contact upstream.
 - **Response-body rewriting:** Fetch an authorized public GET without browser credentials and perform bounded textual replacement through native messaging to an explicitly started local runtime.

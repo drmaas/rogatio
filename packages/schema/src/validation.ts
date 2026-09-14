@@ -307,6 +307,29 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
           } else {
             seenNames.add(paramName);
           }
+
+          const operation = param.operation ?? "set";
+          if (operation === "set") {
+            if (
+              typeof param.value !== "string" ||
+              param.value.length === 0 ||
+              param.value.length > LIMITS.maxQueryValueLength
+            ) {
+              issues.push({
+                instancePath: `${rulePath}/action/params/${p}/value`,
+                keyword: "queryParamValue",
+                message: "query param value is required for set",
+                params: {},
+              });
+            }
+          } else if (param.value !== undefined) {
+            issues.push({
+              instancePath: `${rulePath}/action/params/${p}/value`,
+              keyword: "queryParamValue",
+              message: "query param value must be omitted for remove",
+              params: {},
+            });
+          }
         }
       }
       if (rule.type === "header" && rule.headerName !== undefined) {

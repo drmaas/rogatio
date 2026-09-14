@@ -444,7 +444,7 @@ const RULE_KEYS = [
 ] as const;
 
 const QUERY_ACTION_KEYS = ["type", "params"] as const;
-const QUERY_PARAM_KEYS = ["name", "value"] as const;
+const QUERY_PARAM_KEYS = ["name", "operation", "value"] as const;
 const REQUEST_BODY_REPLACE_KEYS = ["mode", "body"] as const;
 const REQUEST_BODY_REGEX_KEYS = ["mode", "pattern", "replacement"] as const;
 
@@ -463,12 +463,27 @@ function validateQueryParam(
     value.name.length > LIMITS.maxQueryNameLength
   )
     errors.push(issue(`${path}/name`, "invalid-value"));
-  if (
-    typeof value.value !== "string" ||
-    value.value.length === 0 ||
-    value.value.length > LIMITS.maxQueryValueLength
-  )
-    errors.push(issue(`${path}/value`, "invalid-value"));
+
+  const operation = value.operation === undefined ? "set" : value.operation;
+  if (operation !== "set" && operation !== "remove") {
+    errors.push(issue(`${path}/operation`, "invalid-value"));
+    return;
+  }
+
+  if (operation === "set") {
+    if (
+      typeof value.value !== "string" ||
+      value.value.length === 0 ||
+      value.value.length > LIMITS.maxQueryValueLength
+    ) {
+      errors.push(issue(`${path}/value`, "invalid-value"));
+    }
+    return;
+  }
+
+  if (value.value !== undefined) {
+    errors.push(issue(`${path}/value`, "unexpected"));
+  }
 }
 
 function validateQueryAction(

@@ -114,6 +114,24 @@ describe("F7 matcher projection", () => {
     });
   });
 
+  it("builds a DNR query transform with removeParams for remove operations", () => {
+    const mixed: QueryOperation = {
+      ...queryOperation,
+      action: {
+        type: "query",
+        params: [
+          { name: "a", operation: "set", value: "1" },
+          { name: "b", operation: "remove" },
+        ],
+      },
+    };
+    const result = projectMatchers([mixed]);
+    expect(result[0]?.dnrRule?.action.redirect.transform?.query).toEqual({
+      addOrReplaceParams: [{ name: "a", value: "1", replaceOnly: false }],
+      removeParams: ["b"],
+    });
+  });
+
   it("builds an installable DNR redirect rule for a redirect action (F9)", () => {
     const result = projectMatchers([redirectOperation]);
 

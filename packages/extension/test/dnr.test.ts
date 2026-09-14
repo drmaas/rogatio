@@ -1,5 +1,5 @@
 import type { QueryOperation, RedirectOperation } from "@rogatio/compiler";
-import { queryParamsToDNR } from "@rogatio/compiler";
+import { queryActionToDNR } from "@rogatio/compiler";
 import { describe, expect, it, vi } from "vitest";
 import type { ChromeApi } from "../src/chrome.js";
 import {
@@ -86,9 +86,34 @@ describe("F9 DNR translation", () => {
         type: "redirect",
         redirect: {
           transform: {
-            query: {
-              addOrReplaceParams: queryParamsToDNR(queryOp.action),
-            },
+            query: queryActionToDNR(queryOp.action),
+          },
+        },
+      },
+      condition: {
+        regexFilter: "^https://example\\.com/",
+        resourceTypes: ["main_frame"],
+        initiatorDomains: ["example.com"],
+      },
+    });
+  });
+
+  it("maps remove query params to DNR removeParams", () => {
+    const removeOp: QueryOperation = {
+      ...queryOp,
+      action: {
+        type: "query",
+        params: [{ name: "a", operation: "remove" }],
+      },
+    };
+    expect(translateQueryToDnr(removeOp, 8)).toEqual({
+      id: 8,
+      priority: 10,
+      action: {
+        type: "redirect",
+        redirect: {
+          transform: {
+            query: { removeParams: ["a"] },
           },
         },
       },
@@ -118,9 +143,9 @@ describe("F9 DNR translation", () => {
         action: { redirect: { transform: { query: unknown } } };
       }>;
     };
-    expect(payload.addRules[0]?.action.redirect.transform.query).toEqual({
-      addOrReplaceParams: queryParamsToDNR(queryOp.action),
-    });
+    expect(payload.addRules[0]?.action.redirect.transform.query).toEqual(
+      queryActionToDNR(queryOp.action),
+    );
   });
 
   it("does nothing when the declarativeNetRequest API is unavailable", async () => {

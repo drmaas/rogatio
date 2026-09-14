@@ -722,11 +722,11 @@ Query-parameter rules add the shared rule `action` discriminator to the version-
 
 ### Schema (schema-package boundary change)
 
-`RogatioRule` gains an `action` object with a `type` discriminant. Query-parameter rules define `QueryAction = { type: "query"; params: { name: string; value: string }[] }`. The schema `rule` `$defs` adds `action` (additionalProperties still false) and a `queryAction`/`action` subschema. New bounds: `maxQueryParamsPerRule`, `maxQueryNameLength`, `maxQueryValueLength`. Semantic validation adds a duplicate-param-name check and the non-empty/length bounds. `browser-schema.ts` mirrors the same `action` validation and bounds because the MV3 bundle cannot load Ajv. `action` is optional to preserve backward compatibility with the extension's actionless projects.
+`RogatioRule` gains an `action` object with a `type` discriminant. Query-parameter rules define `QueryAction = { type: "query"; params: { name: string; operation?: "set" | "remove"; value?: string }[] }` where omitted `operation` means set and set requires `value` while remove forbids it. The schema `rule` `$defs` adds `action` (additionalProperties still false) and a `queryAction`/`action` subschema. New bounds: `maxQueryParamsPerRule`, `maxQueryNameLength`, `maxQueryValueLength`. Semantic validation adds duplicate-param-name and set/remove value rules. `browser-schema.ts` mirrors the same `action` validation and bounds because the MV3 bundle cannot load Ajv. `action` is optional to preserve backward compatibility with the extension's actionless projects.
 
 ### Compiler (compiler boundary change)
 
-Compiler emits distinct operation types: `MatcherOperation` (actionless), `RedirectOperation` (redirect rules), and `QueryOperation` (query rules). `compileProject` emits the appropriate operation type based on `rule.type`. A pure helper `queryParamsToDNR(action)` produces the DNR `addOrReplaceParams` array (`replaceOnly: false`) for unit testing without a browser. This is the durable foundation header and mock rules extend by adding new operation types.
+Compiler emits distinct operation types: `MatcherOperation` (actionless), `RedirectOperation` (redirect rules), and `QueryOperation` (query rules). `compileProject` emits the appropriate operation type based on `rule.type`. A pure helper `queryActionToDNR(action)` produces DNR `addOrReplaceParams` (`replaceOnly: false`) for set params and `removeParams` for remove params, omitting empty arrays. This is the durable foundation header and mock rules extend by adding new operation types.
 
 ### Extension (extension boundary change)
 
@@ -743,7 +743,7 @@ The version-1 schema keeps `action` optional to preserve backward compatibility 
 ### Rejected alternatives
 
 - Keep `action` optional to preserve the extension's actionless projects: accepted for backward compatibility; actionless rules remain valid but `unsupported`.
-- Add-or-replace via separate `addParams`/`removeParams`/`replaceParams` DNR fields: rejected; `addOrReplaceParams` with `replaceOnly: false` is exactly the required add-or-replace semantics in one field.
+- Using `addParams`/`removeParams`/`replaceParams` **instead of** `addOrReplaceParams` for set: rejected; set still uses `addOrReplaceParams` with `replaceOnly: false`. `removeParams` is only for `operation: "remove"`.
 - Implement query rewriting in the extension service worker rather than DNR `transform.query`: rejected; DNR is browser-native, declarative, and offline, matching the extension's design.
 
 ## Mock Rules

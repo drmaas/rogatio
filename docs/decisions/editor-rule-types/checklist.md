@@ -22,14 +22,14 @@ Acceptance: `{ name, value }` still validates as set. `{ name, operation: "remov
 
 Proof: `packages/schema/test/` query cases; `packages/compiler/test/query.test.ts`; `packages/extension/test/projection.test.ts` / `dnr.test.ts`; browser-schema coverage in existing extension schema tests.
 
-- [ ] Phase 2: Query set/remove wire
-  - [ ] 2.1 `RogatioQueryParam`: optional `operation` `"set" | "remove"`, optional `value`. Omit `operation` ⇒ set.
-  - [ ] 2.2 JSON Schema `queryParam` if/then (value required on set/absent; forbidden on remove). Semantic unique names unchanged; value/remove rules in `validation.ts` if schema if/then is not enough for the remove side.
-  - [ ] 2.3 Replace `queryParamsToDNR` with `queryActionToDNR` returning `{ addOrReplaceParams?, removeParams? }`. Update `applyQueryTransform` for deletes (remove-only, set-only, mixed set+remove; preserve unrelated query keys). Update compiler exports and all callers.
-  - [ ] 2.4 Extension `projection.ts` / `dnr.ts` write both DNR fields; omit empty arrays.
-  - [ ] 2.5 `packages/extension/src/browser-schema.ts`: `operation` on params; same value/remove rules.
-  - [ ] 2.6 `rogatio-overview.md` and `docs/architecture.md` query text: set and remove, `removeParams` only for remove (F10 add-or-replace for set unchanged).
-  - [ ] 2.7 Schema + compiler + extension tests (include mixed set+remove and `{ name, value }` backward compat). `test/integration/packaged-cli.test.ts` still verifies `samples/basic/.rogatio.json`. `pnpm validate`.
+- [x] Phase 2: Query set/remove wire
+  - [x] 2.1 `RogatioQueryParam`: optional `operation` `"set" | "remove"`, optional `value`. Omit `operation` ⇒ set.
+  - [x] 2.2 JSON Schema `queryParam` if/then (value required on set/absent; forbidden on remove). Semantic unique names unchanged; value/remove rules in `validation.ts` if schema if/then is not enough for the remove side.
+  - [x] 2.3 Replace `queryParamsToDNR` with `queryActionToDNR` returning `{ addOrReplaceParams?, removeParams? }`. Update `applyQueryTransform` for deletes (remove-only, set-only, mixed set+remove; preserve unrelated query keys). Update compiler exports and all callers.
+  - [x] 2.4 Extension `projection.ts` / `dnr.ts` write both DNR fields; omit empty arrays.
+  - [x] 2.5 `packages/extension/src/browser-schema.ts`: `operation` on params; same value/remove rules.
+  - [x] 2.6 `rogatio-overview.md` and `docs/architecture.md` query text: set and remove, `removeParams` only for remove (F10 add-or-replace for set unchanged).
+  - [x] 2.7 Schema + compiler + extension tests (include mixed set+remove and `{ name, value }` backward compat). `test/integration/packaged-cli.test.ts` still verifies `samples/basic/.rogatio.json`. `pnpm validate`.
 
 ## Phase 3: Editor query set/remove UI
 

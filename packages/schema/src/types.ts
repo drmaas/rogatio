@@ -50,9 +50,12 @@ export interface RedirectAction {
   destination: string;
 }
 
+export type QueryParamOperation = "set" | "remove";
+
 export interface RogatioQueryParam {
   name: string;
-  value: string;
+  operation?: QueryParamOperation;
+  value?: string;
 }
 
 export interface RogatioQueryAction {
