@@ -10,7 +10,7 @@ A markdown-driven engineering workflow. Each phase is a fresh-context session th
 
 The 11 steps below correspond to the phases in this skill. Each phase has its own file under `phases/` with the exact prompt to send the subagent and the human-gate behavior.
 
-1. Start with a clear problem statement.
+1. Start with a clear problem statement. If the user did not provide one, ask for it first and do not proceed until they do. Derive the feature slug from that statement; never ask for the slug.
 2. Research → `docs/decisions/<feature>/research.md` (draft; becomes `docs/research/<feature>.md` on release).
 3. Research review (agent + human gate).
 4. Planning → `docs/decisions/<feature>/plan.md` and `docs/decisions/<feature>/checklist.md`.
@@ -87,8 +87,10 @@ The diagram from the source article, transcribed:
 - The skill never commits, pushes, opens a PR, or deletes files without explicit per-action user authorization.
 - Artifacts live at `docs/decisions/<feature>/[research|plan|checklist|refactor].md` while the feature is active. On release: `research.md` → `docs/research/<feature>.md`, `plan.md` → `docs/plans/<feature>.md`, `refactor.md` → `docs/plans/<feature>-refactor.md`, optional `workflow.md` → `docs/workflows/<feature>-workflow.md`; `checklist.md` is deleted; the `docs/decisions/<feature>/` folder is removed.
 - `checklist.md` is the implementation tracker; the implementer updates it as work progresses.
-- The user picks the provider tier (opencode-go, opencode-zen, openrouter, or freebuff) at workflow start. The skill records it in workflow state and uses the per-phase routing table in `models.md`.
-- Free tier is preferred. If no no-retention free model fits a phase, the skill pauses and asks the user before using a model that retains or trains on data.
+- If the user did not supply a problem statement, stop and ask for one before any other workflow question. Do not invent the problem.
+- Derive `<feature>` slug from the problem statement automatically (kebab-case, lowercased, concise). Never ask the user for the slug. Confirm the derived slug only if it would collide with an existing `docs/decisions/<slug>/` or worktree.
+- The user picks the provider tier (`cursor` | `free` | `normal` | `freebuff`; aliases `opencode-zen`/`openrouter`→`free`, `opencode-go`→`normal`) at workflow start. The skill records it and resolves models via [`../shared/models.md`](../shared/models.md) (phase → role → tier routing).
+- Prefer **cursor** when the session already runs in Cursor. Outside Cursor, prefer **free**. If no no-retention free model fits a phase, the skill pauses and asks before using a model that retains or trains on data.
 - After every implementation phase, run the repository's canonical validation command. CI should run that same command, not a weaker duplicate.
 - Default implementation strategy is **TDD (tests first)**. The plan-review subagent records the feature's strategy in `plan.md` under `## Implementation strategy` and may flip to Code first only when the feature genuinely cannot be tested (recorded with a one-line reason). The user can override either choice by editing `plan.md` before approving the plan-review gate, or by selecting **Revise** and naming the desired strategy. The implementer and the implementation reviewer both read the strategy from `plan.md` and verify it was followed.
 - After each implementation iteration and before the implementation review, the skill runs the verify step (format → lint → typecheck → tests). The verify subagent edits files in place to fix mechanical failures. The implementation-review subagent is only spawned after verify returns green.
@@ -100,38 +102,29 @@ The diagram from the source article, transcribed:
 
 ## Agent Model Tiers
 
-Choose exactly one provider tier at workflow start (see `models.md`). The provider picks the model catalog; the per-phase routing table in `models.md` picks the model within that catalog.
+Canonical definitions: [`../shared/models.md`](../shared/models.md) (local `models.md` is a redirect stub).
 
-The user picks from:
+Choose exactly one provider tier at workflow start (`cursor` | `free` | `normal` | `freebuff`). Prefer **cursor** in Cursor sessions, **free** otherwise. If unspecified, ask before delegating. On **cursor**, do not use Fable without explicit approval.
 
-- **opencode-go** — paid OpenCode Go models.
-- **opencode-zen** — free OpenCode Zen models (preferred when available).
-- **openrouter** — OpenRouter free models.
-- **freebuff** — freebuff coding agent (when the user wants the freebuff harness).
+Map each RPI phase to a shared role, then resolve the model from the active tier:
 
-OpenCode Zen and OpenCode Go models must be free. Avoid models that retain data or train on data. If no no-retention model fits a phase, pause and ask the user before delegating to one that does.
+| Phase | Role |
+| --- | --- |
+| Research | `reasoning` |
+| Research review | `adversarial` |
+| Plan | `plan` |
+| Plan review | `adversarial` |
+| Implementation | `coding` |
+| Verify | `verify` |
+| Implementation review | `review` |
+| Final review | `review` |
+| Refactor | `docs` |
 
-The free-tier phase routing mirrors `sdd` and `doit`:
-
-| Phase | Primary | Fallback |
-| --- | --- | --- |
-| Research | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Research review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Plan | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Plan review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Implementation | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Verify | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Implementation review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Final review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| Refactor | `opencode/hy3-free` | `openrouter/thinkingmachines/inkling-small:free` |
-
-The implementer uses a cheaper model; planning, review, and refactor use stronger reasoning models. The implementer and its reviewer use different models where possible to avoid correlated blind spots.
-
-Verify model availability once with `opencode models` at workflow start. Record the chosen provider, the model that served each phase, and every fallback. A model report is not verification evidence; all required commands still run for real.
+On **cursor**, walk primary → alt → **cross-pool** when a usage pool is maxed (Cursor Models vs Other Models). On **free** / **normal**, use that file's role primary/fallback or chain. Verify availability at start; record tier, models, fallbacks, and exhausted pools. A model report is not verification evidence.
 
 ## Workflow at a glance
 
-1. Run `question` to capture `<feature>` slug, base branch, and provider tier. Record in conversation state.
+1. If no problem statement yet, ask for one and stop until the user provides it. Derive `<feature>` slug from that statement (do not ask). Then `question` for base branch and provider tier (`cursor` | `free` | `normal` | `freebuff`). Record all three in conversation state.
 2. Run `worktree.md` to create the worktree. Refuse to proceed in the main checkout.
 3. Read `artifacts.md` to confirm path layout, then `phases/01-research.md` to begin.
 4. After every agent review, follow `human-gates.md`: print the agent's summary, then `question` for approved / revise / ignore-points / abort.

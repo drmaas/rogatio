@@ -4,7 +4,7 @@ RPI always runs in a dedicated feature worktree. Never edit in the main checkout
 
 ## Procedure
 
-Run at the start of the workflow, after the user picks `<feature>` and provider tier.
+Run at the start of the workflow, after the problem statement is captured, `<feature>` slug is derived from it, and the user picks provider tier (and base branch).
 
 1. Verify the active root:
 

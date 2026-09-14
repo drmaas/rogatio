@@ -29,60 +29,23 @@ Do not silently skip stages. If a stage is not applicable, record why in the wor
 
 ## Agent Model Tiers
 
-Choose exactly one tier before Stage 1 and carry that tier through every role in the workflow. If the user did not specify `free` or `normal`, ask them to choose before delegating work. Do not silently change tiers mid-workflow.
+Canonical definitions: [`../shared/models.md`](../shared/models.md).
 
-### Free tier
+Choose exactly one provider tier before Stage 1 (`cursor` | `free` | `normal` | `freebuff`). Aliases: `opencode-zen` / `openrouter` → `free`; `opencode-go` → `normal`. Prefer **cursor** in Cursor sessions, **free** otherwise. If the user did not specify a tier, ask before delegating. Do not change tiers mid-workflow.
 
-Free tier uses the OpenCode Zen free catalog and OpenRouter free models. Current exact model IDs are:
+Resolve models by mapping each SDD stage to a shared role (see that file's **sdd** phase→role table), then applying the active tier's role routing:
 
-OpenCode Zen free:
+| Stage | Phase | Role |
+| --- | --- | --- |
+| 1 | Brainstorm / adversarial | `reasoning` / `adversarial` |
+| 2–3 | Architecture, specification | `reasoning` |
+| 5 | Implementation plan | `plan` |
+| 6–7 | Tests, implementation | `coding` |
+| 8 | Verification | `verify` |
+| 9 | Independent review | `review` |
+| 10 | Documentation | `docs` |
 
-- `opencode/x-preview-f-free` (Ox Alpha Free)
-- `opencode/nemotron-3-ultra-free` (Nemotron 3 Ultra Free)
-- `opencode/nemotron-3.5-lightning-free` (Nemotron 3.5 Lightning Free)
-- `opencode/muse-spark-1.2-contributor-free` (Muse Spark 1.2 Free)
-- `opencode/hy3-free` (Hy3 Free)
-- `opencode/mimo-v2.5-free` (MiMo V2.5 Free)
-- `opencode/big-pickle` (Big Pickle)
-
-OpenRouter free:
-
-- `openrouter/poolside/laguna-s-2.1:free` (Laguna S 2.1)
-- `openrouter/thinkingmachines/inkling-small:free` (Inkling Small)
-- `openrouter/dots-studio/dots-3-note-preview:free` (Dots3-Note Preview)
-
-Free mode routes each phase to a primary model with a documented fallback. If the primary is unavailable, use the fallback rather than the session model or a paid provider. Never silently substitute an unlisted model; if both primary and fallback are unavailable, stop and ask the user to switch to normal tier or explicitly approve a replacement.
-
-#### SDD free-phase routing
-
-| Stage | Phase | Primary | Fallback |
-| --- | --- | --- | --- |
-| 1 | Brainstorm | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| 2 | Architecture | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| 3 | Specification | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| 4 | Human review gate | No delegated model; wait for the user | |
-| 5 | Implementation plan | `opencode/hy3-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| 6 | Tests first | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
-| 7 | Implementation | `openrouter/poolside/laguna-s-2.1:free` | `openrouter/thinkingmachines/inkling-small:free` |
-| 8 | Verification and tests | `opencode/nemotron-3.5-lightning-free` | `openrouter/poolside/laguna-s-2.1:free` |
-| 9 | Independent fresh-context review | `opencode/nemotron-3-ultra-free` | `openrouter/thinkingmachines/inkling-small:free` |
-| 10 | Documentation | `opencode/hy3-free` | `openrouter/dots-studio/dots-3-note-preview:free` |
-| 11 | Release actions | No delegated model; require user authorization | |
-
-The reasoning-heavy discovery and design stages (brainstorm, architecture, specification) use Nemotron 3 Ultra Free as primary because it pairs the strongest reasoning with the fastest speed in the catalog. Plan and documentation use Hy3 Free as primary. Implementation and tests use Laguna S 2.1 as primary with Inkling Small as fallback on both speed and coding score. Verification uses Nemotron 3.5 Lightning as primary for its speed, falling back to Laguna S 2.1. Review uses Nemotron 3 Ultra with Inkling Small as fallback so the reviewer stays separate from the implementation model.
-
-### Normal tier
-
-Normal tier retains the existing role chains, but prefers an exact or clearly equivalent free OpenCode Zen model before a paid normal model. The current exact equivalence is `opencode/hy3-free` for the existing `opencode-go/hy3` verification/documentation role. Other free models are alternatives by capability, not automatic equivalents.
-
-- **Primary brainstorm, architecture, SDD specification, tests, and coding:** `opencode-go/gpt-5.6-luna` → `openrouter/openai/gpt-5.6-luna` → session model.
-- **Adversarial brainstorm:** `opencode-go/minimax-m3` → `opencode-go/minimax-m2.7` → `openrouter/anthropic/claude-opus-5` → session model.
-- **Plan writing and independent review:** `opencode-go/glm-5.3` → `opencode-go/glm-5.2` → `openrouter/openai/gpt-5.5` → session model.
-- **Verification and documentation:** `opencode/hy3-free` → `opencode-go/hy3` → `openrouter/openai/gpt-5.5` → session model.
-
-### Selection and recording
-
-At workflow start, verify the selected tier's IDs with `opencode models` or the session's provider list. Record the selected tier, the model used for each role, and every fallback in the workflow log. A model report is not verification evidence; all required commands still run for real. Under a single-model session, keep the role passes distinct and perform the fresh-context review as a deliberate self-review.
+On **cursor**, walk primary → alt → cross-pool when a usage pool is maxed. On **free** / **normal**, use the documented primary/fallback or chain. Record tier, per-role model, fallbacks, and exhausted Cursor pools in the workflow log. Verify IDs at start (`opencode models` or Task allowlist). A model report is not verification evidence.
 
 ## Workflow state and artifacts
 
