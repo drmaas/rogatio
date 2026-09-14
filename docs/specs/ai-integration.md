@@ -1,6 +1,9 @@
+> Status: frozen 2026-09-13
+>
+> Shipped in #83; prior DRAFT banner superseded by merge.
+
 # AI Integration Specification (Revised)
 
-> Status: DRAFT — pending human review (Stage 4)
 > Updated per user guidance: self-contained edit, cross-platform config, shared AI modules.
 
 ## 1. Problem Statement & Goals
