@@ -180,11 +180,22 @@ test("reports an actionable message and failed status when the native host is mi
   await expect(page.locator("[data-extension-id]")).toContainText(
     `Extension ID: ${"a".repeat(32)}`,
   );
-  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page
+  const copyInstallButton = page
     .locator("[data-runtime-guidance]")
-    .getByRole("button", { name: "Copy install command" })
-    .click();
+    .getByRole("button", { name: "Copy install command" });
+  await expect(copyInstallButton).toHaveText("⧉");
+  await expect(copyInstallButton).toHaveAttribute(
+    "title",
+    "Copy install command",
+  );
+  await expect(
+    page.locator(".rogatio-install-command").filter({
+      has: page.locator("[data-runtime-install-command]"),
+      hasText: "⧉",
+    }),
+  ).toHaveCount(1);
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await copyInstallButton.click();
   await expect(page.locator(".rogatio-status")).toContainText(
     "Install command copied",
   );
