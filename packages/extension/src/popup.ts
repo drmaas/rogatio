@@ -272,8 +272,10 @@ function render(): void {
     const summary = document.createElement("summary");
 
     const identity = document.createElement("span");
+    identity.dataset.groupIdentity = "true";
 
     const name = document.createElement("span");
+    name.dataset.groupName = "true";
     name.textContent = group.name;
     identity.append(name);
 

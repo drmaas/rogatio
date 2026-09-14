@@ -393,13 +393,11 @@ test("popup group card chrome", async ({ page }) => {
   await expect(groupCard).not.toHaveAttribute("open");
   const activeProject = groupCard.locator("[data-active-project]");
   await expect(activeProject).toHaveText("Project A");
+  await expect(groupCard.locator("[data-group-name]")).toHaveText("One");
   const subtitleUnderName = await groupCard.evaluate((details) => {
     const summary = details.querySelector("summary");
     if (!summary) return false;
-    const nameSpan = Array.from(summary.querySelectorAll("span")).find(
-      (el) =>
-        el.textContent === "One" && !el.hasAttribute("data-active-project"),
-    );
+    const nameSpan = summary.querySelector("[data-group-name]");
     const subtitle = summary.querySelector("[data-active-project]");
     if (!nameSpan || !subtitle) return false;
     const nameBox = nameSpan.getBoundingClientRect();

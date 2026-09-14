@@ -271,18 +271,14 @@ body {
 .rogatio-popup details[data-group][open] summary::before {
   transform: rotate(45deg);
 }
-.rogatio-popup details[data-group] summary > span:first-child {
+.rogatio-popup details[data-group] summary [data-group-identity] {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
   min-width: 0;
   flex: 1 1 auto;
 }
-.rogatio-popup
-  details[data-group]
-  summary
-  > span:first-child
-  > span:first-child {
+.rogatio-popup details[data-group] summary [data-group-name] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
