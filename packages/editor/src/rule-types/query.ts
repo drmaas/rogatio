@@ -4,6 +4,7 @@ import type {
   RuleTypeFieldExtension,
   RuleTypeFieldMount,
 } from "../types.js";
+import { createSelect } from "./dom.js";
 
 const MAX_QUERY_NAME_LENGTH = 256;
 const MAX_QUERY_VALUE_LENGTH = 2048;
@@ -60,24 +61,6 @@ function stable(diagnostics: EditorDiagnostic[]): readonly EditorDiagnostic[] {
       ? a.code.localeCompare(b.code)
       : a.path.localeCompare(b.path),
   );
-}
-
-function createSelect(
-  document: Document,
-  options: ReadonlyArray<string>,
-  value: string,
-  onChange: (value: string) => void,
-): HTMLSelectElement {
-  const select = document.createElement("select");
-  for (const option of options) {
-    const opt = document.createElement("option");
-    opt.value = option;
-    opt.textContent = option;
-    if (option === value) opt.selected = true;
-    select.append(opt);
-  }
-  select.addEventListener("change", () => onChange(select.value));
-  return select;
 }
 
 export const queryRuleType: RuleTypeFieldExtension = {

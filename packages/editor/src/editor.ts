@@ -268,6 +268,24 @@ function valueAtPath(root: unknown, path: string): unknown {
   return current;
 }
 
+const MATCHER_CREATABLE_FIELDS = ["description", "method", "type"] as const;
+
+const ACTION_PAYLOAD_FIELDS = [
+  "redirect",
+  "action",
+  "requestBody",
+  "responseBody",
+  "headerDirection",
+  "headerOperation",
+  "headerName",
+  "headerValue",
+] as const;
+
+const CREATABLE_RULE_FIELDS = new Set<string>([
+  ...MATCHER_CREATABLE_FIELDS,
+  ...ACTION_PAYLOAD_FIELDS,
+]);
+
 function setValueAtPath(root: unknown, path: string, value: unknown): boolean {
   const segments = decodePointer(path);
   if (!segments || segments.length === 0) return false;
@@ -298,17 +316,7 @@ function setValueAtPath(root: unknown, path: string, value: unknown): boolean {
   if (!isRecord(current)) return false;
   if (
     !Object.hasOwn(current, finalSegment) &&
-    finalSegment !== "description" &&
-    finalSegment !== "method" &&
-    finalSegment !== "type" &&
-    finalSegment !== "action" &&
-    finalSegment !== "redirect" &&
-    finalSegment !== "requestBody" &&
-    finalSegment !== "responseBody" &&
-    finalSegment !== "headerDirection" &&
-    finalSegment !== "headerOperation" &&
-    finalSegment !== "headerName" &&
-    finalSegment !== "headerValue"
+    !CREATABLE_RULE_FIELDS.has(finalSegment)
   ) {
     return false;
   }
@@ -403,17 +411,6 @@ function isValidExtensionName(name: string): boolean {
   );
 }
 
-const ACTION_FIELDS = [
-  "redirect",
-  "action",
-  "requestBody",
-  "responseBody",
-  "headerDirection",
-  "headerOperation",
-  "headerName",
-  "headerValue",
-] as const;
-
 function clearActionFields(
   rule: unknown,
   keep?: string,
@@ -421,7 +418,7 @@ function clearActionFields(
 ): boolean {
   if (!isRecord(rule)) return false;
   let changed = false;
-  for (const field of ACTION_FIELDS) {
+  for (const field of ACTION_PAYLOAD_FIELDS) {
     if (field === keep || keepFields?.has(field)) continue;
     if (Object.hasOwn(rule, field)) {
       delete rule[field];

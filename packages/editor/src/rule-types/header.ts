@@ -6,6 +6,7 @@ import type {
   RuleTypeFieldExtension,
   RuleTypeFieldMount,
 } from "../types.js";
+import { createSelect, createTextInput } from "./dom.js";
 
 const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
   "accept-charset",
@@ -84,38 +85,6 @@ function operationOptions(current: HeaderOperationKind): ReadonlyArray<string> {
   return HEADER_EDITOR_OPERATIONS;
 }
 
-function createSelect(
-  document: Document,
-  options: ReadonlyArray<string>,
-  value: string,
-  onChange: (value: string) => void,
-): HTMLSelectElement {
-  const select = document.createElement("select");
-  for (const option of options) {
-    const opt = document.createElement("option");
-    opt.value = option;
-    opt.textContent = option;
-    if (option === value) opt.selected = true;
-    select.append(opt);
-  }
-  select.addEventListener("change", () => onChange(select.value));
-  return select;
-}
-
-function createInput(
-  document: Document,
-  value: string,
-  onChange: (value: string) => void,
-  maxLength?: number,
-): HTMLInputElement {
-  const input = document.createElement("input");
-  input.type = "text";
-  input.value = value;
-  if (maxLength !== undefined) input.maxLength = maxLength;
-  input.addEventListener("input", () => onChange(input.value));
-  return input;
-}
-
 export function createHeaderRuleType(): RuleTypeFieldExtension {
   return {
     id: "header",
@@ -188,7 +157,7 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
       const nameLabel = document.createElement("label");
       nameLabel.textContent = "Header name";
       const nameValue = (context.getField("headerName") as string) ?? "";
-      const nameInput = createInput(
+      const nameInput = createTextInput(
         document,
         nameValue,
         (value) => {
@@ -201,7 +170,7 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
       fieldset.append(nameLabel);
 
       const valueValue = (context.getField("headerValue") as string) ?? "";
-      const valueInput = createInput(
+      const valueInput = createTextInput(
         document,
         valueValue,
         (value) => {

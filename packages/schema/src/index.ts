@@ -40,6 +40,7 @@ export type {
   RuleType,
 } from "./types.js";
 export { HTTP_METHODS, PROJECT_VERSION, RESOURCE_TYPES } from "./types.js";
+export { hasLoneSurrogate } from "./utf16.js";
 export type {
   ProjectValidationResult,
   RedirectDestinationIssue,

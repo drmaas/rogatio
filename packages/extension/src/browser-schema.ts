@@ -4,6 +4,7 @@ import type {
   ResourceType,
   RogatioProject,
 } from "@rogatio/schema";
+import { hasLoneSurrogate } from "../../schema/src/utf16.js";
 
 // These helpers live canonically in @rogatio/schema (clone.ts/control.ts/digest.ts).
 // The extension build aliases the bare "@rogatio/schema" specifier to this file, so we
@@ -11,6 +12,7 @@ import type {
 export { safeClone } from "../../schema/src/clone.js";
 export { hasControl } from "../../schema/src/control.js";
 export { formatSha256, isSha256Digest } from "../../schema/src/digest.js";
+export { hasLoneSurrogate };
 
 const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
   "accept-charset",
@@ -206,22 +208,6 @@ function snapshotOwnData(
   } finally {
     ancestors.delete(value);
   }
-}
-
-function hasLoneSurrogate(value: string): boolean {
-  for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i);
-    if (code >= 0xd800 && code <= 0xdbff) {
-      if (i + 1 >= value.length) return true;
-      const next = value.charCodeAt(i + 1);
-      if (next < 0xdc00 || next > 0xdfff) return true;
-    } else if (code >= 0xdc00 && code <= 0xdfff) {
-      if (i === 0) return true;
-      const prev = value.charCodeAt(i - 1);
-      if (prev < 0xd800 || prev > 0xdbff) return true;
-    }
-  }
-  return false;
 }
 
 function origin(value: unknown): string | null {
