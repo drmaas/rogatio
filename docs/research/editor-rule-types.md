@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-14
+
 # editor-rule-types — research
 
 ## Problem restatement

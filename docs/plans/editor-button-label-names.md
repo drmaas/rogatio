@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-14
+
 # Plan: editor button/label name cleanup
 
 **Base:** `dc3bacd` (main) · **Branch:** `fix/editor-button-label-names`  

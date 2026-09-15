@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-14
+
 # editor-rule-types — refactor candidates
 
 Proposal only. No behavior change. Conservative: surface duplicates this feature introduced (header/query selects, body replace checks, persist/clear field lists) without new shared form frameworks or package-boundary merges the plan forbade.
