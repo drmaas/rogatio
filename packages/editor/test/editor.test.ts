@@ -318,7 +318,7 @@ describe("@rogatio/editor rule type selection", () => {
   });
 });
 
-describe("@rogatio/editor query rule type ()", () => {
+describe("@rogatio/editor query rule type", () => {
   const rulePath = "/groups/0/rules/0";
 
   it("registers the query rule type as a built-in extension", () => {

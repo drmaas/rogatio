@@ -56,10 +56,23 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
     .locator("[data-desktop-route-rail]")
     .getByRole("button", { name: "One", exact: true })
     .click();
-  await page.getByRole("button", { name: "Move rule First rule down" }).click();
+  await page
+    .locator('[data-rule-card][data-rule-id="rule-one"]')
+    .getByRole("button", { name: "Move rule down", exact: true })
+    .click();
   await expect(
     page.locator('[data-rule-list="group-one"] [data-rule-card]').first(),
   ).toHaveAttribute("data-rule-id", "rule-two");
+  await expect(
+    page
+      .locator('[data-rule-card][data-rule-id="rule-two"]')
+      .getByRole("button", { name: "Move rule up", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('[data-rule-card][data-rule-id="rule-two"]')
+      .getByRole("button", { name: "Remove rule", exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Add rule" }).click();
   await expect(page.getByRole("heading", { name: "New rule" })).toBeVisible();
@@ -79,18 +92,23 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
     .locator("[data-desktop-route-rail]")
     .getByRole("button", { name: "Two", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Remove group Two", exact: true })
-    .click();
+  await expect(
+    page.getByRole("button", { name: "Move group up", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Move group down", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Remove group", exact: true }),
+  ).toBeVisible();
+  await page.locator('[data-command="remove-group"]').click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText("Two");
   await dialog.getByRole("button", { name: "Cancel removal" }).click();
   await expect(
     page.getByRole("button", { name: "Two", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Remove group Two", exact: true })
-    .click();
+  await page.locator('[data-command="remove-group"]').click();
   await page
     .getByRole("alertdialog")
     .getByRole("button", { name: "Remove group" })
@@ -159,7 +177,9 @@ test("converts URLs without executing or mutating on invalid input", async ({
     .locator('[data-rule-id="rule-one"][data-command="convert-url"]')
     .click();
   await expect(
-    page.getByLabel("URL regular expression for First rule"),
+    page
+      .locator('[data-rule-card][data-rule-id="rule-one"]')
+      .getByLabel("URL regular expression", { exact: true }),
   ).toHaveValue("^https://example\\.com/a\\.b\\?x=1$");
 
   await page.evaluate(() => {
@@ -170,7 +190,9 @@ test("converts URLs without executing or mutating on invalid input", async ({
     .click();
   await expect(page.getByRole("alert")).toContainText("valid request URL");
   await expect(
-    page.getByLabel("URL regular expression for First rule"),
+    page
+      .locator('[data-rule-card][data-rule-id="rule-one"]')
+      .getByLabel("URL regular expression", { exact: true }),
   ).toHaveValue("^https://example\\.com/a\\.b\\?x=1$");
 });
 

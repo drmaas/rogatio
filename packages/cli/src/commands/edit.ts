@@ -360,7 +360,8 @@ function generateEditorHtml(
     
     const project = await fetchProject();
     
-    const editor = createEditor(root, {
+    const editor = createEditor({
+      root,
       initialProject: project,
       validate: async (value) => {
         const result = await validateProject(value);
