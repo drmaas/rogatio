@@ -17,8 +17,7 @@ export { projectSchema } from "./schema.js";
 export type {
   HeaderAction,
   HttpMethod,
-  MockAction,
-  MockHeader,
+  QueryParamOperation,
   RedirectAction,
   RequestBodyAction,
   RequestBodyMode,
@@ -27,7 +26,11 @@ export type {
   RequestBodyReplaceAction,
   ResourceType,
   ResponseBodyAction,
+  ResponseBodyMode,
+  ResponseBodyRegexAction,
+  ResponseBodyReplaceAction,
   ResponseBodyReplacement,
+  ResponseBodyUntaggedRegexAction,
   RogatioGroup,
   RogatioProject,
   RogatioQueryAction,
@@ -37,6 +40,7 @@ export type {
   RuleType,
 } from "./types.js";
 export { HTTP_METHODS, PROJECT_VERSION, RESOURCE_TYPES } from "./types.js";
+export { hasLoneSurrogate } from "./utf16.js";
 export type {
   ProjectValidationResult,
   RedirectDestinationIssue,

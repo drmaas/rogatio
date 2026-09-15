@@ -1,11 +1,11 @@
 ---
 title: Local runtime
-description: The consolidated native-messaging runtime for mock, response-body, and request-body rules.
+description: The consolidated native-messaging runtime for response-body and request-body rules.
 ---
 
-Response-body, request-body, and mock rules all run through a single native-messaging host
-process. There is no separate HTTP mock server: pairing, authorization, and mock delivery
-all flow over the `v1` native-messaging envelope (spec REQ-001..REQ-005).
+Response-body and request-body rules run through a single native-messaging host
+process. Pairing, authorization, and body transforms flow over the `v1`
+native-messaging envelope (spec REQ-001..REQ-005).
 
 ## `rogatio runtime` lifecycle
 
@@ -22,7 +22,7 @@ all flow over the `v1` native-messaging envelope (spec REQ-001..REQ-005).
   `uninstall` removes the host manifest, the device-local
   CA files, and the trust installation (idempotent).
 - `rogatio runtime host <path>` launches the consolidated native-messaging host for a project
-  on stdio. The browser extension connects to it for pairing, authorization, and mock delivery.
+  on stdio. The browser extension connects to it for pairing, authorization, and body transforms.
 
 ## Activation is unconditional for the host
 
@@ -44,7 +44,5 @@ initiator origin must be within granted scope. A denied request triggers no inte
 
 Observed request/response bodies are processed in-process only. The native-messaging envelope
 carries bounded metadata and transform instructions, never request or response body bytes,
-credentials, sensitive header values, or file contents — with one deliberate exception: mock
-response bodies cross the envelope as base64 `mockBody` on the `mock.response` message only
-(spec REQ-006). Observed live bodies are never persisted, logged, exported, or transferred
-through native messaging.
+credentials, sensitive header values, or file contents. Observed live bodies are never
+persisted, logged, exported, or transferred through native messaging.

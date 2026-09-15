@@ -4,7 +4,7 @@ import type {
   RedirectOperation,
   RogatioOperation,
 } from "@rogatio/compiler";
-import { queryParamsToDNR } from "@rogatio/compiler";
+import { type DnrQueryTransform, queryActionToDNR } from "@rogatio/compiler";
 import type { ChromeApi } from "./chrome.js";
 
 export interface DnrRedirectRule {
@@ -23,7 +23,7 @@ export interface DnrQueryRule {
   priority: number;
   action: {
     type: "redirect";
-    redirect: { transform: { query: { addOrReplaceParams: unknown[] } } };
+    redirect: { transform: { query: DnrQueryTransform } };
   };
   condition: {
     regexFilter: string;
@@ -80,7 +80,7 @@ export function translateQueryToDnr(
       type: "redirect",
       redirect: {
         transform: {
-          query: { addOrReplaceParams: queryParamsToDNR(operation.action) },
+          query: queryActionToDNR(operation.action),
         },
       },
     },

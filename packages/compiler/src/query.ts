@@ -6,12 +6,44 @@ export interface DnrQueryParam {
   readonly replaceOnly: false;
 }
 
-export function queryParamsToDNR(action: RogatioQueryAction): DnrQueryParam[] {
-  return action.params.map((param) => ({
-    name: param.name,
-    value: param.value,
-    replaceOnly: false,
-  }));
+export interface DnrQueryTransform {
+  addOrReplaceParams?: DnrQueryParam[];
+  removeParams?: string[];
+}
+
+function resolveQueryParamOperation(
+  param: RogatioQueryAction["params"][number],
+): "set" | "remove" {
+  return param.operation ?? "set";
+}
+
+export function queryActionToDNR(
+  action: RogatioQueryAction,
+): DnrQueryTransform {
+  const addOrReplaceParams: DnrQueryParam[] = [];
+  const removeParams: string[] = [];
+
+  for (const param of action.params) {
+    if (resolveQueryParamOperation(param) === "remove") {
+      removeParams.push(param.name);
+      continue;
+    }
+    if (typeof param.value !== "string") continue;
+    addOrReplaceParams.push({
+      name: param.name,
+      value: param.value,
+      replaceOnly: false,
+    });
+  }
+
+  const result: DnrQueryTransform = {};
+  if (addOrReplaceParams.length > 0) {
+    result.addOrReplaceParams = addOrReplaceParams;
+  }
+  if (removeParams.length > 0) {
+    result.removeParams = removeParams;
+  }
+  return result;
 }
 
 export function applyQueryTransform(
@@ -19,8 +51,13 @@ export function applyQueryTransform(
   action: RogatioQueryAction,
 ): string {
   const target = new URL(url);
-  const actionByName = new Map<string, string>();
-  for (const param of action.params) actionByName.set(param.name, param.value);
+  const { addOrReplaceParams = [], removeParams = [] } =
+    queryActionToDNR(action);
+  const removeNames = new Set(removeParams);
+  const setByName = new Map<string, string>();
+  for (const param of addOrReplaceParams) {
+    setByName.set(param.name, param.value);
+  }
 
   const existing: Array<[string, string]> = [];
   for (const [key, value] of target.searchParams) existing.push([key, value]);
@@ -28,17 +65,18 @@ export function applyQueryTransform(
   const replaced = new Set<string>();
   const out: Array<[string, string]> = [];
   for (const [key, value] of existing) {
-    if (actionByName.has(key)) {
+    if (removeNames.has(key)) continue;
+    if (setByName.has(key)) {
       if (!replaced.has(key)) {
         replaced.add(key);
-        out.push([key, actionByName.get(key) as string]);
+        out.push([key, setByName.get(key) as string]);
       }
       continue;
     }
     out.push([key, value]);
   }
-  for (const param of action.params) {
-    if (!replaced.has(param.name)) out.push([param.name, param.value]);
+  for (const [name, value] of setByName) {
+    if (!replaced.has(name)) out.push([name, value]);
   }
 
   const result = new URLSearchParams();

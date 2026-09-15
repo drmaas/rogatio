@@ -6,6 +6,7 @@ import type {
   RuleTypeFieldExtension,
   RuleTypeFieldMount,
 } from "../types.js";
+import { createSelect, createTextInput } from "./dom.js";
 
 const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
   "accept-charset",
@@ -75,37 +76,13 @@ const HEADER_OPERATIONS: ReadonlyArray<HeaderOperationKind> = [
   "append",
   "remove",
 ];
+const HEADER_EDITOR_OPERATIONS = Object.freeze(["set", "remove"] as const);
 
-function createSelect(
-  document: Document,
-  options: ReadonlyArray<string>,
-  value: string,
-  onChange: (value: string) => void,
-): HTMLSelectElement {
-  const select = document.createElement("select");
-  for (const option of options) {
-    const opt = document.createElement("option");
-    opt.value = option;
-    opt.textContent = option;
-    if (option === value) opt.selected = true;
-    select.append(opt);
+function operationOptions(current: HeaderOperationKind): ReadonlyArray<string> {
+  if (current === "append") {
+    return ["set", "append", "remove"];
   }
-  select.addEventListener("change", () => onChange(select.value));
-  return select;
-}
-
-function createInput(
-  document: Document,
-  value: string,
-  onChange: (value: string) => void,
-  maxLength?: number,
-): HTMLInputElement {
-  const input = document.createElement("input");
-  input.type = "text";
-  input.value = value;
-  if (maxLength !== undefined) input.maxLength = maxLength;
-  input.addEventListener("input", () => onChange(input.value));
-  return input;
+  return HEADER_EDITOR_OPERATIONS;
 }
 
 export function createHeaderRuleType(): RuleTypeFieldExtension {
@@ -114,6 +91,14 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
     label: "Header",
     matches(rule) {
       return rule.type === "header";
+    },
+    defaultFields() {
+      return {
+        headerDirection: "request",
+        headerOperation: "set",
+        headerName: "",
+        headerValue: "",
+      };
     },
     mount(context: RuleTypeFieldContext): RuleTypeFieldMount {
       const document = context.document;
@@ -140,14 +125,29 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
 
       const operationLabel = document.createElement("label");
       operationLabel.textContent = "Operation";
-      const operationValue =
+      let operationValue =
         (context.getField("headerOperation") as HeaderOperationKind) ?? "set";
+
+      const valueLabel = document.createElement("label");
+      valueLabel.textContent = "Header value";
+
+      const syncValueVisibility = (): void => {
+        const showValue =
+          operationValue === "set" || operationValue === "append";
+        valueLabel.hidden = !showValue;
+      };
+
       const operationSelect = createSelect(
         document,
-        HEADER_OPERATIONS,
+        operationOptions(operationValue),
         operationValue,
         (value) => {
+          operationValue = value as HeaderOperationKind;
           context.setField("headerOperation", value);
+          if (value === "remove") {
+            context.deleteField("headerValue");
+          }
+          syncValueVisibility();
         },
       );
       context.registerControl("/headerOperation", operationSelect);
@@ -157,7 +157,7 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
       const nameLabel = document.createElement("label");
       nameLabel.textContent = "Header name";
       const nameValue = (context.getField("headerName") as string) ?? "";
-      const nameInput = createInput(
+      const nameInput = createTextInput(
         document,
         nameValue,
         (value) => {
@@ -169,10 +169,8 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
       nameLabel.append(nameInput);
       fieldset.append(nameLabel);
 
-      const valueLabel = document.createElement("label");
-      valueLabel.textContent = "Header value";
       const valueValue = (context.getField("headerValue") as string) ?? "";
-      const valueInput = createInput(
+      const valueInput = createTextInput(
         document,
         valueValue,
         (value) => {
@@ -183,6 +181,7 @@ export function createHeaderRuleType(): RuleTypeFieldExtension {
       context.registerControl("/headerValue", valueInput);
       valueLabel.append(valueInput);
       fieldset.append(valueLabel);
+      syncValueVisibility();
 
       context.container.append(fieldset);
 

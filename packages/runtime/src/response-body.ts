@@ -1,4 +1,8 @@
-import { LIMITS } from "@rogatio/schema";
+import {
+  LIMITS,
+  type ResponseBodyAction,
+  type ResponseBodyReplaceAction,
+} from "@rogatio/schema";
 import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { fetchAuthorized } from "./outbound.js";
@@ -48,6 +52,21 @@ function responseHeader(
   name: string,
 ): string | undefined {
   return headers.find(([key]) => key.toLowerCase() === name)?.[1];
+}
+
+function responseBodyReplacements(
+  action: ResponseBodyAction,
+): readonly ResponseBodyReplacementInput[] {
+  if ("replacements" in action && Array.isArray(action.replacements)) {
+    return action.replacements;
+  }
+  return [];
+}
+
+function isReplaceAction(
+  action: ResponseBodyAction,
+): action is ResponseBodyReplaceAction {
+  return "mode" in action && action.mode === "replace";
 }
 
 export async function rewriteResponseBody(
@@ -108,32 +127,52 @@ export async function rewriteResponseBody(
   };
 }
 
+function replaceResponseBody(
+  body: string,
+  contentType: string | undefined,
+): RuntimeResult<ResponseBodyOutput> {
+  const encoded = new TextEncoder().encode(body);
+  if (encoded.byteLength > RUNTIME_LIMITS.maxResponseBodyBytes)
+    return failure("runtime.size-limit");
+  return {
+    ok: true,
+    value: {
+      body: encoded,
+      contentType: contentType?.split(";", 1)[0]?.trim() ?? "text/plain",
+    },
+  };
+}
+
 /** Fetch and rewrite one already-authorized operation entirely in the runtime. */
 export async function fetchAndRewriteAuthorizedResponse(
   operation: AuthorizedOperation,
-  replacements: readonly ResponseBodyReplacementInput[],
+  action: ResponseBodyAction,
   options: OutboundOptions = {},
 ): Promise<RuntimeResult<AuthorizedResponseBodyOutput>> {
   if (operation.kind !== "outbound-http" || operation.method !== "GET")
     return failure("runtime.unsupported-method");
   const response = await fetchAuthorized(operation, options);
   if (!response.ok) return response;
-  const rewritten = await rewriteResponseBody(
-    {
-      contentType: responseHeader(response.value.headers, "content-type"),
-      contentEncoding: responseHeader(
-        response.value.headers,
-        "content-encoding",
-      ),
-      body: response.value.body,
-    },
-    replacements,
-  );
-  if (!rewritten.ok) return rewritten;
+
+  const contentType = responseHeader(response.value.headers, "content-type");
+  const transformed = isReplaceAction(action)
+    ? replaceResponseBody(action.body, contentType)
+    : await rewriteResponseBody(
+        {
+          contentType,
+          contentEncoding: responseHeader(
+            response.value.headers,
+            "content-encoding",
+          ),
+          body: response.value.body,
+        },
+        responseBodyReplacements(action),
+      );
+  if (!transformed.ok) return transformed;
   return {
     ok: true,
     value: {
-      ...rewritten.value,
+      ...transformed.value,
       status: response.value.status,
       headers: response.value.headers,
     },

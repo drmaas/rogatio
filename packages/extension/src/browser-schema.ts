@@ -4,6 +4,7 @@ import type {
   ResourceType,
   RogatioProject,
 } from "@rogatio/schema";
+import { hasLoneSurrogate } from "../../schema/src/utf16.js";
 
 // These helpers live canonically in @rogatio/schema (clone.ts/control.ts/digest.ts).
 // The extension build aliases the bare "@rogatio/schema" specifier to this file, so we
@@ -11,6 +12,7 @@ import type {
 export { safeClone } from "../../schema/src/clone.js";
 export { hasControl } from "../../schema/src/control.js";
 export { formatSha256, isSha256Digest } from "../../schema/src/digest.js";
+export { hasLoneSurrogate };
 
 const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
   "accept-charset",
@@ -120,6 +122,10 @@ export const LIMITS = Object.freeze({
   maxHeaderNameLength: 256,
   maxHeaderValueLength: 4096,
   maxHeadersPerRule: 1,
+  maxResponseBodyReplacements: 64,
+  maxResponseBodyBytes: 4 * 1024 * 1024,
+  maxResponseBodyPatternLength: 2048,
+  maxResponseBodyReplacementLength: 4096,
   maxRequestBodyBytes: 4 * 1024 * 1024,
   maxRequestBodyPatternLength: 2048,
   maxRequestBodyReplacementLength: 4096,
@@ -202,22 +208,6 @@ function snapshotOwnData(
   } finally {
     ancestors.delete(value);
   }
-}
-
-function hasLoneSurrogate(value: string): boolean {
-  for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i);
-    if (code >= 0xd800 && code <= 0xdbff) {
-      if (i + 1 >= value.length) return true;
-      const next = value.charCodeAt(i + 1);
-      if (next < 0xdc00 || next > 0xdfff) return true;
-    } else if (code >= 0xdc00 && code <= 0xdfff) {
-      if (i === 0) return true;
-      const prev = value.charCodeAt(i - 1);
-      if (prev < 0xd800 || prev > 0xdbff) return true;
-    }
-  }
-  return false;
 }
 
 function origin(value: unknown): string | null {
@@ -438,15 +428,18 @@ const RULE_KEYS = [
   "headerOperation",
   "headerName",
   "headerValue",
-  "mock",
   "responseBody",
   "requestBody",
 ] as const;
 
 const QUERY_ACTION_KEYS = ["type", "params"] as const;
-const QUERY_PARAM_KEYS = ["name", "value"] as const;
+const QUERY_PARAM_KEYS = ["name", "operation", "value"] as const;
 const REQUEST_BODY_REPLACE_KEYS = ["mode", "body"] as const;
 const REQUEST_BODY_REGEX_KEYS = ["mode", "pattern", "replacement"] as const;
+const RESPONSE_BODY_REPLACE_KEYS = ["mode", "body"] as const;
+const RESPONSE_BODY_REGEX_KEYS = ["mode", "replacements"] as const;
+const RESPONSE_BODY_UNTAGGED_REGEX_KEYS = ["replacements"] as const;
+const RESPONSE_BODY_REPLACEMENT_KEYS = ["pattern", "replacement"] as const;
 
 function validateQueryParam(
   errors: ValidationIssue[],
@@ -463,12 +456,27 @@ function validateQueryParam(
     value.name.length > LIMITS.maxQueryNameLength
   )
     errors.push(issue(`${path}/name`, "invalid-value"));
-  if (
-    typeof value.value !== "string" ||
-    value.value.length === 0 ||
-    value.value.length > LIMITS.maxQueryValueLength
-  )
-    errors.push(issue(`${path}/value`, "invalid-value"));
+
+  const operation = value.operation === undefined ? "set" : value.operation;
+  if (operation !== "set" && operation !== "remove") {
+    errors.push(issue(`${path}/operation`, "invalid-value"));
+    return;
+  }
+
+  if (operation === "set") {
+    if (
+      typeof value.value !== "string" ||
+      value.value.length === 0 ||
+      value.value.length > LIMITS.maxQueryValueLength
+    ) {
+      errors.push(issue(`${path}/value`, "invalid-value"));
+    }
+    return;
+  }
+
+  if (value.value !== undefined) {
+    errors.push(issue(`${path}/value`, "unexpected"));
+  }
 }
 
 function validateQueryAction(
@@ -645,7 +653,6 @@ export function validateProjectDetailed(
         rule.type !== "redirect" &&
         rule.type !== "query" &&
         rule.type !== "header" &&
-        rule.type !== "mock" &&
         rule.type !== "response-body" &&
         rule.type !== "request-body"
       )
@@ -715,6 +722,100 @@ export function validateProjectDetailed(
         }
         if (operation === "remove" && headerValue !== undefined) {
           errors.push(issue(`${rulePath}/headerValue`, "unexpected"));
+        }
+      }
+      if (rule.type === "response-body") {
+        const action = rule.responseBody as {
+          mode?: string;
+          body?: unknown;
+          replacements?: unknown;
+        };
+        const actionPath = `${rulePath}/responseBody`;
+        if (!action || typeof action !== "object") {
+          errors.push(issue(actionPath, "response-body-action"));
+        } else if (
+          !hasOnlyKeys(action as JsonRecord, RESPONSE_BODY_REPLACE_KEYS) &&
+          !hasOnlyKeys(action as JsonRecord, RESPONSE_BODY_REGEX_KEYS) &&
+          !hasOnlyKeys(action as JsonRecord, RESPONSE_BODY_UNTAGGED_REGEX_KEYS)
+        ) {
+          errors.push(issue(actionPath, "response-body-unknown-property"));
+        } else if (action.mode === "replace") {
+          const body = action.body;
+          if (typeof body !== "string") {
+            errors.push(
+              issue(`${actionPath}/body`, "response-body-replace-body"),
+            );
+          } else if (body.length > LIMITS.maxResponseBodyBytes) {
+            errors.push(
+              issue(`${actionPath}/body`, "response-body-replace-body"),
+            );
+          } else if (hasLoneSurrogate(body)) {
+            errors.push(
+              issue(`${actionPath}/body`, "response-body-lone-surrogate"),
+            );
+          }
+        } else {
+          const replacements = action.replacements;
+          if (
+            !Array.isArray(replacements) ||
+            replacements.length === 0 ||
+            replacements.length > LIMITS.maxResponseBodyReplacements
+          ) {
+            errors.push(
+              issue(`${actionPath}/replacements`, "response-body-replacements"),
+            );
+          } else {
+            for (let index = 0; index < replacements.length; index += 1) {
+              const entry = replacements[index];
+              if (
+                !isRecord(entry) ||
+                !hasOnlyKeys(entry, RESPONSE_BODY_REPLACEMENT_KEYS)
+              ) {
+                errors.push(
+                  issue(
+                    `${actionPath}/replacements/${index}`,
+                    "response-body-replacement",
+                  ),
+                );
+                continue;
+              }
+              const pattern = entry.pattern;
+              const replacement = entry.replacement;
+              if (typeof pattern !== "string" || pattern.length === 0) {
+                errors.push(
+                  issue(
+                    `${actionPath}/replacements/${index}/pattern`,
+                    "response-body-pattern",
+                  ),
+                );
+              } else if (pattern.length > LIMITS.maxResponseBodyPatternLength) {
+                errors.push(
+                  issue(
+                    `${actionPath}/replacements/${index}/pattern`,
+                    "response-body-pattern",
+                  ),
+                );
+              } else if (!isValidUrlRegex(pattern)) {
+                errors.push(
+                  issue(
+                    `${actionPath}/replacements/${index}/pattern`,
+                    "response-body-pattern",
+                  ),
+                );
+              }
+              if (
+                typeof replacement !== "string" ||
+                replacement.length > LIMITS.maxResponseBodyReplacementLength
+              ) {
+                errors.push(
+                  issue(
+                    `${actionPath}/replacements/${index}/replacement`,
+                    "response-body-replacement",
+                  ),
+                );
+              }
+            }
+          }
         }
       }
       if (rule.type === "request-body") {

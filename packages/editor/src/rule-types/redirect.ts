@@ -10,8 +10,12 @@ export function createRedirectRuleType(): RuleTypeFieldExtension {
   return {
     id: "redirect",
     label: "Redirect",
+    actionField: "redirect",
     matches(rule) {
       return rule.type === "redirect";
+    },
+    defaultAction() {
+      return { destination: "" };
     },
     mount(context: RuleTypeFieldContext): RuleTypeFieldMount {
       const document = context.document;

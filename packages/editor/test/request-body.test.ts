@@ -2,6 +2,12 @@ import { createRequestBodyRuleType } from "@rogatio/editor";
 import { describe, expect, it } from "vitest";
 
 describe(" request-body editor extension", () => {
+  it("provides a default replace payload on requestBody for new rules", () => {
+    const extension = createRequestBodyRuleType();
+    expect(extension.actionField).toBe("requestBody");
+    expect(extension.defaultAction?.()).toEqual({ mode: "replace", body: "" });
+  });
+
   it("is selectable and validates replace mode", () => {
     const extension = createRequestBodyRuleType();
     expect(extension.id).toBe("request-body");

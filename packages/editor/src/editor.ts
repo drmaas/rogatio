@@ -268,6 +268,24 @@ function valueAtPath(root: unknown, path: string): unknown {
   return current;
 }
 
+const MATCHER_CREATABLE_FIELDS = ["description", "method", "type"] as const;
+
+const ACTION_PAYLOAD_FIELDS = [
+  "redirect",
+  "action",
+  "requestBody",
+  "responseBody",
+  "headerDirection",
+  "headerOperation",
+  "headerName",
+  "headerValue",
+] as const;
+
+const CREATABLE_RULE_FIELDS = new Set<string>([
+  ...MATCHER_CREATABLE_FIELDS,
+  ...ACTION_PAYLOAD_FIELDS,
+]);
+
 function setValueAtPath(root: unknown, path: string, value: unknown): boolean {
   const segments = decodePointer(path);
   if (!segments || segments.length === 0) return false;
@@ -298,12 +316,7 @@ function setValueAtPath(root: unknown, path: string, value: unknown): boolean {
   if (!isRecord(current)) return false;
   if (
     !Object.hasOwn(current, finalSegment) &&
-    finalSegment !== "description" &&
-    finalSegment !== "method" &&
-    finalSegment !== "type" &&
-    finalSegment !== "action" &&
-    finalSegment !== "redirect" &&
-    finalSegment !== "mock"
+    !CREATABLE_RULE_FIELDS.has(finalSegment)
   ) {
     return false;
   }
@@ -398,13 +411,15 @@ function isValidExtensionName(name: string): boolean {
   );
 }
 
-const ACTION_FIELDS = ["redirect", "action", "mock"] as const;
-
-function clearActionFields(rule: unknown, keep?: string): boolean {
+function clearActionFields(
+  rule: unknown,
+  keep?: string,
+  keepFields?: ReadonlySet<string>,
+): boolean {
   if (!isRecord(rule)) return false;
   let changed = false;
-  for (const field of ACTION_FIELDS) {
-    if (field === keep) continue;
+  for (const field of ACTION_PAYLOAD_FIELDS) {
+    if (field === keep || keepFields?.has(field)) continue;
     if (Object.hasOwn(rule, field)) {
       delete rule[field];
       changed = true;
@@ -1095,7 +1110,7 @@ class EditorControllerImpl implements EditorController {
         const ruleContainer = valueAtPath(this.draft, ruleContainerPath);
         clearActionFields(
           ruleContainer,
-          rawValue === "redirect" || rawValue === "mock" ? rawValue : undefined,
+          rawValue === "redirect" ? rawValue : undefined,
         );
         this.markChanged();
       }
@@ -1140,16 +1155,32 @@ class EditorControllerImpl implements EditorController {
       return;
     }
     const extension = this.extensions.find((entry) => entry.id === typeId);
-    if (!extension?.defaultAction) return;
-    const actionField = extension.actionField ?? "action";
+    if (!extension?.defaultAction && !extension?.defaultFields) return;
     const changedType = setValueAtPath(this.draft, `${rulePath}/type`, typeId);
-    const changedAction = setValueAtPath(
-      this.draft,
-      `${rulePath}/${actionField}`,
-      extension.defaultAction(),
-    );
-    const cleared = clearActionFields(ruleContainer, actionField);
-    if (changedType || changedAction || cleared) {
+    let changedPayload = false;
+    let keep: string | undefined;
+    let keepFields: ReadonlySet<string> | undefined;
+    if (extension.defaultFields) {
+      const fields = extension.defaultFields();
+      keepFields = new Set(Object.keys(fields));
+      for (const [key, value] of Object.entries(fields)) {
+        if (setValueAtPath(this.draft, `${rulePath}/${key}`, value)) {
+          changedPayload = true;
+        }
+      }
+    } else {
+      const defaultAction = extension.defaultAction;
+      if (defaultAction) {
+        keep = extension.actionField ?? "action";
+        if (
+          setValueAtPath(this.draft, `${rulePath}/${keep}`, defaultAction())
+        ) {
+          changedPayload = true;
+        }
+      }
+    }
+    const cleared = clearActionFields(ruleContainer, keep, keepFields);
+    if (changedType || changedPayload || cleared) {
       this.markChanged();
       this.render();
     }
@@ -1441,9 +1472,7 @@ class EditorControllerImpl implements EditorController {
 
       // Set the action based on rule kind
       const actionField =
-        ruleProposal.kind === "redirect" || ruleProposal.kind === "mock"
-          ? ruleProposal.kind
-          : "action";
+        ruleProposal.kind === "redirect" ? ruleProposal.kind : "action";
 
       rule[actionField] = ruleProposal.action;
 

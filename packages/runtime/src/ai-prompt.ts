@@ -122,9 +122,6 @@ Action: { parameters: Record<string, string> } - Add/replace query parameters
 ### header
 Action: { name: string, value: string, direction: "request" | "response", operation: "set" | "append" | "remove" }
 
-### mock
-Action: { status: number, headers?: Record<string, string>, delayMs?: number, body?: string, file?: string }
-
 ### response-body
 Action: { replacement: string } - Regex replacement on response body (GET/HEAD only)
 
@@ -149,7 +146,7 @@ Return ONLY valid JSON matching this TypeScript interface:
 
 \`\`\`typescript
 interface RuleProposal {
-  kind: "redirect" | "query" | "header" | "mock" | "response-body" | "request-body";
+  kind: "redirect" | "query" | "header" | "response-body" | "request-body";
   groupId: string;
   name: string;
   urlRegex: string;

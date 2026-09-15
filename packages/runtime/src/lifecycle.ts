@@ -287,26 +287,7 @@ export function createNativeRuntimeController(
         }
 
         const matcherOps: RogatioOperation[] = [];
-        const mockConfigs: RuntimeMockConfig[] = [];
         for (const op of compileResult.operations) {
-          if (op.kind === "mock") {
-            const mock = op.mock;
-            let file: string | undefined;
-            if (mock.file !== undefined) {
-              file = mock.file;
-            }
-            mockConfigs.push({
-              ruleId: op.ruleId,
-              status: mock.status,
-              ...(mock.headers !== undefined ? { headers: mock.headers } : {}),
-              ...(mock.delayMs !== undefined ? { delayMs: mock.delayMs } : {}),
-              ...(mock.body !== undefined ? { body: mock.body } : {}),
-              ...(file !== undefined ? { file } : {}),
-            });
-          }
-          // Include all operations with a matcher field (including mocks)
-          // so normalizeRuntimePreset can match mock ruleIds to their matchers.
-          // Convert to MatcherOperation shape since the normalizer expects kind="matcher".
           if ("matcher" in op) {
             matcherOps.push({
               kind: "matcher",
@@ -322,13 +303,10 @@ export function createNativeRuntimeController(
           limits: RUNTIME_LIMITS,
           matchers: matcherOps,
           grants: [],
-          ...(mockConfigs.length > 0 ? { mocks: mockConfigs } : {}),
         };
         console.error(
           "[rogatio-host] normalizeRuntimePreset input: matchers=",
           matcherOps.length,
-          "mocks=",
-          mockConfigs.length,
           "grants=0",
         );
         const normalized = normalizeRuntimePreset(presetInput);

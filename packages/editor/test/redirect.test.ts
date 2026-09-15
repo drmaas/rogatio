@@ -16,6 +16,11 @@ const redirectRule: RogatioRule = {
 };
 
 describe("@rogatio/editor redirect rule type", () => {
+  it("provides a default redirect payload on the redirect field", () => {
+    expect(ext.actionField).toBe("redirect");
+    expect(ext.defaultAction?.()).toEqual({ destination: "" });
+  });
+
   it("matches redirect rules only", () => {
     expect(
       ext.matches(redirectRule as unknown as Record<string, unknown>),

@@ -5,7 +5,7 @@ runner, and runtime dispatch for [Rogatio](https://github.com/drmaas/rogatio).
 
 Rogatio keeps all rules in a single version-controlled `.rogatio.json` file. The CLI
 launches the visual editor, validates and dry-runs rules offline, and controls the
-optional local runtime used for mocks and response/request body rewriting.
+optional local runtime used for response/request body rewriting.
 
 ## Install
 
@@ -41,7 +41,7 @@ rogatio <command> [options]
 | `rogatio test [path] [url...]` | Run offline dry-run tests against `.rogatio.json`. |
 | `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
 | `rogatio runtime <install\|uninstall>` | Register the native-messaging host (and, on capable platforms, the device-local CA) in one transactional install; `uninstall` removes the host manifest, the device-local CA files, and the CA trust installation (idempotent). |
-| `rogatio runtime host <path>` | Run the consolidated native-messaging host for the project (mock/pair/authorize over stdio). Normally launched by the browser; run manually only for debugging. |
+| `rogatio runtime host <path>` | Run the consolidated native-messaging host for the project (pair/authorize/body transforms over stdio). Normally launched by the browser; run manually only for debugging. |
 
 Global options: `--help, -h` and `--version, -v`. Run `rogatio <command> --help`
 for command-specific usage.

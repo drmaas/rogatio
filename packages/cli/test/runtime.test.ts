@@ -9,34 +9,6 @@ import {
 } from "@rogatio/runtime";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runtimeCommand } from "../src/commands/runtime.js";
-import { writeProject } from "../src/utils/file.js";
-
-function mockProject(overrides: Record<string, unknown> = {}): unknown {
-  return {
-    version: 1,
-    name: "Runtime test",
-    groups: [
-      {
-        id: "group-main",
-        name: "Main",
-        origins: ["https://example.com"],
-        rules: [
-          {
-            id: "rule-mock",
-            name: "Mock rule",
-            urlRegex: "^https://example\\.com/",
-            origins: [],
-            resourceTypes: ["main_frame"],
-            priority: 100,
-            type: "mock",
-            mock: { status: 200, body: "hello" },
-          },
-        ],
-      },
-    ],
-    ...overrides,
-  };
-}
 
 function frame(obj: unknown): Uint8Array {
   const json = new TextEncoder().encode(JSON.stringify(obj));
@@ -81,7 +53,21 @@ describe("rogatio runtime command ()", () => {
 
   it("rejects starting the runtime via `rogatio runtime <path>`", async () => {
     const projectPath = join(testDir, ".rogatio.json");
-    await writeProject(projectPath, mockProject());
+    await writeFile(
+      projectPath,
+      JSON.stringify({
+        version: 1,
+        name: "Runtime test",
+        groups: [
+          {
+            id: "group-main",
+            name: "Main",
+            origins: ["https://example.com"],
+            rules: [],
+          },
+        ],
+      }),
+    );
     const error = (console as unknown as { error: (m: string) => void }).error;
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const code = await runtimeCommand([projectPath]);
@@ -102,11 +88,13 @@ describe("rogatio runtime command ()", () => {
     error.mockRestore();
   });
 
-  it("rejects a file mock resolved outside the configured root via runtime host", async () => {
+  it("exits 1 for a project with type mock via runtime host", async () => {
     const projectPath = join(testDir, ".rogatio.json");
-    await writeProject(
+    await writeFile(
       projectPath,
-      mockProject({
+      JSON.stringify({
+        version: 1,
+        name: "Runtime test",
         groups: [
           {
             id: "group-main",
@@ -121,7 +109,7 @@ describe("rogatio runtime command ()", () => {
                 resourceTypes: ["main_frame"],
                 priority: 100,
                 type: "mock",
-                mock: { status: 200, file: "../outside.txt" },
+                mock: { status: 200, body: "hello" },
               },
             ],
           },
@@ -129,7 +117,7 @@ describe("rogatio runtime command ()", () => {
       }),
     );
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const code = await runtimeCommand(["host", "--root", testDir, projectPath]);
+    const code = await runtimeCommand(["host", projectPath]);
     expect(code).toBe(1);
     error.mockRestore();
   });
