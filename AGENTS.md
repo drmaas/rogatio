@@ -41,7 +41,7 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 - `docs/architecture.md` — package boundaries, per-package decisions, and rejected alternatives.
 - `README.md` and `packages/*/README.md` — user-facing overview and usage.
 - `CONTRIBUTING.md` — setup, branching, coding standards, commit/issue policy, and validation workflow.
-- `.agents/skills/` — operational workflows (`sdd`, `doit`, `rpi`) and shared model routing (`.agents/skills/shared/models.md`).
+- `.agents/skills/` — operational workflows (`sdd`, `doit`) and shared model routing (`.agents/skills/shared/models.md`). `rpi` lives at `~/.agents/skills/rpi` (utility-skills), not in this repo.
 
 ## Durable Documentation
 
