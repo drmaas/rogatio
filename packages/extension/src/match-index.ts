@@ -1,9 +1,4 @@
-import type {
-  HeaderOperation,
-  QueryOperation,
-  RedirectOperation,
-  RogatioOperation,
-} from "@rogatio/compiler";
+import type { RogatioOperation } from "@rogatio/compiler";
 import type { ChromeApi } from "./chrome.js";
 import {
   sanitizeDestinationForLog,
@@ -50,17 +45,59 @@ function resolveRedactSensitive(operation: RogatioOperation): boolean {
   return operation.redactSensitiveInLogs === true;
 }
 
+function intentHasOwnString(intent: MatchIndexIntent, key: string): boolean {
+  return (
+    Object.hasOwn(intent, key) &&
+    typeof (intent as unknown as Record<string, unknown>)[key] === "string"
+  );
+}
+
+function isRedirectIntent(intent: MatchIndexIntent): intent is RedirectIntent {
+  return intentHasOwnString(intent, "destination");
+}
+
+function isQueryIntent(intent: MatchIndexIntent): intent is QueryIntent {
+  return (
+    Object.hasOwn(intent, "params") &&
+    Array.isArray((intent as QueryIntent).params)
+  );
+}
+
+function isHeaderIntent(intent: MatchIndexIntent): intent is HeaderIntent {
+  return (
+    intentHasOwnString(intent, "direction") &&
+    intentHasOwnString(intent, "operation") &&
+    intentHasOwnString(intent, "name")
+  );
+}
+
+function boundStoredKind(kind: string): MatchIndexEntry["kind"] {
+  const truncated = truncateLogString(kind);
+  if (
+    truncated === "redirect" ||
+    truncated === "query" ||
+    truncated === "header"
+  ) {
+    return truncated;
+  }
+  return truncated as MatchIndexEntry["kind"];
+}
+
 function sanitizeQueryParams(
-  params: QueryOperation["action"]["params"],
+  params: readonly QueryIntentParam[],
   redactSensitive: boolean,
 ): QueryIntentParam[] {
   return params.map((param) => {
-    const operation = param.operation ?? "set";
-    const name = truncateLogString(param.name);
+    const operation = truncateLogString(
+      typeof param.operation === "string" ? param.operation : "set",
+    );
+    const name = truncateLogString(
+      typeof param.name === "string" ? param.name : "",
+    );
     if (param.value === undefined) return { name, operation };
     const value = sanitizeQueryTransformValue(
-      param.name,
-      param.value,
+      typeof param.name === "string" ? param.name : "",
+      typeof param.value === "string" ? param.value : "",
       redactSensitive,
     );
     return { name, operation, value };
@@ -71,10 +108,10 @@ function sanitizeHeaderIntent(
   intent: HeaderIntent,
   redactSensitive: boolean,
 ): HeaderIntent {
+  const direction = truncateLogString(intent.direction);
+  const operation = truncateLogString(intent.operation);
   const name = truncateLogString(intent.name);
-  const direction = intent.direction;
-  const operation = intent.operation;
-  if (intent.value === undefined) {
+  if (intent.value === undefined || typeof intent.value !== "string") {
     return { direction, operation, name };
   }
   const value = sanitizeHeaderLogValue(
@@ -85,62 +122,90 @@ function sanitizeHeaderIntent(
   return { direction, operation, name, value };
 }
 
-function entryFromOperation(
+function sanitizeIntentByShape(
+  intent: MatchIndexIntent,
+  redactSensitive: boolean,
+): MatchIndexIntent {
+  if (isRedirectIntent(intent)) {
+    return {
+      destination: sanitizeDestinationForLog(
+        intent.destination,
+        redactSensitive,
+      ),
+    };
+  }
+  if (isQueryIntent(intent)) {
+    return {
+      params: sanitizeQueryParams(intent.params, redactSensitive),
+    };
+  }
+  if (isHeaderIntent(intent)) {
+    return sanitizeHeaderIntent(intent, redactSensitive);
+  }
+  if (intent === null || typeof intent !== "object" || Array.isArray(intent)) {
+    return intent;
+  }
+  const bounded: Record<string, unknown> = { ...intent };
+  for (const key of Object.keys(bounded)) {
+    if (!Object.hasOwn(bounded, key)) continue;
+    const value = bounded[key];
+    if (typeof value === "string") bounded[key] = truncateLogString(value);
+  }
+  return bounded as MatchIndexIntent;
+}
+
+function rawEntryFromOperation(
   operation: RogatioOperation,
 ): MatchIndexEntry | undefined {
   const redactSensitiveInLogs = resolveRedactSensitive(operation);
   if (operation.kind === "redirect") {
-    const redirect = operation as RedirectOperation;
     return {
-      ruleId: redirect.ruleId,
+      ruleId: operation.ruleId,
       kind: "redirect",
       redactSensitiveInLogs,
-      intent: {
-        destination: sanitizeDestinationForLog(
-          redirect.redirect.destination,
-          redactSensitiveInLogs,
-        ),
-      },
+      intent: { destination: operation.redirect.destination },
     };
   }
   if (operation.kind === "query") {
-    const query = operation as QueryOperation;
     return {
-      ruleId: query.ruleId,
+      ruleId: operation.ruleId,
       kind: "query",
       redactSensitiveInLogs,
       intent: {
-        params: sanitizeQueryParams(query.action.params, redactSensitiveInLogs),
+        params: operation.action.params.map((param) => {
+          const operationName = param.operation ?? "set";
+          if (param.value === undefined) {
+            return { name: param.name, operation: operationName };
+          }
+          return {
+            name: param.name,
+            operation: operationName,
+            value: param.value,
+          };
+        }),
       },
     };
   }
   if (operation.kind === "header") {
-    const header = operation as HeaderOperation;
-    const name = truncateLogString(header.header.name);
-    const direction = header.header.direction;
-    const headerOperation = header.header.operation;
-    if (header.header.value === undefined) {
+    const {
+      direction,
+      operation: headerOperation,
+      name,
+      value,
+    } = operation.header;
+    if (value === undefined) {
       return {
-        ruleId: header.ruleId,
+        ruleId: operation.ruleId,
         kind: "header",
         redactSensitiveInLogs,
         intent: { direction, operation: headerOperation, name },
       };
     }
     return {
-      ruleId: header.ruleId,
+      ruleId: operation.ruleId,
       kind: "header",
       redactSensitiveInLogs,
-      intent: {
-        direction,
-        operation: headerOperation,
-        name,
-        value: sanitizeHeaderLogValue(
-          header.header.name,
-          header.header.value,
-          redactSensitiveInLogs,
-        ),
-      },
+      intent: { direction, operation: headerOperation, name, value },
     };
   }
   return undefined;
@@ -149,50 +214,46 @@ function entryFromOperation(
 export function sanitizeMatchIndexEntry(
   entry: MatchIndexEntry,
 ): MatchIndexEntry {
+  const ruleId = truncateLogString(entry.ruleId);
+  const kind = boundStoredKind(entry.kind);
   const redactSensitiveInLogs = entry.redactSensitiveInLogs === true;
-  if (entry.kind === "redirect") {
-    const intent = entry.intent as RedirectIntent;
+
+  if (entry.kind === "redirect" && isRedirectIntent(entry.intent)) {
     return {
-      ruleId: entry.ruleId,
-      kind: "redirect",
+      ruleId,
+      kind,
       redactSensitiveInLogs,
       intent: {
         destination: sanitizeDestinationForLog(
-          intent.destination,
+          entry.intent.destination,
           redactSensitiveInLogs,
         ),
       },
     };
   }
-  if (entry.kind === "query") {
-    const intent = entry.intent as QueryIntent;
+  if (entry.kind === "query" && isQueryIntent(entry.intent)) {
     return {
-      ruleId: entry.ruleId,
-      kind: "query",
+      ruleId,
+      kind,
       redactSensitiveInLogs,
       intent: {
-        params: intent.params.map((param) => {
-          const operation = param.operation;
-          const name = truncateLogString(param.name);
-          if (param.value === undefined) return { name, operation };
-          const value = sanitizeQueryTransformValue(
-            param.name,
-            param.value,
-            redactSensitiveInLogs,
-          );
-          return { name, operation, value };
-        }),
+        params: sanitizeQueryParams(entry.intent.params, redactSensitiveInLogs),
       },
     };
   }
-  return {
-    ruleId: entry.ruleId,
-    kind: "header",
-    redactSensitiveInLogs,
-    intent: sanitizeHeaderIntent(
-      entry.intent as HeaderIntent,
+  if (entry.kind === "header" && isHeaderIntent(entry.intent)) {
+    return {
+      ruleId,
+      kind,
       redactSensitiveInLogs,
-    ),
+      intent: sanitizeHeaderIntent(entry.intent, redactSensitiveInLogs),
+    };
+  }
+  return {
+    ruleId,
+    kind,
+    redactSensitiveInLogs,
+    intent: sanitizeIntentByShape(entry.intent, redactSensitiveInLogs),
   };
 }
 
@@ -204,7 +265,7 @@ export function buildInstallIndexSnapshot(
 ): MatchIndexSnapshot {
   const snapshot: MatchIndexSnapshot = {};
   for (const entry of installed) {
-    const indexEntry = entryFromOperation(entry.operation);
+    const indexEntry = rawEntryFromOperation(entry.operation);
     if (indexEntry === undefined) continue;
     snapshot[String(entry.ruleId)] = indexEntry;
   }

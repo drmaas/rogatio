@@ -822,7 +822,7 @@ class EditorControllerImpl implements EditorController {
       path &&
       target instanceof HTMLInputElement &&
       target.type === "checkbox" &&
-      decodePointer(path)?.at(-1) === "redactSensitiveInLogs"
+      !this.extensionControls.has(path)
     ) {
       const changed = setValueAtPath(this.draft, path, target.checked);
       if (changed) {

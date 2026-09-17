@@ -117,6 +117,16 @@ export interface DnrInstallerWithMatchIndex extends RuleInstallerAdapter {
 
 export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
   const tracked = new Map<number, RogatioOperation>();
+  let matchIndexWriteTail: Promise<void> = Promise.resolve();
+
+  function withMatchIndexWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = matchIndexWriteTail;
+    let release!: () => void;
+    matchIndexWriteTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return previous.then(operation).finally(release);
+  }
 
   async function storedIndexByKind(): Promise<{
     header: MatchIndexSnapshot;
@@ -133,41 +143,46 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
     return { header, redirectQuery };
   }
 
-  // Sole wholesale writer for the index (ADR 0003). `headerEntries` omitted
-  // means "keep the stored header intent": a redirect/query install leaves the
-  // installed header rules — and therefore their index entries — untouched.
+  // Sole wholesale writer for the index (ADR 0003). Serialized on one
+  // in-process queue so overlapping install and header sync cannot drop slices.
+  //
+  // Overlay: redirect/query from tracked when non-empty; else stored when
+  // `keepStoredRedirectQuery` (header sync after SW restart), else {}.
+  // Headers from `headerOverlay` when provided; else stored (redirect install).
   async function writeWholesaleMatchIndex(options: {
-    readonly headerEntries?: ReadonlyArray<{
+    readonly headerOverlay?: ReadonlyArray<{
       readonly ruleId: number;
       readonly operation: RogatioOperation;
     }>;
-    readonly preserveUntrackedRedirectQuery?: boolean;
+    readonly keepStoredRedirectQuery?: boolean;
   }): Promise<void> {
-    const redirectQueryEntries = [...tracked.entries()].map(
-      ([ruleId, operation]) => ({ ruleId, operation }),
-    );
-    const needsStored =
-      options.headerEntries === undefined ||
-      (redirectQueryEntries.length === 0 &&
-        options.preserveUntrackedRedirectQuery === true);
-    const stored = needsStored
-      ? await storedIndexByKind()
-      : { header: {}, redirectQuery: {} };
-    const snapshot: MatchIndexSnapshot = {
-      ...(redirectQueryEntries.length > 0
-        ? buildInstallIndexSnapshot(redirectQueryEntries)
-        : options.preserveUntrackedRedirectQuery === true
-          ? stored.redirectQuery
-          : {}),
-      ...(options.headerEntries === undefined
-        ? stored.header
-        : buildInstallIndexSnapshot(options.headerEntries)),
-    };
-    try {
-      await writeMatchIndex(api, snapshot);
-    } catch {
-      // ignored
-    }
+    await withMatchIndexWriteLock(async () => {
+      const redirectQueryEntries = [...tracked.entries()].map(
+        ([ruleId, operation]) => ({ ruleId, operation }),
+      );
+      const needsStored =
+        options.headerOverlay === undefined ||
+        (redirectQueryEntries.length === 0 &&
+          options.keepStoredRedirectQuery === true);
+      const stored = needsStored
+        ? await storedIndexByKind()
+        : { header: {}, redirectQuery: {} };
+      const snapshot: MatchIndexSnapshot = {
+        ...(redirectQueryEntries.length > 0
+          ? buildInstallIndexSnapshot(redirectQueryEntries)
+          : options.keepStoredRedirectQuery === true
+            ? stored.redirectQuery
+            : {}),
+        ...(options.headerOverlay === undefined
+          ? stored.header
+          : buildInstallIndexSnapshot(options.headerOverlay)),
+      };
+      try {
+        await writeMatchIndex(api, snapshot);
+      } catch {
+        // ignored
+      }
+    });
   }
 
   return {
@@ -241,8 +256,8 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
       }>,
     ): Promise<void> {
       await writeWholesaleMatchIndex({
-        headerEntries,
-        preserveUntrackedRedirectQuery: true,
+        headerOverlay: headerEntries,
+        keepStoredRedirectQuery: true,
       });
     },
   };

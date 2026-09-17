@@ -7,8 +7,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChromeApi } from "../src/chrome.js";
 import { createDnrInstaller } from "../src/dnr.js";
 import {
+  type HeaderIntent,
   lookupMatchIndexEntry,
   MATCH_LOGGING_INDEX_KEY,
+  type QueryIntent,
+  type QueryIntentParam,
   sanitizeMatchIndexEntry,
   writeMatchIndex,
 } from "../src/match-index.js";
@@ -584,6 +587,217 @@ describe("match index", () => {
         },
       },
     });
+  });
+
+  it("truncates oversize ruleId, header direction/operation, and query operation", () => {
+    const long = "x".repeat(250);
+
+    const redirect = sanitizeMatchIndexEntry({
+      ruleId: long,
+      kind: "redirect",
+      redactSensitiveInLogs: false,
+      intent: { destination: "https://example.com/" },
+    });
+    expect(redirect.ruleId.length).toBeLessThanOrEqual(200);
+    expect(redirect.ruleId.endsWith("...")).toBe(true);
+
+    const header = sanitizeMatchIndexEntry({
+      ruleId: "h1",
+      kind: "header",
+      redactSensitiveInLogs: false,
+      intent: {
+        direction: long,
+        operation: long,
+        name: "x-trace",
+        value: "on",
+      },
+    });
+    expect(
+      (header.intent as { direction: string }).direction.length,
+    ).toBeLessThanOrEqual(200);
+    expect(
+      (header.intent as { direction: string }).direction.endsWith("..."),
+    ).toBe(true);
+    expect(
+      (header.intent as { operation: string }).operation.length,
+    ).toBeLessThanOrEqual(200);
+    expect(
+      (header.intent as { operation: string }).operation.endsWith("..."),
+    ).toBe(true);
+
+    const query = sanitizeMatchIndexEntry({
+      ruleId: "q1",
+      kind: "query",
+      redactSensitiveInLogs: false,
+      intent: {
+        params: [{ name: "a", operation: long, value: "1" }],
+      },
+    });
+    const param = (
+      query.intent as unknown as { params: Array<{ operation: string }> }
+    ).params[0];
+    expect(param?.operation.length).toBeLessThanOrEqual(200);
+    expect(param?.operation.endsWith("...")).toBe(true);
+  });
+
+  it("bounds nested strings when kind and intent shape disagree", () => {
+    const long = "x".repeat(250);
+    const mismatched = sanitizeMatchIndexEntry({
+      ruleId: "x",
+      kind: "redirect",
+      redactSensitiveInLogs: false,
+      intent: {
+        direction: long,
+        operation: long,
+        name: long,
+        value: long,
+      },
+    });
+    const header = mismatched.intent as {
+      direction: string;
+      operation: string;
+      name: string;
+      value: string;
+    };
+    expect(header.direction.length).toBeLessThanOrEqual(200);
+    expect(header.operation.length).toBeLessThanOrEqual(200);
+    expect(header.name.length).toBeLessThanOrEqual(200);
+    expect(header.value.length).toBeLessThanOrEqual(200);
+    expect(mismatched.kind).toBe("redirect");
+  });
+
+  it("ignores inherited intent fields when sanitizing", () => {
+    const long = "x".repeat(250);
+    const intent = Object.assign(Object.create({ destination: long }), {
+      direction: long,
+      operation: "set",
+      name: "x-trace",
+      value: "on",
+    }) as HeaderIntent;
+    const header = sanitizeMatchIndexEntry({
+      ruleId: "h1",
+      kind: "header",
+      redactSensitiveInLogs: false,
+      intent,
+    });
+    expect(Object.hasOwn(header.intent, "destination")).toBe(false);
+    expect(
+      (header.intent as HeaderIntent).direction.length,
+    ).toBeLessThanOrEqual(200);
+    expect((header.intent as HeaderIntent).operation).toBe("set");
+  });
+
+  it("defaults missing query operation to set instead of throwing", () => {
+    const sanitized = sanitizeMatchIndexEntry({
+      ruleId: "q1",
+      kind: "query",
+      redactSensitiveInLogs: false,
+      intent: {
+        params: [{ name: "a", value: "1" } as QueryIntentParam],
+      },
+    });
+    const param = (sanitized.intent as QueryIntent).params[0];
+    expect(param?.operation).toBe("set");
+    expect(param?.name).toBe("a");
+    expect(param?.value).toBe("1");
+  });
+
+  it("overlapping redirect install and header sync keep both index slices", async () => {
+    const headerOp: HeaderOperation = {
+      kind: "header",
+      groupId: "g1",
+      ruleId: "rule-header-race",
+      redactSensitiveInLogs: false,
+      matcher: {
+        urlRegex: { source: "^https://example\\.com/", flags: "" },
+        origins: ["https://example.com"],
+        resourceTypes: ["main_frame"],
+        priority: 100,
+      },
+      header: {
+        direction: "request",
+        operation: "set",
+        name: "x-race",
+        value: "on",
+      },
+    };
+    const { api, store } = storageApi();
+    const installer = createDnrInstaller(
+      dnrApi(
+        api.storage,
+        vi.fn(async () => {}),
+      ),
+    );
+
+    await Promise.all([
+      installer.install([redirectOp]),
+      installer.syncHeaderMatchIndex([
+        { ruleId: 2_000_001, operation: headerOp },
+      ]),
+    ]);
+
+    const index = store[MATCH_LOGGING_INDEX_KEY] as Record<
+      string,
+      { kind: string; ruleId: string }
+    >;
+    expect(index["2000001"]).toMatchObject({
+      kind: "header",
+      ruleId: "rule-header-race",
+    });
+    expect(
+      Object.values(index).some((entry) => entry.kind === "redirect"),
+    ).toBe(true);
+  });
+
+  it("header sync with empty tracked keeps stored redirect/query entries", async () => {
+    const { api, store } = storageApi();
+    const installChrome = dnrApi(
+      api.storage,
+      vi.fn(async () => {}),
+    );
+    await createDnrInstaller(installChrome).install([redirectOp]);
+
+    const headerOp: HeaderOperation = {
+      kind: "header",
+      groupId: "g1",
+      ruleId: "rule-header-restart",
+      redactSensitiveInLogs: false,
+      matcher: {
+        urlRegex: { source: "^https://example\\.com/", flags: "" },
+        origins: ["https://example.com"],
+        resourceTypes: ["main_frame"],
+        priority: 100,
+      },
+      header: {
+        direction: "request",
+        operation: "set",
+        name: "x-restart",
+        value: "on",
+      },
+    };
+    const restartInstaller = createDnrInstaller(
+      dnrApi(
+        api.storage,
+        vi.fn(async () => {}),
+      ),
+    );
+    await restartInstaller.syncHeaderMatchIndex([
+      { ruleId: 2_000_002, operation: headerOp },
+    ]);
+
+    const index = store[MATCH_LOGGING_INDEX_KEY] as Record<
+      string,
+      { kind: string; ruleId: string }
+    >;
+    expect(index["2000002"]).toMatchObject({
+      kind: "header",
+      ruleId: "rule-header-restart",
+    });
+    expect(
+      Object.values(index).some(
+        (entry) => entry.kind === "redirect" && entry.ruleId === "r1",
+      ),
+    ).toBe(true);
   });
 
   it("keeps stored header intent when a redirect install rewrites the index", async () => {
