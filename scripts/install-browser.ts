@@ -1,5 +1,5 @@
 /**
- * Install Chrome for Testing for Selenium browser e2e.
+ * Install Chrome for Testing + matching ChromeDriver for Selenium browser e2e.
  * https://developer.chrome.com/docs/automation-and-testing/download-test-binaries
  * Usage: node scripts/install-browser.ts
  */
@@ -14,7 +14,8 @@ import {
 } from "@puppeteer/browsers";
 
 const cacheDir = resolve(import.meta.dirname, "../.browser-cache");
-const pathMarker = resolve(cacheDir, "chrome-path.txt");
+const chromePathMarker = resolve(cacheDir, "chrome-path.txt");
+const chromedriverPathMarker = resolve(cacheDir, "chromedriver-path.txt");
 // Channel tag per Chrome for Testing docs (`stable` | `beta` | `dev` | `canary`)
 // or an exact build id. Override with ROGATIO_CHROME_TAG.
 const tag = process.env.ROGATIO_CHROME_TAG ?? "stable";
@@ -25,13 +26,26 @@ if (!platform) {
 }
 
 const buildId = await resolveBuildId(Browser.CHROME, platform, tag);
-const installed = await install({
+const chrome = await install({
   browser: Browser.CHROME,
   buildId,
   platform,
   cacheDir,
 });
-mkdirSync(dirname(pathMarker), { recursive: true });
-writeFileSync(pathMarker, `${installed.executablePath}\n`, "utf8");
-console.log(`Installed ${installed.browser}@${installed.buildId}`);
-console.log(installed.executablePath);
+const chromedriver = await install({
+  browser: Browser.CHROMEDRIVER,
+  buildId,
+  platform,
+  cacheDir,
+});
+mkdirSync(dirname(chromePathMarker), { recursive: true });
+writeFileSync(chromePathMarker, `${chrome.executablePath}\n`, "utf8");
+writeFileSync(
+  chromedriverPathMarker,
+  `${chromedriver.executablePath}\n`,
+  "utf8",
+);
+console.log(`Installed ${chrome.browser}@${chrome.buildId}`);
+console.log(chrome.executablePath);
+console.log(`Installed ${chromedriver.browser}@${chromedriver.buildId}`);
+console.log(chromedriver.executablePath);

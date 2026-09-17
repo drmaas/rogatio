@@ -76,8 +76,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Chrome for Testing
         run: pnpm browser:install
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Full validation
-        run: pnpm validate
+        # Extension journeys force headed Chrome; xvfb provides a display on GHA.
+        run: xvfb-run -a pnpm validate
 
   cross-platform:
     name: Cross-platform smoke (${{ matrix.os }})

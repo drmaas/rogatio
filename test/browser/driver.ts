@@ -12,6 +12,12 @@ export const CHROME_PATH_MARKER = join(
   "chrome-path.txt",
 );
 
+export const CHROMEDRIVER_PATH_MARKER = join(
+  process.cwd(),
+  ".browser-cache",
+  "chromedriver-path.txt",
+);
+
 export type DriverOptions = {
   readonly headless?: boolean;
   readonly userDataDir?: string;
@@ -29,6 +35,14 @@ function defaultHeadless(): boolean {
   return true;
 }
 
+function readMarker(path: string): string | undefined {
+  if (!existsSync(path)) return undefined;
+  const marked = readFileSync(path, "utf8").trim();
+  if (!marked) return undefined;
+  accessSync(marked);
+  return marked;
+}
+
 /**
  * Resolve Chrome for Testing (via `pnpm browser:install` / `@puppeteer/browsers`).
  * Prefer CfT over branded Google Chrome — branded builds dropped `--load-extension`.
@@ -44,13 +58,8 @@ export function resolveChromeBinary(): string {
     return envPath;
   }
 
-  if (existsSync(CHROME_PATH_MARKER)) {
-    const marked = readFileSync(CHROME_PATH_MARKER, "utf8").trim();
-    if (marked) {
-      accessSync(marked);
-      return marked;
-    }
-  }
+  const marked = readMarker(CHROME_PATH_MARKER);
+  if (marked) return marked;
 
   const cacheRoot = join(process.cwd(), ".browser-cache");
   for (const browser of ["chrome", "chromium"] as const) {
@@ -118,12 +127,26 @@ export function resolveChromeBinary(): string {
   );
 }
 
+export function resolveChromeDriverBinary(): string | undefined {
+  const envPath =
+    process.env.CHROMEDRIVER_PATH ?? process.env.ROGATIO_CHROMEDRIVER_PATH;
+  if (envPath) {
+    accessSync(envPath);
+    return envPath;
+  }
+  return readMarker(CHROMEDRIVER_PATH_MARKER);
+}
+
 export async function createDriver(
   options: DriverOptions = {},
 ): Promise<WebDriver> {
   const chromeOptions = new chrome.Options();
   chromeOptions.setChromeBinaryPath(resolveChromeBinary());
-  const headless = options.headless ?? defaultHeadless();
+  // Unpacked extensions are unreliable under headless=new on some CI images.
+  const headless =
+    options.extensionPath !== undefined
+      ? false
+      : (options.headless ?? defaultHeadless());
   if (headless) {
     chromeOptions.addArguments("--headless=new");
   }
@@ -146,10 +169,17 @@ export async function createDriver(
       `--load-extension=${extensionPath}`,
     );
   }
-  return new Builder()
+
+  const builder = new Builder()
     .forBrowser(Browser.CHROME)
-    .setChromeOptions(chromeOptions)
-    .build();
+    .setChromeOptions(chromeOptions);
+
+  const chromedriverPath = resolveChromeDriverBinary();
+  if (chromedriverPath) {
+    builder.setChromeService(new chrome.ServiceBuilder(chromedriverPath));
+  }
+
+  return builder.build();
 }
 
 export function resolveUrl(path: string): string {
