@@ -57,7 +57,10 @@ const FORBIDDEN_RESPONSE_HEADERS = Object.freeze([
 
 const FORBIDDEN_REQUEST_PREFIXES = Object.freeze(["proxy-", "sec-"]);
 
-function isForbiddenHeader(name: string, direction: HeaderDirection): boolean {
+export function isForbiddenHeader(
+  name: string,
+  direction: HeaderDirection,
+): boolean {
   const normalized = name.toLowerCase();
   const forbidden =
     direction === "request"

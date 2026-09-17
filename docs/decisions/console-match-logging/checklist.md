@@ -55,18 +55,18 @@ Env: existing `// @vitest-environment happy-dom` (not jsdom). Do not add testing
 
 ## P2 — Durable id index
 
-- [ ] New module (e.g. `src/match-index.ts`): read/write `rogatio.matchLogging.index` as numeric DNR id → `{ ruleId, kind, redactSensitiveInLogs, intent }`. `intent` is kind-discriminated only:
+- [x] New module (e.g. `src/match-index.ts`): read/write `rogatio.matchLogging.index` as numeric DNR id → `{ ruleId, kind, redactSensitiveInLogs, intent }`. `intent` is kind-discriminated only:
   - redirect: `{ destination }`
   - query: `{ params: [{ name, operation, value? }] }`
   - header (P6 only): `{ direction, operation, name, value? }`
-- [ ] Do **not** store matcher regex, origins, resourceTypes, groupId, event URL, body payloads, or `redactBodiesInLogs`.
-- [ ] At write: resolve the flag (absent/`false` → false; `true` → true); truncate every stored string to ≤200 with `...`; if `redactSensitiveInLogs`, apply the same deny-list the formatter uses (query keys on destination/query values; header-name deny-list on header values).
-- [ ] `createDnrInstaller.install` (`src/dnr.ts:124-163`) is the sole writer for now. After **successful** `updateDynamicRules`, replace the key wholesale with the post-collision-probe ids actually installed (empty install → `{}`).
-- [ ] On **failed** `updateDynamicRules`, do not write. Previous index stays (same as in-memory `tracked`).
-- [ ] Lookup reads storage (not `tracked`) so it survives a service-worker restart. Treat the value as untrusted: wrong types / inherited keys / accessors → skip that entry.
-- [ ] Existing `dnr.test.ts` fakes must grow `storage.local` with Chrome's `{ [key]: value }` `get` shape so current install tests keep passing.
-- [ ] Unknown or malformed id returns `undefined`; never recompute from `ruleIdHash`.
-- [ ] Do not write this key from popup, management page, or `installHeaderRules`.
+- [x] Do **not** store matcher regex, origins, resourceTypes, groupId, event URL, body payloads, or `redactBodiesInLogs`.
+- [x] At write: resolve the flag (absent/`false` → false; `true` → true); truncate every stored string to ≤200 with `...`; if `redactSensitiveInLogs`, apply the same deny-list the formatter uses (query keys on destination/query values; header-name deny-list on header values).
+- [x] `createDnrInstaller.install` (`src/dnr.ts:124-163`) is the sole writer for now. After **successful** `updateDynamicRules`, replace the key wholesale with the post-collision-probe ids actually installed (empty install → `{}`).
+- [x] On **failed** `updateDynamicRules`, do not write. Previous index stays (same as in-memory `tracked`).
+- [x] Lookup reads storage (not `tracked`) so it survives a service-worker restart. Treat the value as untrusted: wrong types / inherited keys / accessors → skip that entry.
+- [x] Existing `dnr.test.ts` fakes must grow `storage.local` with Chrome's `{ [key]: value }` `get` shape so current install tests keep passing.
+- [x] Unknown or malformed id returns `undefined`; never recompute from `ruleIdHash`.
+- [x] Do not write this key from popup, management page, or `installHeaderRules`.
 
 **Acceptance:** AC10, AC12, AC18, K5, K9, K12. Index never lands inside the `rogatio` envelope. Header ids are not installed here — header write-time tests use the shared write helper with a synthetic intent object.
 **Tests (write first):**

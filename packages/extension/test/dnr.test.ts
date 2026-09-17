@@ -22,6 +22,19 @@ const queryOp: QueryOperation = {
   action: { type: "query", params: [{ name: "a", value: "1" }] },
 };
 
+function storageLocal() {
+  const store: Record<string, unknown> = {};
+  return {
+    get: async (key?: string) => {
+      if (key === undefined) return { ...store };
+      return { [key]: store[key] };
+    },
+    set: async (value: Record<string, unknown>) => {
+      Object.assign(store, value);
+    },
+  };
+}
+
 const redirectOp: RedirectOperation = {
   kind: "redirect",
   groupId: "g1",
@@ -58,6 +71,7 @@ describe("F9 DNR translation", () => {
     let storedIds: number[] = [];
     const getDynamicRules = vi.fn(async () => storedIds.map((id) => ({ id })));
     const api = {
+      storage: { local: storageLocal() },
       declarativeNetRequest: { updateDynamicRules, getDynamicRules },
     } as unknown as ChromeApi;
     const installer = createDnrInstaller(api);
@@ -132,6 +146,7 @@ describe("F9 DNR translation", () => {
       async (_payload: { removeRuleIds: number[]; addRules: unknown[] }) => {},
     );
     const api = {
+      storage: { local: storageLocal() },
       declarativeNetRequest: {
         updateDynamicRules,
         getDynamicRules: async () => [],
@@ -151,7 +166,9 @@ describe("F9 DNR translation", () => {
   });
 
   it("does nothing when the declarativeNetRequest API is unavailable", async () => {
-    const api = {} as unknown as ChromeApi;
+    const api = {
+      storage: { local: storageLocal() },
+    } as unknown as ChromeApi;
     const installer = createDnrInstaller(api);
     expect(await installer.current()).toEqual([]);
     expect(await installer.install([redirectOp])).toEqual({

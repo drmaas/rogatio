@@ -6,6 +6,7 @@ import type {
 } from "@rogatio/compiler";
 import { type DnrQueryTransform, queryActionToDNR } from "@rogatio/compiler";
 import type { ChromeApi } from "./chrome.js";
+import { buildInstallIndexSnapshot, writeMatchIndex } from "./match-index.js";
 
 export interface DnrRedirectRule {
   id: number;
@@ -159,6 +160,15 @@ export function createDnrInstaller(api: ChromeApi): RuleInstallerAdapter {
 
       tracked.clear();
       for (const entry of added) tracked.set(entry.ruleId, entry.operation);
+
+      // Rules are already installed; a failed index write only leaves a stale
+      // index, which resolves as an unknown-id no-op (ADR 0003).
+      try {
+        await writeMatchIndex(api, buildInstallIndexSnapshot(added));
+      } catch {
+        // ignored
+      }
+
       return { ok: true };
     },
   };
