@@ -112,6 +112,7 @@ describe("@rogatio/compiler", () => {
           kind: "matcher",
           groupId: "group-main",
           ruleId: "rule-1",
+          name: "Rule 1",
           redactSensitiveInLogs: false,
           matcher: {
             urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -536,6 +537,7 @@ describe("@rogatio/compiler", () => {
         "kind",
         "groupId",
         "ruleId",
+        "name",
         "redactSensitiveInLogs",
         "matcher",
       ]);

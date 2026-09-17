@@ -42,10 +42,11 @@ function getOperations(): readonly MatcherOperation[] {
     throw new Error("fixture project failed to compile");
   }
   return compiled.operations.map(
-    ({ groupId, ruleId, matcher, redactSensitiveInLogs }) => ({
+    ({ groupId, ruleId, name, matcher, redactSensitiveInLogs }) => ({
       kind: "matcher",
       groupId,
       ruleId,
+      name,
       matcher,
       redactSensitiveInLogs,
     }),

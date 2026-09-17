@@ -12,6 +12,7 @@ const queryOp: QueryOperation = {
   kind: "query",
   groupId: "g1",
   ruleId: "query-1",
+  name: "query-1",
   redactSensitiveInLogs: false,
   matcher: {
     urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -39,6 +40,7 @@ const redirectOp: RedirectOperation = {
   kind: "redirect",
   groupId: "g1",
   ruleId: "r1",
+  name: "r1",
   redactSensitiveInLogs: false,
   matcher: {
     urlRegex: { source: "^https://example\\.com/(.*)$", flags: "" },

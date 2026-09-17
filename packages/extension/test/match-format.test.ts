@@ -203,6 +203,7 @@ describe("query and header value redaction helpers", () => {
 describe("formatMatchRecord", () => {
   const redirectEntry: MatchIndexEntry = {
     ruleId: "redirect-rule",
+    name: "Redirect Rule",
     kind: "redirect",
     redactSensitiveInLogs: false,
     intent: { destination: "https://dest.example/new-path" },
@@ -210,6 +211,7 @@ describe("formatMatchRecord", () => {
 
   const queryEntry: MatchIndexEntry = {
     ruleId: "query-rule",
+    name: "Query Rule",
     kind: "query",
     redactSensitiveInLogs: false,
     intent: {
@@ -222,6 +224,7 @@ describe("formatMatchRecord", () => {
 
   const headerEntry: MatchIndexEntry = {
     ruleId: "header-rule",
+    name: "Header Rule",
     kind: "header",
     redactSensitiveInLogs: true,
     intent: {
@@ -264,6 +267,19 @@ describe("formatMatchRecord", () => {
       headerEntry,
     );
     expect(headerLine).toMatchSnapshot("header");
+
+    expect(redirectLine).toContain("Redirect Rule");
+    expect(queryLine).toContain("Query Rule");
+    expect(headerLine).toContain("Header Rule");
+  });
+
+  it("omits empty display name from the dim detail segment", () => {
+    const line = formatMatchRecord(
+      { url: "https://example.com/" },
+      { ...redirectEntry, name: "" },
+    );
+    expect(line).toContain("redirect-rule redirect");
+    expect(line).not.toContain("redirect-rule  redirect");
   });
 
   it("uses lowercase [rogatio], ANSI SGR, and no %c or hex colors", () => {
@@ -301,6 +317,7 @@ describe("formatMatchRecord", () => {
   it("re-applies deny-list and bounds on tampered index values at format time", () => {
     const tampered: MatchIndexEntry = {
       ruleId: "tampered",
+      name: "",
       kind: "query",
       redactSensitiveInLogs: true,
       intent: {
@@ -332,6 +349,7 @@ describe("formatMatchRecord", () => {
       { url: "https://example.com/" },
       {
         ruleId: "tampered-redirect",
+        name: "",
         kind: "redirect",
         redactSensitiveInLogs: true,
         intent: {
@@ -348,6 +366,7 @@ describe("formatMatchRecord", () => {
       { url: "https://example.com/" },
       {
         ruleId: "tampered-header",
+        name: "",
         kind: "header",
         redactSensitiveInLogs: true,
         intent: {
@@ -474,6 +493,7 @@ describe("formatMatchRecord", () => {
   it("keeps deny-listed query plaintext in the line when redactSensitiveInLogs is false", () => {
     const entry: MatchIndexEntry = {
       ruleId: "plain-query",
+      name: "",
       kind: "query",
       redactSensitiveInLogs: false,
       intent: {

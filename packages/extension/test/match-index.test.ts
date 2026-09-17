@@ -76,6 +76,7 @@ const redirectOp: RedirectOperation = {
   kind: "redirect",
   groupId: "g1",
   ruleId: "r1",
+  name: "r1",
   redactSensitiveInLogs: false,
   matcher: {
     urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -90,6 +91,7 @@ const queryOp: QueryOperation = {
   kind: "query",
   groupId: "g1",
   ruleId: "query-1",
+  name: "query-1",
   redactSensitiveInLogs: false,
   matcher: {
     urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -115,6 +117,7 @@ describe("match index", () => {
     const sensitiveRedirect: RedirectOperation = {
       ...redirectOp,
       ruleId: "r-sensitive",
+      name: "r-sensitive",
       redactSensitiveInLogs: true,
       redirect: {
         destination: "https://other.com/?token=secret-value",
@@ -160,6 +163,12 @@ describe("match index", () => {
     expect(sensitiveEntry.kind).toBe("redirect");
     expect(sensitiveEntry.redactSensitiveInLogs).toBe(true);
     expect(sensitiveEntry.intent.destination).toContain("[redacted]");
+    expect((sensitiveEntry as { name?: string }).name).toBe("r-sensitive");
+
+    const queryStored = Object.values(index).find(
+      (entry) => (entry as { ruleId?: string }).ruleId === "query-1",
+    ) as { name?: string };
+    expect(queryStored.name).toBe("query-1");
 
     const absentEntry = Object.values(index).find(
       (entry) => (entry as { ruleId?: string }).ruleId === "q-absent",
@@ -183,6 +192,7 @@ describe("match index", () => {
     const entry = await lookupMatchIndexEntry(api, numericId);
     expect(entry).toEqual({
       ruleId: "r1",
+      name: "r1",
       kind: "redirect",
       redactSensitiveInLogs: false,
       intent: { destination: "https://other.com/path" },
@@ -255,6 +265,7 @@ describe("match index", () => {
     await writeMatchIndex(api, {
       "1": {
         ruleId: "ok",
+        name: "",
         kind: "redirect",
         redactSensitiveInLogs: false,
         intent: { destination: "https://example.com/" },
@@ -284,6 +295,7 @@ describe("match index", () => {
     await api.storage.local.set({ [MATCH_LOGGING_INDEX_KEY]: protoPoison });
     expect(await lookupMatchIndexEntry(api, 1)).toEqual({
       ruleId: "ok",
+      name: "",
       kind: "redirect",
       redactSensitiveInLogs: false,
       intent: { destination: "https://example.com/" },
@@ -490,6 +502,7 @@ describe("match index", () => {
   it("sanitize helper redacts header values by deny-listed name and truncates", () => {
     const sanitized = sanitizeMatchIndexEntry({
       ruleId: "h1",
+      name: "",
       kind: "header",
       redactSensitiveInLogs: true,
       intent: {
@@ -512,6 +525,7 @@ describe("match index", () => {
 
     const plain = sanitizeMatchIndexEntry({
       ruleId: "h2",
+      name: "",
       kind: "header",
       redactSensitiveInLogs: false,
       intent: {
@@ -528,6 +542,7 @@ describe("match index", () => {
     const longValue = "y".repeat(250);
     const truncated = sanitizeMatchIndexEntry({
       ruleId: "h3",
+      name: "",
       kind: "header",
       redactSensitiveInLogs: false,
       intent: {
@@ -550,6 +565,7 @@ describe("match index", () => {
       kind: "header",
       groupId: "g1",
       ruleId: "rule-header-set",
+      name: "rule-header-set",
       redactSensitiveInLogs: true,
       matcher: {
         urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -577,6 +593,7 @@ describe("match index", () => {
     expect(store[MATCH_LOGGING_INDEX_KEY]).toEqual({
       "2000001": {
         ruleId: "rule-header-set",
+        name: "rule-header-set",
         kind: "header",
         redactSensitiveInLogs: true,
         intent: {
@@ -594,15 +611,19 @@ describe("match index", () => {
 
     const redirect = sanitizeMatchIndexEntry({
       ruleId: long,
+      name: long,
       kind: "redirect",
       redactSensitiveInLogs: false,
       intent: { destination: "https://example.com/" },
     });
     expect(redirect.ruleId.length).toBeLessThanOrEqual(200);
     expect(redirect.ruleId.endsWith("...")).toBe(true);
+    expect(redirect.name.length).toBeLessThanOrEqual(200);
+    expect(redirect.name.endsWith("...")).toBe(true);
 
     const header = sanitizeMatchIndexEntry({
       ruleId: "h1",
+      name: "",
       kind: "header",
       redactSensitiveInLogs: false,
       intent: {
@@ -627,6 +648,7 @@ describe("match index", () => {
 
     const query = sanitizeMatchIndexEntry({
       ruleId: "q1",
+      name: "",
       kind: "query",
       redactSensitiveInLogs: false,
       intent: {
@@ -644,6 +666,7 @@ describe("match index", () => {
     const long = "x".repeat(250);
     const mismatched = sanitizeMatchIndexEntry({
       ruleId: "x",
+      name: "",
       kind: "redirect",
       redactSensitiveInLogs: false,
       intent: {
@@ -676,6 +699,7 @@ describe("match index", () => {
     }) as HeaderIntent;
     const header = sanitizeMatchIndexEntry({
       ruleId: "h1",
+      name: "",
       kind: "header",
       redactSensitiveInLogs: false,
       intent,
@@ -690,6 +714,7 @@ describe("match index", () => {
   it("defaults missing query operation to set instead of throwing", () => {
     const sanitized = sanitizeMatchIndexEntry({
       ruleId: "q1",
+      name: "",
       kind: "query",
       redactSensitiveInLogs: false,
       intent: {
@@ -707,6 +732,7 @@ describe("match index", () => {
       kind: "header",
       groupId: "g1",
       ruleId: "rule-header-race",
+      name: "rule-header-race",
       redactSensitiveInLogs: false,
       matcher: {
         urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -761,6 +787,7 @@ describe("match index", () => {
       kind: "header",
       groupId: "g1",
       ruleId: "rule-header-restart",
+      name: "rule-header-restart",
       redactSensitiveInLogs: false,
       matcher: {
         urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -805,6 +832,7 @@ describe("match index", () => {
       kind: "header",
       groupId: "g1",
       ruleId: "rule-header-set",
+      name: "rule-header-set",
       redactSensitiveInLogs: false,
       matcher: {
         urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -840,6 +868,7 @@ describe("match index", () => {
     >;
     expect(index["2000001"]).toEqual({
       ruleId: "rule-header-set",
+      name: "rule-header-set",
       kind: "header",
       redactSensitiveInLogs: false,
       intent: {

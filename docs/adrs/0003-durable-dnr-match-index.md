@@ -6,7 +6,7 @@
 
 ## Decision
 
-Persist `chrome.storage.local` key `rogatio.matchLogging.index` as `numericId → { ruleId, kind, redactSensitiveInLogs, intent }`. `intent` is a kind-discriminated **log subset** of the compiled action: redirect `{ destination }`, query `{ params }`, header `{ direction, operation, name, value? }` (header only after the coverage probe). Do not persist matcher regex, origins, resourceTypes, groupId, event URLs, body payloads, or `redactBodiesInLogs`. Do not persist a full `RogatioOperation`. Resolve `redactSensitiveInLogs` at write: absent → `false`.
+Persist `chrome.storage.local` key `rogatio.matchLogging.index` as `numericId → { ruleId, name, kind, redactSensitiveInLogs, intent }`. `intent` is a kind-discriminated **log subset** of the compiled action: redirect `{ destination }`, query `{ params }`, header `{ direction, operation, name, value? }` (header only after the coverage probe). Do not persist matcher regex, origins, resourceTypes, groupId, event URLs, body payloads, or `redactBodiesInLogs`. Do not persist a full `RogatioOperation`. Resolve `redactSensitiveInLogs` at write: absent → `false`. Missing or non-string stored `name` is accepted as `""` at read for older indexes.
 
 The service worker is the sole writer. Rewrite the key wholesale after a successful redirect/query `updateDynamicRules` (including an empty set). On install failure, leave the previous index. At write, truncate every string to ≤200 with trailing `...`; if `redactSensitiveInLogs` is true, apply the formatter deny-list before store. Treat stored values as untrusted: malformed entries are ignored. Unknown ids are a no-op, never a hash guess.
 

@@ -32,10 +32,11 @@ function toMatcherOperations(
   operations: readonly RogatioOperation[],
 ): MatcherOperation[] {
   return operations.map(
-    ({ groupId, ruleId, matcher, redactSensitiveInLogs }) => ({
+    ({ groupId, ruleId, name, matcher, redactSensitiveInLogs }) => ({
       kind: "matcher",
       groupId,
       ruleId,
+      name,
       matcher,
       redactSensitiveInLogs,
     }),

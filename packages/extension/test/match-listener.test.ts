@@ -21,6 +21,7 @@ function redirectEntry(
 ): MatchIndexEntry {
   return {
     ruleId: "redirect-1",
+    name: "Redirect One",
     kind: "redirect",
     redactSensitiveInLogs: false,
     intent: { destination: "https://dest.example/path" },
@@ -33,6 +34,7 @@ function headerEntry(
 ): MatchIndexEntry {
   return {
     ruleId: "header-1",
+    name: "Header One",
     kind: "header",
     redactSensitiveInLogs: false,
     intent: {
@@ -48,6 +50,7 @@ function headerEntry(
 function queryEntry(overrides: Partial<MatchIndexEntry> = {}): MatchIndexEntry {
   return {
     ruleId: "query-1",
+    name: "Query One",
     kind: "query",
     redactSensitiveInLogs: false,
     intent: {

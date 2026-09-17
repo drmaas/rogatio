@@ -120,6 +120,7 @@ export function formatMatchRecord(
   const requestUrl = logUrl(optionalString(event.url), redactSensitive);
 
   const ruleId = logString(readString(entry, "ruleId"));
+  const displayName = logString(readString(entry, "name"));
   const kind = logString(readString(entry, "kind"));
   const action = formatIntendedAction(entry, redactSensitive);
   const initiatorUrl = logUrl(optionalString(event.initiator), redactSensitive);
@@ -128,7 +129,9 @@ export function formatMatchRecord(
   const live = ["matched", method, resourceType, requestUrl]
     .filter(nonEmpty)
     .join(" ");
-  const detail = [ruleId, kind, action, initiator].filter(nonEmpty).join(" ");
+  const detail = [ruleId, displayName, kind, action, initiator]
+    .filter(nonEmpty)
+    .join(" ");
 
   if (!nonEmpty(detail)) return `${PREFIX} ${live}`;
   return `${PREFIX} ${live} ${DIM}${detail}${RESET}`;

@@ -7,6 +7,7 @@ const queryOperation: QueryOperation = {
   kind: "query",
   groupId: "group-a",
   ruleId: "rule-a",
+  name: "Rule A",
   redactSensitiveInLogs: false,
   matcher: {
     urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -22,6 +23,7 @@ const redirectOperation: RogatioOperation = {
   kind: "redirect",
   groupId: "group-a",
   ruleId: "rule-b",
+  name: "Rule B",
   redactSensitiveInLogs: false,
   matcher: {
     urlRegex: { source: "^https://example\\.com/", flags: "" },

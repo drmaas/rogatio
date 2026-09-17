@@ -22,6 +22,7 @@ export interface NormalizedMatcher {
 interface OperationBase {
   readonly groupId: string;
   readonly ruleId: string;
+  readonly name: string;
   readonly redactSensitiveInLogs: boolean;
 }
 

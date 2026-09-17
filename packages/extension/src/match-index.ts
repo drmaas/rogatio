@@ -34,6 +34,7 @@ export type MatchIndexIntent = RedirectIntent | QueryIntent | HeaderIntent;
 
 export interface MatchIndexEntry {
   readonly ruleId: string;
+  readonly name: string;
   readonly kind: "redirect" | "query" | "header";
   readonly redactSensitiveInLogs: boolean;
   readonly intent: MatchIndexIntent;
@@ -145,13 +146,15 @@ function sanitizeIntentByShape(
   if (intent === null || typeof intent !== "object" || Array.isArray(intent)) {
     return intent;
   }
-  const bounded: Record<string, unknown> = { ...intent };
+  const bounded: Record<string, unknown> = {
+    ...(intent as Record<string, unknown>),
+  };
   for (const key of Object.keys(bounded)) {
     if (!Object.hasOwn(bounded, key)) continue;
     const value = bounded[key];
     if (typeof value === "string") bounded[key] = truncateLogString(value);
   }
-  return bounded as MatchIndexIntent;
+  return bounded as unknown as MatchIndexIntent;
 }
 
 function rawEntryFromOperation(
@@ -161,6 +164,7 @@ function rawEntryFromOperation(
   if (operation.kind === "redirect") {
     return {
       ruleId: operation.ruleId,
+      name: operation.name,
       kind: "redirect",
       redactSensitiveInLogs,
       intent: { destination: operation.redirect.destination },
@@ -169,6 +173,7 @@ function rawEntryFromOperation(
   if (operation.kind === "query") {
     return {
       ruleId: operation.ruleId,
+      name: operation.name,
       kind: "query",
       redactSensitiveInLogs,
       intent: {
@@ -196,6 +201,7 @@ function rawEntryFromOperation(
     if (value === undefined) {
       return {
         ruleId: operation.ruleId,
+        name: operation.name,
         kind: "header",
         redactSensitiveInLogs,
         intent: { direction, operation: headerOperation, name },
@@ -203,6 +209,7 @@ function rawEntryFromOperation(
     }
     return {
       ruleId: operation.ruleId,
+      name: operation.name,
       kind: "header",
       redactSensitiveInLogs,
       intent: { direction, operation: headerOperation, name, value },
@@ -215,12 +222,14 @@ export function sanitizeMatchIndexEntry(
   entry: MatchIndexEntry,
 ): MatchIndexEntry {
   const ruleId = truncateLogString(entry.ruleId);
+  const name = truncateLogString(entry.name);
   const kind = boundStoredKind(entry.kind);
   const redactSensitiveInLogs = entry.redactSensitiveInLogs === true;
 
   if (entry.kind === "redirect" && isRedirectIntent(entry.intent)) {
     return {
       ruleId,
+      name,
       kind,
       redactSensitiveInLogs,
       intent: {
@@ -234,6 +243,7 @@ export function sanitizeMatchIndexEntry(
   if (entry.kind === "query" && isQueryIntent(entry.intent)) {
     return {
       ruleId,
+      name,
       kind,
       redactSensitiveInLogs,
       intent: {
@@ -244,6 +254,7 @@ export function sanitizeMatchIndexEntry(
   if (entry.kind === "header" && isHeaderIntent(entry.intent)) {
     return {
       ruleId,
+      name,
       kind,
       redactSensitiveInLogs,
       intent: sanitizeHeaderIntent(entry.intent, redactSensitiveInLogs),
@@ -251,6 +262,7 @@ export function sanitizeMatchIndexEntry(
   }
   return {
     ruleId,
+    name,
     kind,
     redactSensitiveInLogs,
     intent: sanitizeIntentByShape(entry.intent, redactSensitiveInLogs),
@@ -350,9 +362,11 @@ function parseStoredEntry(raw: unknown): MatchIndexEntry | undefined {
   const entry = ownRecord(raw);
   if (entry === undefined) return undefined;
   const ruleId = own(entry, "ruleId");
+  const nameRaw = own(entry, "name");
   const kind = own(entry, "kind");
   const redactSensitiveInLogs = own(entry, "redactSensitiveInLogs");
   if (typeof ruleId !== "string") return undefined;
+  const name = typeof nameRaw === "string" ? nameRaw : "";
   if (kind !== "redirect" && kind !== "query" && kind !== "header") {
     return undefined;
   }
@@ -364,7 +378,7 @@ function parseStoredEntry(raw: unknown): MatchIndexEntry | undefined {
   else if (kind === "query") intent = parseQueryIntent(intentRaw);
   else intent = parseHeaderIntent(intentRaw);
   if (intent === undefined) return undefined;
-  return { ruleId, kind, redactSensitiveInLogs, intent };
+  return { ruleId, name, kind, redactSensitiveInLogs, intent };
 }
 
 async function readRawIndex(api: ChromeApi): Promise<Record<string, unknown>> {

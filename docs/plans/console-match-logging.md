@@ -33,7 +33,7 @@ Traces PRD R1–R9.
 | --- | --- | --- | --- |
 | A1 | Authoritative match source | `chrome.declarativeNetRequest.onRuleMatchedDebug` only; no `getMatchedRules` polling; no `webRequest` / debugger / native-host body observation. | `docs/adrs/0001-dnr-on-rule-matched-debug.md` |
 | A2 | Page emission | `chrome.scripting.executeScript` into event `tabId`, `world: "ISOLATED"`, `console.log` with `"%s"` for untrusted text. | `docs/adrs/0002-isolated-execute-script-console.md` |
-| A3 | Numeric-id → log-intent lookup | SW-only `rogatio.matchLogging.index`: `numericId → { ruleId, kind, redactSensitiveInLogs, intent }`. Intent is a **kind-discriminated subset** of the compiled action (destination / query params / header op), not a full `RogatioOperation`. Wholesale rewrite on successful DNR install; failure leaves previous index. Lookup must work after a storage round-trip (object keys are strings). | `docs/adrs/0003-durable-dnr-match-index.md` |
+| A3 | Numeric-id → log-intent lookup | SW-only `rogatio.matchLogging.index`: `numericId → { ruleId, name, kind, redactSensitiveInLogs, intent }`. Intent is a **kind-discriminated subset** of the compiled action (destination / query params / header op), not a full `RogatioOperation`. Wholesale rewrite on successful DNR install; failure leaves previous index. Lookup must work after a storage round-trip (object keys are strings). | `docs/adrs/0003-durable-dnr-match-index.md` |
 | A4 | Toggle persistence | `rogatio.matchLogging.enabled` outside the envelope. Popup and management write that key only. No protocol command. Missing key = on; only boolean `false` or garbage is off. | `docs/adrs/0004-match-logging-toggle-storage.md` |
 | A5 | Record shape | Single flat line, ANSI SGR (`\x1B[1;34m` prefix, unstyled message, `\x1B[2m` detail). No `groupCollapsed`, no `%c`. Live fields from the event; intended action from the index. | `docs/adrs/0005-console-match-record-redaction.md` |
 | A6 | Redaction | Pure formatter in `packages/extension` (no Node `schema` / Ajv). Per logged string: drop URL userinfo/fragment; truncate so that string is ≤200 characters with trailing ASCII `...` when cut. When `redactSensitiveInLogs` is true: query-key deny-list → `[redacted]`; intended header values whose names are on the header deny-list → `[redacted]`. When the flag is absent or false: still truncate; do not apply the deny-list. Destination/`initiator` that fail URL parse are opaque strings: still truncate, never throw. | `docs/adrs/0005-console-match-record-redaction.md` |
@@ -94,7 +94,7 @@ One flat line:
 
 1. SGR prefix `[rogatio]`
 2. Unstyled: `matched` + method (if present) + resource type (if present) + redacted request URL
-3. Dim: `ruleId`, kind
+3. Dim: `ruleId`, `name` (omit when empty), kind
 4. Dim: intended action — redirect `→ <destination>`; query compact `set name=value` / `remove name` list; header ` <direction> <op> <name>[=<value>]` (header only after P6 pass)
 5. Dim: `initiator=<redacted initiator>` if the event supplied one
 
