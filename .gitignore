@@ -154,3 +154,6 @@ test-results/
 
 # OCX local project state (receipts, machine-specific paths)
 .ocx/
+
+# Graphify generated analysis output
+graphify-out/
