@@ -35,7 +35,7 @@ Rules visibly report `active`, `disabled`, `needs permission`, `needs runtime`, 
 
 CA trust installation requires elevated privileges: Linux requires `sudo` (passwordless or prompted), macOS requires keychain authorization, and Windows requires Administrator. The `rogatio runtime install` command reports `trust unsupported: <reasons>` when elevation is unavailable and exits 0 (the manifest is still installed; only the CA trust step is skipped).
 
-Chrome can place one bounded, redacted, live-only `[Rogatio]` record in the matched website's DevTools Console when Chrome authoritatively reports a current Rogatio DNSR match. It shows the intended action—not proof that the network operation succeeded—and creates no history or management-page feed.
+When Chrome authoritatively reports a Rogatio-installed DNR rule match (unpacked extension load only), the extension can place one bounded, redacted, live-only lowercase `[rogatio]` line in the matched page's DevTools Console. **Match logging** is controlled by a popup and management-sidebar toggle (default **on**). Coverage is redirect, query, and header rules; matcher and body rules are not logged (body-rule match logging is tracked in GitHub issue #163). Live fields are URL, method, initiator, and resource type; intended redirect, query, or header action comes from rule config. The line reports a match and intended action — not proof the network operation succeeded — and logs no request/response bodies. Non-body rule cards may opt into **Redact sensitive fields in logs** (default off). No history or management-page feed is created.
 
 ## Architecture and technology
 

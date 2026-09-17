@@ -156,10 +156,37 @@ Two steps. Stop after step 1 and record the result before any header-index code.
 
 ## P7 — Docs + validation
 
-- [ ] `docs/architecture.md:90`, `:735` — replace "deferred" with shipped behavior, permissions, unpacked requirement, coverage, live vs intended fields (including resource type), **no live bodies**, toggle-key + index-key exception to envelope-only storage, per-rule redact flag (default off, non-body cards only).
-- [ ] `rogatio-overview.md:38`, `packages/docs-site/src/content/docs/guides/extension.md:33-38`, `.../reference/extension.md:26` — lowercase `[rogatio]`, **Match logging** default on, editor redact checkbox, coverage, "matched ≠ succeeded", bodies not logged, body-rule logging **tracked in GitHub issue #163**.
-- [ ] State the `declarativeNetRequestFeedback` unpacked-only constraint and the `tabId -1` / out-of-origin-tab / iframe-top-frame limitations. Include Q4 result if measured.
-- [ ] Run `pnpm validate`; record evidence against AC1–AC18.
+- [x] `docs/architecture.md:90`, `:735` — replace "deferred" with shipped behavior, permissions, unpacked requirement, coverage, live vs intended fields (including resource type), **no live bodies**, toggle-key + index-key exception to envelope-only storage, per-rule redact flag (default off, non-body cards only).
+- [x] `rogatio-overview.md:38`, `packages/docs-site/src/content/docs/guides/extension.md:33-38`, `.../reference/extension.md:26` — lowercase `[rogatio]`, **Match logging** default on, editor redact checkbox, coverage, "matched ≠ succeeded", bodies not logged, body-rule logging **tracked in GitHub issue #163**.
+- [x] State the `declarativeNetRequestFeedback` unpacked-only constraint and the `tabId -1` / out-of-origin-tab / iframe-top-frame limitations. Include Q4 result if measured.
+- [x] Run `pnpm validate`; record evidence against AC1–AC18.
 
 **Acceptance:** AC7, AC11.
 **Tests:** `pnpm validate` green; browser suites unchanged except the P5/P6 additions. Grep the listed docs: no "deferred", no `[Rogatio]`, no `redactBodiesInLogs`; bodies not logged / live vs intended stated; one redact checkbox, not two.
+
+### P7 validation evidence (2026-09-16)
+
+`pnpm validate` exit 0 — biome format/lint clean, `tsc --noEmit` clean, build 18 artifacts, Vitest 900/900, Playwright 50 passed / 3 skipped (includes P5 toggle + P6 header/Q4 probes).
+
+Implementation review (2026-09-16) also synced two docs beyond the listed set and corrected the unpacked claim: `guides/projects-rules.md` (per-rule redact field), `reference/security.md` (live-only console record, no bodies), `guides/extension.md` (unpacked restriction belongs to `onRuleMatchedDebug`, plus the terminated-worker drop limit from ADR 0001), and `docs/architecture.md:84`/`:88` (pre-existing "DNR installation remains deferred" text that contradicted the shipped redirect/query/header install). Re-verified with `pnpm format:check`, `pnpm lint`, and a docs-site build.
+
+| AC | Evidence |
+| --- | --- |
+| AC1 | `match-listener.test.ts`: one match → one `executeScript`, ISOLATED, tabId from event |
+| AC2 | `match-log-format.test.ts`: prefix `[rogatio]` not `[Rogatio]` |
+| AC3 | Same: SGR `\x1B[1;34m` / `\x1B[2m`; no `%c` / `#` |
+| AC4 | `match-log-redaction.test.ts` + format tests: truncate, deny-list when sensitive true, live resource type, no body |
+| AC5 | `match-listener.test.ts`: storage keys envelope / enabled / index only; no event URL in index |
+| AC6 | P6 probe pass → header coverage shipped; matcher/body kinds absent from index |
+| AC7 | P7 docs grep: listed files updated; no match-log "deferred" / `[Rogatio]` / `redactBodiesInLogs` |
+| AC8 | `match-listener.test.ts` toggle cases + `match-logging-toggle.spec.ts` popup/management |
+| AC9 | `match-listener.test.ts`: fail-closed paths → zero injections, no throw |
+| AC10 | `match-index.test.ts`: SW restart + string-key round-trip resolves intent |
+| AC11 | `pnpm validate` green; manifest permissions in P1 tests; protocol untouched |
+| AC12 | `match-index.test.ts`: failed install keeps index; empty success → `{}` |
+| AC13 | `match-listener.test.ts`: exported `func` → `console.log("%s", line)` |
+| AC14 | P0 schema/compiler/browser-schema tests |
+| AC15 | P0 editor happy-dom checkbox tests |
+| AC16 | P3 snapshots + P4 redirect/query/header inject lines |
+| AC17 | P6 pass: header id `2_000_001` injects; pre-pass would no-op |
+| AC18 | P2/P3/P4: no body segment; no `redactBodiesInLogs` stored |
