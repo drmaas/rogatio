@@ -1,14 +1,17 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { BrowserContext } from "@playwright/test";
-import { chromium } from "@playwright/test";
+import type { WebDriver } from "selenium-webdriver";
+import { createDriver } from "./driver.js";
+import { Page } from "./page.js";
 
 export interface ExtensionContext {
-  readonly context: BrowserContext;
+  readonly driver: WebDriver;
+  readonly page: Page;
   readonly profile: string;
   readonly extensionId: string;
+  close(): Promise<void>;
 }
 
 export interface ExtensionContextOptions {
@@ -26,17 +29,13 @@ function computeExtensionId(extensionPath: string): string {
   return extensionId;
 }
 
-async function launchExtensionContext(
+async function launchExtensionDriver(
   profile: string,
   extensionPath: string,
-): Promise<BrowserContext> {
-  return chromium.launchPersistentContext(profile, {
-    channel: "chromium",
-    headless: true,
-    args: [
-      `--disable-extensions-except=${extensionPath}`,
-      `--load-extension=${extensionPath}`,
-    ],
+): Promise<WebDriver> {
+  return createDriver({
+    userDataDir: profile,
+    extensionPath,
   });
 }
 
@@ -88,8 +87,7 @@ async function seedGrantedOrigins(
   await writeFile(prefsPath, JSON.stringify(prefs));
 }
 
-// Launches a persistent context with the built extension loaded. Callers own
-// teardown: close the context and remove the profile directory.
+// Launches Chrome with the built extension loaded. Callers own teardown via close().
 export async function extensionContext(
   options: ExtensionContextOptions = {},
 ): Promise<ExtensionContext> {
@@ -98,11 +96,24 @@ export async function extensionContext(
   const extensionId = computeExtensionId(extensionPath);
 
   if (options.grantOrigins !== undefined && options.grantOrigins.length > 0) {
-    const bootstrap = await launchExtensionContext(profile, extensionPath);
-    await bootstrap.close();
+    const bootstrap = await launchExtensionDriver(profile, extensionPath);
+    await bootstrap.quit();
     await seedGrantedOrigins(profile, extensionId, options.grantOrigins);
   }
 
-  const context = await launchExtensionContext(profile, extensionPath);
-  return { context, profile, extensionId };
+  const driver = await launchExtensionDriver(profile, extensionPath);
+  const page = new Page(driver);
+  return {
+    driver,
+    page,
+    profile,
+    extensionId,
+    async close() {
+      try {
+        await driver.quit();
+      } finally {
+        await rm(profile, { recursive: true, force: true });
+      }
+    },
+  };
 }

@@ -258,14 +258,16 @@ Prerequisites:
 
 - Node.js **24** or newer (Node 24 is the CI baseline)
 - pnpm **10.32.1**
-- Chromium, for browser smoke tests
+- Chrome for Testing, for browser e2e (`pnpm browser:install`)
 
 Install dependencies and the browser test binary:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm exec playwright install chromium
+pnpm browser:install
 ```
+
+Browser e2e uses Selenium WebDriver against [Chrome for Testing](https://developer.chrome.com/docs/automation-and-testing/download-test-binaries) (not branded Chrome — branded builds dropped `--load-extension`).
 
 Common scripts:
 
@@ -276,7 +278,8 @@ Common scripts:
 | `pnpm typecheck` | Run the pinned strict TypeScript compiler. |
 | `pnpm build` | Build and verify Node and browser ESM artifacts. |
 | `pnpm test` | Build and run the Vitest unit and real-process integration suites. |
-| `pnpm test:browser` | Build and run the Chromium Playwright smoke journey. |
+| `pnpm test:browser` | Build and run Selenium browser journeys (Chrome for Testing). |
+| `pnpm browser:install` | Download Chrome for Testing into `.browser-cache/`. |
 | `pnpm validate` | Run the complete fail-fast validation sequence (includes negative fixtures). |
 
 Use `pnpm validate` before opening a pull request.

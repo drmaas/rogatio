@@ -1,7 +1,6 @@
-import { rm } from "node:fs/promises";
-import type { Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
 import { extensionContext } from "./extension-context.js";
+import { expect, testStandalone as test } from "./fixtures.js";
+import type { Page } from "./page.js";
 
 type ProbeKind = "rule-header-set" | "rule-header-remove";
 
@@ -20,7 +19,8 @@ async function probeUpdateDynamicRules(
   kind: ProbeKind,
 ): Promise<ProbeOutcome> {
   return page.evaluate(
-    async ({ ruleId, ruleKind }) => {
+    (async (payload: { ruleId: number; ruleKind: ProbeKind }) => {
+      const { ruleId, ruleKind } = payload;
       const dnr = chrome.declarativeNetRequest;
       if (!dnr) {
         throw new Error("chrome.declarativeNetRequest is unavailable");
@@ -80,38 +80,39 @@ async function probeUpdateDynamicRules(
           message: error instanceof Error ? error.message : String(error),
         };
       }
-    },
+    }) as never,
     { ruleId: id, ruleKind: kind },
   );
 }
 
 async function removeProbeRule(page: Page, id: number): Promise<void> {
-  await page.evaluate(async (ruleId) => {
-    const dnr = chrome.declarativeNetRequest;
-    if (!dnr) {
-      return;
-    }
-    try {
-      await dnr.updateDynamicRules({
-        addRules: [],
-        removeRuleIds: [ruleId],
-      });
-    } catch {
-      // Best-effort cleanup; probe rules must not leak across reruns.
-    }
-  }, id);
+  await page.evaluate(
+    (async (ruleId: number) => {
+      const dnr = chrome.declarativeNetRequest;
+      if (!dnr) {
+        return;
+      }
+      try {
+        await dnr.updateDynamicRules({
+          addRules: [],
+          removeRuleIds: [ruleId],
+        });
+      } catch {
+        // Best-effort cleanup; probe rules must not leak across reruns.
+      }
+    }) as never,
+    id,
+  );
 }
 
 test("real Chromium accepts corrected toDnrRule sample header shapes", async () => {
-  const testInfo = test.info();
-  const baseId = 9_000_000 + testInfo.parallelIndex * 100;
+  const baseId = 9_000_000;
   const setRuleId = baseId + 1;
   const removeRuleId = baseId + 2;
-  const { context, profile, extensionId } = await extensionContext();
+  const { page, extensionId, close } = await extensionContext();
   const outcomes: ProbeOutcome[] = [];
 
   try {
-    const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/index.html`);
     await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
 
@@ -131,7 +132,6 @@ test("real Chromium accepts corrected toDnrRule sample header shapes", async () 
       { rule: "rule-header-remove", accepted: true, message: null },
     ]);
   } finally {
-    await context.close();
-    await rm(profile, { recursive: true, force: true });
+    await close();
   }
 });

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 test("keeps project selection separate from explicit switch", async ({
   page,
@@ -537,7 +537,7 @@ const RULE_ERROR_REASON_FALLBACK = "The rule failed to install.";
 const DNR_ERROR_MESSAGE = "The declarativeNetRequest operation failed.";
 
 async function installExtensionChromeMock(
-  page: import("@playwright/test").Page,
+  page: import("./page.js").Page,
   initialState: Record<string, unknown>,
 ) {
   await page.addInitScript((seed) => {
@@ -611,7 +611,7 @@ const errorSurfaceProject = {
   badge: { text: "1", attention: true },
 };
 
-async function openWorkspace(page: import("@playwright/test").Page) {
+async function openWorkspace(page: import("./page.js").Page) {
   await page.goto("/extension/index.html");
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
 }

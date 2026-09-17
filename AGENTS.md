@@ -6,7 +6,7 @@ Read `rogatio-overview.md` and `docs/architecture.md` before changing scope. Res
 
 ## Codebase Structure
 
-Strict TS 7, ESM/NodeNext monorepo, pnpm 10.32.1, Node 24. Built with esbuild (`scripts/build.ts`); linted/formatted by Biome; tested by Vitest (unit) and Playwright (browser journeys); docs site uses Astro 7 + Starlight.
+Strict TS 7, ESM/NodeNext monorepo, pnpm 10.32.1, Node 24. Built with esbuild (`scripts/build.ts`); linted/formatted by Biome; tested by Vitest (unit) and Selenium (browser journeys via Chrome for Testing); docs site uses Astro 7 + Starlight.
 
 Dependency direction (no cycles, no skipping):
 
@@ -29,9 +29,9 @@ Package roles — when reading code, start here to know which boundary you are i
 - `packages/sanity` / `packages/smoke` — small focused test/utility packages; check `packages/<name>/README.md` before assuming role.
 - `packages/docs-site` — Astro/Starlight docs site. Excluded from root `tsc`/`biome` (see `tsconfig.json` `exclude`, `.biomeignore`); isolated by design.
 
-Workspace-wide files: `scripts/build.ts` (esbuild build), `scripts/validate.ts` (canonical pre-commit/CI gate, also `pnpm validate`), `scripts/serve-smoke.ts` (smoke HTTP server), `scripts/release-*.mjs` (semantic-release plugins), `biome.json`, `tsconfig.base.json`, `playwright.config.ts`, `vitest.config.ts`, `pnpm-workspace.yaml`, `build-manifest.json` (canonical artifact list asserted by the validator).
+Workspace-wide files: `scripts/build.ts` (esbuild build), `scripts/validate.ts` (canonical pre-commit/CI gate, also `pnpm validate`), `scripts/serve-smoke.ts` (smoke HTTP server), `scripts/release-*.mjs` (semantic-release plugins), `biome.json`, `tsconfig.base.json`, `vitest.config.ts`, `vitest.browser.config.ts`, `pnpm-workspace.yaml`, `build-manifest.json` (canonical artifact list asserted by the validator).
 
-Test layout: per-package `packages/<name>/test/` and `packages/<name>/src/**/__tests__/` for unit; `test/integration/` for cross-package/process journeys on built artifacts; `test/browser/` for real-Chromium Playwright journeys; `test/fixtures/` for shared fixtures; `samples/basic/` for a runnable `.rogatio.json` example.
+Test layout: per-package `packages/<name>/test/` and `packages/<name>/src/**/__tests__/` for unit; `test/integration/` for cross-package/process journeys on built artifacts; `test/browser/` for real Chrome for Testing Selenium journeys; `test/fixtures/` for shared fixtures; `samples/basic/` for a runnable `.rogatio.json` example.
 
 Quick orientation rule: locate the feature in `docs/architecture.md` (which package owns it, what it must not do), then read that package's `src/index.ts`/`types.ts`, then the test that exercises the seam you are about to touch.
 

@@ -240,7 +240,7 @@ All user-controlled values are inserted as text or DOM properties, never as HTML
 
 The view must remain keyboard complete without drag-and-drop or pointer-only commands. Error controls use stable generated IDs, labels, descriptions, focus restoration, and live announcements. Focus indicators and state must remain visible in forced colors; the layout must reflow at narrow widths and 200% zoom without clipping or requiring horizontal scrolling for core controls. CSS uses native/system colors in forced-colors mode and respects reduced-motion preferences.
 
-The editor browser artifact must contain no `node:` imports, Node globals, filesystem code, or runtime-compiled schema/compiler imports. Build and browser checks must import the shipped browser artifact, not only source or a test double. Pure state/conversion tests belong in Vitest; controller/DOM interaction, keyboard, error association, responsive, forced-colors, zoom, and browser-package checks belong in Playwright. No DOM emulation dependency is introduced solely for the editor package.
+The editor browser artifact must contain no `node:` imports, Node globals, filesystem code, or runtime-compiled schema/compiler imports. Build and browser checks must import the shipped browser artifact, not only source or a test double. Pure state/conversion tests belong in Vitest; controller/DOM interaction, keyboard, error association, responsive, forced-colors, zoom, and browser-package checks belong in Selenium browser journeys. No DOM emulation dependency is introduced solely for the editor package.
 
 ### Rejected Alternatives
 
@@ -602,7 +602,7 @@ CLI / Editor
 - Unit tests for `parseTestUrl`, `dryRunProject` (258 tests total).
 - CLI integration tests (exit codes, JSON output, stdin/file inputs).
 - Server endpoint tests (200/403/400).
-- Editor panel accessibility tests (keyboard, SR, forced-colors, 200% zoom via Playwright).
+- Editor panel accessibility tests (keyboard, SR, forced-colors, 200% zoom via Selenium).
 
 ### Dependencies
 
@@ -1225,18 +1225,19 @@ packed tarballs, and the real extension service worker.
 
 2. **Packaged-install tests:** the packed-tarball CLI test above is the packaged-install
    proof for the CLI. The extension's "package" is its built `packages/extension/dist`
-   directory loaded as an unpacked extension in real Chromium (the extension is distributed
+   directory loaded as an unpacked extension in Chrome for Testing (the extension is distributed
    as a ZIP in the release pipeline; the unpacked-load journey is the same code path). The manifest contract
    and MV3 artifact hygiene remain enforced by `scripts/validate.ts`.
 
-3. **Playwright headless browser journeys (`test/browser/`, real Chromium):**
+3. **Selenium headless browser journeys (`test/browser/`, Chrome for Testing):**
 
    - **CLI `edit` journey:** the real built CLI process serves the editor; a headless
-     Chromium page edits a project, validates, saves, and the file is verified on disk and
+     Chrome for Testing page edits a project, validates, saves, and the file is verified on disk and
      the server shuts down.
    - **Extension lifecycle journey:** the real built extension is loaded into a persistent
-     headless Chromium context (`channel: "chromium"`, `--disable-extensions-except` +
-     `--load-extension`). The journey imports a project, reviews declared permissions
+     headless Chrome for Testing profile (`--disable-extensions-except` +
+     `--load-extension`, binary from `pnpm browser:install` / `@puppeteer/browsers`
+     `chrome@stable`). The journey imports a project, reviews declared permissions
      (real `chrome.permissions.contains`), activates groups, reads rule statuses and the
      badge, switches/creates/exports/removes projects, and proves storage persistence
      across service-worker restarts.
@@ -1250,9 +1251,9 @@ packed tarballs, and the real extension service worker.
 ### The permission-prompt boundary (evidence-based)
 
 Chrome's optional-host-permission prompt cannot be automated: `chrome.permissions.request`
-never resolves in headless or headed Chromium when a prompt is required, profile
-pre-seeding of `granted_permissions` is rejected (Secure Preferences MAC), and Playwright
-has no API to answer the prompt (upstream microsoft/playwright#32755). The E2E suite
+never resolves in headless or headed Chrome when a prompt is required, profile
+pre-seeding of `granted_permissions` is rejected (Secure Preferences MAC), and the
+automation harness has no API to answer the Chrome host-permission prompt. The E2E suite
 therefore proves the permission flow at the integration seam (the extension's injected
 permission adapters and the exact-origin request), asserts the real-browser `needs
 permission` statuses, and documents the grant click as a manual check. No test hook,
@@ -1302,12 +1303,12 @@ Building the real journeys exposed defects that the mocked unit tests could not:
 
 - CLI/runtime integration: real `node` children of the built CLI, real loopback HTTP.
 - Packaged install: real tarballs via `npm install --offline` into a temp dir.
-- Extension E2E: real Chromium (`channel: "chromium"`), real extension, real
+- Extension E2E: Chrome for Testing (`pnpm browser:install`), real extension, real
   `chrome.permissions`, `chrome.storage.local`, and `chrome.declarativeNetRequest`.
 - Grant flow: the extension's injected `PermissionAdapter` (existing seam) plus the
   manual browser check.
-- DNR shape: `chrome.declarativeNetRequest.updateDynamicRules` acceptance in real
-  Chromium.
+- DNR shape: `chrome.declarativeNetRequest.updateDynamicRules` acceptance in Chrome
+  for Testing.
 
 ### Rejected alternatives
 

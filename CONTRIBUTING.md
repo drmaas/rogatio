@@ -14,14 +14,16 @@ Rogatio is a pnpm monorepo. You need:
 
 - **Node.js 24** or newer (Node 24 is the CI baseline)
 - **pnpm 10.32.1**
-- **Chromium** for browser smoke tests
+- **Chrome for Testing** for browser e2e (`pnpm browser:install`)
 
 ```sh
 git clone git@github.com:drmaas/rogatio.git
 cd rogatio
 pnpm install --frozen-lockfile
-pnpm exec playwright install chromium
+pnpm browser:install
 ```
+
+`pnpm browser:install` downloads [Chrome for Testing](https://developer.chrome.com/docs/automation-and-testing/download-test-binaries) via `@puppeteer/browsers` into `.browser-cache/` (required for Selenium e2e; branded Chrome cannot load unpacked extensions).
 
 Verify your environment with the full validation sequence:
 

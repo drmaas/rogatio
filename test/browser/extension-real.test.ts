@@ -1,7 +1,7 @@
-import { rm, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test } from "@playwright/test";
 import { extensionContext } from "./extension-context.js";
+import { expect, testStandalone as test } from "./fixtures.js";
 
 const project = {
   version: 1,
@@ -28,15 +28,14 @@ const project = {
 };
 
 test("drives the real extension page lifecycle and mounts the editor", async () => {
-  const { context, profile, extensionId } = await extensionContext();
+  const { page, profile, extensionId, close } = await extensionContext();
   const projectFile = join(profile, "project.json");
   await writeFile(projectFile, JSON.stringify(project));
   try {
-    const page = await context.newPage();
     await page.goto(`chrome-extension://${extensionId}/index.html`);
     await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
 
-    await page.setInputFiles('[data-import-input="true"]', projectFile);
+    await page.locator('[data-import-input="true"]').setInputFiles(projectFile);
     await expect(page.getByText("Project imported.")).toBeVisible();
     await page.getByRole("button", { name: "Workspace", exact: true }).click();
     await page.getByRole("button", { name: "Review permissions" }).click();
@@ -64,13 +63,16 @@ test("drives the real extension page lifecycle and mounts the editor", async () 
 
     await page.getByRole("button", { name: "Dashboard", exact: true }).click();
     await page.locator('[data-command="create"]').click();
-    await page.waitForTimeout(100);
-    await page.keyboard.press("Escape");
+    try {
+      const alert = await page.driver.switchTo().alert();
+      await alert.dismiss();
+    } catch {
+      await page.keyboard.press("Escape");
+    }
     await page.getByRole("button", { name: "Workspace", exact: true }).click();
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
   } finally {
-    await context.close();
-    await rm(profile, { recursive: true, force: true });
+    await close();
   }
 });

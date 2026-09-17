@@ -60,7 +60,7 @@ jobs:
         run: pnpm --filter @rogatio/docs-site build
 
   browser:
-    name: Browser smoke (Chromium)
+    name: Browser smoke (Chrome for Testing)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -74,8 +74,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Install Chrome for Testing
+        run: pnpm browser:install
       - name: Full validation
         run: pnpm validate
 
