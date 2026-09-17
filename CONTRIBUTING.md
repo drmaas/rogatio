@@ -23,7 +23,7 @@ pnpm install --frozen-lockfile
 pnpm browser:install
 ```
 
-`pnpm browser:install` downloads [Chrome for Testing](https://developer.chrome.com/docs/automation-and-testing/download-test-binaries) via `@puppeteer/browsers` into `.browser-cache/` (required for Selenium e2e; branded Chrome cannot load unpacked extensions).
+`pnpm browser:install` downloads [Chrome for Testing](https://developer.chrome.com/docs/automation-and-testing/download-test-binaries) via `@puppeteer/browsers` into `.browser-cache/` (required for Selenium e2e; branded Chrome cannot load unpacked extensions). Override the binary with `CHROME_BIN` (or `ROGATIO_CHROME_PATH`) when needed. Headed debug: `SELENIUM_HEADED=1` or `SELENIUM_HEADLESS=0`.
 
 Verify your environment with the full validation sequence:
 
@@ -55,8 +55,8 @@ to review when split.
 - **Formatting & linting:** Biome is authoritative. Run `pnpm format` and `pnpm lint`.
 - **Builds:** esbuild. Produced artifacts must stay browser-safe for MV3 packages (no Node
   globals, dynamic evaluation, remote code, or Ajv runtime compilation in extension code).
-- **Tests:** Vitest for units, Playwright for browser journeys. Prefer real execution over
-  mocks; do not accept false-green checks.
+- **Tests:** Vitest for units, Selenium (Chrome for Testing) for browser journeys. Prefer
+  real execution over mocks; do not accept false-green checks.
 - **Dependencies:** adding a dependency requires review. pnpm's default install-script
   blocking is intentional; any exception must be documented.
 

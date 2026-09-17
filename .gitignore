@@ -149,6 +149,7 @@ vite.config.ts.timestamp-*
 build-manifest.json
 packages/*/dist/
 .browser-cache/
+test/browser/artifacts/
 test-results/
 
 # OCX local project state (receipts, machine-specific paths)

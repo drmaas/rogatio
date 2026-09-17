@@ -732,7 +732,7 @@ test("tolerates malformed, inherited, and throwing diagnostic payloads", async (
   page,
 }) => {
   const pageErrors: string[] = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.addInitScript(() => {
     const inheritedReason = "inherited reason must not run";
     const proto = {
@@ -1146,7 +1146,7 @@ test("updates the error card without throwing when the rule card is missing", as
   page,
 }) => {
   const pageErrors: string[] = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.on("pageerror", (error) => pageErrors.push(error.message));
   const missingRuleReason =
     "Install failed for a rule no longer in the project";
   const missingGroupReason = "Install failed for an unknown group";

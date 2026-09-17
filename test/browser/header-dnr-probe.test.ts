@@ -105,33 +105,32 @@ async function removeProbeRule(page: Page, id: number): Promise<void> {
   );
 }
 
-test("real Chromium accepts corrected toDnrRule sample header shapes", async () => {
+test("real Chromium accepts corrected toDnrRule sample header shapes", async ({
+  registerDriver,
+}) => {
   const baseId = 9_000_000;
   const setRuleId = baseId + 1;
   const removeRuleId = baseId + 2;
-  const { page, extensionId, close } = await extensionContext();
+  const { page, extensionId, driver, close } = await extensionContext();
+  registerDriver(driver, close);
   const outcomes: ProbeOutcome[] = [];
 
-  try {
-    await page.goto(`chrome-extension://${extensionId}/index.html`);
-    await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
+  await page.goto(`chrome-extension://${extensionId}/index.html`);
+  await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
 
-    for (const [kind, ruleId] of [
-      ["rule-header-set", setRuleId],
-      ["rule-header-remove", removeRuleId],
-    ] as const) {
-      try {
-        outcomes.push(await probeUpdateDynamicRules(page, ruleId, kind));
-      } finally {
-        await removeProbeRule(page, ruleId);
-      }
+  for (const [kind, ruleId] of [
+    ["rule-header-set", setRuleId],
+    ["rule-header-remove", removeRuleId],
+  ] as const) {
+    try {
+      outcomes.push(await probeUpdateDynamicRules(page, ruleId, kind));
+    } finally {
+      await removeProbeRule(page, ruleId);
     }
-
-    expect(outcomes).toEqual([
-      { rule: "rule-header-set", accepted: true, message: null },
-      { rule: "rule-header-remove", accepted: true, message: null },
-    ]);
-  } finally {
-    await close();
   }
+
+  expect(outcomes).toEqual([
+    { rule: "rule-header-set", accepted: true, message: null },
+    { rule: "rule-header-remove", accepted: true, message: null },
+  ]);
 });

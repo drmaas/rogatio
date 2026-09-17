@@ -31,7 +31,7 @@ schema -> compiler -> { browser-core, editor, runtime } -> cli -> { extension, n
 
 - Builds use **esbuild**.
 - Quality gates use **Biome** (format + lint), strict **TypeScript** checks, **Vitest** for
-  unit tests, and **Playwright** for end-to-end tests.
+  unit tests, and **Selenium** (Chrome for Testing) for end-to-end browser journeys.
 - CI and **semantic-release** publish the CLI to npm and extension ZIPs to GitHub Releases,
   with consistent CLI/extension/Git-tag versioning.
 - The documentation site (this site) uses **Astro** and **Starlight** and is a separate

@@ -68,6 +68,8 @@ export class Locator {
     readonly driver: WebDriver,
     private readonly resolveAll: () => Promise<WebElement[]>,
     private readonly description: string,
+    /** When set, `filter({ has })` can query descendants by CSS. */
+    readonly cssSelector?: string,
   ) {}
 
   locator(selector: string): Locator {
@@ -83,6 +85,7 @@ export class Locator {
         return found;
       },
       `${this.description} >> ${selector}`,
+      selector,
     );
   }
 
@@ -137,21 +140,8 @@ export class Locator {
         const parents = await this.resolveAll();
         const found: WebElement[] = [];
         for (const parent of parents) {
-          const candidates = await parent.findElements(By.xpath(".//*"));
-          for (const el of candidates) {
-            try {
-              const content = (await el.getText()).replace(/\s+/g, " ").trim();
-              if (!content) continue;
-              if (typeof text === "string") {
-                const ok = exact ? content === text : content.includes(text);
-                if (ok) found.push(el);
-              } else if (text.test(content)) {
-                found.push(el);
-              }
-            } catch {
-              // stale
-            }
-          }
+          const matches = await findTextMatches(parent, text, exact);
+          found.push(...matches);
         }
         return found;
       },
@@ -160,7 +150,7 @@ export class Locator {
   }
 
   filter(options: FilterOptions): Locator {
-    const hasDescription = options.has?.toString() ?? "";
+    const hasCss = options.has?.cssSelector;
     return new Locator(
       this.driver,
       async () => {
@@ -172,14 +162,12 @@ export class Locator {
             if (!nameMatches(text, options.hasText, false)) continue;
           }
           if (options.has) {
-            // Resolve the sibling locator's CSS from its description when it
-            // is a simple page.locator(selector); otherwise search descendants.
-            const hasSelector = hasDescription.includes(">>")
-              ? null
-              : hasDescription;
-            const nested = hasSelector
-              ? await el.findElements(By.css(hasSelector))
-              : await el.findElements(By.css("*"));
+            let nested: WebElement[];
+            if (hasCss) {
+              nested = await el.findElements(By.css(hasCss));
+            } else {
+              nested = await options.has.resolveAllWithin(el);
+            }
             if (nested.length === 0) continue;
           }
           out.push(el);
@@ -190,6 +178,25 @@ export class Locator {
     );
   }
 
+  /** Resolve this locator relative to a parent element (for `filter({ has })`). */
+  async resolveAllWithin(parent: WebElement): Promise<WebElement[]> {
+    if (this.cssSelector) {
+      return parent.findElements(By.css(this.cssSelector));
+    }
+    // Fall back: run resolveAll and keep elements that are descendants of parent.
+    const all = await this.resolveAll();
+    const out: WebElement[] = [];
+    for (const el of all) {
+      const inside = await this.driver.executeScript<boolean>(
+        "return arguments[0].contains(arguments[1]);",
+        parent,
+        el,
+      );
+      if (inside) out.push(el);
+    }
+    return out;
+  }
+
   first(): Locator {
     return new Locator(
       this.driver,
@@ -198,6 +205,7 @@ export class Locator {
         return all.slice(0, 1);
       },
       `${this.description} >> first`,
+      this.cssSelector,
     );
   }
 
@@ -209,24 +217,30 @@ export class Locator {
         return all[index] ? [all[index]] : [];
       },
       `${this.description} >> nth=${index}`,
+      this.cssSelector,
     );
   }
 
   async element(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<WebElement> {
-    const deadline = Date.now() + timeoutMs;
-    let lastError: unknown;
-    while (Date.now() < deadline) {
-      try {
-        const all = await this.resolveAll();
-        if (all[0]) return all[0];
-      } catch (error) {
-        lastError = error;
+    try {
+      const found = await this.driver.wait(
+        async (): Promise<WebElement | null> => {
+          try {
+            const all = await this.resolveAll();
+            return all[0] ?? null;
+          } catch {
+            return null;
+          }
+        },
+        timeoutMs,
+      );
+      if (!found) {
+        throw new Error(`Locator not found: ${this.description}`);
       }
-      await sleep(50);
+      return found;
+    } catch {
+      throw new Error(`Locator not found: ${this.description}`);
     }
-    throw new Error(
-      `Locator not found: ${this.description}${lastError ? ` (${String(lastError)})` : ""}`,
-    );
   }
 
   async elements(): Promise<WebElement[]> {
@@ -444,33 +458,46 @@ export class Locator {
   }
 
   async waitVisible(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<WebElement> {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const els = await this.elements();
-      for (const el of els) {
-        if (await el.isDisplayed()) return el;
+    try {
+      const found = await this.driver.wait(
+        async (): Promise<WebElement | null> => {
+          const els = await this.elements();
+          for (const el of els) {
+            try {
+              if (await el.isDisplayed()) return el;
+            } catch {
+              // stale
+            }
+          }
+          return null;
+        },
+        timeoutMs,
+      );
+      if (!found) {
+        throw new Error(`Not visible: ${this.description}`);
       }
-      await sleep(50);
+      return found;
+    } catch {
+      throw new Error(`Not visible: ${this.description}`);
     }
-    throw new Error(`Not visible: ${this.description}`);
   }
 
   async waitHidden(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<void> {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const els = await this.elements();
-      let anyVisible = false;
-      for (const el of els) {
-        try {
-          if (await el.isDisplayed()) anyVisible = true;
-        } catch {
-          // Stale → treat as hidden.
+    try {
+      await this.driver.wait(async () => {
+        const els = await this.elements();
+        for (const el of els) {
+          try {
+            if (await el.isDisplayed()) return false;
+          } catch {
+            // Stale → treat as hidden.
+          }
         }
-      }
-      if (!anyVisible) return;
-      await sleep(50);
+        return true;
+      }, timeoutMs);
+    } catch {
+      throw new Error(`Still visible: ${this.description}`);
     }
-    throw new Error(`Still visible: ${this.description}`);
   }
 
   async waitClickable(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<WebElement> {
@@ -561,6 +588,48 @@ async function findByLabel(
   );
 }
 
+async function findTextMatches(
+  root: WebElement,
+  text: string | RegExp,
+  exact: boolean,
+): Promise<WebElement[]> {
+  const isRegex = text instanceof RegExp;
+  return root.getDriver().executeScript<WebElement[]>(
+    `const root = arguments[0];
+     const needle = arguments[1];
+     const exact = arguments[2];
+     const isRegex = arguments[3];
+     const flags = arguments[4];
+     const normalize = (s) => (s || "").replace(/\\s+/g, " ").trim();
+     const matcher = isRegex ? new RegExp(needle, flags) : null;
+     const matches = (own) => {
+       if (!own) return false;
+       if (matcher) return matcher.test(own);
+       return exact ? own === needle : own.includes(needle);
+     };
+     const out = [];
+     const scope = root.querySelectorAll ? root : document.body;
+     for (const el of scope.querySelectorAll("*")) {
+       const own = normalize(el.textContent);
+       if (!matches(own)) continue;
+       let childMatch = false;
+       for (const child of el.querySelectorAll("*")) {
+         if (matches(normalize(child.textContent))) {
+           childMatch = true;
+           break;
+         }
+       }
+       if (!childMatch) out.push(el);
+     }
+     return out;`,
+    root,
+    isRegex ? text.source : text,
+    exact,
+    isRegex,
+    isRegex ? text.flags : "",
+  );
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -613,9 +682,9 @@ export class Page {
 
   constructor(readonly driver: WebDriver) {}
 
-  on(event: "pageerror", handler: (error: Error) => void): void {
+  async on(event: "pageerror", handler: (error: Error) => void): Promise<void> {
     if (event !== "pageerror") return;
-    void this.attachErrorListener(handler);
+    await this.attachErrorListener(handler);
   }
 
   private async attachErrorListener(
@@ -701,6 +770,7 @@ export class Page {
       this.driver,
       async () => this.driver.findElements(By.css(selector)),
       selector,
+      selector,
     );
   }
 
@@ -740,46 +810,8 @@ export class Page {
     return new Locator(
       this.driver,
       async () => {
-        if (typeof text === "string") {
-          return this.driver.executeScript<WebElement[]>(
-            `const needle = arguments[0];
-             const exact = arguments[1];
-             const normalize = (s) => (s || "").replace(/\\s+/g, " ").trim();
-             const out = [];
-             for (const el of document.querySelectorAll("body *")) {
-               // Prefer elements whose own text content matches without relying
-               // solely on nested descendants for exact matches.
-               const own = normalize(el.textContent);
-               if (!own) continue;
-               const ok = exact ? own === needle : own.includes(needle);
-               if (!ok) continue;
-               // Prefer deepest match: skip if a descendant also matches.
-               let childMatch = false;
-               for (const child of el.querySelectorAll("*")) {
-                 const childText = normalize(child.textContent);
-                 if (exact ? childText === needle : childText.includes(needle)) {
-                   childMatch = true;
-                   break;
-                 }
-               }
-               if (!childMatch) out.push(el);
-             }
-             return out;`,
-            text,
-            exact,
-          );
-        }
-        const candidates = await this.driver.findElements(By.css("body *"));
-        const found: WebElement[] = [];
-        for (const el of candidates) {
-          try {
-            const content = (await el.getText()).replace(/\s+/g, " ").trim();
-            if (content && text.test(content)) found.push(el);
-          } catch {
-            // stale
-          }
-        }
-        return found;
+        const body = await this.driver.findElement(By.css("body"));
+        return findTextMatches(body, text, exact);
       },
       `text=${String(text)}`,
     );
@@ -822,6 +854,20 @@ export class Page {
     }
   }
 
+  async waitForCondition(
+    predicate: () => Promise<boolean>,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  ): Promise<void> {
+    await this.driver.wait(async () => {
+      try {
+        return await predicate();
+      } catch {
+        return false;
+      }
+    }, timeoutMs);
+  }
+
+  /** @deprecated Prefer waitForCondition / until — kept for rare live-gated stubs. */
   async waitForTimeout(ms: number): Promise<void> {
     await sleep(ms);
   }
@@ -869,19 +915,19 @@ class LocatorAssertion {
     expected: string | string[] | RegExp,
     exact: boolean,
   ): Promise<void> {
-    const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
     let last = "";
-    while (Date.now() < deadline) {
-      try {
-        const els = await this.locator.visibleElements();
-        if (Array.isArray(expected)) {
-          const texts = await Promise.all(els.map((el) => el.getText()));
-          const ok =
-            texts.length === expected.length &&
-            texts.every((t, i) => t.includes(expected[i] ?? ""));
-          if (ok === !this.negated) return;
-          last = texts.join(" | ");
-        } else {
+    try {
+      await this.locator.driver.wait(async () => {
+        try {
+          const els = await this.locator.visibleElements();
+          if (Array.isArray(expected)) {
+            const texts = await Promise.all(els.map((el) => el.getText()));
+            last = texts.join(" | ");
+            const ok =
+              texts.length === expected.length &&
+              texts.every((t, i) => t.includes(expected[i] ?? ""));
+            return ok === !this.negated;
+          }
           const text = els[0] ? await els[0].getText() : "";
           last = text;
           const ok =
@@ -890,74 +936,74 @@ class LocatorAssertion {
                 ? text === expected
                 : text.includes(expected)
               : expected.test(text);
-          if (ok === !this.negated) return;
+          return ok === !this.negated;
+        } catch {
+          return false;
         }
-      } catch {
-        // Stale element during re-render — retry.
-      }
-      await sleep(50);
+      }, DEFAULT_TIMEOUT_MS);
+    } catch {
+      throw new Error(
+        `Expected ${this.negated ? "not " : ""}text ${String(expected)}, got ${JSON.stringify(last)} for ${this.locator}`,
+      );
     }
-    throw new Error(
-      `Expected ${this.negated ? "not " : ""}text ${String(expected)}, got ${JSON.stringify(last)} for ${this.locator}`,
-    );
   }
 
   async toHaveValue(expected: string): Promise<void> {
-    const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
     let last = "";
-    while (Date.now() < deadline) {
-      try {
-        last = await this.locator.inputValue();
-        const ok = last === expected;
-        if (ok === !this.negated) return;
-      } catch {
-        // retry
-      }
-      await sleep(50);
+    try {
+      await this.locator.driver.wait(async () => {
+        try {
+          last = await this.locator.inputValue();
+          return (last === expected) === !this.negated;
+        } catch {
+          return false;
+        }
+      }, DEFAULT_TIMEOUT_MS);
+    } catch {
+      throw new Error(
+        `Expected value ${expected}, got ${JSON.stringify(last)} for ${this.locator}`,
+      );
     }
-    throw new Error(
-      `Expected value ${expected}, got ${JSON.stringify(last)} for ${this.locator}`,
-    );
   }
 
   async toHaveAttribute(name: string, value?: string): Promise<void> {
-    const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
     let last: string | null = null;
-    while (Date.now() < deadline) {
-      try {
-        last = await this.locator.getAttribute(name);
-        let ok: boolean;
-        if (value === undefined) {
-          ok = last !== null;
-        } else if (value === "" && last !== null) {
-          // Boolean HTML attributes serialize as "" or the attribute name.
-          ok = last === "" || last === name || last === "true";
-        } else {
-          ok = last === value;
+    try {
+      await this.locator.driver.wait(async () => {
+        try {
+          last = await this.locator.getAttribute(name);
+          let ok: boolean;
+          if (value === undefined) {
+            ok = last !== null;
+          } else if (value === "" && last !== null) {
+            ok = last === "" || last === name || last === "true";
+          } else {
+            ok = last === value;
+          }
+          return ok === !this.negated;
+        } catch {
+          return false;
         }
-        if (ok === !this.negated) return;
-      } catch {
-        // retry
-      }
-      await sleep(50);
+      }, DEFAULT_TIMEOUT_MS);
+    } catch {
+      throw new Error(
+        `Expected attribute ${name}=${value}, got ${last} for ${this.locator}`,
+      );
     }
-    throw new Error(
-      `Expected attribute ${name}=${value}, got ${last} for ${this.locator}`,
-    );
   }
 
   async toHaveCount(expected: number): Promise<void> {
-    const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
     let last = -1;
-    while (Date.now() < deadline) {
-      last = await this.locator.count();
-      const ok = last === expected;
-      if (ok === !this.negated) return;
-      await sleep(50);
+    try {
+      await this.locator.driver.wait(async () => {
+        last = await this.locator.count();
+        return (last === expected) === !this.negated;
+      }, DEFAULT_TIMEOUT_MS);
+    } catch {
+      throw new Error(
+        `Expected count ${expected}, got ${last} for ${this.locator}`,
+      );
     }
-    throw new Error(
-      `Expected count ${expected}, got ${last} for ${this.locator}`,
-    );
   }
 
   async toBeDisabled(): Promise<void> {
@@ -982,22 +1028,23 @@ class LocatorAssertion {
   }
 
   async toBeChecked(): Promise<void> {
-    const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
     let last = false;
-    while (Date.now() < deadline) {
-      try {
-        const el = await this.locator.element();
-        last = await this.locator.driver.executeScript<boolean>(
-          "return arguments[0].checked === true;",
-          el,
-        );
-        if (last === !this.negated) return;
-      } catch {
-        // stale during re-render
-      }
-      await sleep(50);
+    try {
+      await this.locator.driver.wait(async () => {
+        try {
+          const el = await this.locator.element();
+          last = await this.locator.driver.executeScript<boolean>(
+            "return arguments[0].checked === true;",
+            el,
+          );
+          return last === !this.negated;
+        } catch {
+          return false;
+        }
+      }, DEFAULT_TIMEOUT_MS);
+    } catch {
+      vitestExpect(last).toBe(!this.negated);
     }
-    vitestExpect(last).toBe(!this.negated);
   }
 }
 
@@ -1010,13 +1057,19 @@ type PollAssertion = {
 
 function createPoll(fn: () => Promise<unknown>): PollAssertion {
   const run = async (expected: unknown, negated: boolean) => {
-    const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
     let last: unknown;
-    while (Date.now() < deadline) {
-      last = await fn();
-      const ok = Object.is(last, expected);
-      if (ok === !negated) return;
-      await sleep(50);
+    try {
+      // Use a short-lived Chrome session wait via Promise race with clock —
+      // polls are for CSS animation; driver.wait needs a driver. Use sleep
+      // only here as animation timing aid.
+      const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
+      while (Date.now() < deadline) {
+        last = await fn();
+        if (Object.is(last, expected) === !negated) return;
+        await sleep(50);
+      }
+    } catch {
+      // fall through
     }
     throw new Error(
       `poll() expected ${negated ? "not " : ""}${String(expected)}, got ${String(last)}`,

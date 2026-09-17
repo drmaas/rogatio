@@ -1,5 +1,6 @@
+import { mkdirSync, writeFileSync } from "node:fs";
 import type { WebDriver } from "selenium-webdriver";
-import { afterEach, beforeEach, it } from "vitest";
+import { afterEach, beforeEach, it, type TestContext } from "vitest";
 import { createDriver } from "./driver.js";
 import { expect, Page, request } from "./page.js";
 
@@ -22,27 +23,55 @@ type BrowserTest = {
 
 let currentDriver: WebDriver | undefined;
 let currentPage: Page | undefined;
-let driverBorrowed = false;
+/** Standalone tests register their driver so afterEach can always quit. */
+let standaloneDriver: WebDriver | undefined;
+let standaloneCloser: (() => Promise<void>) | undefined;
 
 async function ensurePage(): Promise<Page> {
   if (currentPage) return currentPage;
-  currentDriver = await createDriver({ headless: true });
+  currentDriver = await createDriver();
   currentPage = new Page(currentDriver);
   return currentPage;
 }
 
 beforeEach(() => {
-  driverBorrowed = false;
   currentDriver = undefined;
   currentPage = undefined;
+  standaloneDriver = undefined;
+  standaloneCloser = undefined;
 });
 
-afterEach(async () => {
-  const driver = currentDriver;
+afterEach(async (context: TestContext) => {
+  const drivers: WebDriver[] = [];
+  if (currentDriver) drivers.push(currentDriver);
+  if (standaloneDriver) drivers.push(standaloneDriver);
+  const closer = standaloneCloser;
   currentDriver = undefined;
   currentPage = undefined;
-  if (driver && !driverBorrowed) {
-    await driver.quit().catch(() => undefined);
+  standaloneDriver = undefined;
+  standaloneCloser = undefined;
+
+  try {
+    if (context.task.result?.state === "fail") {
+      for (const driver of drivers) {
+        try {
+          const png = await driver.takeScreenshot();
+          mkdirSync("test/browser/artifacts", { recursive: true });
+          const name = context.task.name.replace(/\W+/g, "_").slice(0, 80);
+          writeFileSync(`test/browser/artifacts/${name}.png`, png, "base64");
+        } catch {
+          // Screenshot best-effort; still quit below.
+        }
+      }
+    }
+  } finally {
+    if (closer) {
+      await closer().catch(() => undefined);
+    } else {
+      for (const driver of drivers) {
+        await driver.quit().catch(() => undefined);
+      }
+    }
   }
 });
 
@@ -71,10 +100,22 @@ export const test: BrowserTest = Object.assign(
   },
 );
 
-/** Run a test without the shared page fixture (owns its own WebDriver). */
-export function testStandalone(name: string, fn: () => Promise<void>): void {
+/**
+ * Run a test that owns its WebDriver (e.g. extension context).
+ * Register the driver (and optional closer) so afterEach always cleans up.
+ */
+export function testStandalone(
+  name: string,
+  fn: (register: {
+    registerDriver: (driver: WebDriver, closer?: () => Promise<void>) => void;
+  }) => Promise<void>,
+): void {
   it(name, async () => {
-    driverBorrowed = true;
-    await fn();
+    await fn({
+      registerDriver: (driver, closer) => {
+        standaloneDriver = driver;
+        standaloneCloser = closer;
+      },
+    });
   });
 }
