@@ -128,6 +128,8 @@ export async function createDriver(
     chromeOptions.addArguments("--headless=new");
   }
   chromeOptions.addArguments("--window-size=1280,800", ...(options.args ?? []));
+  // Expose debuggerAddress for CDP WebSocket sessions (ServiceWorker probes).
+  chromeOptions.addArguments("--remote-debugging-port=0");
   if (inContainerOrCi()) {
     chromeOptions.addArguments("--no-sandbox", "--disable-dev-shm-usage");
   }

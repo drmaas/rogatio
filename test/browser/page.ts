@@ -319,6 +319,35 @@ export class Locator {
     }
   }
 
+  async uncheck(): Promise<void> {
+    await this.waitClickable();
+    const el = await this.element();
+    const checked = await this.driver.executeScript<boolean>(
+      "return arguments[0].checked === true;",
+      el,
+    );
+    if (checked) {
+      await this.driver.executeScript("arguments[0].click()", el);
+    }
+  }
+
+  async press(key: string): Promise<void> {
+    const el = await this.element();
+    // Focus only — do not click first (checkbox click would double-toggle with Space).
+    await this.driver.executeScript("arguments[0].focus()", el);
+    const mapped =
+      key === " " || key === "Space"
+        ? Key.SPACE
+        : key === "Enter"
+          ? Key.ENTER
+          : key === "Escape"
+            ? Key.ESCAPE
+            : key === "Tab"
+              ? Key.TAB
+              : key;
+    await el.sendKeys(mapped);
+  }
+
   async focus(): Promise<void> {
     const el = await this.element();
     await this.driver.executeScript("arguments[0].focus()", el);
@@ -530,6 +559,10 @@ function roleSelector(role: string): string {
       return '[role="alertdialog"], dialog[open]';
     case "textbox":
       return 'input:not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]), textarea, [role="textbox"]';
+    case "checkbox":
+      return 'input[type="checkbox"], [role="checkbox"]';
+    case "radio":
+      return 'input[type="radio"], [role="radio"]';
     default:
       return `[role="${role}"]`;
   }
@@ -671,7 +704,9 @@ export class Page {
             ? Key.ESCAPE
             : key === "Tab"
               ? Key.TAB
-              : key;
+              : key === " " || key === "Space"
+                ? Key.SPACE
+                : key;
       await this.driver.switchTo().activeElement().sendKeys(mapped);
     },
   };
@@ -762,6 +797,11 @@ export class Page {
 
   async goto(path: string): Promise<void> {
     await this.driver.get(resolveUrl(path));
+    await this.drainPageErrors();
+  }
+
+  async reload(): Promise<void> {
+    await this.driver.navigate().refresh();
     await this.drainPageErrors();
   }
 
