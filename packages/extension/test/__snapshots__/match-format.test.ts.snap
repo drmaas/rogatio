@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`formatMatchRecord > formats redirect, query, and header snapshots with ANSI and field order > header 1`] = `"[1;34m[rogatio][m matched GET script https://example.com/page [2mheader-rule Header Rule header request set x-api-key=[redacted][m"`;
+
+exports[`formatMatchRecord > formats redirect, query, and header snapshots with ANSI and field order > query 1`] = `"[1;34m[rogatio][m matched POST xhr https://example.com/page [2mquery-rule Query Rule query set a=1 remove b initiator=https://example.com/[m"`;
+
+exports[`formatMatchRecord > formats redirect, query, and header snapshots with ANSI and field order > redirect 1`] = `"[1;34m[rogatio][m matched GET script https://example.com/page [2mredirect-rule Redirect Rule redirect → https://dest.example/new-path initiator=https://example.com/[m"`;

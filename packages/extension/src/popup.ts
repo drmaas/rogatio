@@ -1,3 +1,8 @@
+import {
+  MATCH_LOGGING_ENABLED_KEY,
+  readMatchLoggingEnabledFromStorageResult,
+} from "./match-logging-enabled.js";
+import { createMatchLoggingToggle } from "./match-logging-toggle.js";
 import { createPopupModel, type PopupModel } from "./popup-model.js";
 
 const rootElement = document.querySelector<HTMLElement>("#rogatio-popup-root");
@@ -41,6 +46,8 @@ let createFormOpen = false;
 let createDraft = "";
 /** Last one-line outcome shown in the popup's status region. */
 let statusMessage = "";
+/** Console match logging toggle; missing storage key defaults on. */
+let matchLoggingEnabled = true;
 
 function statusLabel(status: string): string {
   switch (status) {
@@ -251,7 +258,16 @@ function render(): void {
     "Open the Rogatio management page",
   );
   openApp.dataset.openApp = "true";
-  actions.append(newProject, importProject, openApp);
+
+  const matchLoggingLabel = createMatchLoggingToggle({
+    api: chrome,
+    enabled: matchLoggingEnabled,
+    onPersisted: (enabled) => {
+      matchLoggingEnabled = enabled;
+    },
+  });
+
+  actions.append(newProject, importProject, openApp, matchLoggingLabel);
 
   const list = document.createElement("ul");
   list.dataset.groupList = "true";
@@ -347,7 +363,17 @@ function render(): void {
   container.append(...parts);
 }
 
+async function loadMatchLoggingEnabled(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get(MATCH_LOGGING_ENABLED_KEY);
+    matchLoggingEnabled = readMatchLoggingEnabledFromStorageResult(result);
+  } catch {
+    matchLoggingEnabled = false;
+  }
+}
+
 async function refresh(): Promise<void> {
+  await loadMatchLoggingEnabled();
   const response = await client.send({ version: 1, command: "get-state" });
   if (response?.ok !== true || !response.value) return;
   model = createPopupModel({

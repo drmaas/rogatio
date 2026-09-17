@@ -145,6 +145,9 @@ export interface RogatioRule {
   responseBody?: ResponseBodyAction;
   /** Required iff type === "request-body". */
   requestBody?: RequestBodyAction;
+
+  /** When true, deny-list sensitive query/header values in match logs. Absent => false. */
+  redactSensitiveInLogs?: boolean;
 }
 
 export interface RogatioGroup {

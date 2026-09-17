@@ -6,6 +6,12 @@ import type {
 } from "@rogatio/compiler";
 import { type DnrQueryTransform, queryActionToDNR } from "@rogatio/compiler";
 import type { ChromeApi } from "./chrome.js";
+import {
+  buildInstallIndexSnapshot,
+  type MatchIndexSnapshot,
+  readMatchIndexSnapshot,
+  writeMatchIndex,
+} from "./match-index.js";
 
 export interface DnrRedirectRule {
   id: number;
@@ -100,8 +106,84 @@ function ruleIdHash(ruleId: string): number {
   return (Math.abs(hash) % 1_000_000) + 1;
 }
 
-export function createDnrInstaller(api: ChromeApi): RuleInstallerAdapter {
+export interface DnrInstallerWithMatchIndex extends RuleInstallerAdapter {
+  syncHeaderMatchIndex(
+    headerEntries: ReadonlyArray<{
+      readonly ruleId: number;
+      readonly operation: RogatioOperation;
+    }>,
+  ): Promise<void>;
+}
+
+export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
   const tracked = new Map<number, RogatioOperation>();
+  let matchIndexWriteTail: Promise<void> = Promise.resolve();
+
+  function withMatchIndexWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = matchIndexWriteTail;
+    let release!: () => void;
+    matchIndexWriteTail = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return previous.then(operation).finally(release);
+  }
+
+  async function storedIndexByKind(): Promise<{
+    header: MatchIndexSnapshot;
+    redirectQuery: MatchIndexSnapshot;
+  }> {
+    const header: MatchIndexSnapshot = {};
+    const redirectQuery: MatchIndexSnapshot = {};
+    for (const [id, entry] of Object.entries(
+      await readMatchIndexSnapshot(api),
+    )) {
+      if (entry.kind === "header") header[id] = entry;
+      else redirectQuery[id] = entry;
+    }
+    return { header, redirectQuery };
+  }
+
+  // Sole wholesale writer for the index (ADR 0003). Serialized on one
+  // in-process queue so overlapping install and header sync cannot drop slices.
+  //
+  // Overlay: redirect/query from tracked when non-empty; else stored when
+  // `keepStoredRedirectQuery` (header sync after SW restart), else {}.
+  // Headers from `headerOverlay` when provided; else stored (redirect install).
+  async function writeWholesaleMatchIndex(options: {
+    readonly headerOverlay?: ReadonlyArray<{
+      readonly ruleId: number;
+      readonly operation: RogatioOperation;
+    }>;
+    readonly keepStoredRedirectQuery?: boolean;
+  }): Promise<void> {
+    await withMatchIndexWriteLock(async () => {
+      const redirectQueryEntries = [...tracked.entries()].map(
+        ([ruleId, operation]) => ({ ruleId, operation }),
+      );
+      const needsStored =
+        options.headerOverlay === undefined ||
+        (redirectQueryEntries.length === 0 &&
+          options.keepStoredRedirectQuery === true);
+      const stored = needsStored
+        ? await storedIndexByKind()
+        : { header: {}, redirectQuery: {} };
+      const snapshot: MatchIndexSnapshot = {
+        ...(redirectQueryEntries.length > 0
+          ? buildInstallIndexSnapshot(redirectQueryEntries)
+          : options.keepStoredRedirectQuery === true
+            ? stored.redirectQuery
+            : {}),
+        ...(options.headerOverlay === undefined
+          ? stored.header
+          : buildInstallIndexSnapshot(options.headerOverlay)),
+      };
+      try {
+        await writeMatchIndex(api, snapshot);
+      } catch {
+        // ignored
+      }
+    });
+  }
 
   return {
     async current(): Promise<readonly RogatioOperation[]> {
@@ -159,7 +241,24 @@ export function createDnrInstaller(api: ChromeApi): RuleInstallerAdapter {
 
       tracked.clear();
       for (const entry of added) tracked.set(entry.ruleId, entry.operation);
+
+      // Rules are already installed; a failed index write only leaves a stale
+      // index, which resolves as an unknown-id no-op (ADR 0003).
+      await writeWholesaleMatchIndex({});
+
       return { ok: true };
+    },
+
+    async syncHeaderMatchIndex(
+      headerEntries: ReadonlyArray<{
+        readonly ruleId: number;
+        readonly operation: RogatioOperation;
+      }>,
+    ): Promise<void> {
+      await writeWholesaleMatchIndex({
+        headerOverlay: headerEntries,
+        keepStoredRedirectQuery: true,
+      });
     },
   };
 }

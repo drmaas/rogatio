@@ -22,8 +22,11 @@ boundary is designed to accommodate additional browser extensions in the future.
 - Permission requests are projected from sorted effective origins and never include
   undeclared origins or broad host patterns.
 - Actionless matcher operations are reported as `unsupported` and are never sent to DNR.
-- The extension emits no traffic or console diagnostics beyond the bounded, redacted
-  `[Rogatio]` DevTools Console record described in [Chrome extension](/guides/extension/).
+- Console **match logging** injects a bounded, redacted, live-only lowercase `[rogatio]`
+  line into the matched page's DevTools Console when `onRuleMatchedDebug` fires (unpacked
+  load only). See [Chrome extension](/guides/extension/) for coverage, the **Match logging**
+  toggle (default on), per-rule redact checkbox, live vs intended fields, body exclusions,
+  and limitations.
 
 ## Distribution
 

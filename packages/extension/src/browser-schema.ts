@@ -57,7 +57,10 @@ const FORBIDDEN_RESPONSE_HEADERS = Object.freeze([
 
 const FORBIDDEN_REQUEST_PREFIXES = Object.freeze(["proxy-", "sec-"]);
 
-function isForbiddenHeader(name: string, direction: HeaderDirection): boolean {
+export function isForbiddenHeader(
+  name: string,
+  direction: HeaderDirection,
+): boolean {
   const normalized = name.toLowerCase();
   const forbidden =
     direction === "request"
@@ -430,6 +433,7 @@ const RULE_KEYS = [
   "headerValue",
   "responseBody",
   "requestBody",
+  "redactSensitiveInLogs",
 ] as const;
 
 const QUERY_ACTION_KEYS = ["type", "params"] as const;
@@ -648,6 +652,13 @@ export function validateProjectDetailed(
         !HTTP_METHODS.includes(rule.method as HttpMethod)
       )
         errors.push(issue(`${rulePath}/method`, "invalid-value"));
+      if (
+        rule.redactSensitiveInLogs !== undefined &&
+        typeof rule.redactSensitiveInLogs !== "boolean"
+      )
+        errors.push(
+          issue(`${rulePath}/redactSensitiveInLogs`, "invalid-value"),
+        );
       if (
         rule.type !== undefined &&
         rule.type !== "redirect" &&

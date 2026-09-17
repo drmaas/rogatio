@@ -6,6 +6,7 @@ import {
   setBadge,
 } from "./chrome.js";
 import { createDnrInstaller } from "./dnr.js";
+import { registerMatchLogListener } from "./match-listener.js";
 
 import type {
   NativeEnvelope,
@@ -239,6 +240,8 @@ const application = createExtensionApplication({
   extensionId: api.runtime.id,
   nativeRuntime: createNativeRuntimeAdapter(),
 });
+
+registerMatchLogListener(api);
 
 api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   void application.handle(message).then(sendResponse);

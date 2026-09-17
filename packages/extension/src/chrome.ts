@@ -44,12 +44,35 @@ export interface ChromeDynamicRule {
   readonly id: number;
 }
 
+export interface ChromeRuleMatchedDebugInfo {
+  rule: { ruleId: number };
+  request: {
+    url?: string;
+    tabId: number;
+    method?: string;
+    initiator?: string;
+    type?: string;
+  };
+}
+
 export interface ChromeDeclarativeNetRequest {
   getDynamicRules(): Promise<Array<ChromeDynamicRule>>;
   updateDynamicRules(details: {
     removeRuleIds: number[];
     addRules: unknown[];
   }): Promise<void>;
+  onRuleMatchedDebug?: {
+    addListener(listener: (info: ChromeRuleMatchedDebugInfo) => void): void;
+  };
+}
+
+export interface ChromeScripting {
+  executeScript(details: {
+    target: { tabId: number };
+    world?: "ISOLATED";
+    func?: (...args: unknown[]) => void;
+    args?: unknown[];
+  }): Promise<unknown>;
 }
 
 export interface ChromeApi {
@@ -58,6 +81,7 @@ export interface ChromeApi {
   action: ChromeAction;
   runtime: ChromeRuntime;
   declarativeNetRequest?: ChromeDeclarativeNetRequest;
+  scripting?: ChromeScripting;
 }
 
 declare global {

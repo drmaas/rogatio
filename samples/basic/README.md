@@ -160,9 +160,10 @@ rogatio verify samples/basic/.rogatio.json
 
 ### 7b. Live browser validation
 
-Open DevTools (**F12**) on the tab you test in, keep the **Network** panel open, and, for
-header/response-body checks, also watch the **Console** for the bounded `[Rogatio]` record
-when Chrome authoritatively reports a match.
+Open DevTools (**F12**) on the tab you test in and keep the **Network** panel open. For
+redirect, query, and header checks on an unpacked load with **Match logging** on, also
+watch the **Console** for one bounded `[rogatio]` line when Chrome reports a match (intended
+action, not proof of success). Body-rule matches are not logged.
 
 **Redirect** (`rule-redirect`) — no setup needed:
 

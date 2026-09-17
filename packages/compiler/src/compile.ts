@@ -179,6 +179,10 @@ function canonicalResourceTypes(
   return ordered;
 }
 
+function resolveRedactSensitiveInLogs(rule: RogatioRule): boolean {
+  return rule.redactSensitiveInLogs === true;
+}
+
 function compileMatcher(
   group: RogatioGroup,
   rule: RogatioRule,
@@ -212,11 +216,14 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
     for (let ruleIndex = 0; ruleIndex < group.rules.length; ruleIndex += 1) {
       const rule = group.rules[ruleIndex];
       const matcher = compileMatcher(group, rule, groupIndex, ruleIndex);
+      const redactSensitiveInLogs = resolveRedactSensitiveInLogs(rule);
       if (rule.type === "redirect") {
         const operation: RedirectOperation = {
           kind: "redirect",
           groupId: group.id,
           ruleId: rule.id,
+          name: rule.name,
+          redactSensitiveInLogs,
           matcher,
           redirect: { destination: rule.redirect?.destination ?? "" },
         };
@@ -232,6 +239,8 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
           kind: "query",
           groupId: group.id,
           ruleId: rule.id,
+          name: rule.name,
+          redactSensitiveInLogs,
           matcher,
           action,
         };
@@ -241,6 +250,8 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
           kind: "header",
           groupId: group.id,
           ruleId: rule.id,
+          name: rule.name,
+          redactSensitiveInLogs,
           matcher,
           header: {
             direction: rule.headerDirection ?? "request",
@@ -257,6 +268,8 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
           kind: "response-body",
           groupId: group.id,
           ruleId: rule.id,
+          name: rule.name,
+          redactSensitiveInLogs,
           matcher,
           responseBody: rule.responseBody ?? { replacements: [] },
         };
@@ -266,6 +279,8 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
           kind: "request-body",
           groupId: group.id,
           ruleId: rule.id,
+          name: rule.name,
+          redactSensitiveInLogs,
           matcher,
           requestBody: rule.requestBody ?? { mode: "replace", body: "" },
         };
@@ -275,6 +290,8 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
           kind: "matcher",
           groupId: group.id,
           ruleId: rule.id,
+          name: rule.name,
+          redactSensitiveInLogs,
           matcher,
         };
         operations.push(operation);

@@ -26,6 +26,10 @@ Rogatio is local-first by design.
   general forward proxy or file server.
 - The **local runtime** independently revalidates project, rule, URL, method, initiator,
   target, permission, and grant authority.
+- **Console match logging** is live-only: each reported match writes one bounded, redacted
+  line to the matched page's DevTools Console and retains no match history. Request and
+  response bodies and wire-applied header values are never included. See
+  [Chrome extension](/guides/extension/#match-logging).
 
 ## Body confidentiality
 

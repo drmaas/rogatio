@@ -114,8 +114,20 @@ body {
 }
 .rogatio-popup [data-project-actions] {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 0.5rem;
+}
+.rogatio-popup [data-project-actions] label[data-match-logging-toggle] {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  color: var(--rogatio-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 .rogatio-popup [data-project-actions] button,
 .rogatio-popup [data-project-actions] a[data-open-app],

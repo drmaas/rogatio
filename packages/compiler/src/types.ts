@@ -19,33 +19,32 @@ export interface NormalizedMatcher {
   readonly method?: HttpMethod;
 }
 
-export interface MatcherOperation {
-  readonly kind: "matcher";
+interface OperationBase {
   readonly groupId: string;
   readonly ruleId: string;
+  readonly name: string;
+  readonly redactSensitiveInLogs: boolean;
+}
+
+export interface MatcherOperation extends OperationBase {
+  readonly kind: "matcher";
   readonly matcher: NormalizedMatcher;
 }
 
-export interface RedirectOperation {
+export interface RedirectOperation extends OperationBase {
   readonly kind: "redirect";
-  readonly groupId: string;
-  readonly ruleId: string;
   readonly matcher: NormalizedMatcher;
   readonly redirect: { readonly destination: string };
 }
 
-export interface QueryOperation {
+export interface QueryOperation extends OperationBase {
   readonly kind: "query";
-  readonly groupId: string;
-  readonly ruleId: string;
   readonly matcher: NormalizedMatcher;
   readonly action: RogatioQueryAction;
 }
 
-export interface HeaderOperation {
+export interface HeaderOperation extends OperationBase {
   readonly kind: "header";
-  readonly groupId: string;
-  readonly ruleId: string;
   readonly matcher: NormalizedMatcher;
   readonly header: {
     readonly direction: HeaderDirection;
@@ -55,18 +54,14 @@ export interface HeaderOperation {
   };
 }
 
-export interface ResponseBodyOperation {
+export interface ResponseBodyOperation extends OperationBase {
   readonly kind: "response-body";
-  readonly groupId: string;
-  readonly ruleId: string;
   readonly matcher: NormalizedMatcher;
   readonly responseBody: ResponseBodyAction;
 }
 
-export interface RequestBodyOperation {
+export interface RequestBodyOperation extends OperationBase {
   readonly kind: "request-body";
-  readonly groupId: string;
-  readonly ruleId: string;
   readonly matcher: NormalizedMatcher;
   readonly requestBody: RequestBodyAction;
 }

@@ -112,6 +112,8 @@ describe("@rogatio/compiler", () => {
           kind: "matcher",
           groupId: "group-main",
           ruleId: "rule-1",
+          name: "Rule 1",
+          redactSensitiveInLogs: false,
           matcher: {
             urlRegex: { source: "^https://example\\.com/", flags: "" },
             origins: ["http://localhost", "https://example.com"],
@@ -535,6 +537,8 @@ describe("@rogatio/compiler", () => {
         "kind",
         "groupId",
         "ruleId",
+        "name",
+        "redactSensitiveInLogs",
         "matcher",
       ]);
       expect(Object.keys(result.operations[0]?.matcher ?? {})).toEqual([

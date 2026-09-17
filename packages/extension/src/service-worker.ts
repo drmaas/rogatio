@@ -17,6 +17,7 @@ import {
   type ExtensionDiagnostic,
   extensionDiagnostic,
 } from "./diagnostics.js";
+import type { DnrInstallerWithMatchIndex } from "./dnr.js";
 import { installHeaderRules } from "./installer.js";
 
 import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
@@ -35,6 +36,15 @@ type PermissionAdapter = {
   request(origins: readonly string[]): Promise<boolean>;
   remove(origins: readonly string[]): Promise<boolean>;
 };
+
+function installerWithMatchIndex(
+  installer: RuleInstallerAdapter,
+): DnrInstallerWithMatchIndex | undefined {
+  return typeof (installer as DnrInstallerWithMatchIndex)
+    .syncHeaderMatchIndex === "function"
+    ? (installer as DnrInstallerWithMatchIndex)
+    : undefined;
+}
 
 export interface ExtensionApplicationOptions {
   readonly storage: StorageAdapter;
@@ -303,6 +313,10 @@ export function createExtensionApplication(
       installedRuleIds = [];
     }
     let headerInstallErrors: HeaderInstallError[] = [];
+    const headerIndexEntries: Array<{
+      ruleId: number;
+      operation: HeaderOperation;
+    }> = [];
     if (headerOps.length > 0) {
       const allHeaderProjections = projectHeaders(headerOps);
       const enabled = new Set(project.enabledGroupIds);
@@ -322,6 +336,15 @@ export function createExtensionApplication(
           (candidate) => candidate.id === installedId,
         );
         if (projection !== undefined) installedRuleIds.push(projection.ruleId);
+        const operation = headerOps.find(
+          (candidate) => candidate.ruleId === projection?.ruleId,
+        );
+        if (projection !== undefined && operation !== undefined) {
+          headerIndexEntries.push({
+            ruleId: projection.id,
+            operation,
+          });
+        }
       }
       headerInstallErrors = result.errors.flatMap((error) => {
         const projection = allHeaderProjections.find(
@@ -331,6 +354,10 @@ export function createExtensionApplication(
           ? []
           : [{ ruleId: projection.ruleId, message: error.message }];
       });
+    }
+    const matchIndexInstaller = installerWithMatchIndex(options.installer);
+    if (matchIndexInstaller !== undefined) {
+      await matchIndexInstaller.syncHeaderMatchIndex(headerIndexEntries);
     }
     const statuses = operationStatuses(
       compiled.operations,

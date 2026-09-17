@@ -31,12 +31,16 @@ export interface RuntimeCommandResult {
 function toMatcherOperations(
   operations: readonly RogatioOperation[],
 ): MatcherOperation[] {
-  return operations.map(({ groupId, ruleId, matcher }) => ({
-    kind: "matcher",
-    groupId,
-    ruleId,
-    matcher,
-  }));
+  return operations.map(
+    ({ groupId, ruleId, name, matcher, redactSensitiveInLogs }) => ({
+      kind: "matcher",
+      groupId,
+      ruleId,
+      name,
+      matcher,
+      redactSensitiveInLogs,
+    }),
+  );
 }
 
 /**

@@ -41,12 +41,16 @@ function getOperations(): readonly MatcherOperation[] {
     console.error("Compile error:", compiled);
     throw new Error("fixture project failed to compile");
   }
-  return compiled.operations.map(({ groupId, ruleId, matcher }) => ({
-    kind: "matcher",
-    groupId,
-    ruleId,
-    matcher,
-  }));
+  return compiled.operations.map(
+    ({ groupId, ruleId, name, matcher, redactSensitiveInLogs }) => ({
+      kind: "matcher",
+      groupId,
+      ruleId,
+      name,
+      matcher,
+      redactSensitiveInLogs,
+    }),
+  );
 }
 
 describe("parseTestUrl", () => {

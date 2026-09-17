@@ -188,6 +188,8 @@ function buildGrantedPreset(): NormalizedRuntimePreset {
         kind: "matcher",
         groupId: "g",
         ruleId: "r",
+        name: "r",
+        redactSensitiveInLogs: false,
         matcher: {
           urlRegex: { source: ".*", flags: "" },
           origins: ["https://example.com"],

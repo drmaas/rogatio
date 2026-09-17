@@ -1,6 +1,11 @@
 import { createEditor, type EditorController } from "@rogatio/editor";
 import { validateProjectDetailed } from "./browser-schema.js";
 import {
+  MATCH_LOGGING_ENABLED_KEY,
+  readMatchLoggingEnabledFromStorageResult,
+} from "./match-logging-enabled.js";
+import { createMatchLoggingToggle } from "./match-logging-toggle.js";
+import {
   checkAISupport,
   type NativeEnvelope,
   type NativeSessionOptions,
@@ -75,6 +80,8 @@ let aiPreview: unknown | null = null;
 let aiMessage = "";
 /** Selected failed rule for the sidebar error card. */
 let selectedErrorRule: { groupId: string; ruleId: string } | null = null;
+/** Console match logging toggle; missing storage key defaults on. */
+let matchLoggingEnabled = true;
 
 /** Diagnostics modal state */
 let diagnosticsOpen = false;
@@ -433,6 +440,16 @@ function renderSidebar(shell: HTMLElement): void {
     stopRuntime,
   );
   sidebar.append(actions);
+
+  sidebar.append(
+    createMatchLoggingToggle({
+      api: chrome,
+      enabled: matchLoggingEnabled,
+      onPersisted: (enabled) => {
+        matchLoggingEnabled = enabled;
+      },
+    }),
+  );
 
   // Runtime status sits directly under the Start/Stop controls so the current
   // phase is always visible next to the actions that change it.
@@ -1586,7 +1603,17 @@ function renderDiagnosticsModal(container: HTMLElement): void {
   copyBtn.addEventListener("click", () => void copyDiagnostics());
 }
 
+async function loadMatchLoggingEnabled(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get(MATCH_LOGGING_ENABLED_KEY);
+    matchLoggingEnabled = readMatchLoggingEnabledFromStorageResult(result);
+  } catch {
+    matchLoggingEnabled = false;
+  }
+}
+
 async function refresh(): Promise<void> {
+  await loadMatchLoggingEnabled();
   const response = await client.send({ version: 1, command: "refresh" });
   if (response?.ok !== true || !response.value) {
     statusMessage = "The project state could not be refreshed.";
