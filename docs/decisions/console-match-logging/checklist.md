@@ -170,6 +170,8 @@ Two steps. Stop after step 1 and record the result before any header-index code.
 
 Implementation review (2026-09-16) also synced two docs beyond the listed set and corrected the unpacked claim: `guides/projects-rules.md` (per-rule redact field), `reference/security.md` (live-only console record, no bodies), `guides/extension.md` (unpacked restriction belongs to `onRuleMatchedDebug`, plus the terminated-worker drop limit from ADR 0001), and `docs/architecture.md:84`/`:88` (pre-existing "DNR installation remains deferred" text that contradicted the shipped redirect/query/header install). Re-verified with `pnpm format:check`, `pnpm lint`, and a docs-site build.
 
+Final review (2026-09-16): `samples/basic/README.md` no longer tells users to watch Console for body-rule matches or a capital `[Rogatio]` line. ADR 0006 consequences now match the P6 header pass.
+
 | AC | Evidence |
 | --- | --- |
 | AC1 | `match-listener.test.ts`: one match → one `executeScript`, ISOLATED, tabId from event |

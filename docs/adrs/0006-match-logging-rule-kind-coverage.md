@@ -16,5 +16,5 @@ Amended (P6 probe, 2026-09-16): the real-Chromium probe passed — `onRuleMatche
 
 ## Consequences
 
-- Docs must not promise header or body-rule console lines until the probe passes (headers) or the follow-up GitHub issue #163 ships (bodies).
-- Unknown numeric ids (including header ids before a pass) stay silent.
+- Header coverage is shipped (`redirect` + `query` + `header`). Docs must not promise body-rule console lines until GitHub issue #163 ships.
+- Unknown numeric ids stay silent.
