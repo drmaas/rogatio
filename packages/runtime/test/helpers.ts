@@ -14,6 +14,7 @@ export function makeMatcher(
     kind: "matcher",
     groupId: "group-main",
     ruleId,
+    redactSensitiveInLogs: false,
     matcher: {
       urlRegex: { source: "^https://example\\.com/", flags: "" },
       origins: ["https://example.com"],

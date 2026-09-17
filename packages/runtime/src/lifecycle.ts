@@ -293,6 +293,7 @@ export function createNativeRuntimeController(
               kind: "matcher",
               groupId: op.groupId,
               ruleId: op.ruleId,
+              redactSensitiveInLogs: op.redactSensitiveInLogs,
               matcher: (op as { matcher: unknown }).matcher,
             } as RogatioOperation);
           }

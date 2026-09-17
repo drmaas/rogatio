@@ -129,6 +129,7 @@ const projectSchemaDefinition = {
         },
         responseBody: { $ref: "#/$defs/responseBodyAction" },
         requestBody: { $ref: "#/$defs/requestBodyAction" },
+        redactSensitiveInLogs: { type: "boolean" },
       },
       allOf: [
         {

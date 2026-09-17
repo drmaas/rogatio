@@ -112,12 +112,15 @@ function bodyErrorResponse(error: unknown): {
 function toMatcherOperations(
   operations: readonly RogatioOperation[],
 ): readonly MatcherOperation[] {
-  return operations.map(({ groupId, ruleId, matcher }) => ({
-    kind: "matcher",
-    groupId,
-    ruleId,
-    matcher,
-  }));
+  return operations.map(
+    ({ groupId, ruleId, matcher, redactSensitiveInLogs }) => ({
+      kind: "matcher",
+      groupId,
+      ruleId,
+      matcher,
+      redactSensitiveInLogs,
+    }),
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

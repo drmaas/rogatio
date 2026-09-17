@@ -34,12 +34,15 @@ function usageError(message: string): string {
 function toMatcherOperations(
   operations: readonly RogatioOperation[],
 ): readonly MatcherOperation[] {
-  return operations.map(({ groupId, ruleId, matcher }) => ({
-    kind: "matcher",
-    groupId,
-    ruleId,
-    matcher,
-  }));
+  return operations.map(
+    ({ groupId, ruleId, matcher, redactSensitiveInLogs }) => ({
+      kind: "matcher",
+      groupId,
+      ruleId,
+      matcher,
+      redactSensitiveInLogs,
+    }),
+  );
 }
 
 function isUrl(value: string): boolean {

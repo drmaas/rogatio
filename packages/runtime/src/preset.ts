@@ -172,6 +172,7 @@ function freezeMatcher(operation: MatcherOperation): MatcherOperation {
     kind: "matcher" as const,
     groupId: operation.groupId,
     ruleId: operation.ruleId,
+    redactSensitiveInLogs: operation.redactSensitiveInLogs,
     matcher,
   });
 }
@@ -188,7 +189,8 @@ function normalizeMatcher(value: unknown): MatcherOperation | null {
         key !== "groupId" &&
         key !== "ruleId" &&
         key !== "matcher" &&
-        key !== "action",
+        key !== "action" &&
+        key !== "redactSensitiveInLogs",
     )
   )
     return null;
@@ -279,10 +281,16 @@ function normalizeMatcher(value: unknown): MatcherOperation | null {
     method = matcher.method;
   }
 
+  const redactValue = record.redactSensitiveInLogs;
+  if (redactValue !== undefined && typeof redactValue !== "boolean")
+    return null;
+  const redactSensitiveInLogs = redactValue === true;
+
   return freezeMatcher({
     kind: "matcher",
     groupId: record.groupId,
     ruleId: record.ruleId,
+    redactSensitiveInLogs,
     matcher: {
       urlRegex: { source: regex.source, flags: "" },
       origins,

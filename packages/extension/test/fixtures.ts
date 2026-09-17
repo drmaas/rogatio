@@ -28,6 +28,7 @@ export const operation: MatcherOperation = {
   kind: "matcher",
   groupId: "group-a",
   ruleId: "rule-a",
+  redactSensitiveInLogs: false,
   matcher: {
     urlRegex: { source: project.groups[0].rules[0].urlRegex, flags: "" },
     origins: ["https://example.com"],

@@ -20,6 +20,7 @@ function makeOperation(ruleId: string, priority = 100): MatcherOperation {
     kind: "matcher",
     groupId: "g1",
     ruleId,
+    redactSensitiveInLogs: false,
     matcher: {
       urlRegex: { source: "^https://example\\.com/", flags: "" },
       origins: ["https://example.com"],

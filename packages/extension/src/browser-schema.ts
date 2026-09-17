@@ -430,6 +430,7 @@ const RULE_KEYS = [
   "headerValue",
   "responseBody",
   "requestBody",
+  "redactSensitiveInLogs",
 ] as const;
 
 const QUERY_ACTION_KEYS = ["type", "params"] as const;
@@ -648,6 +649,13 @@ export function validateProjectDetailed(
         !HTTP_METHODS.includes(rule.method as HttpMethod)
       )
         errors.push(issue(`${rulePath}/method`, "invalid-value"));
+      if (
+        rule.redactSensitiveInLogs !== undefined &&
+        typeof rule.redactSensitiveInLogs !== "boolean"
+      )
+        errors.push(
+          issue(`${rulePath}/redactSensitiveInLogs`, "invalid-value"),
+        );
       if (
         rule.type !== undefined &&
         rule.type !== "redirect" &&

@@ -1,3 +1,4 @@
+import type { MatcherOperation } from "@rogatio/compiler";
 import { describe, expect, it } from "vitest";
 import {
   normalizeRuntimePreset,
@@ -232,6 +233,37 @@ describe("F6 runtime preset", () => {
         makeGrant({ target: `https://example.com/${"a".repeat(300_000)}` }),
       ],
     });
+  });
+
+  it("resolves redactSensitiveInLogs without changing the digest", () => {
+    const base = normalizeRuntimePreset(makePresetInput());
+    expect(base.ok).toBe(true);
+    if (!base.ok) return;
+
+    const { redactSensitiveInLogs: _omitted, ...withoutFlag } = makeMatcher();
+    for (const [matcher, expected] of [
+      [withoutFlag as unknown as MatcherOperation, false],
+      [makeMatcher(), false],
+      [{ ...makeMatcher(), redactSensitiveInLogs: true }, true],
+    ] as const) {
+      const result = normalizeRuntimePreset(
+        makePresetInput({ matchers: [matcher] }),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      expect(result.value.matchers[0]?.redactSensitiveInLogs).toBe(expected);
+      expect(result.value.digest).toBe(base.value.digest);
+    }
+
+    for (const value of ["true", 1, null, {}]) {
+      expectInvalid(
+        makePresetInput({
+          matchers: [
+            { ...makeMatcher(), redactSensitiveInLogs: value } as never,
+          ],
+        }),
+      );
+    }
   });
 
   it("exports frozen resource limits", () => {

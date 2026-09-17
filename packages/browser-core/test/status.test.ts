@@ -17,6 +17,7 @@ function makeOperation(
     kind: "matcher",
     groupId,
     ruleId,
+    redactSensitiveInLogs: false,
     matcher: {
       urlRegex: { source: "^https://example\\.com/", flags: "" },
       origins: [...origins],
