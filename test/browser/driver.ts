@@ -46,16 +46,16 @@ function readMarker(path: string): string | undefined {
 /**
  * Resolve Chrome for Testing (via `pnpm browser:install` / `@puppeteer/browsers`).
  * Prefer CfT over branded Google Chrome — branded builds dropped `--load-extension`.
+ * Explicit `ROGATIO_CHROME_PATH` wins; `CHROME_BIN` is last so CI images that export
+ * `/usr/bin/google-chrome` do not override the installed CfT binary.
  * @see https://developer.chrome.com/docs/automation-and-testing/download-test-binaries
  */
 export function resolveChromeBinary(): string {
-  const envPath =
-    process.env.CHROME_BIN ??
-    process.env.ROGATIO_CHROME_PATH ??
-    process.env.ROGATIO_CHROMIUM_PATH;
-  if (envPath) {
-    accessSync(envPath);
-    return envPath;
+  const explicit =
+    process.env.ROGATIO_CHROME_PATH ?? process.env.ROGATIO_CHROMIUM_PATH;
+  if (explicit) {
+    accessSync(explicit);
+    return explicit;
   }
 
   const marked = readMarker(CHROME_PATH_MARKER);
@@ -122,8 +122,14 @@ export function resolveChromeBinary(): string {
     }
   }
 
+  const envPath = process.env.CHROME_BIN;
+  if (envPath) {
+    accessSync(envPath);
+    return envPath;
+  }
+
   throw new Error(
-    "Chrome for Testing is required for browser e2e. Run `pnpm browser:install` (or set CHROME_BIN).",
+    "Chrome for Testing is required for browser e2e. Run `pnpm browser:install` (or set ROGATIO_CHROME_PATH).",
   );
 }
 

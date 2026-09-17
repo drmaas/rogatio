@@ -267,7 +267,7 @@ pnpm install --frozen-lockfile
 pnpm browser:install
 ```
 
-Browser e2e uses Selenium WebDriver against [Chrome for Testing](https://developer.chrome.com/docs/automation-and-testing/download-test-binaries) (not branded Chrome — branded builds dropped `--load-extension`). Override with `CHROME_BIN` if the binary is already installed; headed debug via `SELENIUM_HEADED=1`.
+Browser e2e uses Selenium WebDriver against [Chrome for Testing](https://developer.chrome.com/docs/automation-and-testing/download-test-binaries) (not branded Chrome — branded builds dropped `--load-extension`). Override with `ROGATIO_CHROME_PATH` if needed (`CHROME_BIN` is only a last-resort fallback). Headed debug via `SELENIUM_HEADED=1`.
 
 Common scripts:
 
