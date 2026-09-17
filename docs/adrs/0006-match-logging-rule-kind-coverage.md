@@ -12,6 +12,8 @@ Intended header name/value from rule config appear on the line only after a head
 
 Amended: product wanted bodies in the record. Coverage still excludes body kinds. Live bodies remain impossible on this event. No body-redact checkbox.
 
+Amended (P6 probe, 2026-09-16): the real-Chromium probe passed — `onRuleMatchedDebug` fires for `modifyHeaders` — so shipped coverage is `redirect`, `query`, and `header`. Evidence: `test/browser/header-match-probe.spec.ts`.
+
 ## Consequences
 
 - Docs must not promise header or body-rule console lines until the probe passes (headers) or the follow-up GitHub issue #163 ships (bodies).

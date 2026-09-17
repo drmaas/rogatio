@@ -1,4 +1,5 @@
 import type {
+  HeaderOperation,
   QueryOperation,
   RedirectOperation,
   RogatioOperation,
@@ -110,6 +111,35 @@ function entryFromOperation(
       redactSensitiveInLogs,
       intent: {
         params: sanitizeQueryParams(query.action.params, redactSensitiveInLogs),
+      },
+    };
+  }
+  if (operation.kind === "header") {
+    const header = operation as HeaderOperation;
+    const name = truncateLogString(header.header.name);
+    const direction = header.header.direction;
+    const headerOperation = header.header.operation;
+    if (header.header.value === undefined) {
+      return {
+        ruleId: header.ruleId,
+        kind: "header",
+        redactSensitiveInLogs,
+        intent: { direction, operation: headerOperation, name },
+      };
+    }
+    return {
+      ruleId: header.ruleId,
+      kind: "header",
+      redactSensitiveInLogs,
+      intent: {
+        direction,
+        operation: headerOperation,
+        name,
+        value: sanitizeHeaderLogValue(
+          header.header.name,
+          header.header.value,
+          redactSensitiveInLogs,
+        ),
       },
     };
   }
@@ -282,6 +312,22 @@ async function readRawIndex(api: ChromeApi): Promise<Record<string, unknown>> {
   );
   if (result === undefined) return {};
   return ownRecord(own(result, MATCH_LOGGING_INDEX_KEY)) ?? {};
+}
+
+export async function readMatchIndexSnapshot(
+  api: ChromeApi,
+): Promise<MatchIndexSnapshot> {
+  try {
+    const index = await readRawIndex(api);
+    const snapshot: MatchIndexSnapshot = {};
+    for (const [id, raw] of Object.entries(index)) {
+      const entry = parseStoredEntry(raw);
+      if (entry !== undefined) snapshot[id] = entry;
+    }
+    return snapshot;
+  } catch {
+    return {};
+  }
 }
 
 export async function lookupMatchIndexEntry(

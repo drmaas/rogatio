@@ -1,4 +1,8 @@
-import type { QueryOperation, RedirectOperation } from "@rogatio/compiler";
+import type {
+  HeaderOperation,
+  QueryOperation,
+  RedirectOperation,
+} from "@rogatio/compiler";
 import { describe, expect, it, vi } from "vitest";
 import type { ChromeApi } from "../src/chrome.js";
 import { createDnrInstaller } from "../src/dnr.js";
@@ -535,6 +539,104 @@ describe("match index", () => {
     ).toBeLessThanOrEqual(200);
     expect(
       (truncated.intent as { value?: string }).value?.endsWith("..."),
+    ).toBe(true);
+  });
+
+  it("writes header ids and intent through the wholesale installer snapshot", async () => {
+    const headerOp: HeaderOperation = {
+      kind: "header",
+      groupId: "g1",
+      ruleId: "rule-header-set",
+      redactSensitiveInLogs: true,
+      matcher: {
+        urlRegex: { source: "^https://example\\.com/", flags: "" },
+        origins: ["https://example.com"],
+        resourceTypes: ["main_frame"],
+        priority: 100,
+      },
+      header: {
+        direction: "request",
+        operation: "set",
+        name: "authorization",
+        value: "Bearer secret-token",
+      },
+    };
+    const { api, store } = storageApi();
+    const installer = createDnrInstaller(
+      dnrApi(
+        api.storage,
+        vi.fn(async () => {}),
+      ),
+    );
+    await installer.syncHeaderMatchIndex([
+      { ruleId: 2_000_001, operation: headerOp },
+    ]);
+    expect(store[MATCH_LOGGING_INDEX_KEY]).toEqual({
+      "2000001": {
+        ruleId: "rule-header-set",
+        kind: "header",
+        redactSensitiveInLogs: true,
+        intent: {
+          direction: "request",
+          operation: "set",
+          name: "authorization",
+          value: "[redacted]",
+        },
+      },
+    });
+  });
+
+  it("keeps stored header intent when a redirect install rewrites the index", async () => {
+    const headerOp: HeaderOperation = {
+      kind: "header",
+      groupId: "g1",
+      ruleId: "rule-header-set",
+      redactSensitiveInLogs: false,
+      matcher: {
+        urlRegex: { source: "^https://example\\.com/", flags: "" },
+        origins: ["https://example.com"],
+        resourceTypes: ["main_frame"],
+        priority: 100,
+      },
+      header: {
+        direction: "request",
+        operation: "set",
+        name: "x-trace",
+        value: "on",
+      },
+    };
+    const { api, store } = storageApi();
+    const installer = createDnrInstaller(
+      dnrApi(
+        api.storage,
+        vi.fn(async () => {}),
+      ),
+    );
+    await installer.syncHeaderMatchIndex([
+      { ruleId: 2_000_001, operation: headerOp },
+    ]);
+
+    // The redirect/query install never touches installed header rules, so it
+    // must not invalidate their index entries.
+    expect(await installer.install([redirectOp])).toEqual({ ok: true });
+
+    const index = store[MATCH_LOGGING_INDEX_KEY] as Record<
+      string,
+      { ruleId: string; kind: string }
+    >;
+    expect(index["2000001"]).toEqual({
+      ruleId: "rule-header-set",
+      kind: "header",
+      redactSensitiveInLogs: false,
+      intent: {
+        direction: "request",
+        operation: "set",
+        name: "x-trace",
+        value: "on",
+      },
+    });
+    expect(
+      Object.values(index).some((entry) => entry.kind === "redirect"),
     ).toBe(true);
   });
 });

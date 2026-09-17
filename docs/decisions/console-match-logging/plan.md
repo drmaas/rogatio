@@ -191,3 +191,17 @@ Each phase: failing tests first, then code, then that package's tests. P0 block 
 ## Implementation strategy
 
 TDD. Schema, compiler, formatter, index, and fake-ported listener have deterministic seams — write the listed tests first; they must fail; then implement. P1 optional ports are proven by `tsc` plus a fake that omits them. P6 probe file *is* the header/Q4 test; do not write header-index code until it records pass. Not Code first: every phase has a failing test or typecheck before production code.
+
+## P6 probe result (2026-09-16)
+
+Real Chromium 148, Playwright smoke origin `http://127.0.0.1:4173`, host permission seeded in profile (optional-host prompt still unautomated in product flows).
+
+| Step | Result | Evidence |
+| --- | --- | --- |
+| 1a — `modifyHeaders` + `onRuleMatchedDebug` | **pass** | `test/browser/header-match-probe.spec.ts` step 1a: redirect control fired, then the `xmlhttprequest` `modifyHeaders` rule produced `onRuleMatchedDebug` for the smoke origin (the `main_frame` fallback was not needed). Recorded in the `P6-step-1a-detail` annotation. |
+| 1b — Q4 MV3 wake after CDP `ServiceWorker.stopWorker` | **pass** | Same spec step 1b: the worker target disappeared after the CDP stop, stayed absent for 1s, then came back after a smoke-origin navigation only (no extension page opened post-stop). Liveness is read from CDP `service_worker` targets: `context.serviceWorkers()` keeps a terminated extension worker in its cache and reports a false "alive". |
+| 2 — header index | **shipped** | `buildInstallIndexSnapshot` + `createDnrInstaller.syncHeaderMatchIndex` wholesale write header ids (`2_000_001 + index`) with `{ direction, operation, name, value? }` intent; `service-worker.ts` calls sync after header install. |
+
+Coverage: `redirect` + `query` + `header`. No keepalive added.
+
+Both steps were re-run three times after the liveness fix and reported the same verdicts. An earlier run of this spec recorded 1b as `inconclusive` ("CDP stop unavailable (no-version)") because the CDP handler read a singular `version` field from `ServiceWorker.workerVersionUpdated`, which carries a `versions` array; the stop was never issued.

@@ -28,6 +28,23 @@ function redirectEntry(
   };
 }
 
+function headerEntry(
+  overrides: Partial<MatchIndexEntry> = {},
+): MatchIndexEntry {
+  return {
+    ruleId: "header-1",
+    kind: "header",
+    redactSensitiveInLogs: false,
+    intent: {
+      direction: "request",
+      operation: "set",
+      name: "X-Custom-Header",
+      value: "test-value",
+    },
+    ...overrides,
+  };
+}
+
 function queryEntry(overrides: Partial<MatchIndexEntry> = {}): MatchIndexEntry {
   return {
     ruleId: "query-1",
@@ -310,7 +327,7 @@ describe("match log listener", () => {
     expect(missing.executeScript).toHaveBeenCalledTimes(1);
   });
 
-  it("no-ops for tabId -1, unknown id, malformed index entry, and pre-P6 header id", async () => {
+  it("no-ops for tabId -1, unknown id, malformed index entry, and unindexed header id", async () => {
     const harness = createHarness({
       [MATCH_LOGGING_INDEX_KEY]: {
         "100": redirectEntry(),
@@ -348,6 +365,72 @@ describe("match log listener", () => {
       }),
     ).resolves.toBeUndefined();
     expect(harness.executeScript).not.toHaveBeenCalled();
+  });
+
+  it("injects header intent fields for indexed header id 2_000_001", async () => {
+    const { executeScript, fireMatch } = createHarness({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(HEADER_DNR_ID)]: headerEntry(),
+      },
+    });
+    await fireMatch({
+      rule: { ruleId: HEADER_DNR_ID },
+      request: {
+        tabId: 1,
+        url: "https://example.com/api",
+        method: "GET",
+        type: "xmlhttprequest",
+      },
+    });
+    const line = executeScript.mock.calls[0]?.[0]?.args?.[0] as string;
+    expect(line).toContain("request set X-Custom-Header=test-value");
+    expect(line).toContain("header-1");
+  });
+
+  it("redacts deny-listed header values only when sensitive is true", async () => {
+    const sensitive = createHarness({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(HEADER_DNR_ID)]: headerEntry({
+          redactSensitiveInLogs: true,
+          intent: {
+            direction: "request",
+            operation: "set",
+            name: "cookie",
+            value: "session=secret",
+          },
+        }),
+      },
+    });
+    await sensitive.fireMatch({
+      rule: { ruleId: HEADER_DNR_ID },
+      request: { tabId: 1, url: "https://example.com/" },
+    });
+    const sensitiveLine = sensitive.executeScript.mock.calls[0]?.[0]
+      ?.args?.[0] as string;
+    expect(sensitiveLine).toContain("cookie=[redacted]");
+
+    const plain = createHarness({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(HEADER_DNR_ID)]: headerEntry({
+          redactSensitiveInLogs: false,
+          intent: {
+            direction: "request",
+            operation: "set",
+            name: "cookie",
+            value: "c".repeat(250),
+          },
+        }),
+      },
+    });
+    await plain.fireMatch({
+      rule: { ruleId: HEADER_DNR_ID },
+      request: { tabId: 1, url: "https://example.com/" },
+    });
+    const plainLine = plain.executeScript.mock.calls[0]?.[0]
+      ?.args?.[0] as string;
+    expect(plainLine).toContain("cookie=");
+    expect(plainLine).not.toContain("[redacted]");
+    expect(plainLine.length).toBeLessThanOrEqual(500);
   });
 
   it("swallows executeScript rejections without retrying", async () => {
