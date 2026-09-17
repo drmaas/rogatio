@@ -41,7 +41,7 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 - `docs/architecture.md` — package boundaries, per-package decisions, and rejected alternatives.
 - `README.md` and `packages/*/README.md` — user-facing overview and usage.
 - `CONTRIBUTING.md` — setup, branching, coding standards, commit/issue policy, and validation workflow.
-- `.agents/skills/shared/models.md` — Cursor/provider model routing for workflows. `sdd`, `doit`, and `rpi` live in [utility-skills](https://github.com/drmaas/utility-skills) (`~/.agents/skills/{sdd,doit,rpi}`), not in this repo.
+- Workflow skills (`sdd`, `doit`, `rpi`) and their `models.md` role routing live in [utility-skills](https://github.com/drmaas/utility-skills) (`~/.agents/skills/{sdd,doit,rpi}`), not in this repo.
 
 ## Durable Documentation
 
@@ -60,7 +60,7 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 
 ## Agent Model Tiers
 
-Canonical catalogs, Cursor pool exhaustion, free/normal chains, and phase→role maps: [`.agents/skills/shared/models.md`](.agents/skills/shared/models.md).
+Canonical role maps and selection rules: `~/.agents/skills/{sdd,doit,rpi}/models.md` (from [utility-skills](https://github.com/drmaas/utility-skills)). Do not fork model tables into this repo.
 
 Every workflow (`sdd`, `doit`, `rpi`) picks one provider tier at start and uses it for every delegated role:
 
@@ -69,7 +69,7 @@ Every workflow (`sdd`, `doit`, `rpi`) picks one provider tier at start and uses 
 - **normal** — paid OpenCode Go chains (alias: `opencode-go`).
 - **freebuff** — freebuff harness when requested.
 
-If the user did not specify a tier, ask before delegating. Map each workflow stage to a shared role (`reasoning`, `adversarial`, `plan`, `coding`, `verify`, `review`, `docs`), then resolve the model from that file. Do not fork model tables into skill files or duplicate them here.
+If the user did not specify a tier, ask before delegating. Map each workflow stage to a shared role (`reasoning`, `adversarial`, `plan`, `coding`, `verify`, `review`, `docs`), then resolve the model from the installed skill `models.md` against the harness allowlist.
 
 Verify availability once at workflow start (Cursor Task allowlist, or `opencode models` / harness list). Record tier, per-role model, fallbacks, and any exhausted Cursor pools. A model report is not verification evidence. Under a single-model session, keep role passes distinct and use a fresh-context self-review.
 
