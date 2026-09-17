@@ -1,5 +1,5 @@
 import { accessSync, existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { Browser, Builder, type WebDriver } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
 
@@ -128,8 +128,10 @@ export async function createDriver(
     chromeOptions.addArguments("--headless=new");
   }
   chromeOptions.addArguments("--window-size=1280,800", ...(options.args ?? []));
-  // Expose debuggerAddress for CDP WebSocket sessions (ServiceWorker probes).
-  chromeOptions.addArguments("--remote-debugging-port=0");
+  // Keep --load-extension working on Chromium builds that gate the switch.
+  chromeOptions.addArguments(
+    "--disable-features=DisableLoadExtensionCommandLineSwitch",
+  );
   if (inContainerOrCi()) {
     chromeOptions.addArguments("--no-sandbox", "--disable-dev-shm-usage");
   }
@@ -137,9 +139,11 @@ export async function createDriver(
     chromeOptions.addArguments(`--user-data-dir=${options.userDataDir}`);
   }
   if (options.extensionPath) {
+    // Absolute path — Chrome hashes this for the unpacked extension id.
+    const extensionPath = resolve(options.extensionPath);
     chromeOptions.addArguments(
-      `--disable-extensions-except=${options.extensionPath}`,
-      `--load-extension=${options.extensionPath}`,
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
     );
   }
   return new Builder()
