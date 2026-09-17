@@ -104,13 +104,13 @@ Do this phase first alongside P0 (no Chrome).
 
 ## P4 — Listener + injection
 
-- [ ] New module imported from `background.ts` (Chrome boundary). Do not put the listener inside `createExtensionApplication` / protocol. Unit tests import the module, **not** `background.ts`.
-- [ ] Per match: toggle off/garbage → return; `tabId === -1` → return; index miss / malformed entry → return; otherwise format (event URL/method/initiator/type + index intent/flag) and `executeScript({ target: { tabId }, world: "ISOLATED", func, args })`. Do not set `allFrames`. `tabId` only from the Chrome event.
-- [ ] Export the injected `func`. It is closure-free. `console.log("%s", line)` only. All content arrives through JSON-serializable `args`. No `chrome.*` inside `func`.
-- [ ] Wrap injection in try/catch; a rejection is a silent no-op.
-- [ ] Toggle accessor reads `rogatio.matchLogging.enabled`; **default on** (missing → on). Boolean `false` or any non-boolean = off. Per-match read; no `onChanged` cache.
-- [ ] Absent `onRuleMatchedDebug` **or** absent `scripting.executeScript` → register nothing / never throw.
-- [ ] No batching, no dedupe cache, no queue, no keepalive. No webRequest. No native-host log path.
+- [x] New module imported from `background.ts` (Chrome boundary). Do not put the listener inside `createExtensionApplication` / protocol. Unit tests import the module, **not** `background.ts`.
+- [x] Per match: toggle off/garbage → return; `tabId === -1` → return; index miss / malformed entry → return; otherwise format (event URL/method/initiator/type + index intent/flag) and `executeScript({ target: { tabId }, world: "ISOLATED", func, args })`. Do not set `allFrames`. `tabId` only from the Chrome event.
+- [x] Export the injected `func`. It is closure-free. `console.log("%s", line)` only. All content arrives through JSON-serializable `args`. No `chrome.*` inside `func`.
+- [x] Wrap injection in try/catch; a rejection is a silent no-op.
+- [x] Toggle accessor reads `rogatio.matchLogging.enabled`; **default on** (missing → on). Boolean `false` or any non-boolean = off. Per-match read; no `onChanged` cache.
+- [x] Absent `onRuleMatchedDebug` **or** absent `scripting.executeScript` → register nothing / never throw.
+- [x] No batching, no dedupe cache, no queue, no keepalive. No webRequest. No native-host log path.
 
 **Acceptance:** AC1, AC4, AC5, AC9, AC13, AC16, AC18.
 **Tests (write first), fake `ChromeApi`:**
