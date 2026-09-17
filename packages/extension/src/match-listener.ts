@@ -1,35 +1,16 @@
 import type { ChromeApi, ChromeRuleMatchedDebugInfo } from "./chrome.js";
 import { formatMatchRecord } from "./match-format.js";
 import { lookupMatchIndexEntry } from "./match-index.js";
+import {
+  MATCH_LOGGING_ENABLED_KEY,
+  readMatchLoggingEnabled,
+} from "./match-logging-enabled.js";
 
-export const MATCH_LOGGING_ENABLED_KEY = "rogatio.matchLogging.enabled";
+export { MATCH_LOGGING_ENABLED_KEY };
 
 /** Closure-free injected func: all content arrives through serializable args. */
 export function injectMatchLogLine(line: string): void {
   console.log("%s", line);
-}
-
-function ownRecord(raw: unknown): Record<string, unknown> | undefined {
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    return undefined;
-  }
-  return raw as Record<string, unknown>;
-}
-
-async function readMatchLoggingEnabled(api: ChromeApi): Promise<boolean> {
-  try {
-    const result = ownRecord(
-      await api.storage.local.get(MATCH_LOGGING_ENABLED_KEY),
-    );
-    if (result === undefined) return true;
-    // An inherited key on a tampered result is not data; treat it as unset.
-    if (!Object.hasOwn(result, MATCH_LOGGING_ENABLED_KEY)) return true;
-    const enabled = result[MATCH_LOGGING_ENABLED_KEY];
-    if (enabled === undefined) return true;
-    return enabled === true;
-  } catch {
-    return false;
-  }
 }
 
 async function handleRuleMatchedDebug(

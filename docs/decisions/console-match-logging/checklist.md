@@ -127,10 +127,10 @@ Do this phase first alongside P0 (no Chrome).
 
 ## P5 — Toggle UI
 
-- [ ] Popup action row (`src/popup.ts:228-254`): labeled checkbox reusing the existing toggle pattern (`:295-308`). Accessible name **Match logging**.
-- [ ] Management sidebar (`src/extension-page-entry.ts:397-435`): same control, same storage key, same accessible name, design-system tokens only.
-- [ ] Both read/write `rogatio.matchLogging.enabled` only. **No new protocol command**. Do not touch `rogatio` or `rogatio.matchLogging.index`.
-- [ ] Keyboard operability; no new tab, no layout redesign. Default **checked** when the key is missing.
+- [x] Popup action row (`src/popup.ts:228-254`): labeled checkbox reusing the existing toggle pattern (`:295-308`). Accessible name **Match logging**.
+- [x] Management sidebar (`src/extension-page-entry.ts:397-435`): same control, same storage key, same accessible name, design-system tokens only.
+- [x] Both read/write `rogatio.matchLogging.enabled` only. **No new protocol command**. Do not touch `rogatio` or `rogatio.matchLogging.index`.
+- [x] Keyboard operability; no new tab, no layout redesign. Default **checked** when the key is missing.
 
 **Acceptance:** AC8; both surfaces reflect the same persisted value.
 **Tests (write first):**
