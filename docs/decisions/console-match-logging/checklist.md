@@ -42,10 +42,10 @@ Env: existing `// @vitest-environment happy-dom` (not jsdom). Do not add testing
 
 ## P1 — Chrome surface
 
-- [ ] Add `"declarativeNetRequestFeedback"` and `"scripting"` to `permissions` in `packages/extension/public/manifest.json`. Do not touch `optional_host_permissions`.
-- [ ] Extend `ChromeApi` (`src/chrome.ts:47-61`): optional `declarativeNetRequest.onRuleMatchedDebug.addListener(...)` and optional `scripting.executeScript(...)`. Type the debug payload as `rule.ruleId`, `request.url`, `request.tabId`, `request.method`, `request.initiator`, `request.type` (`method` / `initiator` / `url` / `type` optional strings).
-- [ ] Update existing fakes so injected adapters still typecheck. Do not add `tabs`.
-- [ ] Leave `createStorageAdapter` reading/writing only `rogatio`.
+- [x] Add `"declarativeNetRequestFeedback"` and `"scripting"` to `permissions` in `packages/extension/public/manifest.json`. Do not touch `optional_host_permissions`.
+- [x] Extend `ChromeApi` (`src/chrome.ts:47-61`): optional `declarativeNetRequest.onRuleMatchedDebug.addListener(...)` and optional `scripting.executeScript(...)`. Type the debug payload as `rule.ruleId`, `request.url`, `request.tabId`, `request.method`, `request.initiator`, `request.type` (`method` / `initiator` / `url` / `type` optional strings).
+- [x] Update existing fakes so injected adapters still typecheck. Do not add `tabs`.
+- [x] Leave `createStorageAdapter` reading/writing only `rogatio`.
 
 **Acceptance:** AC11 (manifest + ports); no behavior change.
 **Tests (write first):**

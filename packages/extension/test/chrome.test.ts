@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  type ChromeApi,
   createPermissionAdapter,
   createStorageAdapter,
 } from "../src/chrome.js";
+import { createDnrInstaller } from "../src/dnr.js";
 
 function apiFor(storage: {
   get: () => Promise<unknown>;
   set: (value: Record<string, unknown>) => Promise<void>;
-}) {
+}): ChromeApi {
   return {
     storage: { local: storage },
     permissions: {
@@ -60,6 +62,23 @@ describe("F7 Chrome adapters", () => {
     expect(await storage.compareAndSwap({ version: 0 }, { version: 2 })).toBe(
       false,
     );
+  });
+
+  it("constructs adapters when match-logging ports are omitted", () => {
+    const api = apiFor({ get: async () => ({}), set: async () => {} });
+    expect(() => createStorageAdapter(api)).not.toThrow();
+    expect(() => createPermissionAdapter(api)).not.toThrow();
+    expect(() => createDnrInstaller(api)).not.toThrow();
+  });
+
+  it("reads and writes only the rogatio storage key", async () => {
+    const get = vi.fn(async () => ({ rogatio: { version: 1 } }));
+    const set = vi.fn(async () => {});
+    const storage = createStorageAdapter(apiFor({ get, set }));
+    await storage.read();
+    expect(get).toHaveBeenCalledWith("rogatio");
+    await storage.compareAndSwap({ version: 1 }, { version: 2 });
+    expect(set).toHaveBeenCalledWith({ rogatio: { version: 2 } });
   });
 
   it("serializes concurrent compare-and-swap mutations", async () => {
