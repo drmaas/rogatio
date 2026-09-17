@@ -6,9 +6,9 @@ import {
   lookupMatchIndexEntry,
   MATCH_LOGGING_INDEX_KEY,
   sanitizeMatchIndexEntry,
-  truncateLogString,
   writeMatchIndex,
 } from "../src/match-index.js";
+import { truncateLogString } from "../src/match-log-redaction.js";
 
 function storageApi(initial: Record<string, unknown> = {}): {
   api: ChromeApi;

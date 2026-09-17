@@ -83,12 +83,12 @@ Env: existing `// @vitest-environment happy-dom` (not jsdom). Do not add testing
 
 Do this phase first alongside P0 (no Chrome).
 
-- [ ] `redactUrl(url, { redactSensitive })`: drop userinfo and fragment; if `redactSensitive`, replace deny-listed query values with `[redacted]`; if longer than 200 characters, cut so the result is ≤200 and ends with ASCII `...`.
-- [ ] Query-key deny-list per research Q2 (case-insensitive **substring** on the key). Header-name deny-list: frozen forbidden lists plus `authorization`, `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`, `x-auth-token`, `x-csrf-token` (case-insensitive exact name). Import nothing from Node `schema` / Ajv; `browser-schema.ts` only if a shared helper is already there.
-- [ ] `truncateLogString(value)`: same 200/`...` bound for initiator, destination, header values, query values, method, resource type.
-- [ ] `formatMatchRecord(...)`: single line, `\x1B[1;34m[rogatio]\x1B[m`, unstyled `matched` + method + resource type + redacted request URL, `\x1B[2m` detail (`ruleId`, kind, intended action, initiator). Field order as in `plan.md`. Wording stays "matched / intended action" — never claims the network mutation succeeded.
-- [ ] Intended action from index intent, not from the Chrome event. Resource type from the event (`request.type`), not from rule config. No body argument, no body segment.
-- [ ] When `redactSensitiveInLogs` is false: still drop userinfo/fragment and truncate; do not deny-list.
+- [x] `redactUrl(url, { redactSensitive })`: drop userinfo and fragment; if `redactSensitive`, replace deny-listed query values with `[redacted]`; if longer than 200 characters, cut so the result is ≤200 and ends with ASCII `...`.
+- [x] Query-key deny-list per research Q2 (case-insensitive **substring** on the key). Header-name deny-list: frozen forbidden lists plus `authorization`, `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`, `x-auth-token`, `x-csrf-token` (case-insensitive exact name). Import nothing from Node `schema` / Ajv; `browser-schema.ts` only if a shared helper is already there.
+- [x] `truncateLogString(value)`: same 200/`...` bound for initiator, destination, header values, query values, method, resource type.
+- [x] `formatMatchRecord(...)`: single line, `\x1B[1;34m[rogatio]\x1B[m`, unstyled `matched` + method + resource type + redacted request URL, `\x1B[2m` detail (`ruleId`, kind, intended action, initiator). Field order as in `plan.md`. Wording stays "matched / intended action" — never claims the network mutation succeeded.
+- [x] Intended action from index intent, not from the Chrome event. Resource type from the event (`request.type`), not from rule config. No body argument, no body segment.
+- [x] When `redactSensitiveInLogs` is false: still drop userinfo/fragment and truncate; do not deny-list.
 
 **Acceptance:** AC2, AC3, AC4, AC16, AC18.
 **Tests (write first):**
