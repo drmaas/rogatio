@@ -438,5 +438,5 @@ await expectTypeFailure(
   "forbidden direction fixture",
   "test/fixtures/forbidden-direction.ts",
 );
-run("playwright", pnpm, ["test:browser"]);
+run("browser", pnpm, ["test:browser"]);
 console.log("\nValidation completed successfully.");

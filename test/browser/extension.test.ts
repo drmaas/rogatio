@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 test("keeps project selection separate from explicit switch", async ({
   page,
@@ -537,7 +537,7 @@ const RULE_ERROR_REASON_FALLBACK = "The rule failed to install.";
 const DNR_ERROR_MESSAGE = "The declarativeNetRequest operation failed.";
 
 async function installExtensionChromeMock(
-  page: import("@playwright/test").Page,
+  page: import("./page.js").Page,
   initialState: Record<string, unknown>,
 ) {
   await page.addInitScript((seed) => {
@@ -611,7 +611,7 @@ const errorSurfaceProject = {
   badge: { text: "1", attention: true },
 };
 
-async function openWorkspace(page: import("@playwright/test").Page) {
+async function openWorkspace(page: import("./page.js").Page) {
   await page.goto("/extension/index.html");
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
 }
@@ -732,7 +732,7 @@ test("tolerates malformed, inherited, and throwing diagnostic payloads", async (
   page,
 }) => {
   const pageErrors: string[] = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.addInitScript(() => {
     const inheritedReason = "inherited reason must not run";
     const proto = {
@@ -1146,7 +1146,7 @@ test("updates the error card without throwing when the rule card is missing", as
   page,
 }) => {
   const pageErrors: string[] = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.on("pageerror", (error) => pageErrors.push(error.message));
   const missingRuleReason =
     "Install failed for a rule no longer in the project";
   const missingGroupReason = "Install failed for an unknown group";

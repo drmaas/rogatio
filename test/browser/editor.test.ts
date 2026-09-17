@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -237,8 +237,8 @@ test("preserves draft on save failure and prevents pending-save races", async ({
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("button", { name: "Cancel" })).toBeDisabled();
   await expect(page.getByLabel("Project name")).toBeDisabled();
-  await page.evaluate(() => window.editorTest.resolveSave(1, { ok: true }));
-  await expect(page.getByText("Saved")).toBeVisible();
+  await page.evaluate(() => window.editorTest.resolveSave(0, { ok: true }));
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 });
 
 test("keeps route and mobile navigation accessible at narrow width and zoom", async ({

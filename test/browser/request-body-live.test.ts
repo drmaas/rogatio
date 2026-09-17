@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 
 declare global {
   interface Window {
@@ -76,15 +76,14 @@ const LIVE_E2E = process.env.LIVE_E2E === "1";
 
   // 9. Verify stop teardown
   await page.evaluate(() => window.rogatio?.stop?.());
-  await page.waitForTimeout(500);
-
-  const stopped = await page.evaluate(() => {
-    return (
-      window.rogatio?.native?.connected === false &&
-      window.rogatio?.pac?.active === false
-    );
+  await page.waitForCondition(async () => {
+    return page.evaluate(() => {
+      return (
+        window.rogatio?.native?.connected === false &&
+        window.rogatio?.pac?.active === false
+      );
+    });
   });
-  expect(stopped).toBe(true);
 });
 
 (LIVE_E2E ? test : test.skip)(

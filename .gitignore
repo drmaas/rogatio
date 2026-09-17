@@ -148,7 +148,8 @@ vite.config.ts.timestamp-*
 # F1 generated output and browser test state
 build-manifest.json
 packages/*/dist/
-playwright-report/
+.browser-cache/
+test/browser/artifacts/
 test-results/
 
 # OCX local project state (receipts, machine-specific paths)

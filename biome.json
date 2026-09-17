@@ -5,8 +5,8 @@
       "**",
       "!!**/dist",
       "!!coverage",
-      "!!playwright-report",
       "!!test-results",
+      "!!.browser-cache",
       "!!test/fixtures",
       "!!.opencode",
       "!!graphify-out"

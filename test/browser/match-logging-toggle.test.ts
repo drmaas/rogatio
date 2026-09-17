@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
+import type { Page } from "./page.js";
 
 type MockEnvelope = {
   version: number;
@@ -155,7 +156,7 @@ function installToggleChromeMock(seed: ToggleMockSeed): void {
   });
 }
 
-async function readToggleStore(page: import("@playwright/test").Page) {
+async function readToggleStore(page: Page) {
   return page.evaluate(() => {
     const store = (
       window as unknown as { __rogatioToggleStore?: Record<string, unknown> }
@@ -165,7 +166,7 @@ async function readToggleStore(page: import("@playwright/test").Page) {
 }
 
 async function expectToggleBehavior(
-  page: import("@playwright/test").Page,
+  page: Page,
   openWorkspace: boolean,
 ): Promise<void> {
   const checkbox = page.getByRole("checkbox", { name: "Match logging" });

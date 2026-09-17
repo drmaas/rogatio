@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
+import type { Page } from "./page.js";
 
 type MockProject = {
   id: string;
