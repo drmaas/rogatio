@@ -56,7 +56,7 @@ Start/Stop controls, not the CLI. Run 'rogatio runtime install --extension-id
 
 Options:
   --extension-id  Extension ID for native messaging manifest (required for install)
-  --root <dir>    Root for confined file mocks (default: project directory)
+  --root <dir>    Root for confined runtime file access (default: project directory)
   --help, -h      Show this help
 
 Exit codes:

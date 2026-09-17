@@ -1,5 +1,9 @@
+import {
+  LIMITS,
+  validateProjectDetailed as validateNode,
+} from "@rogatio/schema";
 import { describe, expect, it } from "vitest";
-import { LIMITS, validateProjectDetailed } from "../src/index.js";
+import { validateProjectDetailed as validateBrowser } from "../src/browser-schema.js";
 
 function project(rule: Record<string, unknown>) {
   return {
@@ -16,7 +20,7 @@ function project(rule: Record<string, unknown>) {
   };
 }
 
-const baseRegex = {
+const baseUntaggedRegex = {
   id: "r1",
   name: "Rewrite",
   urlRegex: "^https://example\\.com/data$",
@@ -28,7 +32,7 @@ const baseRegex = {
 };
 
 const baseTaggedRegex = {
-  ...baseRegex,
+  ...baseUntaggedRegex,
   responseBody: {
     mode: "regex",
     replacements: [{ pattern: "old", replacement: "new" }],
@@ -36,30 +40,33 @@ const baseTaggedRegex = {
 };
 
 const baseReplace = {
-  ...baseRegex,
+  ...baseUntaggedRegex,
   responseBody: { mode: "replace", body: '{"replaced":true}' },
 };
 
-describe(" response-body schema", () => {
+describe(" response-body browser schema", () => {
   it("accepts untagged regex replacements", () =>
-    expect(validateProjectDetailed(project(baseRegex)).valid).toBe(true));
+    expect(validateBrowser(project(baseUntaggedRegex)).valid).toBe(true));
 
   it("accepts tagged regex replacements", () =>
-    expect(validateProjectDetailed(project(baseTaggedRegex)).valid).toBe(true));
+    expect(validateBrowser(project(baseTaggedRegex)).valid).toBe(true));
 
   it("accepts replace mode with body", () =>
-    expect(validateProjectDetailed(project(baseReplace)).valid).toBe(true));
+    expect(validateBrowser(project(baseReplace)).valid).toBe(true));
 
   it.each([
-    ["missing action", { ...baseRegex, responseBody: undefined }],
+    ["missing action", { ...baseUntaggedRegex, responseBody: undefined }],
     [
       "empty replacements",
-      { ...baseRegex, responseBody: { replacements: [] } },
+      {
+        ...baseUntaggedRegex,
+        responseBody: { replacements: [] },
+      },
     ],
     [
       "invalid pattern",
       {
-        ...baseRegex,
+        ...baseUntaggedRegex,
         responseBody: { replacements: [{ pattern: "[", replacement: "x" }] },
       },
     ],
@@ -68,39 +75,43 @@ describe(" response-body schema", () => {
       { ...baseReplace, responseBody: { mode: "replace" } },
     ],
     [
-      "replace with replacements",
+      "unknown property on replace",
       {
         ...baseReplace,
-        responseBody: {
-          mode: "replace",
-          body: "x",
-          replacements: [{ pattern: "a", replacement: "b" }],
-        },
-      },
-    ],
-    [
-      "unknown property on untagged regex",
-      {
-        ...baseRegex,
-        responseBody: {
-          replacements: [{ pattern: "x", replacement: "y" }],
-          body: "no",
-        },
+        responseBody: { mode: "replace", body: "x", extra: 1 },
       },
     ],
   ])("rejects %s", (_name, rule) => {
-    expect(validateProjectDetailed(project(rule)).valid).toBe(false);
+    expect(validateBrowser(project(rule)).valid).toBe(false);
   });
 
   it("rejects replace body over maxResponseBodyBytes", () => {
     const body = "x".repeat(LIMITS.maxResponseBodyBytes + 1);
     expect(
-      validateProjectDetailed(
+      validateBrowser(
         project({
           ...baseReplace,
           responseBody: { mode: "replace", body },
         }),
       ).valid,
     ).toBe(false);
+  });
+
+  it("matches Node validation for valid payloads", () => {
+    for (const rule of [baseUntaggedRegex, baseTaggedRegex, baseReplace]) {
+      const nodeResult = validateNode(project(rule));
+      const browserResult = validateBrowser(project(rule));
+      expect(nodeResult.valid).toBe(browserResult.valid);
+    }
+  });
+
+  it("matches Node validation for invalid payloads", () => {
+    const invalidRule = {
+      ...baseReplace,
+      responseBody: { mode: "replace" },
+    };
+    const nodeResult = validateNode(project(invalidRule));
+    const browserResult = validateBrowser(project(invalidRule));
+    expect(nodeResult.valid).toBe(browserResult.valid);
   });
 });

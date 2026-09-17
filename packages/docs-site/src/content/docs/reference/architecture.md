@@ -19,7 +19,7 @@ Rogatio is a strict TypeScript 7, ESM/NodeNext monorepo using pnpm 10.32.1.
 | `@rogatio/smoke` | Browser smoke tests and end-to-end journey fixtures. |
 | Chrome MV3 extension | Translates neutral rules to WebExtensions/DNR. Designed to support more browsers later. |
 | `@rogatio/cli` | Editor host, file verification, runtime dispatch, macOS runtime lifecycle. |
-| `@rogatio/runtime` | Reusable bounded mock, response-body, and request-body transformation/runtime components. |
+| `@rogatio/runtime` | Reusable bounded response-body and request-body transformation/runtime components. |
 
 Dependency direction:
 

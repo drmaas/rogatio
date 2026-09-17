@@ -1,10 +1,11 @@
-import { LIMITS } from "@rogatio/schema";
+import { hasLoneSurrogate, LIMITS } from "@rogatio/schema";
 import type {
   EditorDiagnostic,
   RuleTypeFieldContext,
   RuleTypeFieldExtension,
   RuleTypeFieldMount,
 } from "../types.js";
+import { createSelect } from "./dom.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -22,22 +23,6 @@ function requestBodyOf(
     pattern?: string;
     replacement?: string;
   };
-}
-
-function hasLoneSurrogate(value: string): boolean {
-  for (let i = 0; i < value.length; i += 1) {
-    const code = value.charCodeAt(i);
-    if (code >= 0xd800 && code <= 0xdbff) {
-      if (i + 1 >= value.length) return true;
-      const next = value.charCodeAt(i + 1);
-      if (next < 0xdc00 || next > 0xdfff) return true;
-    } else if (code >= 0xdc00 && code <= 0xdfff) {
-      if (i === 0) return true;
-      const prev = value.charCodeAt(i - 1);
-      if (prev < 0xd800 || prev > 0xdbff) return true;
-    }
-  }
-  return false;
 }
 
 function stable(values: EditorDiagnostic[]): readonly EditorDiagnostic[] {
@@ -185,26 +170,25 @@ export function createRequestBodyRuleType(): RuleTypeFieldExtension {
         container.replaceChildren();
         if (current === undefined) return;
 
-        const modeSelect = document.createElement("select");
-        modeSelect.value = current.mode;
-        const replaceOption = document.createElement("option");
-        replaceOption.value = "replace";
-        replaceOption.textContent = "Replace body";
-        const regexOption = document.createElement("option");
-        regexOption.value = "regex";
-        regexOption.textContent = "Regex replace";
-        modeSelect.append(replaceOption, regexOption);
-        modeSelect.addEventListener("change", () => {
-          const next = { ...current, mode: modeSelect.value };
-          if (modeSelect.value === "replace") {
-            delete next.pattern;
-            delete next.replacement;
-          } else {
-            delete next.body;
-          }
-          context.setField("requestBody", next);
-          render();
-        });
+        const modeSelect = createSelect(
+          document,
+          [
+            { value: "replace", label: "Replace body" },
+            { value: "regex", label: "Regex replace" },
+          ],
+          current.mode,
+          (mode) => {
+            const next = { ...current, mode };
+            if (mode === "replace") {
+              delete next.pattern;
+              delete next.replacement;
+            } else {
+              delete next.body;
+            }
+            context.setField("requestBody", next);
+            render();
+          },
+        );
         context.registerControl("/requestBody/mode", modeSelect);
         container.append(modeSelect);
 

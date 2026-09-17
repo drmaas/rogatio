@@ -7,7 +7,11 @@ import type {
   ResponseBodyOperation,
   RogatioOperation,
 } from "@rogatio/compiler";
-import { queryParamsToDNR, validateMatcherShape } from "@rogatio/compiler";
+import {
+  type DnrQueryTransform,
+  queryActionToDNR,
+  validateMatcherShape,
+} from "@rogatio/compiler";
 import { extensionDiagnostic } from "./diagnostics.js";
 
 export interface DnrRule {
@@ -25,13 +29,7 @@ export interface DnrRule {
     readonly redirect: {
       readonly destination?: string;
       readonly transform?: {
-        readonly query: {
-          readonly addOrReplaceParams: readonly {
-            readonly name: string;
-            readonly value: string;
-            readonly replaceOnly: false;
-          }[];
-        };
+        readonly query: DnrQueryTransform;
       };
     };
   };
@@ -90,10 +88,11 @@ function isResponseBodyOperation(
   if (typeof value.groupId !== "string" || typeof value.ruleId !== "string")
     return false;
   if (!validateMatcherShape(value.matcher)) return false;
-  return (
-    isRecord(value.responseBody) &&
-    Array.isArray(value.responseBody.replacements)
-  );
+  const responseBody = value.responseBody;
+  if (!isRecord(responseBody)) return false;
+  if (responseBody.mode === "replace")
+    return typeof responseBody.body === "string";
+  return Array.isArray(responseBody.replacements);
 }
 
 function isQueryOperation(value: unknown): value is QueryOperation {
@@ -230,9 +229,7 @@ export function projectMatchers(
           type: "redirect",
           redirect: {
             transform: {
-              query: {
-                addOrReplaceParams: queryParamsToDNR(operation.action),
-              },
+              query: queryActionToDNR(operation.action),
             },
           },
         },

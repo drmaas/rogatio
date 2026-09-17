@@ -278,6 +278,115 @@ describe("@rogatio/schema", () => {
     expect(validateProject(project)).toBe(true);
   });
 
+  it("accepts query remove params without value and mixed set/remove", () => {
+    const removeOnly = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              type: "query",
+              action: {
+                type: "query",
+                params: [{ name: "utm_source", operation: "remove" }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateProject(removeOnly)).toBe(true);
+
+    const mixed = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              type: "query",
+              action: {
+                type: "query",
+                params: [
+                  { name: "a", operation: "set", value: "1" },
+                  { name: "b", operation: "remove" },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateProject(mixed)).toBe(true);
+  });
+
+  it("rejects query remove params with value and set params without value", () => {
+    const removeWithValue = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              type: "query",
+              action: {
+                type: "query",
+                params: [
+                  { name: "utm_source", operation: "remove", value: "x" },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateProject(removeWithValue)).toBe(false);
+
+    const setWithoutValue = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              type: "query",
+              action: {
+                type: "query",
+                params: [{ name: "a", operation: "set" }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateProject(setWithoutValue)).toBe(false);
+
+    const omittedOperationWithoutValue = {
+      ...makeProject(),
+      groups: [
+        {
+          ...makeProject().groups[0],
+          rules: [
+            {
+              ...makeRule(1),
+              type: "query",
+              action: {
+                type: "query",
+                params: [{ name: "a" }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateProject(omittedOperationWithoutValue)).toBe(false);
+  });
+
   it("rejects an unknown action type", () => {
     const project = {
       ...makeProject(),

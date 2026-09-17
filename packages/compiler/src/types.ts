@@ -2,7 +2,6 @@ import type {
   HeaderDirection,
   HeaderOperationKind,
   HttpMethod,
-  MockAction,
   RequestBodyAction,
   ResourceType,
   ResponseBodyAction,
@@ -56,14 +55,6 @@ export interface HeaderOperation {
   };
 }
 
-export interface MockOperation {
-  readonly kind: "mock";
-  readonly groupId: string;
-  readonly ruleId: string;
-  readonly matcher: NormalizedMatcher;
-  readonly mock: MockAction;
-}
-
 export interface ResponseBodyOperation {
   readonly kind: "response-body";
   readonly groupId: string;
@@ -85,7 +76,6 @@ export type RogatioOperation =
   | RedirectOperation
   | QueryOperation
   | HeaderOperation
-  | MockOperation
   | ResponseBodyOperation
   | RequestBodyOperation;
 

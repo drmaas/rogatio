@@ -307,7 +307,6 @@ describe("ai-assist", () => {
       expect(prompt).toContain("redirect");
       expect(prompt).toContain("query");
       expect(prompt).toContain("header");
-      expect(prompt).toContain("mock");
       expect(prompt).toContain("response-body");
       expect(prompt).toContain("request-body");
     });

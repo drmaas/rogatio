@@ -74,7 +74,6 @@ function isCandidate(
       op.kind === "redirect" ||
       op.kind === "query" ||
       op.kind === "header" ||
-      op.kind === "mock" ||
       op.kind === "request-body"
     ) {
       return true;

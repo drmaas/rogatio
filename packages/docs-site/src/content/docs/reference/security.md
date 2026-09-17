@@ -20,7 +20,7 @@ Rogatio is local-first by design.
 - The **browser grant is not a security boundary**. Every native-messaging transformation is
   re-validated against the canonical `.rogatio.json` (rule existence, URL regex match, origin
   membership, method, resource type, initiator scope, target origin).
-- The **mock/response server** binds only `127.0.0.1`, pairs through a random capability and
+- The **native runtime** binds only `127.0.0.1`, pairs through a random capability and
   preset digest, authorizes the exact rule, confines file access, and enforces SSRF,
   DNS-rebinding, redirect, credential, method, timeout, and size controls. It is never a
   general forward proxy or file server.

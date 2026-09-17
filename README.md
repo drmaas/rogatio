@@ -20,8 +20,8 @@ runtime, no cloud sync, no telemetry, and no retained traffic history.
 - **Visual editor.** Edit, test, and verify rules in an accessible, framework-free editor
   shared by the CLI and the Chrome extension.
 - **Browser-native.** Redirects, query params, and headers run entirely in the browser via
-  Chrome Manifest V3 Declarative Net Request. Mocks and body rewriting use an optional local
-  runtime.
+  Chrome Manifest V3 Declarative Net Request. Response-body and request-body rules use an
+  optional local runtime.
 - **Private by design.** No accounts, no cloud, no telemetry. Site access is granted only
   for declared origins, and you activate groups explicitly.
 
@@ -32,14 +32,14 @@ expression, resource types, priority, and (where supported) an HTTP method.
 
 - **Redirects** — send matching HTTP(S) requests to an absolute destination, including
   regular-expression capture substitution.
-- **Query parameters** — add missing parameters and replace existing values for configured
-  names while preserving everything else.
+- **Query parameters** — set or remove configured names. Set adds missing parameters and
+  replaces existing values; remove drops configured names. Unrelated parameters and the
+  rest of the URL stay intact.
 - **Headers** — set, append, or remove a named request/response header, subject to
   immutable forbidden-header lists.
-- **Mocks** — return a configured status, headers, optional delay, and an inline body or a
-  single approved local file snapshot. Mocks never contact upstream.
-- **Response-body rewriting** — fetch an authorized public GET and perform bounded
-  replacement through a local runtime.
+- **Response body** — fetch an authorized public GET, then either replace the entire
+  body or apply bounded regex rewrites through a local runtime. Upstream status and
+  headers are preserved.
 - **Request-body modification** — replace or apply bounded regex replacement to eligible
   POST/PUT/PATCH XHR bodies, via native messaging to a local runtime.
 
@@ -133,7 +133,7 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
 | `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
 | `rogatio runtime <install\|uninstall>` | Request-body trust lifecycle. `install` registers the native-messaging host manifest and (on capable platforms) provisions and trusts the device-local CA in a single, transactional call. `uninstall` removes the host manifest, the device-local CA files, and the trust installation (idempotent). The CA/trust provisioning remains capability-gated at the OS level and reports `unsupported` without error on incapable platforms. |
-| `rogatio runtime host <path>` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Mock delivery, pairing, and authorization all flow through this single host; no separate HTTP mock server exists. |
+| `rogatio runtime host <path>` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Pairing, authorization, and body transforms flow through this single host. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome, grant only declared site access, and activate the groups you need.
@@ -173,8 +173,8 @@ The config file has `600` permissions (owner read/write only). The API key never
 1. Run `rogatio edit` to open the editor
 2. Click **AI Assist** in the command bar (or use the mobile nav)
 3. Type a natural language prompt like:
-   - "Create a redirect rule for api.example.com to mock.local"
-   - "Add a mock rule that returns 200 with {'status': 'ok'}"
+   - "Create a redirect rule for api.example.com to staging.example.com"
+   - "Add a response-body replace rule that returns {'status': 'ok'}"
    - "Fix the invalid regex on rule xyz"
 4. AI streams the proposal token-by-token
 5. Click **Apply** to add the rule to your project, or **Reject** to discard
@@ -204,13 +204,10 @@ When the native runtime is started (`Start runtime`), the extension management p
 
 Tested with: OpenAI, Ollama, OpenRouter, vLLM. Any OpenAI-compatible chat completions endpoint works.
 
-## Mock rules
+## Runtime
 
-A `mock` rule returns a configured status, optional headers, optional delay, and
-an inline body or a live UTF-8 snapshot of one approved local file — without
-contacting upstream. Mocks are delivered by the consolidated native-messaging
-host; the extension performs the one-time `mock.connect` handshake when you
-click **Start runtime**.
+Response-body and request-body rules run through the consolidated native-messaging
+host. Register it once, then start the runtime from the extension.
 
 ```sh
 # Register the native-messaging host once (required before Start runtime works)
@@ -218,7 +215,7 @@ click **Start runtime**.
 rogatio runtime install --extension-id <extension ID>
 
 # Start the runtime from the extension's Start runtime control
-# (Stop runtime stops it; mocks/response-body rules need only the host installed)
+# (Stop runtime stops it)
 
 # Run the native-messaging host (normally launched by the browser; useful for debugging)
 rogatio runtime host .rogatio.json
@@ -252,7 +249,7 @@ This is a strict-TypeScript 7, ESM/NodeNext pnpm monorepo.
 | `@rogatio/browser-core` | Versioned storage, migrations, permissions, enablement, lifecycle, runtime state. |
 | `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
 | `@rogatio/extension` | Chrome MV3 service worker and extension page (WebExtensions/DNR translation). |
-| `@rogatio/runtime` | Reusable mock, response-body, and request-body transformation components. |
+| `@rogatio/runtime` | Reusable response-body and request-body transformation components. |
 | `@rogatio/cli` | Editor host, file verification, test runner, and runtime dispatch (`rogatio` binary). |
 
 ## Local development

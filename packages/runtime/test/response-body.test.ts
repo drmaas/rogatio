@@ -6,6 +6,7 @@ import {
   type OutboundTransport,
   rewriteResponseBody,
 } from "../src/index.js";
+import { RUNTIME_LIMITS } from "../src/limits.js";
 import { makeGrant, makePresetInput } from "./helpers.js";
 
 describe(" response-body transformation", () => {
@@ -68,7 +69,7 @@ describe(" response-body transformation", () => {
     };
     const result = await fetchAndRewriteAuthorizedResponse(
       authorized.value,
-      [{ pattern: "old", replacement: "new" }],
+      { replacements: [{ pattern: "old", replacement: "new" }] },
       {
         resolver: {
           async lookup() {
@@ -86,5 +87,141 @@ describe(" response-body transformation", () => {
         '{"value":"new"}',
       );
     }
+  });
+
+  it("tagged regex mode still rewrites the fetched body", async () => {
+    const normalized = normalizeRuntimePreset(
+      makePresetInput({ grants: [makeGrant()] }),
+    );
+    expect(normalized.ok).toBe(true);
+    if (!normalized.ok) return;
+
+    const authorized = authorizeExact(normalized.value, makeGrant());
+    expect(authorized.ok).toBe(true);
+    if (!authorized.ok) return;
+
+    const transport: OutboundTransport = {
+      async request() {
+        return {
+          status: 200,
+          headers: [["content-type", "application/json"]],
+          body: (async function* () {
+            yield new TextEncoder().encode('{"value":"old"}');
+          })(),
+        };
+      },
+    };
+    const result = await fetchAndRewriteAuthorizedResponse(
+      authorized.value,
+      {
+        mode: "regex",
+        replacements: [{ pattern: "old", replacement: "new" }],
+      },
+      {
+        resolver: {
+          async lookup() {
+            return [{ address: "93.184.216.34", family: 4 }];
+          },
+        },
+        transport,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(new TextDecoder().decode(result.value.body)).toBe(
+        '{"value":"new"}',
+      );
+    }
+  });
+
+  it("replace mode returns configured body after fetch and preserves status/headers", async () => {
+    const normalized = normalizeRuntimePreset(
+      makePresetInput({ grants: [makeGrant()] }),
+    );
+    expect(normalized.ok).toBe(true);
+    if (!normalized.ok) return;
+
+    const authorized = authorizeExact(normalized.value, makeGrant());
+    expect(authorized.ok).toBe(true);
+    if (!authorized.ok) return;
+
+    const transport: OutboundTransport = {
+      async request() {
+        return {
+          status: 418,
+          headers: [
+            ["content-type", "image/png"],
+            ["x-upstream", "seen"],
+          ],
+          body: (async function* () {
+            yield new TextEncoder().encode("ignored upstream bytes");
+          })(),
+        };
+      },
+    };
+    const result = await fetchAndRewriteAuthorizedResponse(
+      authorized.value,
+      { mode: "replace", body: '{"replaced":true}' },
+      {
+        resolver: {
+          async lookup() {
+            return [{ address: "93.184.216.34", family: 4 }];
+          },
+        },
+        transport,
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.status).toBe(418);
+      expect(result.value.headers).toEqual([
+        ["content-type", "image/png"],
+        ["x-upstream", "seen"],
+      ]);
+      expect(new TextDecoder().decode(result.value.body)).toBe(
+        '{"replaced":true}',
+      );
+    }
+  });
+
+  it("replace mode rejects authored body over maxResponseBodyBytes", async () => {
+    const normalized = normalizeRuntimePreset(
+      makePresetInput({ grants: [makeGrant()] }),
+    );
+    expect(normalized.ok).toBe(true);
+    if (!normalized.ok) return;
+
+    const authorized = authorizeExact(normalized.value, makeGrant());
+    expect(authorized.ok).toBe(true);
+    if (!authorized.ok) return;
+
+    const transport: OutboundTransport = {
+      async request() {
+        return {
+          status: 200,
+          headers: [["content-type", "application/json"]],
+          body: (async function* () {
+            yield new TextEncoder().encode("{}");
+          })(),
+        };
+      },
+    };
+    const body = "x".repeat(RUNTIME_LIMITS.maxResponseBodyBytes + 1);
+    const result = await fetchAndRewriteAuthorizedResponse(
+      authorized.value,
+      { mode: "replace", body },
+      {
+        resolver: {
+          async lookup() {
+            return [{ address: "93.184.216.34", family: 4 }];
+          },
+        },
+        transport,
+      },
+    );
+
+    expect(result.ok).toBe(false);
   });
 });

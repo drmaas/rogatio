@@ -9,8 +9,6 @@ import { dryRunProject } from "@rogatio/dry-run";
 import type { AIClient, AICompletionOptions } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import type { ProjectStorage } from "../utils/file.js";
-import { createMockPreviewAction } from "../utils/mock-preview.js";
-
 export interface RouteContext {
   project: unknown;
   filePath: string;
@@ -477,10 +475,7 @@ export function createRoutes(context: RouteContext) {
       const result = dryRunProject(
         toMatcherOperations(compileResult.operations),
         body.cases as DryRunTestCase[],
-        {
-          ...((body.options as DryRunOptions | undefined) ?? {}),
-          previewAction: createMockPreviewAction(compileResult.operations),
-        },
+        (body.options as DryRunOptions | undefined) ?? {},
       );
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(result));

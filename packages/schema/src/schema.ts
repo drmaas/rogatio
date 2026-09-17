@@ -103,7 +103,6 @@ const projectSchemaDefinition = {
             "redirect",
             "query",
             "header",
-            "mock",
             "response-body",
             "request-body",
           ],
@@ -128,7 +127,6 @@ const projectSchemaDefinition = {
           type: "string",
           maxLength: LIMITS.maxHeaderValueLength,
         },
-        mock: { $ref: "#/$defs/mockAction" },
         responseBody: { $ref: "#/$defs/responseBodyAction" },
         requestBody: { $ref: "#/$defs/requestBodyAction" },
       },
@@ -161,16 +159,6 @@ const projectSchemaDefinition = {
           // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
           then: {
             required: ["headerDirection", "headerOperation", "headerName"],
-          },
-        },
-        {
-          if: {
-            required: ["type"],
-            properties: { type: { const: "mock" } },
-          },
-          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
-          then: {
-            required: ["mock"],
           },
         },
         {
@@ -228,12 +216,15 @@ const projectSchemaDefinition = {
     queryParam: {
       type: "object",
       additionalProperties: false,
-      required: ["name", "value"],
+      required: ["name"],
       properties: {
         name: {
           type: "string",
           minLength: 1,
           maxLength: LIMITS.maxQueryNameLength,
+        },
+        operation: {
+          enum: ["set", "remove"],
         },
         value: {
           type: "string",
@@ -241,6 +232,35 @@ const projectSchemaDefinition = {
           maxLength: LIMITS.maxQueryValueLength,
         },
       },
+      allOf: [
+        {
+          if: {
+            anyOf: [
+              { not: { required: ["operation"] } },
+              {
+                properties: { operation: { const: "set" } },
+                required: ["operation"],
+              },
+            ],
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["value"],
+          },
+        },
+        {
+          if: {
+            properties: { operation: { const: "remove" } },
+            required: ["operation"],
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            properties: {
+              value: false,
+            },
+          },
+        },
+      ],
     },
     queryAction: {
       type: "object",
@@ -253,53 +273,6 @@ const projectSchemaDefinition = {
           minItems: 1,
           maxItems: LIMITS.maxQueryParamsPerRule,
           items: { $ref: "#/$defs/queryParam" },
-        },
-      },
-    },
-    mockHeader: {
-      type: "object",
-      additionalProperties: false,
-      required: ["name", "value"],
-      properties: {
-        name: {
-          type: "string",
-          minLength: 1,
-          maxLength: LIMITS.maxMockHeaderNameLength,
-        },
-        value: {
-          type: "string",
-          maxLength: LIMITS.maxMockHeaderValueLength,
-        },
-      },
-    },
-    mockAction: {
-      type: "object",
-      additionalProperties: false,
-      required: ["status"],
-      properties: {
-        status: {
-          type: "integer",
-          minimum: LIMITS.minMockStatus,
-          maximum: LIMITS.maxMockStatus,
-        },
-        headers: {
-          type: "array",
-          maxItems: LIMITS.maxMockHeadersPerRule,
-          items: { $ref: "#/$defs/mockHeader" },
-        },
-        delayMs: {
-          type: "integer",
-          minimum: 0,
-          maximum: LIMITS.maxMockDelayMs,
-        },
-        body: {
-          type: "string",
-          maxLength: LIMITS.maxMockInlineBodyLength,
-        },
-        file: {
-          type: "string",
-          minLength: 1,
-          maxLength: LIMITS.maxMockFilePathLength,
         },
       },
     },
@@ -320,7 +293,33 @@ const projectSchemaDefinition = {
         },
       },
     },
-    responseBodyAction: {
+    responseBodyReplaceAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mode", "body"],
+      properties: {
+        mode: { const: "replace" },
+        body: {
+          type: "string",
+          maxLength: LIMITS.maxResponseBodyBytes,
+        },
+      },
+    },
+    responseBodyRegexAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["mode", "replacements"],
+      properties: {
+        mode: { const: "regex" },
+        replacements: {
+          type: "array",
+          minItems: 1,
+          maxItems: LIMITS.maxResponseBodyReplacements,
+          items: { $ref: "#/$defs/responseBodyReplacement" },
+        },
+      },
+    },
+    responseBodyUntaggedRegexAction: {
       type: "object",
       additionalProperties: false,
       required: ["replacements"],
@@ -332,6 +331,13 @@ const projectSchemaDefinition = {
           items: { $ref: "#/$defs/responseBodyReplacement" },
         },
       },
+    },
+    responseBodyAction: {
+      oneOf: [
+        { $ref: "#/$defs/responseBodyReplaceAction" },
+        { $ref: "#/$defs/responseBodyRegexAction" },
+        { $ref: "#/$defs/responseBodyUntaggedRegexAction" },
+      ],
     },
     requestBodyReplaceAction: {
       type: "object",

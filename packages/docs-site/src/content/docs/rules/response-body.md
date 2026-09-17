@@ -1,16 +1,17 @@
 ---
-title: Response-body rewriting
-description: Bounded textual replacement on authorized public GETs through the local runtime.
+title: Response body
+description: Full replace or bounded regex rewrite on authorized public GETs through the local runtime.
 ---
 
-Response-body rewriting rules fetch an authorized public GET without browser credentials
-and perform bounded textual replacement via native messaging to the explicitly started
-local runtime.
+Response-body rules fetch an authorized public GET without browser credentials
+and either replace the entire response body or perform bounded textual regex
+rewriting via native messaging to the explicitly started local runtime.
 
 ## Behavior
 
 - Authorized **public GET** only, without browser credentials.
-- **Bounded textual replacement** of the response body.
+- **Replace mode** substitutes the entire fetched response body with the configured UTF-8 text while preserving upstream status and headers.
+- **Regex rewrite mode** applies one or more bounded pattern/replacement pairs to the fetched body.
 - Routed through native messaging to the explicitly started local runtime.
 
 ## Requirements

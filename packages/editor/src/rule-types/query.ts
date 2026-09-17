@@ -4,14 +4,19 @@ import type {
   RuleTypeFieldExtension,
   RuleTypeFieldMount,
 } from "../types.js";
+import { createSelect } from "./dom.js";
 
 const MAX_QUERY_NAME_LENGTH = 256;
 const MAX_QUERY_VALUE_LENGTH = 2048;
 const MAX_QUERY_PARAMS = 64;
+const QUERY_OPERATIONS = Object.freeze(["set", "remove"] as const);
+
+type QueryParamOperation = (typeof QUERY_OPERATIONS)[number];
 
 interface QueryParam {
   name: string;
-  value: string;
+  operation?: QueryParamOperation;
+  value?: string;
 }
 
 interface QueryAction {
@@ -31,6 +36,25 @@ function asQueryAction(value: unknown): QueryAction | undefined {
   return value as unknown as QueryAction;
 }
 
+function paramOperation(param: QueryParam): QueryParamOperation {
+  return param.operation ?? "set";
+}
+
+function buildSetParam(name: string, value: string): QueryParam {
+  return { name, operation: "set", value };
+}
+
+function buildRemoveParam(name: string): QueryParam {
+  return { name, operation: "remove" };
+}
+
+function normalizeParam(param: QueryParam): QueryParam {
+  if (paramOperation(param) === "remove") {
+    return buildRemoveParam(param.name);
+  }
+  return buildSetParam(param.name, param.value ?? "");
+}
+
 function stable(diagnostics: EditorDiagnostic[]): readonly EditorDiagnostic[] {
   return [...diagnostics].sort((a, b) =>
     a.path === b.path
@@ -44,9 +68,7 @@ export const queryRuleType: RuleTypeFieldExtension = {
   label: "Query parameters",
 
   matches(rule): boolean {
-    return (
-      asQueryAction((rule as Record<string, unknown>).action) !== undefined
-    );
+    return rule.type === "query";
   },
 
   validate(rule, rulePath): readonly EditorDiagnostic[] {
@@ -74,6 +96,7 @@ export const queryRuleType: RuleTypeFieldExtension = {
     action.params.forEach((param, index) => {
       const namePath = `${rulePath}/action/params/${index}/name`;
       const valuePath = `${rulePath}/action/params/${index}/value`;
+      const operation = paramOperation(param);
       if (typeof param?.name !== "string" || param.name.length === 0) {
         diagnostics.push({
           code: "editor.query-param-name-required",
@@ -89,19 +112,29 @@ export const queryRuleType: RuleTypeFieldExtension = {
           message: "Query parameter name is too long.",
         });
       }
-      if (typeof param?.value !== "string" || param.value.length === 0) {
+      if (operation === "set") {
+        if (typeof param?.value !== "string" || param.value.length === 0) {
+          diagnostics.push({
+            code: "editor.query-param-value-required",
+            severity: "error",
+            path: valuePath,
+            message: "Query parameter value is required.",
+          });
+        } else if (param.value.length > MAX_QUERY_VALUE_LENGTH) {
+          diagnostics.push({
+            code: "editor.query-param-value-too-long",
+            severity: "error",
+            path: valuePath,
+            message: "Query parameter value is too long.",
+          });
+        }
+      } else if (param?.value !== undefined) {
         diagnostics.push({
-          code: "editor.query-param-value-required",
+          code: "schema.unexpected",
           severity: "error",
           path: valuePath,
-          message: "Query parameter value is required.",
-        });
-      } else if (param.value.length > MAX_QUERY_VALUE_LENGTH) {
-        diagnostics.push({
-          code: "editor.query-param-value-too-long",
-          severity: "error",
-          path: valuePath,
-          message: "Query parameter value is too long.",
+          message:
+            "Query parameter value must not be provided for remove operation.",
         });
       }
       if (typeof param?.name === "string" && seen.has(param.name)) {
@@ -135,6 +168,7 @@ export const queryRuleType: RuleTypeFieldExtension = {
       current.params.forEach((param, index) => {
         const row = document.createElement("div");
         row.dataset.queryParamRow = String(index);
+        const operation = paramOperation(param);
 
         const nameLabel = document.createElement("label");
         nameLabel.textContent = "Name";
@@ -145,30 +179,59 @@ export const queryRuleType: RuleTypeFieldExtension = {
         nameInput.addEventListener("input", () => {
           const c = getCurrent();
           if (c === undefined) return;
-          const params = c.params.map((p, i) =>
-            i === index ? { ...p, name: nameInput.value } : p,
-          );
+          const params = c.params.map((p, i) => {
+            if (i !== index) return p;
+            return normalizeParam({ ...p, name: nameInput.value });
+          });
           setAction({ type: "query", params });
         });
         context.registerControl(`/action/params/${index}/name`, nameInput);
         nameLabel.append(nameInput);
 
+        const operationLabel = document.createElement("label");
+        operationLabel.textContent = "Operation";
+        const operationSelect = createSelect(
+          document,
+          QUERY_OPERATIONS,
+          operation,
+          (value) => {
+            const c = getCurrent();
+            if (c === undefined) return;
+            const params = c.params.map((p, i) => {
+              if (i !== index) return p;
+              if (value === "remove") {
+                return buildRemoveParam(p.name);
+              }
+              return buildSetParam(p.name, p.value ?? "");
+            });
+            setAction({ type: "query", params });
+            render();
+          },
+        );
+        operationSelect.dataset.queryParamOperation = String(index);
+        context.registerControl(
+          `/action/params/${index}/operation`,
+          operationSelect,
+        );
+        operationLabel.append(operationSelect);
+
         const valueLabel = document.createElement("label");
         valueLabel.textContent = "Value";
         const valueInput = document.createElement("input");
         valueInput.type = "text";
-        valueInput.value = param.value;
+        valueInput.value = param.value ?? "";
         valueInput.dataset.editorField = "true";
         valueInput.addEventListener("input", () => {
           const c = getCurrent();
           if (c === undefined) return;
           const params = c.params.map((p, i) =>
-            i === index ? { ...p, value: valueInput.value } : p,
+            i === index ? buildSetParam(p.name, valueInput.value) : p,
           );
           setAction({ type: "query", params });
         });
         context.registerControl(`/action/params/${index}/value`, valueInput);
         valueLabel.append(valueInput);
+        valueLabel.hidden = operation === "remove";
 
         const remove = document.createElement("button");
         remove.type = "button";
@@ -179,9 +242,10 @@ export const queryRuleType: RuleTypeFieldExtension = {
           if (c === undefined) return;
           const params = c.params.filter((_, i) => i !== index);
           setAction({ type: "query", params });
+          render();
         });
 
-        row.append(nameLabel, valueLabel, remove);
+        row.append(nameLabel, operationLabel, valueLabel, remove);
         container.append(row);
       });
 
@@ -194,8 +258,9 @@ export const queryRuleType: RuleTypeFieldExtension = {
         if (c === undefined) return;
         setAction({
           type: "query",
-          params: [...c.params, { name: "", value: "" }],
+          params: [...c.params, buildSetParam("", "")],
         });
+        render();
       });
       container.append(add);
     };
@@ -205,6 +270,9 @@ export const queryRuleType: RuleTypeFieldExtension = {
   },
 
   defaultAction(): unknown {
-    return { type: "query", params: [{ name: "", value: "" }] };
+    return {
+      type: "query",
+      params: [buildSetParam("", "")],
+    };
   },
 };
