@@ -92,7 +92,7 @@ function toDnrHeaderAction(
 }
 
 export function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
-  const { allowed: initiatorDomains, excluded: excludedInitiatorDomains } =
+  const { allowed: requestDomains, excluded: excludedRequestDomains } =
     toDnrDomains(projection.matcher.origins);
   const resourceTypes =
     projection.matcher.resourceTypes.length > 0
@@ -117,12 +117,12 @@ export function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
     },
     condition: {
       // Header rules use the compiler's regular-expression matcher directly.
+      // requestDomains (not initiatorDomains) so main_frame navigations and
+      // cross-initiator XHR still match when the request URL host is in scope.
       regexFilter: projection.matcher.urlRegex.source,
       ...(resourceTypes !== undefined ? { resourceTypes } : {}),
-      ...(initiatorDomains.length > 0 ? { initiatorDomains } : {}),
-      ...(excludedInitiatorDomains.length > 0
-        ? { excludedInitiatorDomains }
-        : {}),
+      ...(requestDomains.length > 0 ? { requestDomains } : {}),
+      ...(excludedRequestDomains.length > 0 ? { excludedRequestDomains } : {}),
       ...(requestMethods !== undefined ? { requestMethods } : {}),
     },
   };

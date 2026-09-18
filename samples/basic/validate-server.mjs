@@ -1,8 +1,9 @@
 import { createServer } from "node:http";
 
 const PORT = 8080;
+const HOST = "127.0.0.1";
 const server = createServer((req, res) => {
-  const url = new URL(req.url, `http://localhost:${PORT}`);
+  const url = new URL(req.url, `http://${HOST}:${PORT}`);
 
   if (req.method === "POST" && url.pathname === "/submit") {
     let body = "";
@@ -36,6 +37,6 @@ const server = createServer((req, res) => {
   res.end("ok");
 });
 
-server.listen(PORT, () =>
-  console.log(`validation server on http://localhost:${PORT}`),
+server.listen(PORT, HOST, () =>
+  console.log(`validation server on http://${HOST}:${PORT}`),
 );

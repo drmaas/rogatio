@@ -148,11 +148,9 @@ export async function createDriver(
 ): Promise<WebDriver> {
   const chromeOptions = new chrome.Options();
   chromeOptions.setChromeBinaryPath(resolveChromeBinary());
-  // Unpacked extensions are unreliable under headless=new on some CI images.
-  const headless =
-    options.extensionPath !== undefined
-      ? false
-      : (options.headless ?? defaultHeadless());
+  // Default headless for all journeys (including unpacked extensions).
+  // Opt into a visible window with SELENIUM_HEADED=1 or SELENIUM_HEADLESS=0.
+  const headless = options.headless ?? defaultHeadless();
   if (headless) {
     chromeOptions.addArguments("--headless=new");
   }

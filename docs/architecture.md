@@ -668,7 +668,9 @@ discriminant `type: "redirect"`, the redirect payload, and translates it to Chro
 
 - `extension/src/dnr.ts` (NEW): `translateRedirectToDnr(op, id)` builds deterministic DNR
   rule `{ id, priority, action:{type:"redirect", redirect:{url}}, condition:
-  {regexFilter, resourceTypes, initiatorDomains:hostnamesFromOrigins(op.matcher.origins)} }`.
+  {regexFilter, resourceTypes, requestDomains:hostnamesFromOrigins(op.matcher.origins)} }`.
+  `requestDomains` (not `initiatorDomains`) so address-bar and automation main_frame
+  navigations match when the request URL host is in the project's granted origins.
   `createDnrInstaller(api)` implements `RuleInstallerAdapter` tracking installed redirect
   operations in a Map keyed by DNR rule id; `current()` reads back via
   `chrome.declarativeNetRequest.getDynamicRules()`; `install(ops)` computes add/remove and
@@ -728,7 +730,7 @@ Query-parameter rules add the shared rule `action` discriminator to the version-
 
 ### Compiler (compiler boundary change)
 
-Compiler emits distinct operation types: `MatcherOperation` (actionless), `RedirectOperation` (redirect rules), and `QueryOperation` (query rules). `compileProject` emits the appropriate operation type based on `rule.type`. A pure helper `queryActionToDNR(action)` produces DNR `addOrReplaceParams` (`replaceOnly: false`) for set params and `removeParams` for remove params, omitting empty arrays. This is the durable foundation header and mock rules extend by adding new operation types.
+Compiler emits distinct operation types: `MatcherOperation` (actionless), `RedirectOperation` (redirect rules), and `QueryOperation` (query rules). `compileProject` emits the appropriate operation type based on `rule.type`. A pure helper `queryActionToDNR(action)` produces DNR `queryTransform.addOrReplaceParams` (`key`/`value`, `replaceOnly: false`) for set params and `removeParams` for remove params, omitting empty arrays. This is the durable foundation header and mock rules extend by adding new operation types.
 
 ### Extension (extension boundary change)
 

@@ -23,7 +23,7 @@
         {
           "id": "rule-query",
           "name": "Add tracking param",
-          "urlRegex": "^https://example\\.com/page\\?",
+          "urlRegex": "^https://example\\.com/page",
           "origins": [],
           "resourceTypes": ["main_frame"],
           "priority": 200,

@@ -27,15 +27,14 @@ function makeProjection(
 }
 
 describe("installer.ts — header DNR rules", () => {
-  it("toDnrRule produces a condition without requestDomains or excludedRequestDomains", () => {
+  it("toDnrRule scopes with requestDomains from origins", () => {
     const projection = makeProjection();
     const rule = toDnrRule(projection);
 
-    expect(rule.condition).not.toHaveProperty("requestDomains");
+    expect(rule.condition).toHaveProperty("requestDomains");
     expect(rule.condition).not.toHaveProperty("excludedRequestDomains");
-    expect(rule.condition).toHaveProperty("initiatorDomains");
-    expect(rule.condition).not.toHaveProperty("excludedInitiatorDomains");
-    expect(rule.condition.initiatorDomains).toEqual(["example.com"]);
+    expect(rule.condition).not.toHaveProperty("initiatorDomains");
+    expect(rule.condition.requestDomains).toEqual(["example.com"]);
   });
 
   it("toDnrRule omits responseHeaders for request-direction projections", () => {
@@ -95,7 +94,7 @@ describe("installer.ts — header DNR rules", () => {
     }
   });
 
-  it("toDnrRule preserves initiatorDomains and excludedInitiatorDomains from origins", () => {
+  it("toDnrRule preserves requestDomains and excludedRequestDomains from origins", () => {
     const projection = makeProjection({
       matcher: {
         urlRegex: { source: "^https://example\\.com/", flags: "" },
@@ -106,9 +105,9 @@ describe("installer.ts — header DNR rules", () => {
     });
     const rule = toDnrRule(projection);
 
-    expect(rule.condition.initiatorDomains).toEqual(["example.com"]);
+    expect(rule.condition.requestDomains).toEqual(["example.com"]);
     // excluded origins keep the full URL (toDnrDomains only strips '!' prefix)
-    expect(rule.condition.excludedInitiatorDomains).toEqual([
+    expect(rule.condition.excludedRequestDomains).toEqual([
       "https://blocked.com",
     ]);
   });

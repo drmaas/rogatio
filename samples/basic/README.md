@@ -132,8 +132,8 @@ the matching `--resource-type` and `--method` for each. `--urls` is a comma-sepa
 # redirect (main_frame, GET)
 rogatio test samples/basic/.rogatio.json --urls "https://example.com/old/foo" --resource-type main_frame --method GET --json
 
-# query (main_frame, GET)
-rogatio test samples/basic/.rogatio.json --urls "https://example.com/page?x=1" --resource-type main_frame --method GET --json
+# query (main_frame, GET) — matches /page and /page?...
+rogatio test samples/basic/.rogatio.json --urls "https://example.com/page,https://example.com/page?x=1" --resource-type main_frame --method GET --json
 
 # header — set request (xmlhttprequest, GET)
 rogatio test samples/basic/.rogatio.json --urls "https://example.com/api/users" --resource-type xmlhttprequest --method GET --json
@@ -160,6 +160,30 @@ rogatio verify samples/basic/.rogatio.json
 
 ### 7b. Live browser validation
 
+#### Automated Selenium journey (repo root)
+
+From the monorepo root, after `pnpm install` and a successful `pnpm build` (or let
+`test:browser` build as needed):
+
+```sh
+# DNR rules live: redirect, query, header-set, header-remove
+# (rewrites sample origins to http://127.0.0.1:8080, seeds host grants,
+# asserts network effects + match-debug events)
+pnpm test:browser -- test/browser/sample-basic-live.test.ts
+
+# Body rules (response-body + request-body): needs LIVE_E2E=1,
+# passwordless sudo for `rogatio runtime install` (CA trust on Linux),
+# and a completed F23 PAC/proxy path for network rewrite.
+# Without that, body cases skip; offline dry-run + runtime activation
+# still covered in the default path.
+LIVE_E2E=1 pnpm test:browser -- test/browser/sample-basic-live.test.ts -t "body"
+```
+
+Without `LIVE_E2E`, body rules still dry-run and move to `active` after **Start
+runtime** in the management UI; live network rewrite is not asserted.
+
+#### Manual checks in Chrome
+
 Open DevTools (**F12**) on the tab you test in and keep the **Network** panel open. For
 redirect, query, and header checks on an unpacked load with **Match logging** on, also
 watch the **Console** for one bounded `[rogatio]` line when Chrome reports a match (intended
@@ -168,8 +192,9 @@ action, not proof of success). Body-rule matches are not logged.
 **Redirect** (`rule-redirect`) — no setup needed:
 
 1. In Chrome, visit `https://example.com/old/anything`.
-2. The address bar changes to `https://example.com/new/anything`. The rule redirected the
-   request before it left the browser.
+2. The address bar changes to `https://example.com/new/`. The rule redirected the
+   request before it left the browser (absolute destination; path after `/old/`
+   is not preserved unless the rule uses regex capture substitution).
 
 **Query** (`rule-query`) — no setup needed:
 
@@ -233,7 +258,8 @@ Edit `samples/basic/.rogatio.json` (or use `rogatio edit`) so the group `origins
 
 - `"origins": ["https://example.com"]` → `"origins": ["http://localhost:8080"]`
 - `"^https://example\\.com/old/"` → `"^http://localhost:8080/old/"`
-- and so on for `/page\?`, `/api/`, `/data\.json`, `/submit`.
+- `"^https://example\\.com/page"` → `"^http://localhost:8080/page"`
+- and so on for `/api/`, `/data\.json`, `/submit`.
 
 Re-import the modified file (or **Update** the project in the extension), re-grant
 `http://localhost:8080/*`, and re-activate the group. Then:

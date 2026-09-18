@@ -20,7 +20,7 @@ export interface DnrRedirectRule {
   condition: {
     regexFilter: string;
     resourceTypes: readonly string[];
-    initiatorDomains: string[];
+    requestDomains?: string[];
   };
 }
 
@@ -29,12 +29,12 @@ export interface DnrQueryRule {
   priority: number;
   action: {
     type: "redirect";
-    redirect: { transform: { query: DnrQueryTransform } };
+    redirect: { transform: { queryTransform: DnrQueryTransform } };
   };
   condition: {
     regexFilter: string;
     resourceTypes: readonly string[];
-    initiatorDomains: string[];
+    requestDomains?: string[];
   };
 }
 
@@ -51,9 +51,29 @@ function hostnamesFromOrigins(origins: readonly string[]): string[] {
     const colon = value.indexOf(":");
     if (colon !== -1) value = value.slice(0, colon);
     if (value.startsWith("*.")) value = value.slice(2);
+    // Chrome DNR requestDomains rejects bare IPv4/IPv6 literals in practice for
+    // dynamic rules; origin scoping stays in regexFilter (which includes host:port).
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value) || value.includes(":")) {
+      continue;
+    }
     if (value.length > 0) hosts.push(value);
   }
   return hosts;
+}
+
+function redirectQueryCondition(
+  operation: RedirectOperation | QueryOperation,
+): {
+  regexFilter: string;
+  resourceTypes: readonly string[];
+  requestDomains?: string[];
+} {
+  const requestDomains = hostnamesFromOrigins(operation.matcher.origins);
+  return {
+    regexFilter: operation.matcher.urlRegex.source,
+    resourceTypes: operation.matcher.resourceTypes,
+    ...(requestDomains.length > 0 ? { requestDomains } : {}),
+  };
 }
 
 export function translateRedirectToDnr(
@@ -67,11 +87,7 @@ export function translateRedirectToDnr(
       type: "redirect",
       redirect: { url: operation.redirect.destination },
     },
-    condition: {
-      regexFilter: operation.matcher.urlRegex.source,
-      resourceTypes: operation.matcher.resourceTypes,
-      initiatorDomains: hostnamesFromOrigins(operation.matcher.origins),
-    },
+    condition: redirectQueryCondition(operation),
   };
 }
 
@@ -86,15 +102,11 @@ export function translateQueryToDnr(
       type: "redirect",
       redirect: {
         transform: {
-          query: queryActionToDNR(operation.action),
+          queryTransform: queryActionToDNR(operation.action),
         },
       },
     },
-    condition: {
-      regexFilter: operation.matcher.urlRegex.source,
-      resourceTypes: operation.matcher.resourceTypes,
-      initiatorDomains: hostnamesFromOrigins(operation.matcher.origins),
-    },
+    condition: redirectQueryCondition(operation),
   };
 }
 
@@ -230,25 +242,53 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
 
       const dnr = api.declarativeNetRequest;
       if (dnr === undefined) return { ok: false, diagnostics: [] };
-      try {
-        await dnr.updateDynamicRules({
-          removeRuleIds,
-          addRules,
-        });
-      } catch {
-        return { ok: false, diagnostics: [] };
+
+      // Drop previously tracked redirect/query ids first.
+      if (removeRuleIds.length > 0) {
+        try {
+          await dnr.updateDynamicRules({ removeRuleIds, addRules: [] });
+        } catch {
+          // Continue; per-rule adds below still attempt a clean install.
+        }
+      }
+      tracked.clear();
+
+      // Install each rule independently so one invalid transform cannot block
+      // the rest (Chrome rejects the whole updateDynamicRules batch on error).
+      let anyFailed = false;
+      let anySucceeded = false;
+      for (const entry of added) {
+        const rule = addRules.find(
+          (candidate) => candidate.id === entry.ruleId,
+        );
+        if (rule === undefined) continue;
+        try {
+          await dnr.updateDynamicRules({
+            removeRuleIds: [],
+            addRules: [rule],
+          });
+          tracked.set(entry.ruleId, entry.operation);
+          anySucceeded = true;
+        } catch (error) {
+          anyFailed = true;
+          console.log(
+            "[rogatio] DNR install failed:",
+            error instanceof Error ? error.message : String(error),
+            JSON.stringify(rule),
+          );
+        }
       }
 
-      tracked.clear();
-      for (const entry of added) tracked.set(entry.ruleId, entry.operation);
+      // Preserve prior index when every add fails. Empty install([]) still
+      // clears the index deliberately.
+      if (anySucceeded || removeRuleIds.length > 0 || operations.length === 0) {
+        await writeWholesaleMatchIndex({});
+      }
 
-      // Rules are already installed; a failed index write only leaves a stale
-      // index, which resolves as an unknown-id no-op (ADR 0003).
-      await writeWholesaleMatchIndex({});
-
-      return { ok: true };
+      return anyFailed && tracked.size === 0 && operations.length > 0
+        ? { ok: false, diagnostics: [] }
+        : { ok: true };
     },
-
     async syncHeaderMatchIndex(
       headerEntries: ReadonlyArray<{
         readonly ruleId: number;
