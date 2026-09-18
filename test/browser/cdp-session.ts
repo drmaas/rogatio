@@ -53,17 +53,23 @@ export async function openPageCdpSession(
     webSocketDebuggerUrl?: string;
   }>;
   const currentUrl = await driver.getCurrentUrl();
+  const pageTargets = targets.filter(
+    (t) => t.type === "page" && typeof t.webSocketDebuggerUrl === "string",
+  );
   const pageTarget =
-    targets.find(
+    pageTargets.find((t) => t.url === currentUrl) ??
+    pageTargets.find(
       (t) =>
-        t.type === "page" &&
-        typeof t.webSocketDebuggerUrl === "string" &&
-        (t.url === currentUrl ||
-          (t.url?.startsWith("chrome-extension://") ?? false)),
+        typeof t.url === "string" &&
+        currentUrl.startsWith("chrome-extension://") &&
+        t.url.startsWith("chrome-extension://"),
     ) ??
-    targets.find(
-      (t) => t.type === "page" && typeof t.webSocketDebuggerUrl === "string",
-    );
+    pageTargets.find(
+      (t) =>
+        typeof t.url === "string" &&
+        (currentUrl.startsWith(t.url) || t.url.startsWith(currentUrl)),
+    ) ??
+    pageTargets[0];
   if (!pageTarget?.webSocketDebuggerUrl) {
     throw new Error("No page CDP target with webSocketDebuggerUrl");
   }

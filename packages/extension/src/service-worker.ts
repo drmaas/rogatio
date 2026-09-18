@@ -205,14 +205,7 @@ function operationStatuses(
       }
       return { ...status };
     }
-    // redirect and query operations are installable; pass through status
-    if (status.status === "active" || status.status === "error") {
-      return {
-        groupId: status.groupId,
-        ruleId: status.ruleId,
-        status: "active",
-      };
-    }
+    // redirect and query: trust computeRuleStatuses (active only when installed).
     return { ...status };
   });
 }
@@ -358,6 +351,41 @@ export function createExtensionApplication(
     const matchIndexInstaller = installerWithMatchIndex(options.installer);
     if (matchIndexInstaller !== undefined) {
       await matchIndexInstaller.syncHeaderMatchIndex(headerIndexEntries);
+    }
+    // Keep redirect/query DNR in sync on every state projection (not only on
+    // set-group-enabled), so import+enable and permission seed races still land.
+    try {
+      const desiredDnrOps = dnrManagedOps(
+        compiled.operations,
+        project.enabledGroupIds,
+        granted,
+      );
+      const currentlyInstalled = await options.installer.current();
+      const currentRedirectQuery = currentlyInstalled.filter(
+        (operation) =>
+          operation.kind === "redirect" || operation.kind === "query",
+      );
+      const desiredIds = new Set(
+        desiredDnrOps.map((operation) => operation.ruleId),
+      );
+      const currentIds = new Set(
+        currentRedirectQuery.map((operation) => operation.ruleId),
+      );
+      const sameSet =
+        desiredIds.size === currentIds.size &&
+        [...desiredIds].every((id) => currentIds.has(id));
+      if (!sameSet) {
+        await options.installer.install(desiredDnrOps);
+      }
+      const installedAfter = await options.installer.current();
+      installedRuleIds = [
+        ...new Set([
+          ...installedRuleIds,
+          ...installedAfter.map((operation) => operation.ruleId),
+        ]),
+      ];
+    } catch {
+      // Install failure surfaces as rule-not-installed / error statuses below.
     }
     const statuses = operationStatuses(
       compiled.operations,

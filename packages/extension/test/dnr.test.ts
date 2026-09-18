@@ -61,7 +61,7 @@ describe("F9 DNR translation", () => {
       condition: {
         regexFilter: "^https://example\\.com/(.*)$",
         resourceTypes: ["main_frame"],
-        initiatorDomains: ["example.com"],
+        requestDomains: ["example.com"],
       },
     });
   });
@@ -104,14 +104,14 @@ describe("F9 DNR translation", () => {
         type: "redirect",
         redirect: {
           transform: {
-            query: queryActionToDNR(queryOp.action),
+            queryTransform: queryActionToDNR(queryOp.action),
           },
         },
       },
       condition: {
         regexFilter: "^https://example\\.com/",
         resourceTypes: ["main_frame"],
-        initiatorDomains: ["example.com"],
+        requestDomains: ["example.com"],
       },
     });
   });
@@ -131,14 +131,14 @@ describe("F9 DNR translation", () => {
         type: "redirect",
         redirect: {
           transform: {
-            query: { removeParams: ["a"] },
+            queryTransform: { removeParams: ["a"] },
           },
         },
       },
       condition: {
         regexFilter: "^https://example\\.com/",
         resourceTypes: ["main_frame"],
-        initiatorDomains: ["example.com"],
+        requestDomains: ["example.com"],
       },
     });
   });
@@ -157,14 +157,18 @@ describe("F9 DNR translation", () => {
     const installer = createDnrInstaller(api);
 
     expect(await installer.install([queryOp])).toEqual({ ok: true });
-    const payload = updateDynamicRules.mock.calls[0][0] as {
+    const addCall = updateDynamicRules.mock.calls.find(
+      (call) =>
+        Array.isArray((call[0] as { addRules?: unknown[] }).addRules) &&
+        ((call[0] as { addRules: unknown[] }).addRules?.length ?? 0) > 0,
+    )?.[0] as {
       addRules: Array<{
-        action: { redirect: { transform: { query: unknown } } };
+        action: { redirect: { transform: { queryTransform: unknown } } };
       }>;
     };
-    expect(payload.addRules[0]?.action.redirect.transform.query).toEqual(
-      queryActionToDNR(queryOp.action),
-    );
+    expect(
+      addCall.addRules[0]?.action.redirect.transform.queryTransform,
+    ).toEqual(queryActionToDNR(queryOp.action));
   });
 
   it("does nothing when the declarativeNetRequest API is unavailable", async () => {

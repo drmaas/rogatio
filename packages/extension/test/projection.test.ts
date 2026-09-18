@@ -107,9 +107,9 @@ describe("F7 matcher projection", () => {
         type: "redirect",
         redirect: {
           transform: {
-            query: {
+            queryTransform: {
               addOrReplaceParams: [
-                { name: "a", value: "1", replaceOnly: false },
+                { key: "a", value: "1", replaceOnly: false },
               ],
             },
           },
@@ -130,8 +130,10 @@ describe("F7 matcher projection", () => {
       },
     };
     const result = projectMatchers([mixed]);
-    expect(result[0]?.dnrRule?.action.redirect.transform?.query).toEqual({
-      addOrReplaceParams: [{ name: "a", value: "1", replaceOnly: false }],
+    expect(
+      result[0]?.dnrRule?.action.redirect.transform?.queryTransform,
+    ).toEqual({
+      addOrReplaceParams: [{ key: "a", value: "1", replaceOnly: false }],
       removeParams: ["b"],
     });
   });

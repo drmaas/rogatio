@@ -109,8 +109,9 @@ export function testStandalone(
   fn: (register: {
     registerDriver: (driver: WebDriver, closer?: () => Promise<void>) => void;
   }) => Promise<void>,
+  timeoutMs = 120_000,
 ): void {
-  it(name, async () => {
+  it(name, { timeout: timeoutMs }, async () => {
     await fn({
       registerDriver: (driver, closer) => {
         standaloneDriver = driver;

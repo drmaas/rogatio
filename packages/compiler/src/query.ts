@@ -1,7 +1,8 @@
 import type { RogatioQueryAction } from "@rogatio/schema";
 
 export interface DnrQueryParam {
-  readonly name: string;
+  /** Chrome Declarative Net Request QueryKeyValue.key */
+  readonly key: string;
   readonly value: string;
   readonly replaceOnly: false;
 }
@@ -30,7 +31,7 @@ export function queryActionToDNR(
     }
     if (typeof param.value !== "string") continue;
     addOrReplaceParams.push({
-      name: param.name,
+      key: param.name,
       value: param.value,
       replaceOnly: false,
     });
@@ -56,7 +57,7 @@ export function applyQueryTransform(
   const removeNames = new Set(removeParams);
   const setByName = new Map<string, string>();
   for (const param of addOrReplaceParams) {
-    setByName.set(param.name, param.value);
+    setByName.set(param.key, param.value);
   }
 
   const existing: Array<[string, string]> = [];

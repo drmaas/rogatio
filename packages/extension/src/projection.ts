@@ -29,7 +29,7 @@ export interface DnrRule {
     readonly redirect: {
       readonly destination?: string;
       readonly transform?: {
-        readonly query: DnrQueryTransform;
+        readonly queryTransform: DnrQueryTransform;
       };
     };
   };
@@ -229,7 +229,7 @@ export function projectMatchers(
           type: "redirect",
           redirect: {
             transform: {
-              query: queryActionToDNR(operation.action),
+              queryTransform: queryActionToDNR(operation.action),
             },
           },
         },

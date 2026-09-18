@@ -13,7 +13,7 @@ describe("@rogatio/compiler query transform", () => {
 
   it("translates set params into DNR addOrReplaceParams with replaceOnly false", () => {
     expect(queryActionToDNR(setAction)).toEqual({
-      addOrReplaceParams: [{ name: "a", value: "1", replaceOnly: false }],
+      addOrReplaceParams: [{ key: "a", value: "1", replaceOnly: false }],
     });
   });
 
@@ -36,7 +36,7 @@ describe("@rogatio/compiler query transform", () => {
         ],
       }),
     ).toEqual({
-      addOrReplaceParams: [{ name: "a", value: "1", replaceOnly: false }],
+      addOrReplaceParams: [{ key: "a", value: "1", replaceOnly: false }],
       removeParams: ["b"],
     });
   });
