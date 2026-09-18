@@ -41,12 +41,11 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 - `docs/architecture.md` — package boundaries, per-package decisions, and rejected alternatives.
 - `README.md` and `packages/*/README.md` — user-facing overview and usage.
 - `CONTRIBUTING.md` — setup, branching, coding standards, commit/issue policy, and validation workflow.
-- Workflow skills (`sdd`, `doit`, `rpi`) and their `models.md` role routing live in [utility-skills](https://github.com/drmaas/utility-skills) (`~/.agents/skills/{sdd,doit,rpi}`), not in this repo.
 
 ## Durable Documentation
 
 - The code is the source of truth for what the system does. Decision records (research, specs, plans, workflow logs) describe *why* a feature is the way it is, *what was rejected*, and *what was approved* — not what the system currently does.
-- **One active tree for every workflow** (`sdd`, `rpi`, `doit`): `docs/decisions/<feature>/` with lowercase filenames (`research.md`, `spec.md`, `plan.md`, `workflow.md`, `checklist.md`, `refactor.md` as applicable). There is no separate `docs/rpi/` tree.
+- **One active tree for every feature workflow:** `docs/decisions/<feature>/` with lowercase filenames (`research.md`, `spec.md`, `plan.md`, `workflow.md`, `checklist.md`, `refactor.md` as applicable).
 - **On release or supersession**, move durable files (not copy, not edit) and remove the feature folder:
   - `research.md` → `docs/research/<feature>.md`
   - `spec.md` → `docs/specs/<feature>.md`
@@ -57,21 +56,6 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 - Frozen files are read-only; if a record goes stale, write a new one with a `> Superseded by:` footer.
 - Only `docs/architecture.md`, `README.md`, `packages/*/README.md`, and `packages/docs-site/` describe current behavior and must be kept in sync with the code. Decision records are append-only and do not require synchronization on behavior changes.
 - Raw brainstorm output is ephemeral; do not create or retain brainstorm documents. Prompt before deleting existing brainstorm files.
-
-## Agent Model Tiers
-
-Canonical role maps and selection rules: `~/.agents/skills/{sdd,doit,rpi}/models.md` (from [utility-skills](https://github.com/drmaas/utility-skills)). Do not fork model tables into this repo.
-
-Every workflow (`sdd`, `doit`, `rpi`) picks one provider tier at start and uses it for every delegated role:
-
-- **cursor** — preferred in Cursor sessions; primary → alt → cross-pool when a usage pool is maxed.
-- **free** — OpenCode Zen + OpenRouter free (aliases: `opencode-zen`, `openrouter`). Preferred outside Cursor.
-- **normal** — paid OpenCode Go chains (alias: `opencode-go`).
-- **freebuff** — freebuff harness when requested.
-
-If the user did not specify a tier, ask before delegating. Map each workflow stage to a shared role (`reasoning`, `adversarial`, `plan`, `coding`, `verify`, `review`, `docs`), then resolve the model from the installed skill `models.md` against the harness allowlist.
-
-Verify availability once at workflow start (Cursor Task allowlist, or `opencode models` / harness list). Record tier, per-role model, fallbacks, and any exhausted Cursor pools. A model report is not verification evidence. Under a single-model session, keep role passes distinct and use a fresh-context self-review.
 
 ## Repository Rules
 
@@ -115,10 +99,10 @@ Always prompt before deleting files or directories.
 
 ## Worktree Convention
 
-All implementation work uses a dedicated git worktree created with `git worktree add`, never the `opencode-worktree` plugin.
+All implementation work uses a dedicated git worktree created with `git worktree add`. Do not edit in the main checkout.
 
-- Worktrees always live at `/home/drmaas/.local/share/opencode/worktree/<repo name>/<branch name>`.
-- Create a worktree with `git worktree add -b <branch> /home/drmaas/.local/share/opencode/worktree/<repo name>/<branch name> <baseBranch>`.
-- After creating, run the project setup in the new worktree (e.g. `pnpm install`) and confirm the shell is operating there.
-- Tear down with `git worktree remove /home/drmaas/.local/share/opencode/worktree/<repo name>/<branch name>` (auto-commit your changes first).
+- Place worktrees outside the main clone (stable local parent directory for this machine).
+- Create with `git worktree add -b <branch> <path> <baseBranch>`.
+- After creating, run project setup in the new worktree (e.g. `pnpm install`) and confirm the shell is operating there.
+- Tear down with `git worktree remove <path>` (commit changes first).
 - Exception: the pre-existing manual worktree `~/Projects/github/drmaas/rogatio-f7` (branch `feature/f7-extension-shell`) remains in place.
