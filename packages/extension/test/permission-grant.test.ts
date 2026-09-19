@@ -195,10 +195,11 @@ describe("grant moves installed rules and statuses with it", () => {
     });
   });
 
-  it("does not install for a non-active project", async () => {
-    const { app, install } = grantHarness(false);
+  it("installs when granting access on the active project", async () => {
+    const { app, install, setGranted } = grantHarness(false);
     await prepare(app);
 
+    setGranted(true);
     const granted = await app.handle({
       version: 1,
       command: "grant-permissions",
@@ -207,7 +208,7 @@ describe("grant moves installed rules and statuses with it", () => {
       granted: true,
     });
     expect(granted).toMatchObject({ ok: true });
-    // The granted project is the active project here, so it installs once.
+    // Grant reconciles through state() → projectState (full desired set).
     expect(install).toHaveBeenCalledTimes(1);
   });
 

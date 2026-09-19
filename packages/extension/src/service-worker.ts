@@ -659,17 +659,7 @@ export function createExtensionApplication(
 
         nativePhase = "started";
         nativeRuntimeError = null;
-        const declared = declaredPermissionOrigins({
-          operations: compileResult.operations,
-        });
-        const granted = await grantedOriginsFor(declared);
-        await options.installer.install(
-          dnrManagedOps(
-            compileResult.operations,
-            project.enabledGroupIds,
-            granted,
-          ),
-        );
+        // DNR reconcile runs inside state() → projectState (full desired set).
         return state();
       }
       if (request.command === "stop-native-runtime") {
@@ -692,33 +682,7 @@ export function createExtensionApplication(
         });
         nativePhase = "stopped";
         nativeRuntimeError = null;
-        // Reinstall browser-side redirect/query rules after stopping the
-        // native runtime.
-        try {
-          const stopCurrent = await repository.state();
-          if (stopCurrent.ok && stopCurrent.value.activeProjectId) {
-            const stopProject =
-              stopCurrent.value.projects[stopCurrent.value.activeProjectId];
-            if (stopProject) {
-              const stopCompiled = compileProject(stopProject.data);
-              if (stopCompiled.ok) {
-                const stopDeclared = declaredPermissionOrigins({
-                  operations: stopCompiled.operations,
-                });
-                const stopGranted = await grantedOriginsFor(stopDeclared);
-                await options.installer.install(
-                  dnrManagedOps(
-                    stopCompiled.operations,
-                    stopProject.enabledGroupIds,
-                    stopGranted,
-                  ),
-                );
-              }
-            }
-          }
-        } catch {
-          // Best-effort cleanup: the runtime session is already stopped.
-        }
+        // DNR reconcile runs inside state() → projectState (full desired set).
         return state();
       }
       const result = await options.nativeRuntime.status();
@@ -801,26 +765,8 @@ export function createExtensionApplication(
       if (!changed) return failure("extension.permission-failed");
       const currentGranted = await grantedOriginsFor(declared);
       await syncStoredGrants(projectId, declared, currentGranted);
-      // A permission change must move the installed rules with it: rules that
-      // become permitted are installed immediately (covering the common
-      // activate-then-grant sequence), and revoked origins stop being served.
-      const postGrantState = await repository.state();
-      if (
-        postGrantState.ok &&
-        postGrantState.value.activeProjectId === projectId
-      ) {
-        const activeProject = postGrantState.value.projects[projectId];
-        const postGrantCompiled = compileProject(activeProject?.data);
-        if (postGrantCompiled.ok) {
-          await options.installer.install(
-            dnrManagedOps(
-              postGrantCompiled.operations,
-              activeProject.enabledGroupIds,
-              currentGranted,
-            ),
-          );
-        }
-      }
+      // Permission changes move installed rules via state() → projectState
+      // (full desired set). That covers activate-then-grant and revoke.
       await state();
       return {
         ok: true,
