@@ -239,7 +239,7 @@ describe("F9 DNR translation", () => {
     expect(await installer.current()).toEqual([]);
     expect(await installer.install([redirectOp])).toEqual({
       ok: false,
-      diagnostics: [],
+      diagnostics: [expect.objectContaining({ code: "core.install-failed" })],
     });
   });
 });
@@ -357,7 +357,12 @@ describe("P1 DNR remove via Chrome ∩ Rogatio ids", () => {
     const installer = createDnrInstaller(api);
     expect(await installer.install([redirectOp])).toEqual({
       ok: false,
-      diagnostics: [],
+      diagnostics: [
+        expect.objectContaining({
+          code: "core.install-failed",
+          params: { reason: "DNR unavailable" },
+        }),
+      ],
     });
     expect(updateDynamicRules).not.toHaveBeenCalled();
   });
@@ -375,7 +380,7 @@ describe("P1 DNR remove via Chrome ∩ Rogatio ids", () => {
     const installer = createDnrInstaller(api);
     expect(await installer.install([redirectOp])).toEqual({
       ok: false,
-      diagnostics: [],
+      diagnostics: [expect.objectContaining({ code: "core.install-failed" })],
     });
     expect(updateDynamicRules).not.toHaveBeenCalled();
   });
@@ -708,6 +713,94 @@ describe("P3a headers share unified reconciler authority", () => {
     expect(harness.chromeIds()).toEqual([HEADER_BAND_ID]);
     expect((await installer.current()).map((op) => op.kind)).toEqual([
       "header",
+    ]);
+  });
+});
+
+describe("P3b DNR install diagnostics", () => {
+  it("returns core.install-failed with Chrome reason on total redirect fail", async () => {
+    const harness = chromeHeldInstaller([]);
+    harness.updateDynamicRules.mockImplementation(async () => {
+      throw new Error("Rule with id 1: invalid regexFilter");
+    });
+    const installer = createDnrInstaller(harness.api);
+    const result = await installer.install([redirectOp]);
+    expect(result).toMatchObject({
+      ok: false,
+      diagnostics: [
+        {
+          code: "core.install-failed",
+          params: { reason: "Rule with id 1: invalid regexFilter" },
+        },
+      ],
+    });
+    expect(installer.takeInstallErrors()).toEqual([
+      {
+        ruleId: redirectOp.ruleId,
+        message: "Rule with id 1: invalid regexFilter",
+      },
+    ]);
+  });
+
+  it("returns core.install-failed with Chrome reason on total header fail", async () => {
+    const harness = chromeHeldInstaller([]);
+    harness.updateDynamicRules.mockImplementation(async () => {
+      throw new Error("Rule with id 2000001 cannot have an empty list");
+    });
+    const installer = createDnrInstaller(harness.api);
+    const result = await installer.install([headerOp]);
+    expect(result).toMatchObject({
+      ok: false,
+      diagnostics: [
+        {
+          code: "core.install-failed",
+          params: {
+            reason: "Rule with id 2000001 cannot have an empty list",
+          },
+        },
+      ],
+    });
+    expect(installer.takeInstallErrors()).toEqual([
+      {
+        ruleId: headerOp.ruleId,
+        message: "Rule with id 2000001 cannot have an empty list",
+      },
+    ]);
+  });
+
+  it("keeps ok: true on partial success and records failed sibling reason", async () => {
+    const harness = chromeHeldInstaller([]);
+    let adds = 0;
+    harness.updateDynamicRules.mockImplementation(
+      async (payload: {
+        removeRuleIds: number[];
+        addRules: Array<{ id: number }>;
+      }) => {
+        if ((payload.addRules?.length ?? 0) > 0) {
+          adds += 1;
+          if (adds > 1) {
+            throw new Error("Chrome rejected second rule");
+          }
+        }
+        const remove = new Set(payload.removeRuleIds);
+        let chromeIds = harness.chromeIds().filter((id) => !remove.has(id));
+        for (const rule of payload.addRules) {
+          chromeIds = [...chromeIds, rule.id];
+        }
+        harness.setChromeIds(chromeIds);
+      },
+    );
+    const installer = createDnrInstaller(harness.api);
+    const result = await installer.install([redirectOp, queryOp]);
+    expect(result).toEqual({ ok: true });
+    expect(installer.takeInstallErrors()).toEqual([
+      {
+        ruleId: queryOp.ruleId,
+        message: "Chrome rejected second rule",
+      },
+    ]);
+    expect((await installer.current()).map((op) => op.ruleId)).toEqual([
+      redirectOp.ruleId,
     ]);
   });
 });

@@ -361,7 +361,7 @@ describe("grant moves installed rules and statuses with it", () => {
     });
   });
 
-  it("marks failed header installs as error (Chrome reason overlay is P3b)", async () => {
+  it("marks failed header installs as error with extension.dnr-error reason", async () => {
     const headerProject = {
       version: 1,
       name: "Header error project",
@@ -428,12 +428,26 @@ describe("grant moves installed rules and statuses with it", () => {
     expect(state).toMatchObject({
       ok: true,
       value: {
-        ruleStatuses: [{ ruleId: "rule-header-fail", status: "error" }],
+        ruleStatuses: [
+          {
+            ruleId: "rule-header-fail",
+            status: "error",
+            diagnostics: [
+              {
+                code: "extension.dnr-error",
+                params: {
+                  ruleId: "rule-header-fail",
+                  reason: "Rule with id 2000001 cannot have an empty list",
+                },
+              },
+            ],
+          },
+        ],
       },
     });
   });
 
-  it("marks non-Error header install rejections as error (Chrome reason overlay is P3b)", async () => {
+  it("marks non-Error header install rejections as error with extension.dnr-error reason", async () => {
     const headerProject = {
       version: 1,
       name: "Header non-error project",
@@ -500,8 +514,137 @@ describe("grant moves installed rules and statuses with it", () => {
     expect(state).toMatchObject({
       ok: true,
       value: {
-        ruleStatuses: [{ ruleId: "rule-header-fail", status: "error" }],
+        ruleStatuses: [
+          {
+            ruleId: "rule-header-fail",
+            status: "error",
+            diagnostics: [
+              {
+                code: "extension.dnr-error",
+                params: {
+                  ruleId: "rule-header-fail",
+                  reason: "not-an-error",
+                },
+              },
+            ],
+          },
+        ],
       },
     });
+  });
+
+  it("overlays extension.dnr-error on failed redirect sibling after partial success", async () => {
+    const partialProject = {
+      version: 1,
+      name: "Partial DNR project",
+      groups: [
+        {
+          id: "group-a",
+          name: "Group A",
+          origins: ["https://example.com"],
+          rules: [
+            {
+              id: "rule-ok",
+              name: "Redirect ok",
+              urlRegex: "^https://example\\.com/(.*)$",
+              origins: [],
+              resourceTypes: ["main_frame"],
+              priority: 100,
+              type: "redirect",
+              redirect: { destination: "https://other.com/\\1" },
+            },
+            {
+              id: "rule-fail",
+              name: "Query fail",
+              urlRegex: "^https://example\\.com/(.*)$",
+              origins: [],
+              resourceTypes: ["main_frame"],
+              priority: 100,
+              type: "query",
+              action: {
+                type: "query",
+                params: [{ name: "marker", value: "1" }],
+              },
+            },
+          ],
+        },
+      ],
+    } as const;
+    const harness = chromeHeldInstaller([]);
+    let adds = 0;
+    harness.updateDynamicRules.mockImplementation(
+      async (payload: {
+        removeRuleIds: number[];
+        addRules: Array<{ id: number }>;
+      }) => {
+        if ((payload.addRules?.length ?? 0) > 0) {
+          adds += 1;
+          if (adds > 1) {
+            throw new Error("Chrome rejected query rule");
+          }
+        }
+        const remove = new Set(payload.removeRuleIds);
+        let chromeIds = harness.chromeIds().filter((id) => !remove.has(id));
+        for (const rule of payload.addRules) {
+          chromeIds = [...chromeIds, rule.id];
+        }
+        harness.setChromeIds(chromeIds);
+      },
+    );
+    let envelope: unknown;
+    const app = createExtensionApplication({
+      storage: {
+        read: async () => envelope,
+        compareAndSwap: async (_expected: unknown, next: unknown) => {
+          envelope = next;
+          return true;
+        },
+      },
+      permissions: {
+        contains: async () => true,
+        request: vi.fn(async () => true),
+        remove: async () => true,
+      },
+      installer: createDnrInstaller(harness.api),
+      generateId: () => "project-partial",
+      now: () => 1,
+    });
+    await app.handle({
+      version: 1,
+      command: "create-project",
+      data: partialProject,
+    });
+    await app.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "project-partial",
+      groupId: "group-a",
+      enabled: true,
+    });
+
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state.ok).toBe(true);
+    if (!state.ok) return;
+    const statuses = (
+      state.value as { ruleStatuses: Record<string, unknown>[] }
+    ).ruleStatuses;
+    expect(statuses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ ruleId: "rule-ok", status: "active" }),
+        expect.objectContaining({
+          ruleId: "rule-fail",
+          status: "error",
+          diagnostics: [
+            expect.objectContaining({
+              code: "extension.dnr-error",
+              params: {
+                ruleId: "rule-fail",
+                reason: "Chrome rejected query rule",
+              },
+            }),
+          ],
+        }),
+      ]),
+    );
   });
 });

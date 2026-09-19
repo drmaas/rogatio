@@ -239,7 +239,12 @@ describe("match index", () => {
 
     expect(await installer.install([redirectOp])).toEqual({
       ok: false,
-      diagnostics: [],
+      diagnostics: [
+        expect.objectContaining({
+          code: "core.install-failed",
+          params: { reason: "dnr-failed" },
+        }),
+      ],
     });
     expect(store[MATCH_LOGGING_INDEX_KEY]).toEqual({
       "42": {

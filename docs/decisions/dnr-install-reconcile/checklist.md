@@ -80,15 +80,15 @@ Track progress in this file. Stay in `packages/extension` + tests. Do not change
 **AC:** AC4, AC5  
 **Prove:** unit — redirect/query/header failures emit `extension.dnr-error` with Chrome reason; attention helper no longer primary-pushes re-activate/restart-runtime for this class; no unproven reload string.
 
-- [ ] Total fail: `install` returns `{ ok: false, diagnostics }` with Chrome reason in params when available (ADR 0010)
-- [ ] Partial success: keep `{ ok: true }`; do not flip `ok: false`
-- [ ] `projectState` reads install reasons; overlay `extension.dnr-error` + `params.reason` for redirect/query/header
-- [ ] Attention: drop primary “Re-activate the group, or restart the native runtime” for this error class when reconcile fixes it
-- [ ] Do **not** bake “reload the extension” unless a test proves it
-- [ ] Unit: total-fail diagnostics for redirect/query and header
-- [ ] Unit: partial success `ok: true` + overlay reason on the failed sibling
-- [ ] Unit: pure attention helper (extract if needed; do not unit the page-closed `attentionFromStatuses`) — must **not** return “Re-activate the group, or restart the native runtime” as primary fix; no “reload the extension”
-- [ ] Phase verify: extension unit suite green
+- [x] Total fail: `install` returns `{ ok: false, diagnostics }` with Chrome reason in params when available (ADR 0010)
+- [x] Partial success: keep `{ ok: true }`; do not flip `ok: false`
+- [x] `projectState` reads install reasons; overlay `extension.dnr-error` + `params.reason` for redirect/query/header
+- [x] Attention: drop primary “Re-activate the group, or restart the native runtime” for this error class when reconcile fixes it
+- [x] Do **not** bake “reload the extension” unless a test proves it
+- [x] Unit: total-fail diagnostics for redirect/query and header
+- [x] Unit: partial success `ok: true` + overlay reason on the failed sibling
+- [x] Unit: pure attention helper (extract if needed; do not unit the page-closed `attentionFromStatuses`) — must **not** return “Re-activate the group, or restart the native runtime” as primary fix; no “reload the extension”
+- [x] Phase verify: extension unit suite green
 
 ---
 

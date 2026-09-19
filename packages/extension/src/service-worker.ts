@@ -13,7 +13,7 @@ import {
   type ExtensionDiagnostic,
   extensionDiagnostic,
 } from "./diagnostics.js";
-import type { DnrInstallerWithMatchIndex } from "./dnr.js";
+import type { DnrInstallError, DnrInstallerWithMatchIndex } from "./dnr.js";
 
 import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
@@ -38,6 +38,15 @@ function installerWithMatchIndex(
   return typeof candidate.hydrateInstalled === "function"
     ? candidate
     : undefined;
+}
+
+function takeDnrInstallErrors(
+  installer: RuleInstallerAdapter,
+): readonly DnrInstallError[] {
+  const candidate = installer as DnrInstallerWithMatchIndex;
+  return typeof candidate.takeInstallErrors === "function"
+    ? candidate.takeInstallErrors()
+    : [];
 }
 
 export interface ExtensionApplicationOptions {
@@ -69,11 +78,6 @@ export interface ExtensionApplicationOptions {
 type StateProjection = {
   readonly statuses: readonly Record<string, unknown>[];
   readonly badge: { readonly text: string; readonly attention: boolean };
-};
-
-type HeaderInstallError = {
-  readonly ruleId: string;
-  readonly message: string;
 };
 
 type Success = { readonly ok: true; readonly value?: unknown };
@@ -120,7 +124,7 @@ function operationStatuses(
   enabledGroupIds: readonly string[],
   grantedOrigins: readonly string[],
   nativePhase: NativeRuntimePhase | "unsupported",
-  headerInstallErrors: readonly HeaderInstallError[] = [],
+  dnrInstallErrors: readonly DnrInstallError[] = [],
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -134,16 +138,16 @@ function operationStatuses(
         candidate.ruleId === status.ruleId &&
         candidate.groupId === status.groupId,
     );
-    const headerInstallError = headerInstallErrors.find(
+    const dnrInstallError = dnrInstallErrors.find(
       (error) => error.ruleId === status.ruleId,
     );
-    if (headerInstallError && status.status === "error") {
+    if (dnrInstallError && status.status === "error") {
       return {
         ...status,
         diagnostics: [
           extensionDiagnostic("extension.dnr-error", {
-            ruleId: headerInstallError.ruleId,
-            reason: headerInstallError.message,
+            ruleId: dnrInstallError.ruleId,
+            reason: dnrInstallError.message,
           }),
         ],
       };
@@ -308,6 +312,7 @@ export function createExtensionApplication(
     // Keep redirect/query/header DNR in sync on every state projection (not
     // only on set-group-enabled), so import+enable and permission seed races
     // still land. Body rules never enter this installer path.
+    let dnrInstallErrors: readonly DnrInstallError[] = [];
     try {
       const desiredDnrOps = dnrManagedOps(
         compiled.operations,
@@ -332,6 +337,7 @@ export function createExtensionApplication(
         [...desiredIds].every((id) => currentIds.has(id));
       if (!sameSet) {
         await options.installer.install(desiredDnrOps);
+        dnrInstallErrors = takeDnrInstallErrors(options.installer);
       }
       const installedAfter = await options.installer.current();
       installedRuleIds = [
@@ -342,6 +348,7 @@ export function createExtensionApplication(
       ];
     } catch {
       // Install failure surfaces as rule-not-installed / error statuses below.
+      dnrInstallErrors = takeDnrInstallErrors(options.installer);
     }
     const statuses = operationStatuses(
       compiled.operations,
@@ -349,6 +356,7 @@ export function createExtensionApplication(
       project.enabledGroupIds,
       granted,
       nativePhase,
+      dnrInstallErrors,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),

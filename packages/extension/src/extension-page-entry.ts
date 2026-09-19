@@ -1,4 +1,5 @@
 import { createEditor, type EditorController } from "@rogatio/editor";
+import { attentionFromRuleStatuses } from "./attention.js";
 import { validateProjectDetailed } from "./browser-schema.js";
 import {
   MATCH_LOGGING_ENABLED_KEY,
@@ -290,53 +291,11 @@ function runtimeRecoveryText(): string {
  * sidebar note must describe what is actually blocking — never a canned
  * "grant access" hint when permissions are already granted.
  */
-interface AttentionExplanation {
-  readonly blocking: string;
-  readonly explanation: string;
-  readonly fix: string;
-}
-
-const ATTENTION_PRECEDENCE: readonly string[] = [
-  "error",
-  "needs permission",
-  "needs runtime",
-  "unsupported",
-];
-
-function attentionFromStatuses(): AttentionExplanation | null {
-  if (state.badge?.attention !== true) return null;
-  const statuses = state.ruleStatuses ?? [];
-  for (const blocking of ATTENTION_PRECEDENCE) {
-    if (!statuses.some((status) => status.status === blocking)) continue;
-    if (blocking === "error") {
-      return {
-        blocking:
-          "rules failed to install: re-activate the group or restart the runtime",
-        explanation: "some rules failed to install.",
-        fix: "Re-activate the group, or restart the native runtime.",
-      };
-    }
-    if (blocking === "needs permission") {
-      return {
-        blocking: "needs permission: grant declared access",
-        explanation: "some rules need permission.",
-        fix: "Click 'Grant declared access' after reviewing origins.",
-      };
-    }
-    if (blocking === "needs runtime") {
-      return {
-        blocking: "needs runtime: start the native runtime",
-        explanation: "some rules need the native runtime.",
-        fix: "Click 'Start runtime'.",
-      };
-    }
-    return {
-      blocking: "unsupported rules: no action available",
-      explanation: "some rules are unsupported in this browser.",
-      fix: "",
-    };
-  }
-  return null;
+function attentionFromStatuses() {
+  return attentionFromRuleStatuses({
+    attention: state.badge?.attention === true,
+    statuses: state.ruleStatuses ?? [],
+  });
 }
 
 function countGroups(value: unknown): number {

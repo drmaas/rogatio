@@ -1,4 +1,8 @@
-import type { RuleInstallerAdapter } from "@rogatio/browser-core";
+import {
+  type CoreDiagnostic,
+  coreDiagnostic,
+  type RuleInstallerAdapter,
+} from "@rogatio/browser-core";
 import type {
   HeaderOperation,
   QueryOperation,
@@ -15,6 +19,18 @@ import {
   writeMatchIndex,
 } from "./match-index.js";
 import { projectHeaders } from "./projection.js";
+
+/** Per-rule Chrome/DNR failure from the last `install` attempt (ADR 0010). */
+export type DnrInstallError = {
+  readonly ruleId: string;
+  readonly message: string;
+};
+
+function chromeFailureMessage(error: unknown): string {
+  if (error instanceof Error && error.message.length > 0) return error.message;
+  if (typeof error === "string" && error.length > 0) return error;
+  return "Failed to install DNR rule";
+}
 
 export interface DnrRedirectRule {
   id: number;
@@ -145,10 +161,16 @@ function removeIdsForBand(
 export interface DnrInstallerWithMatchIndex extends RuleInstallerAdapter {
   /** Warm cold tracked from Chrome ∩ index ∩ compiled (ADR 0008). */
   hydrateInstalled(compiled: readonly RogatioOperation[]): Promise<void>;
+  /**
+   * Consume per-rule install failures from the last `install` call.
+   * Used by projectState for `extension.dnr-error` overlays (ADR 0010).
+   */
+  takeInstallErrors(): readonly DnrInstallError[];
 }
 
 export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
   const tracked = new Map<number, RogatioOperation>();
+  let lastInstallErrors: DnrInstallError[] = [];
   let matchIndexWriteTail: Promise<void> = Promise.resolve();
 
   function withMatchIndexWriteLock<T>(operation: () => Promise<T>): Promise<T> {
@@ -270,9 +292,18 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
       }
     },
 
+    takeInstallErrors(): readonly DnrInstallError[] {
+      const errors = lastInstallErrors;
+      lastInstallErrors = [];
+      return errors;
+    },
+
     async install(
       operations: readonly RogatioOperation[],
-    ): Promise<{ ok: true } | { ok: false; diagnostics: never[] }> {
+    ): Promise<
+      { ok: true } | { ok: false; diagnostics: readonly CoreDiagnostic[] }
+    > {
+      lastInstallErrors = [];
       const addRules: DnrRule[] = [];
       const added: Array<{ ruleId: number; operation: RogatioOperation }> = [];
       const usedIds = new Set<number>();
@@ -306,7 +337,12 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
         }
       }
       const dnr = api.declarativeNetRequest;
-      if (dnr === undefined) return { ok: false, diagnostics: [] };
+      if (dnr === undefined) {
+        return {
+          ok: false,
+          diagnostics: [coreDiagnostic("core.install-failed")],
+        };
+      }
 
       // Chrome live set is authority for remove (ADR 0009). Fail closed if
       // unreadable — never treat as empty and add (duplicate-id / wipe risk).
@@ -314,13 +350,22 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
       let liveOwned: number[];
       try {
         const live = await dnr.getDynamicRules();
-        if (!Array.isArray(live)) return { ok: false, diagnostics: [] };
+        if (!Array.isArray(live)) {
+          return {
+            ok: false,
+            diagnostics: [coreDiagnostic("core.install-failed")],
+          };
+        }
         liveOwned = [
           ...removeIdsForBand(live, "redirect-query"),
           ...removeIdsForBand(live, "header"),
         ];
-      } catch {
-        return { ok: false, diagnostics: [] };
+      } catch (error) {
+        const reason = chromeFailureMessage(error);
+        return {
+          ok: false,
+          diagnostics: [coreDiagnostic("core.install-failed", { reason })],
+        };
       }
 
       const desiredIds = new Set(addRules.map((rule) => rule.id));
@@ -362,9 +407,14 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
           anySucceeded = true;
         } catch (error) {
           anyFailed = true;
+          const message = chromeFailureMessage(error);
+          lastInstallErrors.push({
+            ruleId: entry.operation.ruleId,
+            message,
+          });
           console.log(
             "[rogatio] DNR install failed:",
-            error instanceof Error ? error.message : String(error),
+            message,
             JSON.stringify(rule),
           );
         }
@@ -376,9 +426,18 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
         await writeWholesaleMatchIndex();
       }
 
-      return anyFailed && tracked.size === 0 && operations.length > 0
-        ? { ok: false, diagnostics: [] }
-        : { ok: true };
+      if (anyFailed && tracked.size === 0 && operations.length > 0) {
+        const reason = lastInstallErrors[0]?.message;
+        return {
+          ok: false,
+          diagnostics: [
+            reason === undefined
+              ? coreDiagnostic("core.install-failed")
+              : coreDiagnostic("core.install-failed", { reason }),
+          ],
+        };
+      }
+      return { ok: true };
     },
   };
 }
