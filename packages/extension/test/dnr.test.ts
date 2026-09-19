@@ -7,6 +7,17 @@ import {
   translateQueryToDnr,
   translateRedirectToDnr,
 } from "../src/dnr.js";
+import {
+  MATCH_LOGGING_INDEX_KEY,
+  type MatchIndexEntry,
+} from "../src/match-index.js";
+import {
+  chromeHeldInstaller,
+  desiredNumericId,
+  FOREIGN_ID,
+  HEADER_BAND_ID,
+  storageLocal,
+} from "./dnr-harness.js";
 
 const queryOp: QueryOperation = {
   kind: "query",
@@ -22,19 +33,6 @@ const queryOp: QueryOperation = {
   },
   action: { type: "query", params: [{ name: "a", value: "1" }] },
 };
-
-function storageLocal() {
-  const store: Record<string, unknown> = {};
-  return {
-    get: async (key?: string) => {
-      if (key === undefined) return { ...store };
-      return { [key]: store[key] };
-    },
-    set: async (value: Record<string, unknown>) => {
-      Object.assign(store, value);
-    },
-  };
-}
 
 const redirectOp: RedirectOperation = {
   kind: "redirect",
@@ -187,61 +185,6 @@ describe("F9 DNR translation", () => {
 });
 
 describe("P1 DNR remove via Chrome ∩ Rogatio ids", () => {
-  const HEADER_BAND_ID = 2_000_001;
-  const FOREIGN_ID = 1_500_000;
-
-  function chromeHeldInstaller(initialIds: number[]) {
-    let chromeIds = [...initialIds];
-    const updateDynamicRules = vi.fn(
-      async (payload: {
-        removeRuleIds: number[];
-        addRules: Array<{ id: number }>;
-      }) => {
-        const remove = new Set(payload.removeRuleIds);
-        chromeIds = chromeIds.filter((id) => !remove.has(id));
-        for (const rule of payload.addRules) {
-          if (chromeIds.includes(rule.id)) {
-            throw new Error(`Rule with id ${rule.id} already exists`);
-          }
-          chromeIds.push(rule.id);
-        }
-      },
-    );
-    const getDynamicRules = vi.fn(async () => chromeIds.map((id) => ({ id })));
-    const api = {
-      storage: { local: storageLocal() },
-      declarativeNetRequest: { updateDynamicRules, getDynamicRules },
-    } as unknown as ChromeApi;
-    return {
-      api,
-      updateDynamicRules,
-      getDynamicRules,
-      chromeIds: () => chromeIds,
-      setChromeIds: (ids: number[]) => {
-        chromeIds = [...ids];
-      },
-    };
-  }
-
-  async function desiredNumericId(
-    api: ChromeApi,
-    operation: RedirectOperation | QueryOperation,
-  ): Promise<number> {
-    const probe = createDnrInstaller(api);
-    const update = api.declarativeNetRequest?.updateDynamicRules as
-      | ReturnType<typeof vi.fn>
-      | undefined;
-    await probe.install([operation]);
-    const addCall = (update?.mock.calls ?? []).find(
-      (call) =>
-        Array.isArray((call[0] as { addRules?: unknown[] }).addRules) &&
-        ((call[0] as { addRules: unknown[] }).addRules?.length ?? 0) > 0,
-    )?.[0] as { addRules: Array<{ id: number }> } | undefined;
-    const id = addCall?.addRules[0]?.id;
-    if (id === undefined) throw new Error("probe install did not add a rule");
-    return id;
-  }
-
   it("removes Chrome-held desired ids when tracked is empty (SW restart)", async () => {
     const harness = chromeHeldInstaller([]);
     const desiredId = await desiredNumericId(harness.api, redirectOp);
@@ -394,5 +337,175 @@ describe("P1 DNR remove via Chrome ∩ Rogatio ids", () => {
     expect(removeCall?.removeRuleIds).not.toContain(HEADER_BAND_ID);
     expect(removeCall?.removeRuleIds).not.toContain(FOREIGN_ID);
     expect(harness.chromeIds()).toEqual([HEADER_BAND_ID, FOREIGN_ID]);
+  });
+});
+
+describe("P2 current() survives restart via Chrome ∩ index ∩ compiled", () => {
+  function redirectIndexEntry(operation: RedirectOperation): MatchIndexEntry {
+    return {
+      ruleId: operation.ruleId,
+      name: operation.name,
+      kind: "redirect",
+      redactSensitiveInLogs: false,
+      intent: { destination: operation.redirect.destination },
+    };
+  }
+
+  function queryIndexEntry(operation: QueryOperation): MatchIndexEntry {
+    return {
+      ruleId: operation.ruleId,
+      name: operation.name,
+      kind: "query",
+      redactSensitiveInLogs: false,
+      intent: {
+        params: operation.action.params.map((param) => {
+          const operationName = param.operation ?? "set";
+          if (param.value === undefined) {
+            return { name: param.name, operation: operationName };
+          }
+          return {
+            name: param.name,
+            operation: operationName,
+            value: param.value,
+          };
+        }),
+      },
+    };
+  }
+
+  it("hydrates current() from Chrome ∩ index ∩ compiled when tracked is empty", async () => {
+    const harness = chromeHeldInstaller([]);
+    const desiredId = await desiredNumericId(harness.api, redirectOp);
+    harness.updateDynamicRules.mockClear();
+    harness.getDynamicRules.mockClear();
+    harness.setChromeIds([desiredId]);
+    await harness.api.storage.local.set({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(desiredId)]: redirectIndexEntry(redirectOp),
+      },
+    });
+
+    const cold = createDnrInstaller(harness.api);
+    expect(await cold.current()).toEqual([]);
+
+    await cold.hydrateInstalled([redirectOp, queryOp]);
+    const current = await cold.current();
+    expect(current).toHaveLength(1);
+    expect(current[0]).toBe(redirectOp);
+    expect(current.map((op) => op.ruleId)).toEqual([redirectOp.ruleId]);
+  });
+
+  it("does not report Chrome-held ids when index is missing (no ruleIdHash guess)", async () => {
+    const harness = chromeHeldInstaller([]);
+    const desiredId = await desiredNumericId(harness.api, redirectOp);
+    harness.setChromeIds([desiredId]);
+    await harness.api.storage.local.set({ [MATCH_LOGGING_INDEX_KEY]: {} });
+
+    const cold = createDnrInstaller(harness.api);
+    await cold.hydrateInstalled([redirectOp]);
+    expect(await cold.current()).toEqual([]);
+  });
+
+  it("does not report index-only ids missing from Chrome", async () => {
+    const harness = chromeHeldInstaller([]);
+    const desiredId = await desiredNumericId(harness.api, redirectOp);
+    harness.setChromeIds([]);
+    await harness.api.storage.local.set({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(desiredId)]: redirectIndexEntry(redirectOp),
+      },
+    });
+
+    const cold = createDnrInstaller(harness.api);
+    await cold.hydrateInstalled([redirectOp]);
+    expect(await cold.current()).toEqual([]);
+  });
+
+  it("does not report Chrome ∩ index when compiled ops omit the ruleId", async () => {
+    const harness = chromeHeldInstaller([]);
+    const desiredId = await desiredNumericId(harness.api, redirectOp);
+    harness.setChromeIds([desiredId]);
+    await harness.api.storage.local.set({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(desiredId)]: redirectIndexEntry(redirectOp),
+      },
+    });
+
+    const cold = createDnrInstaller(harness.api);
+    await cold.hydrateInstalled([queryOp]);
+    expect(await cold.current()).toEqual([]);
+  });
+
+  it("ignores malformed index entries and still hydrates valid siblings", async () => {
+    const harness = chromeHeldInstaller([]);
+    // Discover numeric ids on a separate store so harness index stays intentional.
+    const probeHarness = chromeHeldInstaller([]);
+    const redirectId = await desiredNumericId(probeHarness.api, redirectOp);
+    const queryId = await desiredNumericId(probeHarness.api, queryOp);
+    expect(redirectId).not.toBe(queryId);
+    harness.setChromeIds([redirectId, queryId]);
+    await harness.api.storage.local.set({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(redirectId)]: { not: "an-entry" },
+        [String(queryId)]: queryIndexEntry(queryOp),
+      },
+    });
+
+    const cold = createDnrInstaller(harness.api);
+    await cold.hydrateInstalled([redirectOp, queryOp]);
+    const current = await cold.current();
+    expect(current.map((op) => op.ruleId)).toEqual([queryOp.ruleId]);
+    expect(current[0]).toBe(queryOp);
+  });
+
+  it("does not wipe warm tracked when compiled this turn omits a live rule", async () => {
+    const harness = chromeHeldInstaller([]);
+    const installer = createDnrInstaller(harness.api);
+    expect(await installer.install([redirectOp])).toEqual({ ok: true });
+    expect(await installer.current()).toEqual([redirectOp]);
+
+    await installer.hydrateInstalled([queryOp]);
+    const current = await installer.current();
+    expect(current).toHaveLength(1);
+    expect(current[0]).toBe(redirectOp);
+  });
+
+  it("does not hydrate when index kind disagrees with compiled kind", async () => {
+    const harness = chromeHeldInstaller([]);
+    const desiredId = await desiredNumericId(harness.api, redirectOp);
+    harness.setChromeIds([desiredId]);
+    await harness.api.storage.local.set({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(desiredId)]: {
+          ...redirectIndexEntry(redirectOp),
+          ruleId: queryOp.ruleId,
+          kind: "query",
+        },
+      },
+    });
+
+    const cold = createDnrInstaller(harness.api);
+    await cold.hydrateInstalled([redirectOp, queryOp]);
+    expect(await cold.current()).toEqual([]);
+  });
+
+  it("writes durable match-index identity on successful redirect/query install", async () => {
+    const harness = chromeHeldInstaller([]);
+    const installer = createDnrInstaller(harness.api);
+    expect(await installer.install([redirectOp, queryOp])).toEqual({
+      ok: true,
+    });
+
+    const stored = (await harness.api.storage.local.get(
+      MATCH_LOGGING_INDEX_KEY,
+    )) as Record<string, unknown>;
+    const index = stored[MATCH_LOGGING_INDEX_KEY] as Record<
+      string,
+      MatchIndexEntry
+    >;
+    const ruleIds = Object.values(index).map((entry) => entry.ruleId);
+    expect(ruleIds).toEqual(
+      expect.arrayContaining([redirectOp.ruleId, queryOp.ruleId]),
+    );
   });
 });

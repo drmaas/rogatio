@@ -140,6 +140,8 @@ function removeIdsForBand(
 }
 
 export interface DnrInstallerWithMatchIndex extends RuleInstallerAdapter {
+  /** Warm cold tracked from Chrome ∩ index ∩ compiled (ADR 0008). */
+  hydrateInstalled(compiled: readonly RogatioOperation[]): Promise<void>;
   syncHeaderMatchIndex(
     headerEntries: ReadonlyArray<{
       readonly ruleId: number;
@@ -228,12 +230,54 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
       } catch {
         return [];
       }
+      if (!Array.isArray(rules)) return [];
       const operations: RogatioOperation[] = [];
       for (const rule of rules) {
         const operation = tracked.get(rule.id);
         if (operation !== undefined) operations.push(operation);
       }
       return operations;
+    },
+
+    async hydrateInstalled(
+      compiled: readonly RogatioOperation[],
+    ): Promise<void> {
+      // ADR 0008: hydrate only when memory is cold. Wiping warm tracked would
+      // hide stale compiler ids from projectState sameSet and skip install()
+      // orphan cleanup (P1).
+      for (const id of tracked.keys()) {
+        if (isOwnedBandId(id, "redirect-query")) return;
+      }
+
+      const dnr = api.declarativeNetRequest;
+      if (dnr === undefined) return;
+      let live: Array<{ id: number }>;
+      try {
+        live = await dnr.getDynamicRules();
+      } catch {
+        return;
+      }
+      if (!Array.isArray(live)) return;
+
+      const byRuleId = new Map<string, RogatioOperation>();
+      for (const operation of compiled) {
+        if (operation.kind === "redirect" || operation.kind === "query") {
+          byRuleId.set(operation.ruleId, operation);
+        }
+      }
+
+      const index = await readMatchIndexSnapshot(api);
+      for (const rule of live) {
+        if (!isOwnedBandId(rule.id, "redirect-query")) continue;
+        const key = String(rule.id);
+        if (!Object.hasOwn(index, key)) continue;
+        const entry = index[key];
+        if (entry.kind !== "redirect" && entry.kind !== "query") continue;
+        const operation = byRuleId.get(entry.ruleId);
+        if (operation === undefined) continue;
+        if (operation.kind !== entry.kind) continue;
+        tracked.set(rule.id, operation);
+      }
     },
 
     async install(
@@ -268,6 +312,7 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
       let liveOwned: number[];
       try {
         const live = await dnr.getDynamicRules();
+        if (!Array.isArray(live)) return { ok: false, diagnostics: [] };
         // Kind-scoped: redirect/query replace only touches 1..1_000_000.
         liveOwned = removeIdsForBand(live, "redirect-query");
       } catch {

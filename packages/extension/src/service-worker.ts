@@ -40,9 +40,10 @@ type PermissionAdapter = {
 function installerWithMatchIndex(
   installer: RuleInstallerAdapter,
 ): DnrInstallerWithMatchIndex | undefined {
-  return typeof (installer as DnrInstallerWithMatchIndex)
-    .syncHeaderMatchIndex === "function"
-    ? (installer as DnrInstallerWithMatchIndex)
+  const candidate = installer as DnrInstallerWithMatchIndex;
+  return typeof candidate.syncHeaderMatchIndex === "function" &&
+    typeof candidate.hydrateInstalled === "function"
+    ? candidate
     : undefined;
 }
 
@@ -298,6 +299,11 @@ export function createExtensionApplication(
       operations: compiled.operations,
     });
     const granted = await grantedOriginsFor(declared);
+    const matchIndexInstaller = installerWithMatchIndex(options.installer);
+    if (matchIndexInstaller !== undefined) {
+      // ADR 0008: warm cold tracked before reporting installed ids.
+      await matchIndexInstaller.hydrateInstalled(compiled.operations);
+    }
     let installedRuleIds: string[] = [];
     try {
       const installed = await options.installer.current();
@@ -348,7 +354,6 @@ export function createExtensionApplication(
           : [{ ruleId: projection.ruleId, message: error.message }];
       });
     }
-    const matchIndexInstaller = installerWithMatchIndex(options.installer);
     if (matchIndexInstaller !== undefined) {
       await matchIndexInstaller.syncHeaderMatchIndex(headerIndexEntries);
     }

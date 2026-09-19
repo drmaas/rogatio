@@ -44,15 +44,18 @@ Track progress in this file. Stay in `packages/extension` + tests. Do not change
 **AC:** AC2  
 **Prove (TDD first):** same empty-`tracked` + Chrome-held ids setup as P1, plus seeded `rogatio.matchLogging.index` + compiled ops this turn. Hydrated `current()` / reported ids include those compiler `ruleId`s and return the compiled op identity (not a rebuilt object). Join seam: Chrome ∩ index ∩ compiled.
 
-- [ ] Reuse `rogatio.matchLogging.index` only (ADR 0008). No sibling key, no new install fields
-- [ ] Resolve installed ids from: Chrome live ids ∩ index `ruleId` ∩ compiled ops from project (not index-alone rebuild)
-- [ ] Hydrate cold `current()` / `installedRuleIds` from that join; do not change adapter `current()` signature
-- [ ] Write/update durable identity on successful install for redirect/query (header write lands in P3a)
-- [ ] Wire `projectState` so `installedRuleIds` are correct after SW death (join this turn, then warm `current()`)
-- [ ] Unit first (TDD): empty `tracked` + Chrome-held ids + index + compiled → `current()` / reported ids non-empty
-- [ ] Unit: empty `tracked` + Chrome-held ids, **no** index → not reported (no `ruleIdHash` guess)
-- [ ] Unit: Chrome missing / index-only id → not reported; malformed index entries ignored
-- [ ] Phase verify: focused unit + no body-path regressions in touched SW paths
+- [x] Reuse `rogatio.matchLogging.index` only (ADR 0008). No sibling key, no new install fields
+- [x] Resolve installed ids from: Chrome live ids ∩ index `ruleId` ∩ compiled ops from project (not index-alone rebuild)
+- [x] Hydrate cold `current()` / `installedRuleIds` from that join; do not change adapter `current()` signature
+- [x] Hydrate only when redirect/query `tracked` is empty (do not wipe warm memory; sameSet must still see stale ids so `install()` can drop Chrome orphans)
+- [x] Write/update durable identity on successful install for redirect/query (header write lands in P3a)
+- [x] Wire `projectState` so `installedRuleIds` are correct after SW death (join this turn, then warm `current()`)
+- [x] Unit first (TDD): empty `tracked` + Chrome-held ids + index + compiled → `current()` / reported ids non-empty
+- [x] Unit: empty `tracked` + Chrome-held ids, **no** index → not reported (no `ruleIdHash` guess)
+- [x] Unit: Chrome missing / index-only id → not reported; malformed index entries ignored
+- [x] Shared `dnr-harness.ts` for P1/P2 Chrome-held helpers (no duplicated harness)
+- [x] SW integration: cold installer + shared envelope → `get-state` redirect `active` without `install()`
+- [x] Phase verify: focused unit + no body-path regressions in touched SW paths
 
 ---
 
