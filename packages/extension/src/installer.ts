@@ -28,17 +28,6 @@ export interface DnrHeaderAction {
   readonly value?: string;
 }
 
-export interface InstallResult {
-  readonly installed: readonly number[];
-  readonly errors: readonly DnrInstallError[];
-}
-
-export interface DnrInstallError {
-  readonly ruleId: number;
-  readonly code: string;
-  readonly message: string;
-}
-
 function toDnrResourceTypes(types: readonly string[]): string[] {
   const mapping: Record<string, string> = {
     main_frame: "main_frame",
@@ -126,66 +115,4 @@ export function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
       ...(requestMethods !== undefined ? { requestMethods } : {}),
     },
   };
-}
-
-export async function installHeaderRules(
-  projections: readonly HeaderProjection[],
-  removeRuleIds: readonly number[] = projections.map((rule) => rule.id),
-): Promise<InstallResult> {
-  const rules = projections.map(toDnrRule);
-  const installed: number[] = [];
-  const errors: DnrInstallError[] = [];
-  const dnr = (
-    globalThis as {
-      chrome?: {
-        declarativeNetRequest?: {
-          updateDynamicRules: (options: {
-            removeRuleIds: number[];
-            addRules: DnrHeaderRule[];
-          }) => Promise<void>;
-          getDynamicRules?: () => Promise<Array<{ id: number }>>;
-        };
-      };
-    }
-  ).chrome?.declarativeNetRequest;
-  if (!dnr) {
-    for (const rule of rules) {
-      errors.push({
-        ruleId: rule.id,
-        code: "extension.dnr-error",
-        message: "declarativeNetRequest API not available",
-      });
-    }
-    return { installed, errors };
-  }
-  let existingIds: readonly number[] = [];
-  if (dnr.getDynamicRules) {
-    try {
-      const current = await dnr.getDynamicRules();
-      const currentIds = new Set(current.map((rule) => rule.id));
-      existingIds = removeRuleIds.filter((id) => currentIds.has(id));
-    } catch {
-      // Do not issue removals we could not verify; still attempt the add.
-      existingIds = [];
-    }
-  }
-  try {
-    await dnr.updateDynamicRules({
-      removeRuleIds: [...existingIds],
-      addRules: rules,
-    });
-    installed.push(...rules.map((r) => r.id));
-  } catch (error) {
-    for (const rule of rules) {
-      errors.push({
-        ruleId: rule.id,
-        code: "extension.dnr-error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to install header rule",
-      });
-    }
-  }
-  return { installed, errors };
 }

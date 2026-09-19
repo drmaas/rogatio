@@ -239,7 +239,12 @@ describe("match index", () => {
 
     expect(await installer.install([redirectOp])).toEqual({
       ok: false,
-      diagnostics: [],
+      diagnostics: [
+        expect.objectContaining({
+          code: "core.install-failed",
+          params: { reason: "dnr-failed" },
+        }),
+      ],
     });
     expect(store[MATCH_LOGGING_INDEX_KEY]).toEqual({
       "42": {
@@ -587,9 +592,7 @@ describe("match index", () => {
         vi.fn(async () => {}),
       ),
     );
-    await installer.syncHeaderMatchIndex([
-      { ruleId: 2_000_001, operation: headerOp },
-    ]);
+    expect(await installer.install([headerOp])).toEqual({ ok: true });
     expect(store[MATCH_LOGGING_INDEX_KEY]).toEqual({
       "2000001": {
         ruleId: "rule-header-set",
@@ -727,7 +730,7 @@ describe("match index", () => {
     expect(param?.value).toBe("1");
   });
 
-  it("overlapping redirect install and header sync keep both index slices", async () => {
+  it("overlapping redirect and header installs stay well-formed", async () => {
     const headerOp: HeaderOperation = {
       kind: "header",
       groupId: "g1",
@@ -757,25 +760,23 @@ describe("match index", () => {
 
     await Promise.all([
       installer.install([redirectOp]),
-      installer.syncHeaderMatchIndex([
-        { ruleId: 2_000_001, operation: headerOp },
-      ]),
+      installer.install([headerOp]),
     ]);
 
     const index = store[MATCH_LOGGING_INDEX_KEY] as Record<
       string,
       { kind: string; ruleId: string }
     >;
-    expect(index["2000001"]).toMatchObject({
-      kind: "header",
-      ruleId: "rule-header-race",
-    });
-    expect(
-      Object.values(index).some((entry) => entry.kind === "redirect"),
-    ).toBe(true);
+    // Last writer wins under the install lock; final snapshot must be
+    // well-formed for whichever slice that install left tracked.
+    expect(Object.keys(index).length).toBeGreaterThan(0);
+    for (const entry of Object.values(index)) {
+      expect(["redirect", "query", "header"]).toContain(entry.kind);
+      expect(typeof entry.ruleId).toBe("string");
+    }
   });
 
-  it("header sync with empty tracked keeps stored redirect/query entries", async () => {
+  it("cold header-only install clears stored redirect/query identity", async () => {
     const { api, store } = storageApi();
     const installChrome = dnrApi(
       api.storage,
@@ -808,26 +809,26 @@ describe("match index", () => {
         vi.fn(async () => {}),
       ),
     );
-    await restartInstaller.syncHeaderMatchIndex([
-      { ruleId: 2_000_002, operation: headerOp },
-    ]);
+    expect(await restartInstaller.install([headerOp])).toEqual({ ok: true });
 
     const index = store[MATCH_LOGGING_INDEX_KEY] as Record<
       string,
       { kind: string; ruleId: string }
     >;
-    expect(index["2000002"]).toMatchObject({
-      kind: "header",
-      ruleId: "rule-header-restart",
-    });
+    expect(
+      Object.values(index).some(
+        (entry) =>
+          entry.kind === "header" && entry.ruleId === "rule-header-restart",
+      ),
+    ).toBe(true);
     expect(
       Object.values(index).some(
         (entry) => entry.kind === "redirect" && entry.ruleId === "r1",
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it("keeps stored header intent when a redirect install rewrites the index", async () => {
+  it("clears stored header identity when a redirect-only install rewrites the index", async () => {
     const headerOp: HeaderOperation = {
       kind: "header",
       groupId: "g1",
@@ -854,30 +855,17 @@ describe("match index", () => {
         vi.fn(async () => {}),
       ),
     );
-    await installer.syncHeaderMatchIndex([
-      { ruleId: 2_000_001, operation: headerOp },
-    ]);
+    expect(await installer.install([headerOp])).toEqual({ ok: true });
 
-    // The redirect/query install never touches installed header rules, so it
-    // must not invalidate their index entries.
+    // Unified install owns both Rogatio bands. A redirect-only replace
+    // drops Chrome header ids and must drop their index identity too.
     expect(await installer.install([redirectOp])).toEqual({ ok: true });
 
     const index = store[MATCH_LOGGING_INDEX_KEY] as Record<
       string,
       { ruleId: string; kind: string }
     >;
-    expect(index["2000001"]).toEqual({
-      ruleId: "rule-header-set",
-      name: "rule-header-set",
-      kind: "header",
-      redactSensitiveInLogs: false,
-      intent: {
-        direction: "request",
-        operation: "set",
-        name: "x-trace",
-        value: "on",
-      },
-    });
+    expect(index["2000001"]).toBeUndefined();
     expect(
       Object.values(index).some((entry) => entry.kind === "redirect"),
     ).toBe(true);
