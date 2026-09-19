@@ -1125,7 +1125,8 @@ function createPoll(fn: () => Promise<unknown>): PollAssertion {
 
 type ExpectFn = {
   (locator: Locator): LocatorAssertion;
-  <T>(actual: T): Assertion<T>;
+  // Vitest 5: Assertion<R, T> — R is matcher return type, T is received value.
+  <T>(actual: T): Assertion<void, T>;
   poll: (fn: () => Promise<unknown>) => PollAssertion;
 };
 
