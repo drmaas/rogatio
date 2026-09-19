@@ -2,7 +2,7 @@ import type { RogatioProject } from "@rogatio/schema";
 import { describe, expect, it, vi } from "vitest";
 import { createDnrInstaller } from "../src/dnr.js";
 import { createExtensionApplication } from "../src/service-worker.js";
-import { chromeHeldInstaller } from "./dnr-harness.js";
+import { chromeHeldInstaller, HEADER_BAND_ID } from "./dnr-harness.js";
 
 const redirectProject: RogatioProject = {
   version: 1,
@@ -389,5 +389,144 @@ describe("P3a body stays native overlay", () => {
         ),
       ).toBe(true);
     }
+  });
+});
+
+describe("P3a set-group-enabled uses full desired DNR set", () => {
+  const twoGroupProject: RogatioProject = {
+    version: 1,
+    name: "P3a two-group project",
+    groups: [
+      {
+        id: "group-headers",
+        name: "Headers",
+        origins: ["https://example.com"],
+        rules: [
+          {
+            id: "rule-header",
+            name: "Header rule",
+            urlRegex: "^https://example\\.com/",
+            origins: [],
+            resourceTypes: ["main_frame"],
+            priority: 100,
+            method: "GET",
+            type: "header",
+            headerDirection: "request",
+            headerOperation: "set",
+            headerName: "X-Custom-Header",
+            headerValue: "test",
+          },
+        ],
+      },
+      {
+        id: "group-redirect",
+        name: "Redirect",
+        origins: ["https://example.com"],
+        rules: [
+          {
+            id: "rule-redirect",
+            name: "Redirect rule",
+            urlRegex: "^https://example\\.com/(.*)$",
+            origins: [],
+            resourceTypes: ["main_frame"],
+            priority: 100,
+            type: "redirect",
+            redirect: { destination: "https://other.com/\\1" },
+          },
+        ],
+      },
+    ],
+  };
+
+  it("does not subset-install redirect-only and wipe already-installed headers", async () => {
+    const harness = chromeHeldInstaller([]);
+    const installer = createDnrInstaller(harness.api);
+    let envelope: unknown;
+    const app = createExtensionApplication({
+      storage: {
+        read: async () => envelope,
+        compareAndSwap: async (_expected: unknown, next: unknown) => {
+          envelope = next;
+          return true;
+        },
+      },
+      permissions: {
+        contains: async () => true,
+        request: vi.fn(async () => true),
+        remove: async () => true,
+      },
+      installer,
+      generateId: () => "project-two-group",
+      now: () => 1,
+    });
+
+    expect(
+      (
+        await app.handle({
+          version: 1,
+          command: "create-project",
+          data: twoGroupProject,
+        })
+      ).ok,
+    ).toBe(true);
+    expect(
+      (
+        await app.handle({
+          version: 1,
+          command: "select-project",
+          projectId: "project-two-group",
+        })
+      ).ok,
+    ).toBe(true);
+    expect(
+      (
+        await app.handle({
+          version: 1,
+          command: "set-group-enabled",
+          projectId: "project-two-group",
+          groupId: "group-headers",
+          enabled: true,
+        })
+      ).ok,
+    ).toBe(true);
+    expect(harness.chromeIds()).toContain(HEADER_BAND_ID);
+
+    const installSpy = vi.spyOn(installer, "install");
+    expect(
+      (
+        await app.handle({
+          version: 1,
+          command: "set-group-enabled",
+          projectId: "project-two-group",
+          groupId: "group-redirect",
+          enabled: true,
+        })
+      ).ok,
+    ).toBe(true);
+
+    expect(installSpy).toHaveBeenCalled();
+    for (const call of installSpy.mock.calls) {
+      const kinds = (call[0] as readonly { kind: string }[]).map(
+        (operation) => operation.kind,
+      );
+      expect(kinds).toEqual(expect.arrayContaining(["header", "redirect"]));
+    }
+    expect(harness.chromeIds()).toContain(HEADER_BAND_ID);
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: {
+        ruleStatuses: expect.arrayContaining([
+          expect.objectContaining({
+            ruleId: "rule-header",
+            status: "active",
+          }),
+          expect.objectContaining({
+            ruleId: "rule-redirect",
+            status: "active",
+          }),
+        ]),
+      },
+    });
   });
 });

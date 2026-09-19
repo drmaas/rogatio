@@ -66,6 +66,7 @@ Track progress in this file. Stay in `packages/extension` + tests. Do not change
 
 - [x] Fold `installHeaderRules` into unified reconciler; delete unused `installHeaderRules` + `syncHeaderMatchIndex`
 - [x] Remove dual path in `projectState`
+- [x] Final review: drop leftover `set-group-enabled` redirect/query-only `install()` (unified replace would orphan headers)
 - [x] Kind-scoped bands preserved under unified remove
 - [x] Write header identity on successful install (same index key; ADR 0008)
 - [x] Unit: unified header+redirect/query install/remove
@@ -131,7 +132,8 @@ Workspace `[data-rule-statuses]` must not show “not installed” for those DNR
 ## Done criteria
 
 - [ ] All AC1–AC7 checked with evidence in PR/description
-- [ ] No third durable install map
-- [ ] No browser-core status formula change (unless documented tiny plumbing)
-- [ ] Contracts untouched
+- [x] No third durable install map
+- [x] No browser-core status formula change (unless documented tiny plumbing)
+- [x] Contracts untouched
 - [ ] Implementation review + human gate per phase (RPI)
+- [ ] Rebase onto `main` before merge (`main` has #181/#183; two-dot diff looks like workspace-group-enable revert)

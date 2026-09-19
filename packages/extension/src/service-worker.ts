@@ -564,30 +564,9 @@ export function createExtensionApplication(
         data.enabled,
       );
       if (!result.ok) return failure("extension.not-found");
-      if (data.enabled === true) {
-        const current = await repository.state();
-        const project = current.ok
-          ? current.value.projects[projectId]
-          : undefined;
-        const compiled = compileProject(project?.data);
-        if (compiled.ok) {
-          const granted = await grantedOriginsFor(
-            declaredPermissionOrigins({ operations: compiled.operations }),
-          );
-          const grantedSet = new Set(granted);
-          const installable = compiled.operations.filter(
-            (operation) =>
-              (operation.kind === "redirect" || operation.kind === "query") &&
-              operation.groupId === groupId &&
-              operation.matcher.origins.length > 0 &&
-              operation.matcher.origins.every((origin) =>
-                grantedSet.has(origin),
-              ),
-          );
-          if (installable.length > 0)
-            await options.installer.install(installable);
-        }
-      }
+      // Unified install() replaces both Rogatio DNR bands (ADR 0009). Do not
+      // pass a redirect/query-only subset here — that treats live headers as
+      // orphans. projectState via state() installs the full desired set.
       await state();
       return { ok: true, value: result.value };
     }

@@ -673,8 +673,10 @@ discriminant `type: "redirect"`, the redirect payload, and translates it to Chro
   navigations match when the request URL host is in the project's granted origins.
   `createDnrInstaller(api)` implements `RuleInstallerAdapter` tracking installed redirect,
   query, and header operations in a Map keyed by DNR rule id; `current()` reads back via
-  `chrome.declarativeNetRequest.getDynamicRules()`; `install(ops)` computes add/remove and
-  calls `updateDynamicRules`. Guarded for missing `declarativeNetRequest`.
+  `chrome.declarativeNetRequest.getDynamicRules()`; `install(ops)` replaces both Rogatio
+  bands from the full desired set (remove = live ids ∩ owned bands; fail closed if the
+  live set is unreadable — ADR 0009). Callers must pass every desired redirect/query/header
+  op; a subset wipes the omitted band. Guarded for missing `declarativeNetRequest`.
 - `extension/src/chrome.ts`: `ChromeApi.declarativeNetRequest` made optional (`?`) to
   preserve test fixture compatibility.
 - `extension/src/background.ts`: wires real `createDnrInstaller(api)` replacing stub.
