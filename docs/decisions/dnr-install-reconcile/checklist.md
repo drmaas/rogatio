@@ -119,11 +119,12 @@ Workspace `[data-rule-statuses]` must not show “not installed” for those DNR
 7. Re-read `getExtensionState`; assert the table above. UI list must not contain “not installed” for DNR sample rules.
 8. `getDynamicRules()` still contains the snapshotted numeric ids (Chrome still holds them).
 
-- [ ] New focused browser test file + reuse helpers (not `sample-basic-live`)
-- [ ] Seed grants; import/enable sample; record baseline `statusFor` + Chrome ids
-- [ ] CDP stop `"stopped"` + worker gone (fail on inconclusive)
-- [ ] Reopen Workspace; worker alive; DNR `active`; body `needs runtime`; Chrome still holds snapshotted ids
-- [ ] Phase verify: that browser test green; then `pnpm validate`
+- [x] New focused browser test file + reuse helpers (not `sample-basic-live`)
+- [x] Seed grants; import/enable sample; record baseline `statusFor` + Chrome ids
+- [x] CDP stop `"stopped"` + worker gone (fail on inconclusive)
+- [x] Reopen Workspace; worker alive; DNR `active`; body `needs runtime`; Chrome still holds snapshotted ids
+- [x] Chrome live set is exactly the four named DNR ids; body ruleIds absent from match index (AC7)
+- [x] Phase verify: that browser test green; then `pnpm validate`
 
 ---
 
