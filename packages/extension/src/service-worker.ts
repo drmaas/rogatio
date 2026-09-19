@@ -6,11 +6,7 @@ import {
   type RuleInstallerAdapter,
   type StorageAdapter,
 } from "@rogatio/browser-core";
-import {
-  compileProject,
-  type HeaderOperation,
-  type RogatioOperation,
-} from "@rogatio/compiler";
+import { compileProject, type RogatioOperation } from "@rogatio/compiler";
 import { normalizeSiteOrigin } from "@rogatio/schema";
 import { validateProjectDetailed } from "./browser-schema.js";
 import {
@@ -18,7 +14,6 @@ import {
   extensionDiagnostic,
 } from "./diagnostics.js";
 import type { DnrInstallerWithMatchIndex } from "./dnr.js";
-import { installHeaderRules } from "./installer.js";
 
 import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
@@ -28,7 +23,6 @@ import {
   stopNativeSession,
 } from "./native-session.js";
 import { declaredPermissionOrigins } from "./permissions.js";
-import { projectHeaders } from "./projection.js";
 import { type ExtensionRequest, parseRequest } from "./protocol.js";
 
 type PermissionAdapter = {
@@ -41,8 +35,7 @@ function installerWithMatchIndex(
   installer: RuleInstallerAdapter,
 ): DnrInstallerWithMatchIndex | undefined {
   const candidate = installer as DnrInstallerWithMatchIndex;
-  return typeof candidate.syncHeaderMatchIndex === "function" &&
-    typeof candidate.hydrateInstalled === "function"
+  return typeof candidate.hydrateInstalled === "function"
     ? candidate
     : undefined;
 }
@@ -241,7 +234,7 @@ export function createExtensionApplication(
 
   /**
    * The DNR-managed operation set for the active project. Browser-side
-   * redirect/query rules stay installed across start and stop.
+   * redirect/query/header rules stay installed across start and stop.
    */
   function dnrManagedOps(
     operations: readonly RogatioOperation[],
@@ -251,14 +244,18 @@ export function createExtensionApplication(
     const enabled = new Set(enabledGroupIds);
     const grantedSet = new Set(granted);
     return operations.filter((operation) => {
-      if (operation.kind === "redirect" || operation.kind === "query") {
+      if (
+        operation.kind === "redirect" ||
+        operation.kind === "query" ||
+        operation.kind === "header"
+      ) {
         return (
           enabled.has(operation.groupId) &&
           operation.matcher.origins.length > 0 &&
           operation.matcher.origins.every((origin) => grantedSet.has(origin))
         );
       }
-      // Header rules handled separately by installHeaderRules.
+      // Body rules stay on the native-runtime overlay (never DNR).
       return false;
     });
   }
@@ -292,9 +289,6 @@ export function createExtensionApplication(
       await options.badge?.(badge);
       return { statuses: [], badge };
     }
-    const headerOps = compiled.operations.filter(
-      (op): op is HeaderOperation => op.kind === "header",
-    );
     const declared = declaredPermissionOrigins({
       operations: compiled.operations,
     });
@@ -311,54 +305,9 @@ export function createExtensionApplication(
     } catch {
       installedRuleIds = [];
     }
-    let headerInstallErrors: HeaderInstallError[] = [];
-    const headerIndexEntries: Array<{
-      ruleId: number;
-      operation: HeaderOperation;
-    }> = [];
-    if (headerOps.length > 0) {
-      const allHeaderProjections = projectHeaders(headerOps);
-      const enabled = new Set(project.enabledGroupIds);
-      const headerProjections = allHeaderProjections.filter(
-        (projection) =>
-          enabled.has(projection.groupId) &&
-          projection.matcher.origins.every((origin) =>
-            granted.includes(origin),
-          ),
-      );
-      const result = await installHeaderRules(
-        headerProjections,
-        allHeaderProjections.map((projection) => projection.id),
-      );
-      for (const installedId of result.installed) {
-        const projection = allHeaderProjections.find(
-          (candidate) => candidate.id === installedId,
-        );
-        if (projection !== undefined) installedRuleIds.push(projection.ruleId);
-        const operation = headerOps.find(
-          (candidate) => candidate.ruleId === projection?.ruleId,
-        );
-        if (projection !== undefined && operation !== undefined) {
-          headerIndexEntries.push({
-            ruleId: projection.id,
-            operation,
-          });
-        }
-      }
-      headerInstallErrors = result.errors.flatMap((error) => {
-        const projection = allHeaderProjections.find(
-          (candidate) => candidate.id === error.ruleId,
-        );
-        return projection === undefined
-          ? []
-          : [{ ruleId: projection.ruleId, message: error.message }];
-      });
-    }
-    if (matchIndexInstaller !== undefined) {
-      await matchIndexInstaller.syncHeaderMatchIndex(headerIndexEntries);
-    }
-    // Keep redirect/query DNR in sync on every state projection (not only on
-    // set-group-enabled), so import+enable and permission seed races still land.
+    // Keep redirect/query/header DNR in sync on every state projection (not
+    // only on set-group-enabled), so import+enable and permission seed races
+    // still land. Body rules never enter this installer path.
     try {
       const desiredDnrOps = dnrManagedOps(
         compiled.operations,
@@ -366,15 +315,17 @@ export function createExtensionApplication(
         granted,
       );
       const currentlyInstalled = await options.installer.current();
-      const currentRedirectQuery = currentlyInstalled.filter(
+      const currentDnr = currentlyInstalled.filter(
         (operation) =>
-          operation.kind === "redirect" || operation.kind === "query",
+          operation.kind === "redirect" ||
+          operation.kind === "query" ||
+          operation.kind === "header",
       );
       const desiredIds = new Set(
         desiredDnrOps.map((operation) => operation.ruleId),
       );
       const currentIds = new Set(
-        currentRedirectQuery.map((operation) => operation.ruleId),
+        currentDnr.map((operation) => operation.ruleId),
       );
       const sameSet =
         desiredIds.size === currentIds.size &&
@@ -398,7 +349,6 @@ export function createExtensionApplication(
       project.enabledGroupIds,
       granted,
       nativePhase,
-      headerInstallErrors,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),

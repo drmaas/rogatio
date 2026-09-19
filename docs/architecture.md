@@ -671,8 +671,8 @@ discriminant `type: "redirect"`, the redirect payload, and translates it to Chro
   {regexFilter, resourceTypes, requestDomains:hostnamesFromOrigins(op.matcher.origins)} }`.
   `requestDomains` (not `initiatorDomains`) so address-bar and automation main_frame
   navigations match when the request URL host is in the project's granted origins.
-  `createDnrInstaller(api)` implements `RuleInstallerAdapter` tracking installed redirect
-  operations in a Map keyed by DNR rule id; `current()` reads back via
+  `createDnrInstaller(api)` implements `RuleInstallerAdapter` tracking installed redirect,
+  query, and header operations in a Map keyed by DNR rule id; `current()` reads back via
   `chrome.declarativeNetRequest.getDynamicRules()`; `install(ops)` computes add/remove and
   calls `updateDynamicRules`. Guarded for missing `declarativeNetRequest`.
 - `extension/src/chrome.ts`: `ChromeApi.declarativeNetRequest` made optional (`?`) to
@@ -734,7 +734,7 @@ Compiler emits distinct operation types: `MatcherOperation` (actionless), `Redir
 
 ### Extension (extension boundary change)
 
-`projection.ts` `projectMatchers` dispatches on operation kind. For `QueryOperation` it builds a DNR rule with `redirect.transform.query`; for `RedirectOperation` it builds a DNR `redirect` rule; for `MatcherOperation` it returns `installable: false`. `service-worker.ts` `operationStatuses` reports redirect and query rules as `active` when compiled, enabled, and granted; actionless matchers remain `unsupported`. Permission domains derive from origin hostnames (requestDomains/initiatorDomains). Successful DNR install writes the match-logging index for redirect and query ids; installed header ids reach the same single wholesale writer through `syncHeaderMatchIndex`. Console match logging is described under Chrome MV3 Extension Architecture.
+`projection.ts` `projectMatchers` dispatches on operation kind. For `QueryOperation` it builds a DNR rule with `redirect.transform.query`; for `RedirectOperation` it builds a DNR `redirect` rule; for `MatcherOperation` it returns `installable: false`. `service-worker.ts` `operationStatuses` reports redirect and query rules as `active` when compiled, enabled, and granted; actionless matchers remain `unsupported`. Permission domains derive from origin hostnames (requestDomains/initiatorDomains). Successful DNR install writes the match-logging index for redirect, query, and header ids through one wholesale writer on `install()`. Console match logging is described under Chrome MV3 Extension Architecture.
 
 ### Editor (editor boundary change)
 

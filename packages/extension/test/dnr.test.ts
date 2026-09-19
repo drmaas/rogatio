@@ -1,4 +1,9 @@
-import type { QueryOperation, RedirectOperation } from "@rogatio/compiler";
+import type {
+  HeaderOperation,
+  QueryOperation,
+  RedirectOperation,
+  ResponseBodyOperation,
+} from "@rogatio/compiler";
 import { queryActionToDNR } from "@rogatio/compiler";
 import { describe, expect, it, vi } from "vitest";
 import type { ChromeApi } from "../src/chrome.js";
@@ -48,6 +53,61 @@ const redirectOp: RedirectOperation = {
   },
   redirect: { destination: "https://other.com/\\1" },
 };
+
+const headerOp: HeaderOperation = {
+  kind: "header",
+  groupId: "g1",
+  ruleId: "rule-header-set",
+  name: "rule-header-set",
+  redactSensitiveInLogs: false,
+  matcher: {
+    urlRegex: { source: "^https://example\\.com/", flags: "" },
+    origins: ["https://example.com"],
+    resourceTypes: ["main_frame"],
+    priority: 100,
+    method: "GET",
+  },
+  header: {
+    direction: "request",
+    operation: "set",
+    name: "X-Custom-Header",
+    value: "test-value",
+  },
+};
+
+const bodyOp: ResponseBodyOperation = {
+  kind: "response-body",
+  groupId: "g1",
+  ruleId: "rule-response-body",
+  name: "rule-response-body",
+  redactSensitiveInLogs: false,
+  matcher: {
+    urlRegex: { source: "^https://example\\.com/data$", flags: "" },
+    origins: ["https://example.com"],
+    resourceTypes: ["xmlhttprequest"],
+    priority: 100,
+  },
+  responseBody: {
+    replacements: [{ pattern: "old", replacement: "new" }],
+  },
+};
+
+function headerIndexEntry(operation: HeaderOperation): MatchIndexEntry {
+  return {
+    ruleId: operation.ruleId,
+    name: operation.name,
+    kind: "header",
+    redactSensitiveInLogs: false,
+    intent: {
+      direction: operation.header.direction,
+      operation: operation.header.operation,
+      name: operation.header.name,
+      ...(operation.header.value !== undefined
+        ? { value: operation.header.value }
+        : {}),
+    },
+  };
+}
 
 describe("F9 DNR translation", () => {
   it("maps a redirect operation to a Chrome DNR rule", () => {
@@ -205,7 +265,7 @@ describe("P1 DNR remove via Chrome ∩ Rogatio ids", () => {
     expect(harness.chromeIds()).toContain(desiredId);
   });
 
-  it("drops Rogatio-owned orphans and leaves foreign / header-band ids alone", async () => {
+  it("drops Rogatio-owned orphans and leaves foreign ids alone", async () => {
     const harness = chromeHeldInstaller([]);
     const desiredId = await desiredNumericId(harness.api, redirectOp);
     const orphanId = desiredId === 42 ? 43 : 42;
@@ -226,8 +286,9 @@ describe("P1 DNR remove via Chrome ∩ Rogatio ids", () => {
         payload.removeRuleIds.includes(orphanId)
       );
     })?.[0] as { removeRuleIds: number[] } | undefined;
-    expect(orphanRemove?.removeRuleIds).toEqual([orphanId]);
-    expect(orphanRemove?.removeRuleIds).not.toContain(HEADER_BAND_ID);
+    expect(orphanRemove?.removeRuleIds).toEqual(
+      expect.arrayContaining([orphanId, HEADER_BAND_ID]),
+    );
     expect(orphanRemove?.removeRuleIds).not.toContain(FOREIGN_ID);
 
     const replaceCall = harness.updateDynamicRules.mock.calls.find((call) => {
@@ -240,9 +301,10 @@ describe("P1 DNR remove via Chrome ∩ Rogatio ids", () => {
     expect(replaceCall?.removeRuleIds).toEqual([desiredId]);
 
     expect(harness.chromeIds()).toEqual(
-      expect.arrayContaining([desiredId, HEADER_BAND_ID, FOREIGN_ID]),
+      expect.arrayContaining([desiredId, FOREIGN_ID]),
     );
     expect(harness.chromeIds()).not.toContain(orphanId);
+    expect(harness.chromeIds()).not.toContain(HEADER_BAND_ID);
   });
 
   it("reinstalls desired ids when orphan bulk-remove fails (per-rule remove+add)", async () => {
@@ -318,7 +380,7 @@ describe("P1 DNR remove via Chrome ∩ Rogatio ids", () => {
     expect(updateDynamicRules).not.toHaveBeenCalled();
   });
 
-  it("empty desired drops owned Chrome ids and leaves foreign / header-band ids", async () => {
+  it("empty desired drops owned Chrome ids in both bands and leaves foreign ids", async () => {
     const harness = chromeHeldInstaller([]);
     const ownedId = await desiredNumericId(harness.api, queryOp);
     harness.updateDynamicRules.mockClear();
@@ -333,10 +395,11 @@ describe("P1 DNR remove via Chrome ∩ Rogatio ids", () => {
         ((call[0] as { removeRuleIds: number[] }).removeRuleIds?.length ?? 0) >
         0,
     )?.[0] as { removeRuleIds: number[] } | undefined;
-    expect(removeCall?.removeRuleIds).toContain(ownedId);
-    expect(removeCall?.removeRuleIds).not.toContain(HEADER_BAND_ID);
+    expect(removeCall?.removeRuleIds).toEqual(
+      expect.arrayContaining([ownedId, HEADER_BAND_ID]),
+    );
     expect(removeCall?.removeRuleIds).not.toContain(FOREIGN_ID);
-    expect(harness.chromeIds()).toEqual([HEADER_BAND_ID, FOREIGN_ID]);
+    expect(harness.chromeIds()).toEqual([FOREIGN_ID]);
   });
 });
 
@@ -507,5 +570,144 @@ describe("P2 current() survives restart via Chrome ∩ index ∩ compiled", () =
     expect(ruleIds).toEqual(
       expect.arrayContaining([redirectOp.ruleId, queryOp.ruleId]),
     );
+  });
+});
+
+describe("P3a headers share unified reconciler authority", () => {
+  it("installs and removes header+redirect/query through one install path", async () => {
+    const harness = chromeHeldInstaller([]);
+    const installer = createDnrInstaller(harness.api);
+
+    expect(await installer.install([redirectOp, headerOp])).toEqual({
+      ok: true,
+    });
+
+    const current = await installer.current();
+    expect(current.map((op) => op.ruleId).sort()).toEqual(
+      [redirectOp.ruleId, headerOp.ruleId].sort(),
+    );
+    expect(current.find((op) => op.ruleId === headerOp.ruleId)).toBe(headerOp);
+    expect(harness.chromeIds()).toEqual(
+      expect.arrayContaining([HEADER_BAND_ID]),
+    );
+
+    const addCalls = harness.updateDynamicRules.mock.calls.filter((call) => {
+      const payload = call[0] as { addRules: Array<{ id: number }> };
+      return payload.addRules.length > 0;
+    });
+    const headerAdd = addCalls.find((call) =>
+      (call[0] as { addRules: Array<{ id: number }> }).addRules.some(
+        (rule) => rule.id === HEADER_BAND_ID,
+      ),
+    )?.[0] as
+      | {
+          removeRuleIds: number[];
+          addRules: Array<{
+            id: number;
+            action: { type: string };
+          }>;
+        }
+      | undefined;
+    expect(headerAdd?.removeRuleIds).toEqual([HEADER_BAND_ID]);
+    expect(headerAdd?.addRules[0]?.action.type).toBe("modifyHeaders");
+
+    harness.updateDynamicRules.mockClear();
+    expect(await installer.install([redirectOp])).toEqual({ ok: true });
+    expect(harness.chromeIds()).not.toContain(HEADER_BAND_ID);
+    expect((await installer.current()).map((op) => op.ruleId)).toEqual([
+      redirectOp.ruleId,
+    ]);
+  });
+
+  it("empty tracked + Chrome-held header ids use same remove/installed authority", async () => {
+    const harness = chromeHeldInstaller([]);
+    const warm = createDnrInstaller(harness.api);
+    expect(await warm.install([headerOp])).toEqual({ ok: true });
+    expect(harness.chromeIds()).toEqual([HEADER_BAND_ID]);
+
+    await harness.api.storage.local.set({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(HEADER_BAND_ID)]: headerIndexEntry(headerOp),
+      },
+    });
+    harness.updateDynamicRules.mockClear();
+    harness.getDynamicRules.mockClear();
+
+    const cold = createDnrInstaller(harness.api);
+    expect(await cold.current()).toEqual([]);
+
+    await cold.hydrateInstalled([headerOp, redirectOp]);
+    const hydrated = await cold.current();
+    expect(hydrated).toHaveLength(1);
+    expect(hydrated[0]).toBe(headerOp);
+
+    expect(await cold.install([headerOp])).toEqual({ ok: true });
+    const removeCall = harness.updateDynamicRules.mock.calls.find(
+      (call) =>
+        ((call[0] as { removeRuleIds: number[] }).removeRuleIds?.length ?? 0) >
+        0,
+    )?.[0] as { removeRuleIds: number[] } | undefined;
+    expect(removeCall?.removeRuleIds).toContain(HEADER_BAND_ID);
+    expect(harness.chromeIds()).toContain(HEADER_BAND_ID);
+    expect((await cold.current())[0]).toBe(headerOp);
+  });
+
+  it("writes durable header identity on successful install (same index key)", async () => {
+    const harness = chromeHeldInstaller([]);
+    const installer = createDnrInstaller(harness.api);
+    expect(await installer.install([headerOp, redirectOp])).toEqual({
+      ok: true,
+    });
+
+    const stored = (await harness.api.storage.local.get(
+      MATCH_LOGGING_INDEX_KEY,
+    )) as Record<string, unknown>;
+    const index = stored[MATCH_LOGGING_INDEX_KEY] as Record<
+      string,
+      MatchIndexEntry
+    >;
+    expect(index[String(HEADER_BAND_ID)]).toMatchObject({
+      ruleId: headerOp.ruleId,
+      kind: "header",
+    });
+    expect(
+      Object.values(index).some((entry) => entry.ruleId === redirectOp.ruleId),
+    ).toBe(true);
+  });
+
+  it("clears header index identity when unified install drops headers", async () => {
+    const harness = chromeHeldInstaller([]);
+    const installer = createDnrInstaller(harness.api);
+    expect(await installer.install([headerOp, redirectOp])).toEqual({
+      ok: true,
+    });
+
+    expect(await installer.install([redirectOp])).toEqual({ ok: true });
+    expect(harness.chromeIds()).not.toContain(HEADER_BAND_ID);
+
+    const stored = (await harness.api.storage.local.get(
+      MATCH_LOGGING_INDEX_KEY,
+    )) as Record<string, unknown>;
+    const index = stored[MATCH_LOGGING_INDEX_KEY] as Record<
+      string,
+      MatchIndexEntry
+    >;
+    expect(index[String(HEADER_BAND_ID)]).toBeUndefined();
+    expect(Object.values(index).some((entry) => entry.kind === "header")).toBe(
+      false,
+    );
+    expect(
+      Object.values(index).some((entry) => entry.ruleId === redirectOp.ruleId),
+    ).toBe(true);
+  });
+
+  it("ignores body ops on the DNR installer path", async () => {
+    const harness = chromeHeldInstaller([]);
+    const installer = createDnrInstaller(harness.api);
+    expect(await installer.install([bodyOp, headerOp])).toEqual({ ok: true });
+    expect(harness.chromeIds()).toEqual([HEADER_BAND_ID]);
+    expect((await installer.current()).map((op) => op.kind)).toEqual([
+      "header",
+    ]);
   });
 });

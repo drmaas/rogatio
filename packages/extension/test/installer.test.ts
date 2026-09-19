@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { installHeaderRules, toDnrRule } from "../src/installer.js";
+import { describe, expect, it } from "vitest";
+import { toDnrRule } from "../src/installer.js";
 import type { HeaderProjection } from "../src/projection.js";
 
 function makeProjection(
@@ -26,7 +26,7 @@ function makeProjection(
   };
 }
 
-describe("installer.ts — header DNR rules", () => {
+describe("installer.ts — header DNR rule shape", () => {
   it("toDnrRule scopes with requestDomains from origins", () => {
     const projection = makeProjection();
     const rule = toDnrRule(projection);
@@ -110,67 +110,5 @@ describe("installer.ts — header DNR rules", () => {
     expect(rule.condition.excludedRequestDomains).toEqual([
       "https://blocked.com",
     ]);
-  });
-
-  it("installHeaderRules returns installed IDs when updateDynamicRules succeeds", async () => {
-    const projection = makeProjection();
-    const updateDynamicRules = vi.fn(async () => {});
-    const getDynamicRules = vi.fn(async () => []);
-
-    // @ts-expect-error - mock chrome.declarativeNetRequest
-    globalThis.chrome = {
-      declarativeNetRequest: { updateDynamicRules, getDynamicRules },
-    };
-
-    const result = await installHeaderRules([projection]);
-
-    expect(updateDynamicRules).toHaveBeenCalledTimes(1);
-    expect(result.installed).toEqual([projection.id]);
-    expect(result.errors).toHaveLength(0);
-
-    // @ts-expect-error - cleanup mock
-    globalThis.chrome = undefined;
-  });
-
-  it("installHeaderRules returns errors when updateDynamicRules throws", async () => {
-    const projection = makeProjection();
-    const updateDynamicRules = vi.fn(async () => {
-      throw new Error("DNR installation failed");
-    });
-    const getDynamicRules = vi.fn(async () => []);
-
-    // @ts-expect-error - mock chrome.declarativeNetRequest
-    globalThis.chrome = {
-      declarativeNetRequest: { updateDynamicRules, getDynamicRules },
-    };
-
-    const result = await installHeaderRules([projection]);
-
-    expect(result.installed).toHaveLength(0);
-    expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].code).toBe("extension.dnr-error");
-    expect(result.errors[0].message).toBe("DNR installation failed");
-
-    // @ts-expect-error - cleanup mock
-    globalThis.chrome = undefined;
-  });
-
-  it("installHeaderRules returns errors when DNR API is unavailable", async () => {
-    const projection = makeProjection();
-
-    // @ts-expect-error - no chrome.declarativeNetRequest
-    globalThis.chrome = {};
-
-    const result = await installHeaderRules([projection]);
-
-    expect(result.installed).toHaveLength(0);
-    expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].code).toBe("extension.dnr-error");
-    expect(result.errors[0].message).toBe(
-      "declarativeNetRequest API not available",
-    );
-
-    // @ts-expect-error - cleanup mock
-    globalThis.chrome = undefined;
   });
 });

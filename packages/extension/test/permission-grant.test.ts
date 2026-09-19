@@ -1,6 +1,8 @@
 import type { RogatioOperation } from "@rogatio/compiler";
 import { describe, expect, it, vi } from "vitest";
+import { createDnrInstaller } from "../src/dnr.js";
 import { createExtensionApplication } from "../src/service-worker.js";
+import { chromeHeldInstaller } from "./dnr-harness.js";
 
 const mixedProject = {
   version: 1,
@@ -250,90 +252,116 @@ describe("grant moves installed rules and statuses with it", () => {
         },
       ],
     } as const;
-    const dynamic = vi.fn(
-      async (_options: {
-        addRules: Array<{
-          action: {
-            requestHeaders?: Array<{ operation: string; value?: string }>;
-            responseHeaders?: Array<{ operation: string; value?: string }>;
-          };
-          condition: { requestMethods?: string[]; regexFilter?: string };
-        }>;
-      }) => {},
+    const harness = chromeHeldInstaller([]);
+    let containsGranted = false;
+    let envelope: unknown;
+    const app = createExtensionApplication({
+      storage: {
+        read: async () => envelope,
+        compareAndSwap: async (_expected: unknown, next: unknown) => {
+          envelope = next;
+          return true;
+        },
+      },
+      permissions: {
+        contains: async () => containsGranted,
+        request: vi.fn(async () => true),
+        remove: async () => true,
+      },
+      installer: createDnrInstaller(harness.api),
+      generateId: () => "project-g",
+      now: () => 1,
+    });
+
+    const created = await app.handle({
+      version: 1,
+      command: "create-project",
+      data: headerProject,
+    });
+    expect(created).toMatchObject({ ok: true });
+    const enabled = await app.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "project-g",
+      groupId: "group-a",
+      enabled: true,
+    });
+    expect(enabled).toMatchObject({ ok: true });
+
+    const before = await app.handle({ version: 1, command: "get-state" });
+    expect(before).toMatchObject({
+      ok: true,
+      value: {
+        ruleStatuses: [
+          { ruleId: "rule-header", status: "needs permission" },
+          { ruleId: "rule-header-remove", status: "needs permission" },
+        ],
+      },
+    });
+
+    containsGranted = true;
+    harness.updateDynamicRules.mockClear();
+    const after = await app.handle({ version: 1, command: "get-state" });
+    const addCalls = harness.updateDynamicRules.mock.calls.filter(
+      (call) =>
+        ((call[0] as { addRules: unknown[] }).addRules?.length ?? 0) > 0,
     );
-    const previousChrome = (globalThis as Record<string, unknown>).chrome;
-    (globalThis as Record<string, unknown>).chrome = {
-      declarativeNetRequest: { updateDynamicRules: dynamic },
-    };
-    try {
-      const { app, setGranted } = grantHarness(false);
-      const created = await app.handle({
-        version: 1,
-        command: "create-project",
-        data: headerProject,
-      });
-      expect(created).toMatchObject({ ok: true });
-      const enabled = await app.handle({
-        version: 1,
-        command: "set-group-enabled",
-        projectId: "project-g",
-        groupId: "group-a",
-        enabled: true,
-      });
-      expect(enabled).toMatchObject({ ok: true });
-
-      const before = await app.handle({ version: 1, command: "get-state" });
-      expect(before).toMatchObject({
-        ok: true,
-        value: {
-          ruleStatuses: [
-            { ruleId: "rule-header", status: "needs permission" },
-            { ruleId: "rule-header-remove", status: "needs permission" },
-          ],
-        },
-      });
-
-      setGranted(true);
-      const after = await app.handle({ version: 1, command: "get-state" });
-      expect(dynamic).toHaveBeenCalled();
-      const latestRules = dynamic.mock.calls.at(-1)?.[0].addRules ?? [];
-      expect(latestRules).toHaveLength(2);
-      expect(latestRules[0]?.condition).toMatchObject({
-        requestMethods: ["get"],
-        regexFilter: "^https://example\\.com/",
-      });
-      expect(latestRules[0]?.action.requestHeaders?.[0]).toMatchObject({
-        operation: "set",
-        value: "test-value",
-      });
-      // Chrome rejects an empty modify-header list, so the opposite direction's
-      // list must be absent rather than empty on the rules actually submitted.
-      expect(latestRules[0]?.action).not.toHaveProperty("responseHeaders");
-      expect(latestRules[1]?.action).not.toHaveProperty("requestHeaders");
-      // A remove action must omit value entirely; Chrome rejects an undefined
-      // value in a modifyHeaders rule and rejects the whole atomic update.
-      expect(latestRules[1]?.action.responseHeaders?.[0]).toEqual({
-        header: "X-Test-Header",
-        operation: "remove",
-      });
-      // The header rules install through the DNR session API on every state
-      // computation; statuses must reflect the real installation (REQ-009)
-      // instead of comparing numeric DNR ids against project rule ids.
-      expect(after).toMatchObject({
-        ok: true,
-        value: {
-          ruleStatuses: [
-            { ruleId: "rule-header", status: "active" },
-            { ruleId: "rule-header-remove", status: "active" },
-          ],
-        },
-      });
-    } finally {
-      (globalThis as Record<string, unknown>).chrome = previousChrome;
-    }
+    expect(addCalls.length).toBeGreaterThanOrEqual(2);
+    const addedRules = addCalls.flatMap(
+      (call) =>
+        (
+          call[0] as unknown as {
+            addRules: Array<{
+              action: {
+                type: string;
+                requestHeaders?: Array<{
+                  operation: string;
+                  value?: string;
+                  header: string;
+                }>;
+                responseHeaders?: Array<{
+                  operation: string;
+                  value?: string;
+                  header: string;
+                }>;
+              };
+              condition: { requestMethods?: string[]; regexFilter?: string };
+            }>;
+          }
+        ).addRules,
+    );
+    expect(addedRules).toHaveLength(2);
+    expect(addedRules[0]?.condition).toMatchObject({
+      requestMethods: ["get"],
+      regexFilter: "^https://example\\.com/",
+    });
+    expect(addedRules[0]?.action.requestHeaders?.[0]).toMatchObject({
+      operation: "set",
+      value: "test-value",
+    });
+    // Chrome rejects an empty modify-header list, so the opposite direction's
+    // list must be absent rather than empty on the rules actually submitted.
+    expect(addedRules[0]?.action).not.toHaveProperty("responseHeaders");
+    expect(addedRules[1]?.action).not.toHaveProperty("requestHeaders");
+    // A remove action must omit value entirely; Chrome rejects an undefined
+    // value in a modifyHeaders rule and rejects the whole atomic update.
+    expect(addedRules[1]?.action.responseHeaders?.[0]).toEqual({
+      header: "X-Test-Header",
+      operation: "remove",
+    });
+    // Headers share the unified DNR installer; statuses use project rule ids.
+    expect(after).toMatchObject({
+      ok: true,
+      value: {
+        ruleStatuses: [
+          { ruleId: "rule-header", status: "active" },
+          { ruleId: "rule-header-remove", status: "active" },
+        ],
+      },
+    });
   });
 
-  it("surfaces thrown header install errors as extension.dnr-error with the reason", async () => {
+  it("marks failed header installs as error (Chrome reason overlay is P3b)", async () => {
     const headerProject = {
       version: 1,
       name: "Header error project",
@@ -361,55 +389,51 @@ describe("grant moves installed rules and statuses with it", () => {
         },
       ],
     } as const;
-    const updateDynamicRules = vi.fn(async () => {
+    const harness = chromeHeldInstaller([]);
+    harness.updateDynamicRules.mockImplementation(async () => {
       throw new Error("Rule with id 2000001 cannot have an empty list");
     });
-    const previousChrome = (globalThis as Record<string, unknown>).chrome;
-    (globalThis as Record<string, unknown>).chrome = {
-      declarativeNetRequest: { updateDynamicRules },
-    };
-    try {
-      const { app } = grantHarness(true);
-      await app.handle({
-        version: 1,
-        command: "create-project",
-        data: headerProject,
-      });
-      await app.handle({
-        version: 1,
-        command: "set-group-enabled",
-        projectId: "project-g",
-        groupId: "group-a",
-        enabled: true,
-      });
-
-      const state = await app.handle({ version: 1, command: "get-state" });
-      expect(state).toMatchObject({
-        ok: true,
-        value: {
-          ruleStatuses: [
-            {
-              ruleId: "rule-header-fail",
-              status: "error",
-              diagnostics: [
-                {
-                  code: "extension.dnr-error",
-                  params: {
-                    ruleId: "rule-header-fail",
-                    reason: "Rule with id 2000001 cannot have an empty list",
-                  },
-                },
-              ],
-            },
-          ],
+    let envelope: unknown;
+    const app = createExtensionApplication({
+      storage: {
+        read: async () => envelope,
+        compareAndSwap: async (_expected: unknown, next: unknown) => {
+          envelope = next;
+          return true;
         },
-      });
-    } finally {
-      (globalThis as Record<string, unknown>).chrome = previousChrome;
-    }
+      },
+      permissions: {
+        contains: async () => true,
+        request: vi.fn(async () => true),
+        remove: async () => true,
+      },
+      installer: createDnrInstaller(harness.api),
+      generateId: () => "project-g",
+      now: () => 1,
+    });
+    await app.handle({
+      version: 1,
+      command: "create-project",
+      data: headerProject,
+    });
+    await app.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "project-g",
+      groupId: "group-a",
+      enabled: true,
+    });
+
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: {
+        ruleStatuses: [{ ruleId: "rule-header-fail", status: "error" }],
+      },
+    });
   });
 
-  it("surfaces non-Error header install rejections with the stable fallback reason", async () => {
+  it("marks non-Error header install rejections as error (Chrome reason overlay is P3b)", async () => {
     const headerProject = {
       version: 1,
       name: "Header non-error project",
@@ -437,51 +461,47 @@ describe("grant moves installed rules and statuses with it", () => {
         },
       ],
     } as const;
-    const updateDynamicRules = vi.fn(async () => {
+    const harness = chromeHeldInstaller([]);
+    harness.updateDynamicRules.mockImplementation(async () => {
       throw "not-an-error";
     });
-    const previousChrome = (globalThis as Record<string, unknown>).chrome;
-    (globalThis as Record<string, unknown>).chrome = {
-      declarativeNetRequest: { updateDynamicRules },
-    };
-    try {
-      const { app } = grantHarness(true);
-      await app.handle({
-        version: 1,
-        command: "create-project",
-        data: headerProject,
-      });
-      await app.handle({
-        version: 1,
-        command: "set-group-enabled",
-        projectId: "project-g",
-        groupId: "group-a",
-        enabled: true,
-      });
-
-      const state = await app.handle({ version: 1, command: "get-state" });
-      expect(state).toMatchObject({
-        ok: true,
-        value: {
-          ruleStatuses: [
-            {
-              ruleId: "rule-header-fail",
-              status: "error",
-              diagnostics: [
-                {
-                  code: "extension.dnr-error",
-                  params: {
-                    ruleId: "rule-header-fail",
-                    reason: "Failed to install header rule",
-                  },
-                },
-              ],
-            },
-          ],
+    let envelope: unknown;
+    const app = createExtensionApplication({
+      storage: {
+        read: async () => envelope,
+        compareAndSwap: async (_expected: unknown, next: unknown) => {
+          envelope = next;
+          return true;
         },
-      });
-    } finally {
-      (globalThis as Record<string, unknown>).chrome = previousChrome;
-    }
+      },
+      permissions: {
+        contains: async () => true,
+        request: vi.fn(async () => true),
+        remove: async () => true,
+      },
+      installer: createDnrInstaller(harness.api),
+      generateId: () => "project-g",
+      now: () => 1,
+    });
+    await app.handle({
+      version: 1,
+      command: "create-project",
+      data: headerProject,
+    });
+    await app.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "project-g",
+      groupId: "group-a",
+      enabled: true,
+    });
+
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: {
+        ruleStatuses: [{ ruleId: "rule-header-fail", status: "error" }],
+      },
+    });
   });
 });

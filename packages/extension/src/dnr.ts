@@ -1,17 +1,20 @@
 import type { RuleInstallerAdapter } from "@rogatio/browser-core";
 import type {
+  HeaderOperation,
   QueryOperation,
   RedirectOperation,
   RogatioOperation,
 } from "@rogatio/compiler";
 import { type DnrQueryTransform, queryActionToDNR } from "@rogatio/compiler";
 import type { ChromeApi } from "./chrome.js";
+import { type DnrHeaderRule, toDnrRule } from "./installer.js";
 import {
   buildInstallIndexSnapshot,
   type MatchIndexSnapshot,
   readMatchIndexSnapshot,
   writeMatchIndex,
 } from "./match-index.js";
+import { projectHeaders } from "./projection.js";
 
 export interface DnrRedirectRule {
   id: number;
@@ -38,7 +41,7 @@ export interface DnrQueryRule {
   };
 }
 
-export type DnrRule = DnrRedirectRule | DnrQueryRule;
+export type DnrRule = DnrRedirectRule | DnrQueryRule | DnrHeaderRule;
 
 function hostnamesFromOrigins(origins: readonly string[]): string[] {
   const hosts: string[] = [];
@@ -142,12 +145,6 @@ function removeIdsForBand(
 export interface DnrInstallerWithMatchIndex extends RuleInstallerAdapter {
   /** Warm cold tracked from Chrome ∩ index ∩ compiled (ADR 0008). */
   hydrateInstalled(compiled: readonly RogatioOperation[]): Promise<void>;
-  syncHeaderMatchIndex(
-    headerEntries: ReadonlyArray<{
-      readonly ruleId: number;
-      readonly operation: RogatioOperation;
-    }>,
-  ): Promise<void>;
 }
 
 export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
@@ -163,54 +160,29 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
     return previous.then(operation).finally(release);
   }
 
-  async function storedIndexByKind(): Promise<{
-    header: MatchIndexSnapshot;
-    redirectQuery: MatchIndexSnapshot;
-  }> {
-    const header: MatchIndexSnapshot = {};
-    const redirectQuery: MatchIndexSnapshot = {};
-    for (const [id, entry] of Object.entries(
-      await readMatchIndexSnapshot(api),
-    )) {
-      if (entry.kind === "header") header[id] = entry;
-      else redirectQuery[id] = entry;
-    }
-    return { header, redirectQuery };
-  }
-
-  // Sole wholesale writer for the index (ADR 0003). Serialized on one
-  // in-process queue so overlapping install and header sync cannot drop slices.
-  //
-  // Overlay: redirect/query from tracked when non-empty; else stored when
-  // `keepStoredRedirectQuery` (header sync after SW restart), else {}.
-  // Headers from `headerOverlay` when provided; else stored (redirect install).
-  async function writeWholesaleMatchIndex(options: {
-    readonly headerOverlay?: ReadonlyArray<{
-      readonly ruleId: number;
-      readonly operation: RogatioOperation;
-    }>;
-    readonly keepStoredRedirectQuery?: boolean;
-  }): Promise<void> {
+  async function writeWholesaleMatchIndex(): Promise<void> {
     await withMatchIndexWriteLock(async () => {
-      const redirectQueryEntries = [...tracked.entries()].map(
-        ([ruleId, operation]) => ({ ruleId, operation }),
-      );
-      const needsStored =
-        options.headerOverlay === undefined ||
-        (redirectQueryEntries.length === 0 &&
-          options.keepStoredRedirectQuery === true);
-      const stored = needsStored
-        ? await storedIndexByKind()
-        : { header: {}, redirectQuery: {} };
+      const redirectQueryEntries: Array<{
+        ruleId: number;
+        operation: RogatioOperation;
+      }> = [];
+      const trackedHeaderEntries: Array<{
+        ruleId: number;
+        operation: RogatioOperation;
+      }> = [];
+      for (const [ruleId, operation] of tracked.entries()) {
+        if (operation.kind === "header") {
+          trackedHeaderEntries.push({ ruleId, operation });
+        } else if (
+          operation.kind === "redirect" ||
+          operation.kind === "query"
+        ) {
+          redirectQueryEntries.push({ ruleId, operation });
+        }
+      }
       const snapshot: MatchIndexSnapshot = {
-        ...(redirectQueryEntries.length > 0
-          ? buildInstallIndexSnapshot(redirectQueryEntries)
-          : options.keepStoredRedirectQuery === true
-            ? stored.redirectQuery
-            : {}),
-        ...(options.headerOverlay === undefined
-          ? stored.header
-          : buildInstallIndexSnapshot(options.headerOverlay)),
+        ...buildInstallIndexSnapshot(redirectQueryEntries),
+        ...buildInstallIndexSnapshot(trackedHeaderEntries),
       };
       try {
         await writeMatchIndex(api, snapshot);
@@ -242,12 +214,16 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
     async hydrateInstalled(
       compiled: readonly RogatioOperation[],
     ): Promise<void> {
-      // ADR 0008: hydrate only when memory is cold. Wiping warm tracked would
-      // hide stale compiler ids from projectState sameSet and skip install()
-      // orphan cleanup (P1).
+      // ADR 0008: hydrate only when memory is cold per band. Wiping warm
+      // tracked would hide stale compiler ids from projectState sameSet and
+      // skip install() orphan cleanup (P1).
+      let hydrateRedirectQuery = true;
+      let hydrateHeader = true;
       for (const id of tracked.keys()) {
-        if (isOwnedBandId(id, "redirect-query")) return;
+        if (isOwnedBandId(id, "redirect-query")) hydrateRedirectQuery = false;
+        if (isOwnedBandId(id, "header")) hydrateHeader = false;
       }
+      if (!hydrateRedirectQuery && !hydrateHeader) return;
 
       const dnr = api.declarativeNetRequest;
       if (dnr === undefined) return;
@@ -261,22 +237,36 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
 
       const byRuleId = new Map<string, RogatioOperation>();
       for (const operation of compiled) {
-        if (operation.kind === "redirect" || operation.kind === "query") {
+        if (
+          operation.kind === "redirect" ||
+          operation.kind === "query" ||
+          operation.kind === "header"
+        ) {
           byRuleId.set(operation.ruleId, operation);
         }
       }
 
       const index = await readMatchIndexSnapshot(api);
       for (const rule of live) {
-        if (!isOwnedBandId(rule.id, "redirect-query")) continue;
         const key = String(rule.id);
         if (!Object.hasOwn(index, key)) continue;
         const entry = index[key];
-        if (entry.kind !== "redirect" && entry.kind !== "query") continue;
         const operation = byRuleId.get(entry.ruleId);
         if (operation === undefined) continue;
         if (operation.kind !== entry.kind) continue;
-        tracked.set(rule.id, operation);
+        if (
+          hydrateRedirectQuery &&
+          isOwnedBandId(rule.id, "redirect-query") &&
+          (entry.kind === "redirect" || entry.kind === "query")
+        ) {
+          tracked.set(rule.id, operation);
+        } else if (
+          hydrateHeader &&
+          isOwnedBandId(rule.id, "header") &&
+          entry.kind === "header"
+        ) {
+          tracked.set(rule.id, operation);
+        }
       }
     },
 
@@ -286,6 +276,7 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
       const addRules: DnrRule[] = [];
       const added: Array<{ ruleId: number; operation: RogatioOperation }> = [];
       const usedIds = new Set<number>();
+      const headerOps: HeaderOperation[] = [];
       for (const operation of operations) {
         if (operation.kind === "redirect") {
           const redirect = operation as RedirectOperation;
@@ -301,20 +292,33 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
           usedIds.add(id);
           addRules.push(translateQueryToDnr(query, id));
           added.push({ ruleId: id, operation: query });
+        } else if (operation.kind === "header") {
+          headerOps.push(operation as HeaderOperation);
         }
       }
-
+      for (const projection of projectHeaders(headerOps)) {
+        addRules.push(toDnrRule(projection));
+        const operation = headerOps.find(
+          (candidate) => candidate.ruleId === projection.ruleId,
+        );
+        if (operation !== undefined) {
+          added.push({ ruleId: projection.id, operation });
+        }
+      }
       const dnr = api.declarativeNetRequest;
       if (dnr === undefined) return { ok: false, diagnostics: [] };
 
       // Chrome live set is authority for remove (ADR 0009). Fail closed if
       // unreadable — never treat as empty and add (duplicate-id / wipe risk).
+      // Unified replace touches both Rogatio bands; foreign ids stay untouched.
       let liveOwned: number[];
       try {
         const live = await dnr.getDynamicRules();
         if (!Array.isArray(live)) return { ok: false, diagnostics: [] };
-        // Kind-scoped: redirect/query replace only touches 1..1_000_000.
-        liveOwned = removeIdsForBand(live, "redirect-query");
+        liveOwned = [
+          ...removeIdsForBand(live, "redirect-query"),
+          ...removeIdsForBand(live, "header"),
+        ];
       } catch {
         return { ok: false, diagnostics: [] };
       }
@@ -366,26 +370,15 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
         }
       }
 
-      // Preserve prior index when every add fails. Empty install([]) still
-      // clears the index deliberately.
+      // Preserve prior index when every add fails. Empty or header-less
+      // install still rewrites both Rogatio slices (unified replace).
       if (anySucceeded || orphanIds.length > 0 || operations.length === 0) {
-        await writeWholesaleMatchIndex({});
+        await writeWholesaleMatchIndex();
       }
 
       return anyFailed && tracked.size === 0 && operations.length > 0
         ? { ok: false, diagnostics: [] }
         : { ok: true };
-    },
-    async syncHeaderMatchIndex(
-      headerEntries: ReadonlyArray<{
-        readonly ruleId: number;
-        readonly operation: RogatioOperation;
-      }>,
-    ): Promise<void> {
-      await writeWholesaleMatchIndex({
-        headerOverlay: headerEntries,
-        keepStoredRedirectQuery: true,
-      });
     },
   };
 }

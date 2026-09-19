@@ -64,14 +64,14 @@ Track progress in this file. Stay in `packages/extension` + tests. Do not change
 **AC:** AC3 (+ AC7 regression if SW overlay touched)  
 **Prove:** unit — headers use same remove/install/`installedRuleIds` authority as redirect/query; no separate header-only path.
 
-- [ ] Fold `installHeaderRules` into unified reconciler (call-path only; no unrelated dnr.ts cleanup)
-- [ ] Remove dual path in `projectState`
-- [ ] Kind-scoped bands preserved under unified remove
-- [ ] Write header identity on successful install (same index key; ADR 0008)
-- [ ] Unit: unified header+redirect/query install/remove
-- [ ] Unit: empty `tracked` + Chrome-held header ids (`2_000_001+`) → remove/`installed` same authority
-- [ ] Unit/assert: body still native overlay if SW touched
-- [ ] Phase verify: focused extension unit tests
+- [x] Fold `installHeaderRules` into unified reconciler; delete unused `installHeaderRules` + `syncHeaderMatchIndex`
+- [x] Remove dual path in `projectState`
+- [x] Kind-scoped bands preserved under unified remove
+- [x] Write header identity on successful install (same index key; ADR 0008)
+- [x] Unit: unified header+redirect/query install/remove
+- [x] Unit: empty `tracked` + Chrome-held header ids (`2_000_001+`) → remove/`installed` same authority
+- [x] Unit/assert: body still native overlay if SW touched
+- [x] Phase verify: focused extension unit tests
 
 ---
 
