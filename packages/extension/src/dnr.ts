@@ -110,12 +110,33 @@ export function translateQueryToDnr(
   };
 }
 
+/** Redirect/query DNR ids occupy 1..1_000_000 (ADR 0009). */
+const REDIRECT_QUERY_ID_MAX = 1_000_000;
+/** Header DNR ids start at 2_000_001 (ADR 0009). */
+const HEADER_ID_MIN = 2_000_001;
+
+type RogatioDnrBand = "redirect-query" | "header";
+
 function ruleIdHash(ruleId: string): number {
   let hash = 0;
   for (let index = 0; index < ruleId.length; index += 1) {
     hash = (hash * 31 + ruleId.charCodeAt(index)) | 0;
   }
-  return (Math.abs(hash) % 1_000_000) + 1;
+  return (Math.abs(hash) % REDIRECT_QUERY_ID_MAX) + 1;
+}
+
+function isOwnedBandId(id: number, band: RogatioDnrBand): boolean {
+  if (!Number.isInteger(id)) return false;
+  if (band === "redirect-query") return id >= 1 && id <= REDIRECT_QUERY_ID_MAX;
+  return id >= HEADER_ID_MIN;
+}
+
+/** Live Chrome ids ∩ Rogatio-owned band for this replace (ADR 0009). */
+function removeIdsForBand(
+  live: ReadonlyArray<{ id: number }>,
+  band: RogatioDnrBand,
+): number[] {
+  return live.map((rule) => rule.id).filter((id) => isOwnedBandId(id, band));
 }
 
 export interface DnrInstallerWithMatchIndex extends RuleInstallerAdapter {
@@ -218,7 +239,6 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
     async install(
       operations: readonly RogatioOperation[],
     ): Promise<{ ok: true } | { ok: false; diagnostics: never[] }> {
-      const removeRuleIds = [...tracked.keys()];
       const addRules: DnrRule[] = [];
       const added: Array<{ ruleId: number; operation: RogatioOperation }> = [];
       const usedIds = new Set<number>();
@@ -226,14 +246,14 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
         if (operation.kind === "redirect") {
           const redirect = operation as RedirectOperation;
           let id = ruleIdHash(redirect.ruleId);
-          while (usedIds.has(id)) id = (id % 1_000_000) + 1;
+          while (usedIds.has(id)) id = (id % REDIRECT_QUERY_ID_MAX) + 1;
           usedIds.add(id);
           addRules.push(translateRedirectToDnr(redirect, id));
           added.push({ ruleId: id, operation: redirect });
         } else if (operation.kind === "query") {
           const query = operation as QueryOperation;
           let id = ruleIdHash(query.ruleId);
-          while (usedIds.has(id)) id = (id % 1_000_000) + 1;
+          while (usedIds.has(id)) id = (id % REDIRECT_QUERY_ID_MAX) + 1;
           usedIds.add(id);
           addRules.push(translateQueryToDnr(query, id));
           added.push({ ruleId: id, operation: query });
@@ -243,18 +263,40 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
       const dnr = api.declarativeNetRequest;
       if (dnr === undefined) return { ok: false, diagnostics: [] };
 
-      // Drop previously tracked redirect/query ids first.
-      if (removeRuleIds.length > 0) {
+      // Chrome live set is authority for remove (ADR 0009). Fail closed if
+      // unreadable — never treat as empty and add (duplicate-id / wipe risk).
+      let liveOwned: number[];
+      try {
+        const live = await dnr.getDynamicRules();
+        // Kind-scoped: redirect/query replace only touches 1..1_000_000.
+        liveOwned = removeIdsForBand(live, "redirect-query");
+      } catch {
+        return { ok: false, diagnostics: [] };
+      }
+
+      const desiredIds = new Set(addRules.map((rule) => rule.id));
+      const orphanIds = liveOwned.filter((id) => !desiredIds.has(id));
+
+      tracked.clear();
+
+      // Orphans only: best-effort bulk drop. Desired ids are never removed
+      // here — each add below does atomic remove+add for its own id so a
+      // failed orphan batch cannot leave a duplicate-id add path.
+      if (orphanIds.length > 0) {
         try {
-          await dnr.updateDynamicRules({ removeRuleIds, addRules: [] });
+          await dnr.updateDynamicRules({
+            removeRuleIds: orphanIds,
+            addRules: [],
+          });
         } catch {
-          // Continue; per-rule adds below still attempt a clean install.
+          // Best-effort; desired per-rule replace below still proceeds.
         }
       }
-      tracked.clear();
 
       // Install each rule independently so one invalid transform cannot block
       // the rest (Chrome rejects the whole updateDynamicRules batch on error).
+      // Always removeRuleIds: [rule.id] with the add so Chrome-held desired
+      // ids survive a prior orphan-remove failure (no empty-remove-then-add).
       let anyFailed = false;
       let anySucceeded = false;
       for (const entry of added) {
@@ -264,7 +306,7 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
         if (rule === undefined) continue;
         try {
           await dnr.updateDynamicRules({
-            removeRuleIds: [],
+            removeRuleIds: [rule.id],
             addRules: [rule],
           });
           tracked.set(entry.ruleId, entry.operation);
@@ -281,7 +323,7 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
 
       // Preserve prior index when every add fails. Empty install([]) still
       // clears the index deliberately.
-      if (anySucceeded || removeRuleIds.length > 0 || operations.length === 0) {
+      if (anySucceeded || orphanIds.length > 0 || operations.length === 0) {
         await writeWholesaleMatchIndex({});
       }
 

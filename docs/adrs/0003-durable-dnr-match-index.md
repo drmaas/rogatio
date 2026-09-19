@@ -21,3 +21,5 @@ Amended: earlier decision stored only `{ ruleId, kind }` and forbade destination
 - A stale index after a crash between DNR update and storage write yields unknown-id no-ops, not guessed names.
 - Extension pages that read `chrome.storage.local` can see intended action strings in this key as well as in the envelope. Residual accepted; subset + write-time bound keep it from being unbounded.
 - No `redactBodiesInLogs`. Extra body fields on a stored entry are ignored at format time.
+
+> Amended for install identity: see `0008-reuse-match-index-for-install-identity.md`. The same key is the durable `numericId → ruleId` map. Header identity is written on successful install (0006 probe already shipped header logging). Log-intent shape unchanged. Do not persist a full `RogatioOperation`.
