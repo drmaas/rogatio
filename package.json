@@ -35,7 +35,7 @@
     "selenium-webdriver": "4.49.0",
     "semantic-release": "25.0.9",
     "typescript": "7.0.2",
-    "vitest": "4.1.11"
+    "vitest": "5.0.1"
   },
   "dependencies": {
     "@peculiar/x509": "^2.1.0",

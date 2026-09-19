@@ -10,9 +10,8 @@ export default defineConfig({
     setupFiles: [resolve(root, "test/setup.ts")],
     projects: [
       {
-        // Vitest 4 inline projects do not inherit the root config (including
-        // `resolve.alias`) unless they opt in.
-        extends: true,
+        // Vitest 5: inline projects inherit root config by default
+        // (`extends` defaults to true), including `resolve.alias`.
         test: {
           name: "unit",
           environment: "node",
@@ -21,7 +20,6 @@ export default defineConfig({
         },
       },
       {
-        extends: true,
         test: {
           name: "integration",
           environment: "node",
