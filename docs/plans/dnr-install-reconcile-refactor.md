@@ -1,5 +1,8 @@
 # Refactor proposals — dnr-install-reconcile
 
+> Status: frozen 2026-09-18
+
+
 **Audience:** hybrid  
 **Status:** candidates 1–2 implemented — awaiting commit / freeze  
 **Feature:** `dnr-install-reconcile`  

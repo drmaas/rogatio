@@ -1,5 +1,8 @@
 # Plan — dnr-install-reconcile
 
+> Status: frozen 2026-09-18
+
+
 **Audience:** hybrid  
 **Status:** approved — implement next  
 **Plan gate:** Approved (Q2 → one PR; strategy → TDD)  

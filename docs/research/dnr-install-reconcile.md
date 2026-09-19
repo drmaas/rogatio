@@ -1,5 +1,8 @@
 # Research — dnr-install-reconcile
 
+> Status: frozen 2026-09-18
+
+
 **Audience:** hybrid  
 **Status:** approved — plan next  
 **Research gate:** Approved with recommendations (Q1→ADR; Q2→plan gate; reload-extension claim → prove or avoid)  
