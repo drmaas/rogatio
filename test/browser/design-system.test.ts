@@ -30,6 +30,13 @@ type MockEnvelope = {
   version: number;
   projects: Record<string, MockProject>;
   activeProjectId: string | null;
+  ruleStatuses?: Array<{
+    groupId: string;
+    ruleId: string;
+    status: string;
+  }>;
+  badge?: { text: string; attention: boolean };
+  nativeRuntimeState?: { phase: string };
 };
 
 type MockRule = MockProject["data"]["groups"][number]["rules"][number];
@@ -145,7 +152,12 @@ function installChromeMock(seed: MockEnvelope): void {
       runtime: {
         lastError: undefined,
         sendMessage(
-          message: { command?: string; projectId?: string },
+          message: {
+            command?: string;
+            projectId?: string;
+            groupId?: string;
+            enabled?: boolean;
+          },
           callback: (value: unknown) => void,
         ) {
           if (message.command === "refresh" || message.command === "get-state")
@@ -153,6 +165,34 @@ function installChromeMock(seed: MockEnvelope): void {
           else if (message.command === "switch-project") {
             state.activeProjectId = message.projectId ?? null;
             callback({ ok: true, value: state });
+          } else if (message.command === "set-group-enabled") {
+            const projectId = message.projectId;
+            const groupId = message.groupId;
+            const project =
+              projectId !== undefined ? state.projects[projectId] : undefined;
+            if (
+              project &&
+              typeof groupId === "string" &&
+              typeof message.enabled === "boolean"
+            ) {
+              const enabled = new Set(project.enabledGroupIds);
+              if (message.enabled) enabled.add(groupId);
+              else enabled.delete(groupId);
+              project.enabledGroupIds = [...enabled];
+              const activeCount = project.enabledGroupIds.length;
+              state.badge = {
+                text: String(activeCount),
+                attention: activeCount === 0,
+              };
+              state.ruleStatuses = project.data.groups.flatMap((group) =>
+                group.rules.map((rule) => ({
+                  groupId: group.id,
+                  ruleId: rule.id,
+                  status: enabled.has(group.id) ? "active" : "disabled",
+                })),
+              );
+            }
+            callback({ ok: true, value: project ?? state });
           } else callback({ ok: true, value: state });
         },
       },
@@ -573,4 +613,79 @@ test("popup Open app href stays management page after project switch", async ({
   await page.locator("[data-project-picker]").selectOption("project-b");
   await expect(page.locator("[data-project-picker]")).toHaveValue("project-b");
   await expect(openApp).toHaveAttribute("href", "index.html");
+});
+
+test("workspace group activation sits under the active project card", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, defaultEnvelope());
+  await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+
+  const projectCard = page.locator("[data-active-project-card]");
+  const activation = page.locator("[data-group-activation]");
+  const startRuntime = page.getByRole("button", { name: "Start runtime" });
+  await expect(projectCard).toBeVisible();
+  await expect(activation).toBeVisible();
+  await expect(page.locator("[data-group-toggle]")).toHaveCount(1);
+
+  const order = await page.evaluate(() => {
+    const card = document.querySelector("[data-active-project-card]");
+    const groups = document.querySelector("[data-group-activation]");
+    const start = document.querySelector(
+      '[data-command="start-native-runtime"]',
+    );
+    if (!card || !groups || !start) return null;
+    const position = card.compareDocumentPosition(groups);
+    const groupsBeforeStart = groups.compareDocumentPosition(start);
+    return {
+      groupsFollowCard: (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      startFollowsGroups:
+        (groupsBeforeStart & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+    };
+  });
+  expect(order).toEqual({
+    groupsFollowCard: true,
+    startFollowsGroups: true,
+  });
+  await expect(startRuntime).toBeVisible();
+});
+
+test("workspace group toggle keeps dirty editor draft mounted", async ({
+  page,
+}) => {
+  const startedEnvelope: MockEnvelope = {
+    ...defaultEnvelope(),
+    nativeRuntimeState: { phase: "started" },
+    badge: { text: "1", attention: false },
+    ruleStatuses: [
+      { groupId: "group-one", ruleId: "rule-one", status: "active" },
+    ],
+  };
+  await page.addInitScript(installChromeMock, startedEnvelope);
+  await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+
+  const nameInput = page.locator('[data-path="/name"]');
+  await expect(nameInput).toBeVisible();
+  await nameInput.fill("Draft rename");
+  await expect(page.locator("[data-dirty-state]")).toHaveText(
+    "Unsaved changes",
+  );
+
+  const toggle = page.locator("[data-group-toggle]");
+  await expect(toggle).toBeChecked();
+  await toggle.uncheck();
+  await expect(toggle).not.toBeChecked();
+  await expect(page.getByText("Group deactivated.")).toBeVisible();
+  await expect(page.locator("[data-dirty-state]")).toHaveText(
+    "Unsaved changes",
+  );
+  await expect(nameInput).toHaveValue("Draft rename");
+  await expect(page.locator("[data-badge-state]")).toContainText(
+    "Active rules: 0",
+  );
+  await expect(page.locator("[data-rule-statuses]")).toContainText(
+    "group-one/rule-one: disabled",
+  );
 });

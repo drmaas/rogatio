@@ -11,6 +11,7 @@ import {
   type NativeSessionOptions,
 } from "./native-session.js";
 import { runtimeControlDisabled } from "./runtime-controls.js";
+import { shouldRemountEditorAfterGroupEnablement } from "./workspace-enablement-refresh.js";
 
 interface StoredProject {
   readonly id: string;
@@ -355,6 +356,16 @@ function countRules(value: unknown): number {
   return total;
 }
 
+function badgeLabelText(): string {
+  const attention = attentionFromStatuses();
+  const attentionText = state.badge?.attention ? " (attention needed)" : "";
+  const attentionReason =
+    attention !== null && state.ruleStatuses ? ` — ${attention.blocking}` : "";
+  return state.badge
+    ? `Active rules: ${state.badge.text}${attentionText}${attentionReason}`
+    : `Active rules: 0${attentionText}${attentionReason}`;
+}
+
 function renderTopbar(shell: HTMLElement): void {
   const topbar = document.createElement("header");
   topbar.className = "rogatio-topbar";
@@ -386,22 +397,14 @@ function renderTopbar(shell: HTMLElement): void {
     const badge = document.createElement("span");
     badge.dataset.badgeState = "true";
     badge.className = "rogatio-badge-pill";
-    const attention = attentionFromStatuses();
-    const attentionText = state.badge?.attention ? " (attention needed)" : "";
-    const attentionReason =
-      attention !== null && state.ruleStatuses
-        ? ` — ${attention.blocking}`
-        : "";
-    badge.textContent = state.badge
-      ? `Active rules: ${state.badge.text}${attentionText}${attentionReason}`
-      : `Active rules: 0${attentionText}${attentionReason}`;
+    badge.textContent = badgeLabelText();
     actions.append(badge);
     topbar.append(actions);
   }
   shell.append(topbar);
 }
 
-function renderSidebar(shell: HTMLElement): void {
+function createSidebar(): HTMLElement {
   const sidebar = document.createElement("aside");
   sidebar.className = "rogatio-sidebar";
 
@@ -420,6 +423,38 @@ function renderSidebar(shell: HTMLElement): void {
     status.textContent = "Active project";
     projectCard.append(title, status);
     sidebar.append(projectCard);
+  }
+
+  // Group activation sits directly under the active project so enable/disable
+  // is as discoverable here as in the toolbar popup.
+  if (activeProject && isProjectRecord(activeProject.data)) {
+    const groups = document.createElement("fieldset");
+    groups.dataset.groupActivation = "true";
+    const legend = document.createElement("legend");
+    legend.textContent = "Group activation";
+    groups.append(legend);
+    const enabled = new Set(activeProject.enabledGroupIds);
+    const sourceGroups = Array.isArray(activeProject.data.groups)
+      ? activeProject.data.groups
+      : [];
+    for (const group of sourceGroups) {
+      if (!isProjectRecord(group) || typeof group.id !== "string") continue;
+      const label = document.createElement("label");
+      label.className = enabled.has(group.id)
+        ? "rogatio-group-label rogatio-group-active"
+        : "rogatio-group-label rogatio-group-inactive";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = enabled.has(group.id);
+      checkbox.dataset.groupId = group.id;
+      checkbox.dataset.groupToggle = "true";
+      label.append(
+        checkbox,
+        document.createTextNode(text(group.name, group.id)),
+      );
+      groups.append(label);
+    }
+    sidebar.append(groups);
   }
 
   const actions = document.createElement("div");
@@ -524,35 +559,6 @@ function renderSidebar(shell: HTMLElement): void {
     sidebar.append(permissionSummary);
   }
 
-  if (activeProject && isProjectRecord(activeProject.data)) {
-    const groups = document.createElement("fieldset");
-    const legend = document.createElement("legend");
-    legend.textContent = "Group activation";
-    groups.append(legend);
-    const enabled = new Set(activeProject.enabledGroupIds);
-    const sourceGroups = Array.isArray(activeProject.data.groups)
-      ? activeProject.data.groups
-      : [];
-    for (const group of sourceGroups) {
-      if (!isProjectRecord(group) || typeof group.id !== "string") continue;
-      const label = document.createElement("label");
-      label.className = enabled.has(group.id)
-        ? "rogatio-group-label rogatio-group-active"
-        : "rogatio-group-label rogatio-group-inactive";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = enabled.has(group.id);
-      checkbox.dataset.groupId = group.id;
-      checkbox.dataset.groupToggle = "true";
-      label.append(
-        checkbox,
-        document.createTextNode(text(group.name, group.id)),
-      );
-      groups.append(label);
-    }
-    sidebar.append(groups);
-  }
-
   const attention = attentionFromStatuses();
   if (attention !== null) {
     const attentionNote = document.createElement("p");
@@ -611,7 +617,21 @@ function renderSidebar(shell: HTMLElement): void {
     sidebar.append(card);
   }
 
-  shell.append(sidebar);
+  return sidebar;
+}
+
+function renderSidebar(shell: HTMLElement): void {
+  shell.append(createSidebar());
+}
+
+/** Update enablement chrome without remounting a dirty editor draft. */
+function patchWorkspaceEnablementChrome(): void {
+  const existing = root.querySelector(".rogatio-sidebar");
+  if (existing) existing.replaceWith(createSidebar());
+  const status = root.querySelector(".rogatio-status");
+  if (status) status.textContent = statusMessage;
+  const badge = root.querySelector("[data-badge-state]");
+  if (badge) badge.textContent = badgeLabelText();
 }
 
 function renderOverview(shell: HTMLElement): void {
@@ -1300,7 +1320,11 @@ async function setGroupEnabled(
         ? "Group activated."
         : "Group deactivated."
       : "The group activation could not be changed.";
-  await refresh();
+  await refresh({
+    remountEditor: shouldRemountEditorAfterGroupEnablement(
+      editor?.isDirty() === true,
+    ),
+  });
 }
 
 async function nativeRuntimeCommand(
@@ -1471,11 +1495,9 @@ async function checkNativeAISupport(): Promise<void> {
     const supported = await checkAISupport(adapter);
     aiSupported = supported;
     aiStatusChecked = true;
-    renderShell();
   } catch {
     aiSupported = false;
     aiStatusChecked = true;
-    renderShell();
   }
 }
 
@@ -1612,17 +1634,25 @@ async function loadMatchLoggingEnabled(): Promise<void> {
   }
 }
 
-async function refresh(): Promise<void> {
+async function refresh(
+  options: { readonly remountEditor?: boolean } = {},
+): Promise<void> {
   await loadMatchLoggingEnabled();
   const response = await client.send({ version: 1, command: "refresh" });
   if (response?.ok !== true || !response.value) {
     statusMessage = "The project state could not be refreshed.";
+    if (options.remountEditor === false) {
+      patchWorkspaceEnablementChrome();
+      return;
+    }
     renderShell();
     return;
   }
   const previousActiveProjectId = state.activeProjectId;
   state = response.value as Envelope;
-  if (previousActiveProjectId !== state.activeProjectId) {
+  const activeProjectChanged =
+    previousActiveProjectId !== state.activeProjectId;
+  if (activeProjectChanged) {
     permissionOrigins = [];
     permissionGranted = false;
   }
@@ -1637,6 +1667,12 @@ async function refresh(): Promise<void> {
     aiStatusChecked = false;
   }
 
+  // Never soft-patch across an active-project change: the mounted draft belongs
+  // to the previous project and must not be saved against the new active id.
+  if (options.remountEditor === false && !activeProjectChanged) {
+    patchWorkspaceEnablementChrome();
+    return;
+  }
   renderShell();
 }
 
