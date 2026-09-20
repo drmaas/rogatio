@@ -5,6 +5,7 @@ description: >-
   Use when updating README, AGENTS.md, docs/architecture.md, rogatio-overview.md,
   packages/docs-site content, package READMEs, or when docs drift from CLI/runtime/
   extension behavior (pnpm pin, package DAG, install commands, host vs CA).
+  Runs graphify (update or full) then queries the graph before editing.
   Lives at .agents/skills/ for multi-agent discovery (Cursor, Claude Code, etc.).
 ---
 
@@ -23,6 +24,7 @@ Bring **current-behavior** docs in line with code. Decision records stay frozen.
 - Do **not** rewrite `docs/specs/`, `docs/plans/`, `docs/workflows/`, `docs/research/`, or `docs/adrs/` to match current behavior (append-only; `Superseded by:` only when reviewing a record)
 - Do **not** invent product behavior; code and tests win
 - Do **not** edit in the main checkout
+- Do **not** commit `graphify-out/` (gitignored local artifact)
 
 ## Source-of-truth priority
 
@@ -31,6 +33,8 @@ Bring **current-behavior** docs in line with code. Decision records stay frozen.
 3. `docs/architecture.md` (boundaries + decisions)
 4. `README.md`, `packages/*/README.md`
 5. Decision records (why / rejected — not what the system does now)
+
+Graphify answers are **orientation aids**. If graphify and code disagree, **code wins**.
 
 Live current-behavior surfaces that **must** stay synced with code:
 
@@ -55,9 +59,50 @@ pnpm install
 
 All edits and validation run only in that worktree.
 
+## Graphify (required)
+
+After entering the worktree, **before** drafting doc edits, refresh and query the knowledge graph. Follow the `graphify` skill for install/detect details when the CLI is missing.
+
+### Refresh
+
+```bash
+# Prefer incremental when a graph already exists in this worktree
+if [ -f graphify-out/graph.json ]; then
+  graphify . --update --no-viz
+else
+  graphify . --no-viz
+fi
+```
+
+If `graphify` is not on `PATH`, install/resolve via the graphify skill (`uv tool install graphifyy` or equivalent), then re-run. Use worktree root as `INPUT_PATH`. Skip viz (`--no-viz`) unless the user wants HTML.
+
+Optional deeper pass when architecture/DAG claims look badly wrong: `graphify . --mode deep --no-viz` (slower).
+
+### Query before edit
+
+Run these (or close equivalents) and keep answers for the audit:
+
+```bash
+graphify query "What are the Rogatio packages and their dependency direction?"
+graphify query "What is the public CLI surface and runtime install vs Start/Stop model?"
+graphify query "Where do README, AGENTS, architecture, and docs-site disagree with packages/cli and packages/runtime?"
+graphify path "@rogatio/schema" "@rogatio/extension"
+```
+
+Use further `graphify query` / `explain` / `path` when a specific doc claim is ambiguous (match logging, AI, CA trust, rule statuses).
+
+### After edits (optional but preferred)
+
+```bash
+graphify . --update --no-viz
+graphify query "Do orientation docs and docs-site still contradict the package DAG or CLI?"
+```
+
+Do not treat a clean graphify answer as a substitute for `pnpm validate` or for reading `package.json` / CLI router.
+
 ## Audit before edit
 
-Read code, not memory:
+Read code, not memory (cross-check graphify answers against these):
 
 1. **Toolchain:** `package.json#packageManager`, `engines.node`, TypeScript version
 2. **CLI surface:** `packages/cli/src/index.ts` router cases + `packages/cli/src/commands/*`
@@ -133,5 +178,6 @@ Do not declare done on a green unit suite alone when `pnpm validate` includes br
 ## Additional resources
 
 - Repo agent rules: `AGENTS.md`
+- Graphify skill: follow `graphify` for install, detect, and query semantics
 - Durable-docs policy: decision trees under `docs/decisions/` → freeze to `docs/{research,specs,plans,workflows}/`
 - Site sidebar: `packages/docs-site/astro.config.mjs`
