@@ -11,13 +11,13 @@
         {
           "id": "rule-redirect",
           "name": "Redirect to docs",
-          "urlRegex": "^https://example\\.com/old/(.*)$",
+          "urlRegex": "^https://example\\.com/old/",
           "origins": [],
           "resourceTypes": ["main_frame"],
           "priority": 100,
           "type": "redirect",
           "redirect": {
-            "destination": "https://example.com/new/$1"
+            "destination": "https://example.com/new/"
           }
         },
         {
