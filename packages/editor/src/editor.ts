@@ -1929,7 +1929,7 @@ class EditorControllerImpl implements EditorController {
     }
     const testOption = this.document.createElement("option");
     testOption.value = "test";
-    testOption.textContent = "Test rules";
+    testOption.textContent = "Test console";
     select.append(testOption);
     if (this.route.kind === "project") {
       select.value = "project";
@@ -1971,7 +1971,7 @@ class EditorControllerImpl implements EditorController {
       }
       this.rail.append(button);
     }
-    const testBtn = this.createButton("Test rules", "route:test");
+    const testBtn = this.createButton("Test console", "route:test");
     testBtn.dataset.route = "test";
     testBtn.dataset.editorKey = "route:test";
     if (this.route.kind === "test")
@@ -2010,44 +2010,38 @@ class EditorControllerImpl implements EditorController {
     }
     this.commandBar.append(
       this.createCommandButton("Validate", "validate", this.saving),
-      this.createCommandButton("Save", "save", this.saving || !this.isDirty()),
+      this.createCommandButton(
+        "Save",
+        "save",
+        this.saving || !this.isDirty(),
+        {},
+        "primary",
+      ),
       this.createCommandButton("Cancel", "cancel", this.saving),
     );
     if (this.route.kind === "project") {
       this.commandBar.append(
-        this.createCommandButton("Add group", "add-group", this.saving),
+        this.createCommandButton(
+          "Add group",
+          "add-group",
+          this.saving,
+          {},
+          "primary",
+        ),
       );
       return;
     }
     if (this.route.kind === "test") {
       this.commandBar.append(
-        this.createCommandButton("Run test", "test:run", this.saving),
+        this.createCommandButton(
+          "Run test",
+          "test:run",
+          this.saving,
+          {},
+          "primary",
+        ),
       );
-      return;
     }
-    const group = this.groupById(this.route.groupId);
-    if (!group) return;
-    const index = this.groupIndex(this.route.groupId);
-    this.commandBar.append(
-      this.createCommandButton("Add rule", "add-rule", this.saving, {
-        groupId: this.route.groupId,
-      }),
-      this.createCommandButton(
-        "Move group up",
-        "move-group-up",
-        this.saving || index <= 0,
-        { groupId: this.route.groupId },
-      ),
-      this.createCommandButton(
-        "Move group down",
-        "move-group-down",
-        this.saving || index >= this.draft.groups.length - 1,
-        { groupId: this.route.groupId },
-      ),
-      this.createCommandButton("Remove group", "remove-group", this.saving, {
-        groupId: this.route.groupId,
-      }),
-    );
   }
 
   private renderProject(): void {
@@ -2078,6 +2072,7 @@ class EditorControllerImpl implements EditorController {
     this.form.append(fields);
 
     const groups = this.document.createElement("section");
+    groups.dataset.groupListSection = "true";
     const groupsHeading = this.document.createElement("h2");
     groupsHeading.textContent = "Groups";
     groups.append(groupsHeading);
@@ -2087,15 +2082,28 @@ class EditorControllerImpl implements EditorController {
       groups.append(empty);
     } else {
       const list = this.document.createElement("ul");
+      list.dataset.groupList = "true";
       for (const group of this.draft.groups) {
+        const groupId = safeText(group.id);
+        const groupName = displayName(group.name, "Unnamed group");
         const item = this.document.createElement("li");
-        const button = this.createButton(
-          `Edit group ${displayName(group.name, "Unnamed group")}`,
-          `route:group:${safeText(group.id)}`,
+        item.dataset.groupRow = "true";
+        const open = this.createButton(
+          `Edit group ${groupName}`,
+          `route:group:${groupId}`,
         );
-        button.dataset.route = "group";
-        button.dataset.groupId = safeText(group.id);
-        item.append(button);
+        open.dataset.route = "group";
+        open.dataset.groupId = groupId;
+        open.dataset.btn = "secondary";
+        const remove = this.createCommandButton(
+          "Remove group",
+          "remove-group",
+          this.saving,
+          { groupId },
+          "danger",
+        );
+        remove.setAttribute("aria-label", `Remove group ${groupName}`);
+        item.append(open, remove);
         list.append(item);
       }
       groups.append(list);
@@ -2107,11 +2115,23 @@ class EditorControllerImpl implements EditorController {
     const group = this.groupById(groupId);
     if (!group) return;
     const groupIndex = this.groupIndex(groupId);
+    const groupName = displayName(group.name, "Unnamed group");
+    const headingRow = this.document.createElement("div");
+    headingRow.dataset.groupHeading = "true";
     const heading = this.document.createElement("h2");
-    heading.textContent = displayName(group.name, "Unnamed group");
-    this.form.append(heading);
+    heading.textContent = groupName;
+    const removeGroup = this.createCommandButton(
+      "Remove group",
+      "remove-group",
+      this.saving,
+      { groupId },
+      "danger",
+    );
+    headingRow.append(heading, removeGroup);
+    this.form.append(headingRow);
 
     const settings = this.document.createElement("fieldset");
+    settings.dataset.groupCard = "true";
     const legend = this.document.createElement("legend");
     legend.textContent = "Group details";
     settings.append(legend);
@@ -2150,9 +2170,20 @@ class EditorControllerImpl implements EditorController {
     );
 
     const rulesSection = this.document.createElement("section");
+    rulesSection.dataset.rulesSection = "true";
+    const rulesHeadingRow = this.document.createElement("div");
+    rulesHeadingRow.dataset.sectionHeading = "true";
     const rulesHeading = this.document.createElement("h2");
     rulesHeading.textContent = "Rules";
-    rulesSection.append(rulesHeading);
+    const addRule = this.createCommandButton(
+      "Add rule",
+      "add-rule",
+      this.saving,
+      { groupId },
+      "primary",
+    );
+    rulesHeadingRow.append(rulesHeading, addRule);
+    rulesSection.append(rulesHeadingRow);
     const list = this.document.createElement("div");
     list.dataset.ruleList = groupId;
     for (let ruleIndex = 0; ruleIndex < group.rules.length; ruleIndex += 1) {
@@ -2162,7 +2193,9 @@ class EditorControllerImpl implements EditorController {
     }
     if (group.rules.length === 0) {
       const empty = this.document.createElement("p");
-      empty.textContent = "No rules yet.";
+      empty.dataset.emptyRules = "true";
+      empty.textContent =
+        "No rules yet. Add a rule to start matching requests.";
       list.append(empty);
     }
     rulesSection.append(list);
@@ -2171,7 +2204,7 @@ class EditorControllerImpl implements EditorController {
 
   private renderTest(): void {
     const heading = this.document.createElement("h2");
-    heading.textContent = "Test rules (dry-run)";
+    heading.textContent = "Test console";
     this.form.append(heading);
 
     const description = this.document.createElement("p");
@@ -2274,6 +2307,8 @@ class EditorControllerImpl implements EditorController {
     const runBtn = this.createButton("Run test", "test:run");
     runBtn.type = "button";
     runBtn.dataset.testRun = "true";
+    runBtn.dataset.command = "test:run";
+    runBtn.dataset.btn = "primary";
     runBtn.disabled = this.saving || this.testRunning;
     panel.append(runBtn);
 
@@ -2307,11 +2342,37 @@ class EditorControllerImpl implements EditorController {
     card.dataset.ruleId = ruleId;
     card.id = `rogatio-rule-${groupId}-${ruleId}`;
     card.tabIndex = -1;
+    const headingRow = this.document.createElement("div");
+    headingRow.dataset.ruleHeading = "true";
     const heading = this.document.createElement("h3");
     heading.id = `${this.instanceId}-rule-title-${groupIndex}-${ruleIndex}`;
     heading.textContent = ruleName;
     card.setAttribute("aria-labelledby", heading.id);
-    card.append(heading);
+    const actions = this.document.createElement("div");
+    actions.dataset.ruleActions = "true";
+    actions.append(
+      this.createCommandButton(
+        "Move rule up",
+        "move-rule-up",
+        this.saving || ruleIndex <= 0,
+        { groupId, ruleId },
+      ),
+      this.createCommandButton(
+        "Move rule down",
+        "move-rule-down",
+        this.saving || ruleIndex >= group.rules.length - 1,
+        { groupId, ruleId },
+      ),
+      this.createCommandButton(
+        "Remove rule",
+        "remove-rule",
+        this.saving,
+        { groupId, ruleId },
+        "danger",
+      ),
+    );
+    headingRow.append(heading, actions);
+    card.append(headingRow);
 
     const fields = this.document.createElement("fieldset");
     const legend = this.document.createElement("legend");
@@ -2343,6 +2404,7 @@ class EditorControllerImpl implements EditorController {
       "convert-url",
       this.saving,
       { groupId, ruleId },
+      "secondary",
     );
     grid.append(convert);
     fields.append(grid);
@@ -2454,27 +2516,6 @@ class EditorControllerImpl implements EditorController {
       card.append(extensionError);
     }
 
-    const actions = this.document.createElement("div");
-    actions.dataset.ruleActions = "true";
-    actions.append(
-      this.createCommandButton(
-        "Move rule up",
-        "move-rule-up",
-        this.saving || ruleIndex <= 0,
-        { groupId, ruleId },
-      ),
-      this.createCommandButton(
-        "Move rule down",
-        "move-rule-down",
-        this.saving || ruleIndex >= group.rules.length - 1,
-        { groupId, ruleId },
-      ),
-      this.createCommandButton("Remove rule", "remove-rule", this.saving, {
-        groupId,
-        ruleId,
-      }),
-    );
-    card.append(actions);
     return card;
   }
 
@@ -2517,6 +2558,7 @@ class EditorControllerImpl implements EditorController {
         owner === "group" ? "remove-group-origin" : "remove-rule-origin",
         this.saving,
         { groupId, ruleId, index: String(index) },
+        "danger",
       );
       row.append(remove);
       fieldset.append(row);
@@ -2527,6 +2569,7 @@ class EditorControllerImpl implements EditorController {
         owner === "group" ? "add-group-origin" : "add-rule-origin",
         this.saving,
         { groupId, ruleId },
+        "secondary",
       ),
     );
     parent.append(fieldset);
@@ -2858,6 +2901,7 @@ class EditorControllerImpl implements EditorController {
         ? "cancel-confirmation"
         : "remove-confirmation";
     cancel.dataset.editorKey = "confirm-cancel";
+    cancel.dataset.btn = "secondary";
     cancel.textContent =
       this.confirmation.kind === "cancel" ? "Keep editing" : "Cancel removal";
     const confirm = this.document.createElement("button");
@@ -2870,14 +2914,17 @@ class EditorControllerImpl implements EditorController {
       message.textContent =
         "Your current edits will be replaced by the last saved project.";
       confirm.textContent = "Discard changes";
+      confirm.dataset.btn = "danger";
     } else if (this.confirmation.kind === "remove-group") {
       title.textContent = "Remove group?";
       message.textContent = `Remove group ${this.confirmation.name} and its rules?`;
       confirm.textContent = "Remove group";
+      confirm.dataset.btn = "danger";
     } else {
       title.textContent = "Remove rule?";
       message.textContent = `Remove rule ${this.confirmation.name}?`;
       confirm.textContent = "Remove rule";
+      confirm.dataset.btn = "danger";
     }
     dialog.setAttribute("aria-labelledby", title.id);
     actions.append(cancel, confirm);
@@ -2899,12 +2946,14 @@ class EditorControllerImpl implements EditorController {
     command: string,
     disabled: boolean,
     data: Record<string, string | undefined> = {},
+    tone: "primary" | "secondary" | "danger" = "secondary",
   ): HTMLButtonElement {
     const button = this.createButton(
       label,
       `command:${command}:${Object.values(data).join(":")}`,
     );
     button.dataset.command = command;
+    button.dataset.btn = tone;
     button.disabled = disabled;
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined) button.dataset[key] = value;

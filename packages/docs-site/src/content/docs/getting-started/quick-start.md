@@ -27,7 +27,7 @@ anchored regular expression.
 
 ## 3. Test it offline
 
-Open the **Test rules** panel, paste a few URLs, and confirm the rule matches as
+Open the **Test console** panel, paste a few URLs, and confirm the rule matches as
 expected. The dry-run never contacts the URLs, requests permission, or changes installed
 rules. See [Offline dry-run](/guides/dry-run/).
 

@@ -93,22 +93,36 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
     .getByRole("button", { name: "Two", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Move group up", exact: true }),
+    page.locator('[data-editor-command-bar] [data-command="move-group-up"]'),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('[data-editor-command-bar] [data-command="move-group-down"]'),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('[data-editor-command-bar] [data-command="add-rule"]'),
+  ).toHaveCount(0);
+  await expect(
+    page.locator('[data-section-heading] [data-command="add-rule"]'),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Move group down", exact: true }),
+    page
+      .locator("[data-group-heading]")
+      .getByRole("button", { name: "Remove group", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Remove group", exact: true }),
-  ).toBeVisible();
-  await page.locator('[data-command="remove-group"]').click();
+  await page
+    .locator("[data-group-heading]")
+    .locator('[data-command="remove-group"]')
+    .click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText("Two");
   await dialog.getByRole("button", { name: "Cancel removal" }).click();
   await expect(
     page.getByRole("button", { name: "Two", exact: true }),
   ).toBeVisible();
-  await page.locator('[data-command="remove-group"]').click();
+  await page
+    .locator("[data-group-heading]")
+    .locator('[data-command="remove-group"]')
+    .click();
   await page
     .getByRole("alertdialog")
     .getByRole("button", { name: "Remove group" })

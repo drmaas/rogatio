@@ -24,7 +24,7 @@ and previews redirect destinations or resulting query URLs.
 
 ## Using it
 
-- In the editor: open the **Test rules** panel, enter one URL per line, and run.
+- In the editor: open the **Test console** panel, enter one URL per line, and run.
 - In the CLI: use `rogatio test` with `--urls`, `--urls-file`, and options for method,
   resource type, and batch size (`--max-cases`, default 256).
 

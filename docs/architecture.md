@@ -218,9 +218,11 @@ Draft transitions are explicit:
 
 ### View and Navigation
 
-The view uses a semantic `main`, `nav`, `form`, headings, `fieldset`/`legend`, native inputs/selects/checkboxes, and a live status region. The desktop route rail contains Project and one route per group. A synchronized native select is the compact mobile navigation. Routes are internal editor state, not browser history or host persistence. Removing the current group falls back to Project and announces the change.
+The view uses a semantic `main`, `nav`, `form`, headings, `fieldset`/`legend`, native inputs/selects/checkboxes, and a live status region. The desktop route rail contains Project, one route per group, and Test console. A synchronized native select is the compact mobile navigation. Routes are internal editor state, not browser history or host persistence. Removing the current group falls back to Project and announces the change.
 
-The contextual command bar keeps Validate, Save, and Cancel available and exposes only commands valid for the current route or focused entity, such as Add group, Add rule, move, and remove. Remove actions use a cancellable accessible alert dialog and name the affected group or rule. Reorder commands operate on the item's absolute source position even when search is active; announcements include the resulting position so hidden neighboring items cannot make the operation ambiguous.
+The contextual command bar keeps Validate, Save, and Cancel available, plus route-scoped actions: Add group on Project and Run test on Test console. Entity actions live next to their content: Add rule in the Rules section, rule reorder/remove beside each rule title, and Remove group beside the group name (group page heading and Project group list). Group reorder is not exposed because groups are selected as independent rail tabs. Remove actions use a cancellable accessible alert dialog and name the affected group or rule. Rule reorder commands operate on the item's absolute source position even when search is active; announcements include the resulting position so hidden neighboring items cannot make the operation ambiguous.
+
+Command and entity buttons use tone tokens (`data-btn`: primary / secondary / danger). Rule cards use a raised surface with a teal signal edge so they read as distinct interception units against cooler group fieldsets.
 
 Search is project-wide, literal, case-insensitive, and NFKC-normalized for matching only. It searches common project, group, and rule fields, reports deterministic source-order results, and navigates to the selected group or field without changing project data. It never treats user text as a regular expression. Search updates are region-level updates rather than full document replacement on every keystroke.
 
@@ -505,7 +507,7 @@ rogatio edit [path]
 
 ### Overview
 
-The offline dry-run package adds a pure-offline, bounded URL-batch dry-run capability that evaluates matcher operations (from the compiler) against a list of test cases without contacting the network, requesting permissions, changing installed rules, connecting to runtime, or saving test data. It is usable from both the CLI (`rogatio test`) and the Editor (`Test rules` route/panel).
+The offline dry-run package adds a pure-offline, bounded URL-batch dry-run capability that evaluates matcher operations (from the compiler) against a list of test cases without contacting the network, requesting permissions, changing installed rules, connecting to runtime, or saving test data. It is usable from both the CLI (`rogatio test`) and the Editor (`Test console` route/panel).
 
 ### Components
 
@@ -546,7 +548,7 @@ The offline dry-run package adds a pure-offline, bounded URL-batch dry-run capab
 
 - **`types.ts`**: Local DryRun type definitions (no `@rogatio/dry-run` import in browser bundle), `EditorDryRunHandler`, added to `EditorOptions`.
 - **`editor.ts`**: New `route.kind === "test"` with:
-  - Rail navigation button "Test rules" (accessible, announced).
+  - Rail navigation button "Test console" (accessible, announced).
   - Panel: URLs textarea (one per line), method/resource-type defaults, maxCases input, Run button.
   - Results rendering: per-URL cards with matched/unmatched badges, 4-dimension badges (color-coded: green=matched, red=unmatched, gray=not-applicable), detail text, actionPreview when present.
   - Keyboard complete, SR announcements, forced-colors/200% zoom compatible (uses CSS variables, native elements, live regions).
