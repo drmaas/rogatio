@@ -1,4 +1,8 @@
-import type { ChromeApi, ChromeRuleMatchedDebugInfo } from "./chrome.js";
+import type {
+  ChromeApi,
+  ChromeRuleMatchedDebugInfo,
+  ChromeScripting,
+} from "./chrome.js";
 import { formatMatchRecord } from "./match-format.js";
 import { lookupMatchIndexEntry } from "./match-index.js";
 import {
@@ -8,36 +12,25 @@ import {
 
 export { MATCH_LOGGING_ENABLED_KEY };
 
+/** Delays after the first failed main_frame inject (navigation race). */
+export const MAIN_FRAME_INJECT_RETRY_DELAYS_MS = [50, 150, 350] as const;
+
 /** Closure-free injected func: all content arrives through serializable args. */
 export function injectMatchLogLine(line: string): void {
   console.log("%s", line);
 }
 
-async function handleRuleMatchedDebug(
-  api: ChromeApi,
-  info: ChromeRuleMatchedDebugInfo,
-): Promise<void> {
-  if (!(await readMatchLoggingEnabled(api))) return;
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
-  const tabId = info.request.tabId;
-  if (tabId === -1) return;
-
-  const entry = await lookupMatchIndexEntry(api, info.rule.ruleId);
-  if (entry === undefined) return;
-
-  const line = formatMatchRecord(
-    {
-      url: info.request.url,
-      method: info.request.method,
-      initiator: info.request.initiator,
-      resourceType: info.request.type,
-    },
-    entry,
-  );
-
-  const scripting = api.scripting;
-  if (scripting === undefined) return;
-
+async function tryInjectMatchLog(
+  scripting: ChromeScripting,
+  tabId: number,
+  line: string,
+): Promise<boolean> {
   try {
     // Called as a method: Chrome rejects a detached `executeScript` reference.
     await scripting.executeScript({
@@ -46,8 +39,65 @@ async function handleRuleMatchedDebug(
       func: injectMatchLogLine as (...args: unknown[]) => void,
       args: [line],
     });
+    return true;
   } catch {
-    // Fail closed: injection rejection is a silent no-op.
+    return false;
+  }
+}
+
+/**
+ * Emit one match line into the tab console. Redirect/query (and other
+ * main_frame) matches often reject the first inject while the document
+ * navigates; retry briefly before fail-closed silence. Non-main_frame stays
+ * single-shot.
+ */
+async function injectMatchLog(
+  scripting: ChromeScripting,
+  tabId: number,
+  line: string,
+  resourceType: string | undefined,
+): Promise<void> {
+  if (await tryInjectMatchLog(scripting, tabId, line)) return;
+  if (resourceType !== "main_frame") return;
+
+  for (const delayMs of MAIN_FRAME_INJECT_RETRY_DELAYS_MS) {
+    await sleep(delayMs);
+    if (await tryInjectMatchLog(scripting, tabId, line)) return;
+  }
+}
+
+export async function handleRuleMatchedDebug(
+  api: ChromeApi,
+  info: ChromeRuleMatchedDebugInfo,
+): Promise<void> {
+  try {
+    if (!(await readMatchLoggingEnabled(api))) return;
+
+    const request = info.request;
+    if (request === null || typeof request !== "object") return;
+
+    const tabId = request.tabId;
+    if (typeof tabId !== "number" || tabId === -1) return;
+
+    const entry = await lookupMatchIndexEntry(api, info.rule.ruleId);
+    if (entry === undefined) return;
+
+    const line = formatMatchRecord(
+      {
+        url: request.url,
+        method: request.method,
+        initiator: request.initiator,
+        resourceType: request.type,
+      },
+      entry,
+    );
+
+    const scripting = api.scripting;
+    if (scripting === undefined) return;
+
+    await injectMatchLog(scripting, tabId, line, request.type);
+  } catch {
+    // Fail closed: malformed event payloads or unexpected throws stay silent.
   }
 }
 

@@ -9,7 +9,9 @@ import {
   type MatchIndexEntry,
 } from "../src/match-index.js";
 import {
+  handleRuleMatchedDebug,
   injectMatchLogLine,
+  MAIN_FRAME_INJECT_RETRY_DELAYS_MS,
   MATCH_LOGGING_ENABLED_KEY,
   registerMatchLogListener,
 } from "../src/match-listener.js";
@@ -110,10 +112,6 @@ function createHarness(initial: Record<string, unknown> = {}) {
 
   registerMatchLogListener(api);
 
-  async function flushAsyncWork(): Promise<void> {
-    await new Promise<void>((resolve) => setImmediate(resolve));
-  }
-
   return {
     api,
     store,
@@ -121,8 +119,8 @@ function createHarness(initial: Record<string, unknown> = {}) {
     addListener,
     async fireMatch(info: ChromeRuleMatchedDebugInfo) {
       if (listener === undefined) throw new Error("listener not registered");
-      listener(info);
-      await flushAsyncWork();
+      // Await the handler directly so retry timers settle under fake timers.
+      await handleRuleMatchedDebug(api, info);
     },
   };
 }
@@ -436,7 +434,7 @@ describe("match log listener", () => {
     expect(plainLine.length).toBeLessThanOrEqual(500);
   });
 
-  it("swallows executeScript rejections without retrying", async () => {
+  it("swallows non-main_frame executeScript rejections without retrying", async () => {
     const { executeScript, fireMatch } = createHarness({
       [MATCH_LOGGING_INDEX_KEY]: { "100": redirectEntry() },
     });
@@ -444,10 +442,69 @@ describe("match log listener", () => {
     await expect(
       fireMatch({
         rule: { ruleId: 100 },
-        request: { tabId: 2, url: "https://example.com/" },
+        request: {
+          tabId: 2,
+          url: "https://example.com/",
+          type: "xmlhttprequest",
+        },
       }),
     ).resolves.toBeUndefined();
     expect(executeScript).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries main_frame inject after navigation rejection then succeeds once", async () => {
+    vi.useFakeTimers();
+    try {
+      const { executeScript, fireMatch } = createHarness({
+        [MATCH_LOGGING_INDEX_KEY]: { "100": redirectEntry() },
+      });
+      executeScript
+        .mockRejectedValueOnce(new Error("Frame with ID 0 was removed"))
+        .mockResolvedValueOnce(undefined);
+
+      const pending = fireMatch({
+        rule: { ruleId: 100 },
+        request: {
+          tabId: 2,
+          url: "https://example.com/old/",
+          type: "main_frame",
+        },
+      });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toBeUndefined();
+      expect(executeScript).toHaveBeenCalledTimes(2);
+      expect(executeScript.mock.calls[1]?.[0]?.args?.[0]).toContain(
+        "https://dest.example/path",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("exhausts main_frame inject retries then fail-closes", async () => {
+    vi.useFakeTimers();
+    try {
+      const { executeScript, fireMatch } = createHarness({
+        [MATCH_LOGGING_INDEX_KEY]: { "100": queryEntry() },
+      });
+      executeScript.mockRejectedValue(new Error("injection failed"));
+
+      const pending = fireMatch({
+        rule: { ruleId: 100 },
+        request: {
+          tabId: 3,
+          url: "https://example.com/page",
+          type: "main_frame",
+        },
+      });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toBeUndefined();
+      expect(executeScript).toHaveBeenCalledTimes(
+        1 + MAIN_FRAME_INJECT_RETRY_DELAYS_MS.length,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("registers nothing when onRuleMatchedDebug is absent", () => {
