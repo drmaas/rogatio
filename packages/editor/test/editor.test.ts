@@ -373,3 +373,45 @@ describe("@rogatio/editor query rule type", () => {
     );
   });
 });
+
+describe("@rogatio/editor resource type hints", () => {
+  it("shows glosses and groups for resource type checkboxes", () => {
+    const { root } = createTestEditor();
+    const fieldset = Array.from(root.querySelectorAll("fieldset")).find(
+      (el) => el.querySelector("legend")?.textContent === "Resource types",
+    );
+    expect(fieldset).toBeTruthy();
+    expect(fieldset?.querySelector("[data-editor-hint]")?.textContent).toBe(
+      "Chrome request categories this rule can match.",
+    );
+
+    const groupLabels = Array.from(
+      fieldset?.querySelectorAll("[data-editor-check-group-label]") ?? [],
+    ).map((el) => el.textContent);
+    expect(groupLabels).toEqual(["Page", "Assets", "Network", "Other"]);
+
+    const mainFrame = fieldset?.querySelector(
+      'input[data-resource-type="main_frame"]',
+    ) as HTMLInputElement | null;
+    expect(mainFrame).toBeTruthy();
+    expect(mainFrame?.checked).toBe(true);
+    expect(mainFrame?.title).toBe("Top-level page navigation");
+    const mainLabel = mainFrame?.closest("label");
+    expect(
+      mainLabel?.querySelector("[data-editor-check-id]")?.textContent,
+    ).toBe("main_frame");
+    expect(mainLabel?.querySelector("small")?.textContent).toBe(
+      "Top-level page navigation",
+    );
+
+    const xhr = fieldset?.querySelector(
+      'input[data-resource-type="xmlhttprequest"]',
+    ) as HTMLInputElement | null;
+    expect(xhr?.closest("label")?.querySelector("small")?.textContent).toBe(
+      "XHR and fetch",
+    );
+
+    const checkboxes = fieldset?.querySelectorAll("input[data-resource-type]");
+    expect(checkboxes?.length).toBe(15);
+  });
+});

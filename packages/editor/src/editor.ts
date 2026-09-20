@@ -34,6 +34,47 @@ const RESOURCE_TYPES = [
   "other",
 ] as const satisfies readonly ResourceType[];
 
+const RESOURCE_TYPE_GLOSS: Readonly<Record<ResourceType, string>> = {
+  main_frame: "Top-level page navigation",
+  sub_frame: "iframe / embedded frame",
+  stylesheet: "CSS stylesheet",
+  script: "JavaScript file",
+  image: "Image",
+  font: "Web font",
+  object: "Plugin / <object> / <embed>",
+  media: "Audio / video",
+  xmlhttprequest: "XHR and fetch",
+  ping: "Hyperlink ping / beacon",
+  csp_report: "CSP violation report",
+  websocket: "WebSocket",
+  webtransport: "WebTransport",
+  webbundle: "Web Bundle",
+  other: "Anything else",
+};
+
+const RESOURCE_TYPE_GROUPS = [
+  { label: "Page", types: ["main_frame", "sub_frame"] },
+  {
+    label: "Assets",
+    types: ["stylesheet", "script", "image", "font", "media", "object"],
+  },
+  {
+    label: "Network",
+    types: [
+      "xmlhttprequest",
+      "websocket",
+      "webtransport",
+      "ping",
+      "csp_report",
+      "webbundle",
+    ],
+  },
+  { label: "Other", types: ["other"] },
+] as const satisfies ReadonlyArray<{
+  readonly label: string;
+  readonly types: readonly ResourceType[];
+}>;
+
 const HTTP_METHODS = [
   "GET",
   "POST",
@@ -2584,20 +2625,50 @@ class EditorControllerImpl implements EditorController {
     const legend = this.document.createElement("legend");
     legend.textContent = "Resource types";
     fieldset.append(legend);
-    const checks = this.document.createElement("div");
-    checks.dataset.editorChecks = "true";
-    for (const resourceType of RESOURCE_TYPES) {
-      const label = this.document.createElement("label");
-      const input = this.document.createElement("input");
-      input.type = "checkbox";
-      input.dataset.resourcePath = `${rulePath}/resourceTypes`;
-      input.dataset.resourceType = resourceType;
-      input.checked = rule.resourceTypes.includes(resourceType);
-      input.disabled = this.saving;
-      label.append(input, this.document.createTextNode(resourceType));
-      checks.append(label);
+    const hint = this.document.createElement("p");
+    hint.dataset.editorHint = "true";
+    hint.textContent = "Chrome request categories this rule can match.";
+    fieldset.append(hint);
+    const groups = this.document.createElement("div");
+    groups.dataset.editorCheckGroups = "true";
+    for (const group of RESOURCE_TYPE_GROUPS) {
+      const groupEl = this.document.createElement("div");
+      groupEl.dataset.editorCheckGroup = "true";
+      groupEl.setAttribute("role", "group");
+      const groupLabel = this.document.createElement("p");
+      groupLabel.dataset.editorCheckGroupLabel = "true";
+      groupLabel.id = `${this.instanceId}-resource-type-group-${group.label.toLowerCase()}-${safeText(rule.id)}`;
+      groupLabel.textContent = group.label;
+      groupEl.setAttribute("aria-labelledby", groupLabel.id);
+      groupEl.append(groupLabel);
+      const checks = this.document.createElement("div");
+      checks.dataset.editorChecks = "true";
+      for (const resourceType of group.types) {
+        const gloss = RESOURCE_TYPE_GLOSS[resourceType];
+        const label = this.document.createElement("label");
+        label.title = gloss;
+        const input = this.document.createElement("input");
+        input.type = "checkbox";
+        input.dataset.resourcePath = `${rulePath}/resourceTypes`;
+        input.dataset.resourceType = resourceType;
+        input.checked = rule.resourceTypes.includes(resourceType);
+        input.disabled = this.saving;
+        input.title = gloss;
+        const text = this.document.createElement("span");
+        text.dataset.editorCheckText = "true";
+        const idSpan = this.document.createElement("span");
+        idSpan.dataset.editorCheckId = "true";
+        idSpan.textContent = resourceType;
+        const glossEl = this.document.createElement("small");
+        glossEl.textContent = gloss;
+        text.append(idSpan, glossEl);
+        label.append(input, text);
+        checks.append(label);
+      }
+      groupEl.append(checks);
+      groups.append(groupEl);
     }
-    fieldset.append(checks);
+    fieldset.append(groups);
     parent.append(fieldset);
   }
 
