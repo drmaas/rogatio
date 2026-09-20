@@ -13,6 +13,20 @@ Query parameter rules modify the query string of matching requests. Each param i
 
 Set requires a `value`. Remove must omit `value`.
 
+Set values may use URL captures. Use `$1` through `$9` for captures from the
+rule's `urlRegex`, and `$$` for a literal dollar sign. A capture-dependent query
+rewrite uses the native runtime path; it is never installed as literal `$1` text.
+
+```json
+{
+  "urlRegex": "^https://api\\.example\\.com/users/([^/]+)/items$",
+  "action": {
+    "type": "query",
+    "params": [{ "name": "user", "value": "$1" }]
+  }
+}
+```
+
 ## Notes
 
 - Only the named parameters are touched; everything else in the URL is left intact.

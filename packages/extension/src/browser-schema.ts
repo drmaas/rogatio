@@ -4,6 +4,10 @@ import type {
   ResourceType,
   RogatioProject,
 } from "@rogatio/schema";
+import {
+  containsUrlCaptureReference,
+  validateCaptureTemplate,
+} from "../../schema/src/captures.js";
 import { hasLoneSurrogate } from "../../schema/src/utf16.js";
 
 // These helpers live canonically in @rogatio/schema (clone.ts/control.ts/digest.ts).
@@ -12,7 +16,7 @@ import { hasLoneSurrogate } from "../../schema/src/utf16.js";
 export { safeClone } from "../../schema/src/clone.js";
 export { hasControl } from "../../schema/src/control.js";
 export { formatSha256, isSha256Digest } from "../../schema/src/digest.js";
-export { hasLoneSurrogate };
+export { containsUrlCaptureReference, hasLoneSurrogate };
 
 const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
   "accept-charset",
@@ -483,10 +487,33 @@ function validateQueryParam(
   }
 }
 
+function addCaptureIssues(
+  errors: ValidationIssue[],
+  value: string,
+  urlRegex: string,
+  path: string,
+): void {
+  for (const capture of validateCaptureTemplate(value, urlRegex)) {
+    errors.push({
+      instancePath: path,
+      keyword: `capture-${capture.code}`,
+      message: capture.message,
+      params: {
+        offset: capture.offset,
+        groups: capture.groups,
+        ...(capture.referenced === undefined
+          ? {}
+          : { referenced: capture.referenced }),
+      },
+    });
+  }
+}
+
 function validateQueryAction(
   errors: ValidationIssue[],
   value: unknown,
   path: string,
+  urlRegex: string,
 ): void {
   if (!isRecord(value) || !hasOnlyKeys(value, QUERY_ACTION_KEYS)) {
     errors.push(issue(path, "invalid-structure"));
@@ -515,6 +542,18 @@ function validateQueryAction(
       else seenNames.add(param.name);
     }
     validateQueryParam(errors, param, `${path}/params/${index}`);
+    if (
+      isRecord(param) &&
+      (param.operation === undefined || param.operation === "set") &&
+      typeof param.value === "string"
+    ) {
+      addCaptureIssues(
+        errors,
+        param.value,
+        urlRegex,
+        `${path}/params/${index}/value`,
+      );
+    }
   }
 }
 
@@ -679,9 +718,11 @@ export function validateProjectDetailed(
         if (destination === undefined) {
           errors.push(issue(`${rulePath}/redirect/destination`, "required"));
         } else {
+          const urlRegex =
+            typeof rule.urlRegex === "string" ? rule.urlRegex : "";
           for (const destIssue of validateRedirectDestination(
             destination,
-            typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+            urlRegex,
           )) {
             errors.push({
               instancePath: `${rulePath}/redirect/destination`,
@@ -690,10 +731,21 @@ export function validateProjectDetailed(
               params: {},
             });
           }
+          addCaptureIssues(
+            errors,
+            destination,
+            urlRegex,
+            `${rulePath}/redirect/destination`,
+          );
         }
       }
       if (rule.action !== undefined)
-        validateQueryAction(errors, rule.action, `${rulePath}/action`);
+        validateQueryAction(
+          errors,
+          rule.action,
+          `${rulePath}/action`,
+          typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+        );
       if (rule.type === "header") {
         const direction = (rule as Record<string, unknown>).headerDirection;
         const operation = (rule as Record<string, unknown>).headerOperation;
@@ -729,6 +781,13 @@ export function validateProjectDetailed(
             headerValue.length > LIMITS.maxHeaderValueLength
           ) {
             errors.push(issue(`${rulePath}/headerValue`, "out-of-range"));
+          } else {
+            addCaptureIssues(
+              errors,
+              headerValue,
+              typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+              `${rulePath}/headerValue`,
+            );
           }
         }
         if (operation === "remove" && headerValue !== undefined) {
@@ -763,6 +822,13 @@ export function validateProjectDetailed(
           } else if (hasLoneSurrogate(body)) {
             errors.push(
               issue(`${actionPath}/body`, "response-body-lone-surrogate"),
+            );
+          } else {
+            addCaptureIssues(
+              errors,
+              body,
+              typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+              `${actionPath}/body`,
             );
           }
         } else {
@@ -862,6 +928,13 @@ export function validateProjectDetailed(
             } else if (hasLoneSurrogate(body)) {
               errors.push(
                 issue(`${actionPath}/body`, "request-body-lone-surrogate"),
+              );
+            } else {
+              addCaptureIssues(
+                errors,
+                body,
+                typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+                `${actionPath}/body`,
               );
             }
           }

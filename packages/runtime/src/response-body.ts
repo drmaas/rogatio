@@ -1,7 +1,9 @@
 import {
   LIMITS,
+  matchUrlCaptures,
   type ResponseBodyAction,
   type ResponseBodyReplaceAction,
+  substituteUrlCaptures,
 } from "@rogatio/schema";
 import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
@@ -31,6 +33,11 @@ export interface ResponseBodyOutput {
 export interface AuthorizedResponseBodyOutput extends ResponseBodyOutput {
   readonly status: number;
   readonly headers: readonly (readonly [string, string])[];
+}
+
+export interface UrlCaptureContext {
+  readonly url: string;
+  readonly urlRegex: string;
 }
 
 function supportedContentType(value: string | undefined): boolean {
@@ -72,6 +79,8 @@ function isReplaceAction(
 export async function rewriteResponseBody(
   input: ResponseBodyInput,
   replacements: readonly ResponseBodyReplacementInput[],
+  replaceAction?: ResponseBodyReplaceAction,
+  captureContext?: UrlCaptureContext,
 ): Promise<RuntimeResult<ResponseBodyOutput>> {
   if (
     !supportedContentType(input.contentType) ||
@@ -85,7 +94,7 @@ export async function rewriteResponseBody(
     return failure("runtime.size-limit");
   if (
     input.body.byteLength > RUNTIME_LIMITS.maxResponseBodyBytes ||
-    replacements.length === 0 ||
+    (replaceAction === undefined && replacements.length === 0) ||
     replacements.length > LIMITS.maxResponseBodyReplacements
   )
     return failure("runtime.size-limit");
@@ -95,6 +104,19 @@ export async function rewriteResponseBody(
     text = new TextDecoder("utf-8", { fatal: true }).decode(input.body);
   } catch {
     return failure("runtime.size-limit");
+  }
+
+  if (replaceAction !== undefined) {
+    if (captureContext === undefined) {
+      text = replaceAction.body;
+    } else {
+      const captures = matchUrlCaptures(
+        captureContext.urlRegex,
+        captureContext.url,
+      );
+      if (captures === null) return failure("runtime.url-capture-mismatch");
+      text = substituteUrlCaptures(replaceAction.body, captures);
+    }
   }
 
   try {
@@ -130,8 +152,20 @@ export async function rewriteResponseBody(
 function replaceResponseBody(
   body: string,
   contentType: string | undefined,
+  captureContext?: UrlCaptureContext,
 ): RuntimeResult<ResponseBodyOutput> {
-  const encoded = new TextEncoder().encode(body);
+  const captures =
+    captureContext === undefined
+      ? []
+      : matchUrlCaptures(captureContext.urlRegex, captureContext.url);
+  if (captureContext !== undefined && captures === null) {
+    return failure("runtime.url-capture-mismatch");
+  }
+  const expanded =
+    captureContext === undefined
+      ? body
+      : substituteUrlCaptures(body, captures ?? []);
+  const encoded = new TextEncoder().encode(expanded);
   if (encoded.byteLength > RUNTIME_LIMITS.maxResponseBodyBytes)
     return failure("runtime.size-limit");
   return {
@@ -156,7 +190,13 @@ export async function fetchAndRewriteAuthorizedResponse(
 
   const contentType = responseHeader(response.value.headers, "content-type");
   const transformed = isReplaceAction(action)
-    ? replaceResponseBody(action.body, contentType)
+    ? replaceResponseBody(
+        action.body,
+        contentType,
+        operation.urlRegex === undefined
+          ? undefined
+          : { url: operation.target, urlRegex: operation.urlRegex },
+      )
     : await rewriteResponseBody(
         {
           contentType,

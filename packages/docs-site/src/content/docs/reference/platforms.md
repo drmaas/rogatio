@@ -12,7 +12,8 @@ supported browser.
 
 | Rule type | Runs in |
 |-----------|---------|
-| Redirects, query parameters, request/response headers | Entirely in the browser (DNR). |
+| Static redirects, query parameters, request/response headers | Entirely in the browser (DNR). |
+| Capture-dependent query and header values | Native runtime path; never installed as literal `$1` text. |
 | Response-body replacement/rewriting | Local runtime via native messaging. |
 | Request-body replacement/modification | Local runtime via native messaging (TLS proxy). |
 

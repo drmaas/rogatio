@@ -8,13 +8,13 @@ Rogatio is a local-first tool for creating, reviewing, and running browser reque
 
 Rules belong to named groups. Groups can define shared site origins, while individual rules can add origins and specify a stable ID, case-sensitive URL regular expression, resource types, priority, and—where supported—an HTTP method.
 
-- **Redirects:** Send matching HTTP(S) requests to an absolute destination, including controlled regular-expression capture substitution.
-- **Query parameters:** Set or remove configured parameter names per rule. Set adds missing names and replaces all existing values for configured names; remove drops configured names from the query string. Unrelated parameters, scheme, authority, path, and fragment are preserved.
-- **Request and response headers:** Set, append, or remove a named header, subject to immutable forbidden-header lists and browser limitations.
-- **Response body:** Fetch an authorized public GET without browser credentials, then either replace the entire response body or apply bounded regex rewrites to the fetched UTF-8 body through native messaging to an explicitly started local runtime. Upstream status and headers are preserved.
-- **Request-body replacement/modification:** Replace a complete body or apply bounded global ECMAScript regular-expression replacement to eligible POST, PUT, or PATCH XHR requests. Supported inputs are bounded UTF-8 JSON, form-encoded, or textual bodies without unsupported framing, encoding, or signatures. This feature works in existing Chrome profiles on macOS through native messaging to a separately installed native runtime.
+- **Redirects:** Send matching HTTP(S) requests to an absolute destination, including controlled regular-expression capture substitution. `$1`–`$9` are canonical; existing redirect `\\1`–`\\9` values remain compatible.
+- **Query parameters:** Set or remove configured parameter names per rule. Set adds missing names and replaces all existing values for configured names; remove drops configured names from the query string. Set values may use URL captures. Unrelated parameters, scheme, authority, path, and fragment are preserved.
+- **Request and response headers:** Set, append, or remove a named header, subject to immutable forbidden-header lists and browser limitations. Set and append values may use URL captures.
+- **Response body:** Fetch an authorized public GET without browser credentials, then either replace the entire response body or apply bounded regex rewrites to the fetched UTF-8 body through native messaging to an explicitly started local runtime. Replace bodies may use URL captures. Upstream status and headers are preserved.
+- **Request-body replacement/modification:** Replace a complete body or apply bounded global ECMAScript regular-expression replacement to eligible POST, PUT, or PATCH XHR requests. Replace bodies may use URL captures; regex-mode replacements retain body-regex captures. Supported inputs are bounded UTF-8 JSON, form-encoded, or textual bodies without unsupported framing, encoding, or signatures. This feature works in existing Chrome profiles on macOS through native messaging to a separately installed native runtime.
 
-Every rule can be tested against a bounded batch of HTTP(S) URLs before saving. This offline dry run reports regular-expression, effective-origin, method, and resource-type results and previews redirect destinations or resulting query URLs. It never contacts the tested URL, requests permission, changes installed rules, connects to a runtime, or saves the test data.
+Every rule can be tested against a bounded batch of HTTP(S) URLs before saving. This offline dry run reports regular-expression, effective-origin, method, and resource-type results and previews substituted action values. It never contacts the tested URL, requests permission, changes installed rules, connects to a runtime, or saves the test data.
 
 ## User experience
 

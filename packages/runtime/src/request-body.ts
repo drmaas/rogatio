@@ -1,5 +1,10 @@
 import { Worker } from "node:worker_threads";
-import { hasLoneSurrogate, LIMITS } from "@rogatio/schema";
+import {
+  hasLoneSurrogate,
+  LIMITS,
+  matchUrlCaptures,
+  substituteUrlCaptures,
+} from "@rogatio/schema";
 import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import type { RuntimeResult } from "./types.js";
@@ -28,6 +33,11 @@ export type RequestBodyAction =
 export interface RequestBodyOutput {
   readonly body: Uint8Array;
   readonly contentType: string;
+}
+
+export interface UrlCaptureContext {
+  readonly url: string;
+  readonly urlRegex: string;
 }
 
 function supportedContentType(value: string | undefined): boolean {
@@ -255,6 +265,7 @@ function runRegexReplace(
 export async function rewriteRequestBody(
   input: RequestBodyInput,
   action: RequestBodyAction,
+  captureContext?: UrlCaptureContext,
 ): Promise<RuntimeResult<RequestBodyOutput>> {
   if (!supportedContentType(input.contentType)) {
     return failure("runtime.request-body-unsupported-mime-type");
@@ -286,6 +297,14 @@ export async function rewriteRequestBody(
       return failure("runtime.request-body-lone-surrogate");
     }
     outputText = action.body;
+    if (captureContext !== undefined) {
+      const captures = matchUrlCaptures(
+        captureContext.urlRegex,
+        captureContext.url,
+      );
+      if (captures === null) return failure("runtime.url-capture-mismatch");
+      outputText = substituteUrlCaptures(outputText, captures);
+    }
   } else {
     if (action.pattern.length === 0) {
       return failure("runtime.request-body-regex-missing-pattern");

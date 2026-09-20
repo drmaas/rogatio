@@ -86,6 +86,7 @@ export interface AuthorizedOperation {
   readonly kind: RuntimeOperationKind;
   readonly target: string;
   readonly method: HttpMethod;
+  readonly urlRegex?: string;
   readonly presetDigest: PresetDigest;
 }
 
@@ -225,7 +226,8 @@ export type RuntimeErrorCode =
   | "runtime.request-body-timeout"
   | "runtime.tls-ca-not-loaded"
   | "runtime.tls-leaf-generation-failed"
-  | "runtime.mock-unknown";
+  | "runtime.mock-unknown"
+  | "runtime.url-capture-mismatch";
 
 export interface RuntimeError {
   readonly code: RuntimeErrorCode;

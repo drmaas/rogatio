@@ -1,3 +1,10 @@
+export {
+  containsUrlCaptureReference,
+  countCapturingGroups as countUrlCapturingGroups,
+  matchUrlCaptures,
+  substituteUrlCaptures,
+  validateCaptureTemplate,
+} from "./captures.js";
 export { safeClone } from "./clone.js";
 export { hasControl } from "./control.js";
 export type { Sha256Digest } from "./digest.js";

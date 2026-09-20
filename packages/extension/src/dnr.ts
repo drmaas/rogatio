@@ -10,6 +10,7 @@ import type {
   RogatioOperation,
 } from "@rogatio/compiler";
 import { type DnrQueryTransform, queryActionToDNR } from "@rogatio/compiler";
+import { containsUrlCaptureReference } from "@rogatio/schema";
 import type { ChromeApi } from "./chrome.js";
 import { type DnrHeaderRule, toDnrRule } from "./installer.js";
 import {
@@ -59,6 +60,27 @@ export interface DnrQueryRule {
 
 export type DnrRule = DnrRedirectRule | DnrQueryRule | DnrHeaderRule;
 
+function normalizeDnrRegexSubstitution(value: string): string {
+  let normalized = "";
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== "$") {
+      normalized += value[index];
+      continue;
+    }
+    const next = value[index + 1];
+    if (next === "$") {
+      normalized += "$";
+      index += 1;
+    } else if (next !== undefined && next >= "1" && next <= "9") {
+      normalized += `\\${next}`;
+      index += 1;
+    } else {
+      normalized += "$";
+    }
+  }
+  return normalized;
+}
+
 function hostnamesFromOrigins(origins: readonly string[]): string[] {
   const hosts: string[] = [];
   for (const origin of origins) {
@@ -104,7 +126,9 @@ export function translateRedirectToDnr(
     priority: operation.matcher.priority,
     action: {
       type: "redirect",
-      redirect: { url: operation.redirect.destination },
+      redirect: {
+        url: normalizeDnrRegexSubstitution(operation.redirect.destination),
+      },
     },
     condition: redirectQueryCondition(operation),
   };
@@ -318,13 +342,39 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
           added.push({ ruleId: id, operation: redirect });
         } else if (operation.kind === "query") {
           const query = operation as QueryOperation;
+          if (
+            query.action.params.some(
+              (param) =>
+                param.operation !== "remove" &&
+                typeof param.value === "string" &&
+                containsUrlCaptureReference(param.value),
+            )
+          ) {
+            lastInstallErrors.push({
+              ruleId: query.ruleId,
+              message: "Dynamic query values require the native runtime.",
+            });
+            continue;
+          }
           let id = ruleIdHash(query.ruleId);
           while (usedIds.has(id)) id = (id % REDIRECT_QUERY_ID_MAX) + 1;
           usedIds.add(id);
           addRules.push(translateQueryToDnr(query, id));
           added.push({ ruleId: id, operation: query });
         } else if (operation.kind === "header") {
-          headerOps.push(operation as HeaderOperation);
+          const header = operation as HeaderOperation;
+          if (
+            header.header.operation !== "remove" &&
+            typeof header.header.value === "string" &&
+            containsUrlCaptureReference(header.header.value)
+          ) {
+            lastInstallErrors.push({
+              ruleId: header.ruleId,
+              message: "Dynamic header values require the native runtime.",
+            });
+            continue;
+          }
+          headerOps.push(header);
         }
       }
       for (const projection of projectHeaders(headerOps)) {

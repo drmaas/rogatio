@@ -11,32 +11,32 @@
         {
           "id": "rule-redirect",
           "name": "Redirect to docs",
-          "urlRegex": "^https://example\\.com/old/",
+          "urlRegex": "^https://example\\.com/old/(.*)$",
           "origins": [],
           "resourceTypes": ["main_frame"],
           "priority": 100,
           "type": "redirect",
           "redirect": {
-            "destination": "https://example.com/new/"
+            "destination": "https://example.com/new/$1"
           }
         },
         {
           "id": "rule-query",
           "name": "Add tracking param",
-          "urlRegex": "^https://example\\.com/page",
+          "urlRegex": "^https://example\\.com/page/([^/]+)",
           "origins": [],
           "resourceTypes": ["main_frame"],
           "priority": 200,
           "type": "query",
           "action": {
             "type": "query",
-            "params": [{ "name": "ref", "value": "rogatio" }]
+            "params": [{ "name": "ref", "value": "$1" }]
           }
         },
         {
           "id": "rule-header-set",
           "name": "Set request header",
-          "urlRegex": "^https://example\\.com/api/",
+          "urlRegex": "^https://example\\.com/api/([^/]+)/",
           "origins": [],
           "resourceTypes": ["xmlhttprequest"],
           "priority": 300,
@@ -45,12 +45,12 @@
           "headerDirection": "request",
           "headerOperation": "set",
           "headerName": "X-Rogatio-Sample",
-          "headerValue": "enabled"
+          "headerValue": "user-$1"
         },
         {
           "id": "rule-header-remove",
           "name": "Remove response header",
-          "urlRegex": "^https://example\\.com/api/",
+          "urlRegex": "^https://example\\.com/api/([^/]+)/",
           "origins": [],
           "resourceTypes": ["main_frame"],
           "priority": 310,
@@ -63,21 +63,20 @@
         {
           "id": "rule-response-body",
           "name": "Rewrite response body",
-          "urlRegex": "^https://example\\.com/data\\.json",
+          "urlRegex": "^https://example\\.com/data\\.json/([^/]+)",
           "origins": [],
           "resourceTypes": ["main_frame"],
           "priority": 500,
           "type": "response-body",
           "responseBody": {
-            "replacements": [
-              { "pattern": "oldValue", "replacement": "newValue" }
-            ]
+            "mode": "replace",
+            "body": "{\"user\":\"$1\"}"
           }
         },
         {
           "id": "rule-request-body",
           "name": "Replace request body",
-          "urlRegex": "^https://example\\.com/submit",
+          "urlRegex": "^https://example\\.com/submit/([^/]+)",
           "origins": [],
           "resourceTypes": ["xmlhttprequest"],
           "priority": 600,
@@ -85,7 +84,7 @@
           "type": "request-body",
           "requestBody": {
             "mode": "replace",
-            "body": "{\"replaced\":true}"
+            "body": "{\"user\":\"$1\"}"
           }
         }
       ]

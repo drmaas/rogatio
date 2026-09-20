@@ -110,6 +110,7 @@ export function authorizeExact(
         kind: grant.kind,
         target: grant.target,
         method: grant.method,
+        urlRegex: matcher.matcher.urlRegex.source,
         presetDigest: preset.digest,
       }),
     };
