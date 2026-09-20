@@ -624,9 +624,14 @@ class EditorControllerImpl implements EditorController {
     this.draft = initial;
     this.committed = cloneSnapshot(initial) as DraftProject;
 
-    const initialDiagnostics = this.collectDiagnostics(this.draft);
-    if (initialDiagnostics.length > 0) {
-      throw new EditorInitializationError(initialDiagnostics);
+    // Structurally valid drafts may still fail host validation (e.g. CLI bootstrap
+    // with an empty name). Mount and surface those diagnostics instead of failing closed.
+    this.errors = this.collectDiagnostics(this.draft);
+    if (this.errors.length > 0) {
+      this.statusMessage = `${this.errors.length} validation error${
+        this.errors.length === 1 ? "" : "s"
+      } found.`;
+      this.focusRequest = this.errors[0]?.path;
     }
 
     // Initialize AI Assist Panel if handler provided

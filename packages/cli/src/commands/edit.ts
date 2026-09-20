@@ -434,10 +434,22 @@ function generateEditorHtml(
       });
       void editor;
     } catch (error) {
-      const message = error && typeof error === 'object' && 'message' in error
-        ? String(error.message)
-        : 'Rogatio editor could not initialize';
-      root.textContent = message;
+      const parts = [];
+      if (error && typeof error === 'object') {
+        if ('message' in error) parts.push(String(error.message));
+        if (Array.isArray(error.diagnostics)) {
+          for (const diagnostic of error.diagnostics) {
+            if (
+              diagnostic &&
+              typeof diagnostic === 'object' &&
+              typeof diagnostic.message === 'string'
+            ) {
+              parts.push(diagnostic.message);
+            }
+          }
+        }
+      }
+      root.textContent = parts.join(' — ') || 'Rogatio editor could not initialize';
     }
   </script>
 </body>

@@ -177,7 +177,7 @@ schema -> compiler -> editor
 
 The editor uses schema types and the compiler's diagnostic/validation contract. The editor's public browser entry point does not import the current runtime-compiled Node ESM artifacts from the schema or compiler packages. Instead, the host supplies a synchronous validation adapter and an asynchronous save adapter. A Node host can implement the validation adapter with `compileProject`; a later browser host must supply an explicitly approved browser-safe schema/compiler adapter. This prevents Ajv or Node-only modules from leaking into the editor browser bundle while keeping the schema and compiler packages authoritative.
 
-The initial value must be a valid, parsed JSON project accepted by the supplied validator. The editor takes a defensive JSON snapshot and refuses to mount an invalid or hostile initial value rather than coercing, dropping, or silently repairing data. Repairing an invalid file remains a host or later workflow concern.
+The initial value must be a defensive JSON snapshot of a structurally parseable project. Hostile or unreadable values (accessors, cycles, sparse arrays, symbols) still fail closed with `EditorInitializationError` and never partially mount. Host-validator failures on an otherwise parseable draft (for example a CLI bootstrap project with an empty name) mount the editor and surface those diagnostics so the user can repair them in place rather than seeing a blank page.
 
 The conceptual public boundary is:
 
