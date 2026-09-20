@@ -389,6 +389,17 @@ describe("@rogatio/editor resource type hints", () => {
       fieldset?.querySelectorAll("[data-editor-check-group-label]") ?? [],
     ).map((el) => el.textContent);
     expect(groupLabels).toEqual(["Page", "Assets", "Network", "Other"]);
+    expect(fieldset?.querySelectorAll("[data-editor-check-group]").length).toBe(
+      4,
+    );
+    const pageGroup = fieldset
+      ?.querySelectorAll("[data-editor-check-group]")
+      .item(0);
+    expect(
+      Array.from(
+        pageGroup?.querySelectorAll("input[data-resource-type]") ?? [],
+      ).map((el) => el.getAttribute("data-resource-type")),
+    ).toEqual(["main_frame", "sub_frame"]);
 
     const mainFrame = fieldset?.querySelector(
       'input[data-resource-type="main_frame"]',
