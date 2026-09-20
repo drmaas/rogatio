@@ -1,5 +1,5 @@
 import type { HttpMethod, ResourceType } from "@rogatio/schema";
-import { hasControl } from "@rogatio/schema";
+import { hasControl, LIMITS } from "@rogatio/schema";
 import { createAIAssistPanel } from "./ai-assist-panel.js";
 import { builtInRuleTypes } from "./rule-types/index.js";
 import {
@@ -624,9 +624,14 @@ class EditorControllerImpl implements EditorController {
     this.draft = initial;
     this.committed = cloneSnapshot(initial) as DraftProject;
 
-    const initialDiagnostics = this.collectDiagnostics(this.draft);
-    if (initialDiagnostics.length > 0) {
-      throw new EditorInitializationError(initialDiagnostics);
+    // Structurally valid drafts may still fail host validation (e.g. CLI bootstrap
+    // with an empty name). Mount and surface those diagnostics instead of failing closed.
+    this.errors = this.collectDiagnostics(this.draft);
+    if (this.errors.length > 0) {
+      this.statusMessage = `${this.errors.length} validation error${
+        this.errors.length === 1 ? "" : "s"
+      } found.`;
+      this.focusRequest = this.errors[0]?.path;
     }
 
     // Initialize AI Assist Panel if handler provided
@@ -972,10 +977,21 @@ class EditorControllerImpl implements EditorController {
       if (groupId) this.requestRemoveGroup(groupId);
       return;
     }
+    if (command === "copy-group") {
+      const groupId = element.dataset.groupId;
+      if (groupId) this.copyGroup(groupId);
+      return;
+    }
     if (command === "remove-rule") {
       const groupId = element.dataset.groupId;
       const ruleId = element.dataset.ruleId;
       if (groupId && ruleId) this.requestRemoveRule(groupId, ruleId);
+      return;
+    }
+    if (command === "copy-rule") {
+      const groupId = element.dataset.groupId;
+      const ruleId = element.dataset.ruleId;
+      if (groupId && ruleId) this.copyRule(groupId, ruleId);
       return;
     }
     if (command === "add-group-origin") {
@@ -1264,12 +1280,25 @@ class EditorControllerImpl implements EditorController {
     return ids;
   }
 
-  private nextId(prefix: string): string {
-    const ids = this.allIds();
+  private allocateId(prefix: string, reserved: Set<string>): string {
     let candidate = prefix;
     let suffix = 2;
-    while (ids.has(candidate)) candidate = `${prefix}-${suffix++}`;
+    while (reserved.has(candidate)) candidate = `${prefix}-${suffix++}`;
+    reserved.add(candidate);
     return candidate;
+  }
+
+  private nextId(prefix: string): string {
+    return this.allocateId(prefix, this.allIds());
+  }
+
+  private copyLabel(name: unknown): string {
+    const base = typeof name === "string" ? name : "";
+    const suffix = " (copy)";
+    if (base.length + suffix.length <= LIMITS.maxLabelLength) {
+      return `${base}${suffix}`;
+    }
+    return base;
   }
 
   private addGroup(): void {
@@ -1312,6 +1341,75 @@ class EditorControllerImpl implements EditorController {
       "name",
     );
     this.statusMessage = "Rule added.";
+    this.render();
+  }
+
+  private copyRule(groupId: string, ruleId: string): void {
+    if (this.saving) return;
+    const group = this.groupById(groupId);
+    if (!group) return;
+    const sourceIndex = this.ruleIndex(group, ruleId);
+    if (sourceIndex < 0) return;
+    const snapshot = snapshotOwnData(group.rules[sourceIndex]);
+    if (
+      !snapshot.valid ||
+      typeof snapshot.value !== "object" ||
+      snapshot.value === null
+    ) {
+      this.statusMessage = "Could not copy rule.";
+      this.render();
+      return;
+    }
+    const copied = snapshot.value as DraftRule;
+    copied.id = this.nextId("rule-new");
+    copied.name = this.copyLabel(group.rules[sourceIndex].name);
+    group.rules.splice(sourceIndex + 1, 0, copied);
+    this.markChanged();
+    this.route = { kind: "group", groupId };
+    const groupIndex = this.groupIndex(groupId);
+    this.focusRequest = pointer(
+      "groups",
+      groupIndex,
+      "rules",
+      sourceIndex + 1,
+      "name",
+    );
+    this.statusMessage = "Rule copied.";
+    this.render();
+  }
+
+  private copyGroup(groupId: string): void {
+    if (this.saving) return;
+    const sourceIndex = this.groupIndex(groupId);
+    if (sourceIndex < 0) return;
+    const source = this.draft.groups[sourceIndex];
+    const snapshot = snapshotOwnData(source);
+    if (
+      !snapshot.valid ||
+      typeof snapshot.value !== "object" ||
+      snapshot.value === null
+    ) {
+      this.statusMessage = "Could not copy group.";
+      this.render();
+      return;
+    }
+    const copied = snapshot.value as DraftGroup;
+    if (!Array.isArray(copied.rules)) {
+      this.statusMessage = "Could not copy group.";
+      this.render();
+      return;
+    }
+    const reserved = this.allIds();
+    copied.id = this.allocateId("group-new", reserved);
+    copied.name = this.copyLabel(source.name);
+    for (const rule of copied.rules) {
+      rule.id = this.allocateId("rule-new", reserved);
+    }
+    this.draft.groups.splice(sourceIndex + 1, 0, copied);
+    this.markChanged();
+    this.route = { kind: "group", groupId: String(copied.id) };
+    this.focusRequest = pointer("groups", sourceIndex + 1, "name");
+    this.statusMessage = "Group copied.";
     this.render();
   }
 
@@ -2136,6 +2234,13 @@ class EditorControllerImpl implements EditorController {
         open.dataset.route = "group";
         open.dataset.groupId = groupId;
         open.dataset.btn = "secondary";
+        const copy = this.createCommandButton(
+          "Copy group",
+          "copy-group",
+          this.saving,
+          { groupId },
+        );
+        copy.setAttribute("aria-label", `Copy group ${groupName}`);
         const remove = this.createCommandButton(
           "Remove group",
           "remove-group",
@@ -2144,7 +2249,7 @@ class EditorControllerImpl implements EditorController {
           "danger",
         );
         remove.setAttribute("aria-label", `Remove group ${groupName}`);
-        item.append(open, remove);
+        item.append(open, copy, remove);
         list.append(item);
       }
       groups.append(list);
@@ -2161,6 +2266,12 @@ class EditorControllerImpl implements EditorController {
     headingRow.dataset.groupHeading = "true";
     const heading = this.document.createElement("h2");
     heading.textContent = groupName;
+    const copyGroup = this.createCommandButton(
+      "Copy group",
+      "copy-group",
+      this.saving,
+      { groupId },
+    );
     const removeGroup = this.createCommandButton(
       "Remove group",
       "remove-group",
@@ -2168,7 +2279,7 @@ class EditorControllerImpl implements EditorController {
       { groupId },
       "danger",
     );
-    headingRow.append(heading, removeGroup);
+    headingRow.append(heading, copyGroup, removeGroup);
     this.form.append(headingRow);
 
     const settings = this.document.createElement("fieldset");
@@ -2404,6 +2515,10 @@ class EditorControllerImpl implements EditorController {
         this.saving || ruleIndex >= group.rules.length - 1,
         { groupId, ruleId },
       ),
+      this.createCommandButton("Copy rule", "copy-rule", this.saving, {
+        groupId,
+        ruleId,
+      }),
       this.createCommandButton(
         "Remove rule",
         "remove-rule",

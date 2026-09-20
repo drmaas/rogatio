@@ -426,3 +426,31 @@ describe("@rogatio/editor resource type hints", () => {
     expect(checkboxes?.length).toBe(15);
   });
 });
+
+describe("@rogatio/editor initial host validation", () => {
+  it("mounts a structurally valid draft that fails host validation", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: { version: 1, name: "", groups: [] },
+      validate: () => [
+        {
+          code: "schema.minLength",
+          severity: "error",
+          path: "/name",
+          message: "Enter a project name.",
+        },
+      ],
+      save: () => ({ ok: true }),
+    });
+    expect(root.querySelector("[data-rogatio-editor]")).not.toBeNull();
+    expect(root.querySelector('[role="alert"]')?.textContent).toContain(
+      "Enter a project name.",
+    );
+    expect(
+      root.querySelector('[data-path="/name"]')?.getAttribute("aria-invalid"),
+    ).toBe("true");
+    editor.destroy();
+  });
+});

@@ -74,6 +74,20 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
       .getByRole("button", { name: "Remove rule", exact: true }),
   ).toBeVisible();
 
+  await page
+    .locator('[data-rule-card][data-rule-id="rule-one"]')
+    .getByRole("button", { name: "Copy rule", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "First rule (copy)", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-rule-card][data-rule-id="rule-new"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[data-rule-list="group-one"] [data-rule-card]'),
+  ).toHaveCount(3);
+
   await page.getByRole("button", { name: "Add rule" }).click();
   await expect(page.getByRole("heading", { name: "New rule" })).toBeVisible();
   await page.getByLabel("Search rules by name").fill("Second rule");
@@ -107,8 +121,29 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
   await expect(
     page
       .locator("[data-group-heading]")
+      .getByRole("button", { name: "Copy group", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("[data-group-heading]")
       .getByRole("button", { name: "Remove group", exact: true }),
   ).toBeVisible();
+  await page
+    .locator("[data-group-heading]")
+    .locator('[data-command="copy-group"]')
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Two (copy)", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Group ID")).toHaveValue("group-new");
+  const copiedRuleId = await page.getByLabel("Rule ID").inputValue();
+  expect(copiedRuleId).not.toBe("rule-three");
+  expect(copiedRuleId.startsWith("rule-new")).toBe(true);
+
+  await page
+    .locator("[data-desktop-route-rail]")
+    .getByRole("button", { name: "Two", exact: true })
+    .click();
   await page
     .locator("[data-group-heading]")
     .locator('[data-command="remove-group"]')
@@ -127,7 +162,12 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
     .getByRole("alertdialog")
     .getByRole("button", { name: "Remove group" })
     .click();
-  await expect(page.getByRole("button", { name: "Two" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Two", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Two (copy)", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Project", exact: true }),
   ).toBeVisible();

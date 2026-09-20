@@ -32,12 +32,27 @@ describe("edit command", () => {
     const code = await exitCode;
     expect(code).toBe(0);
 
-    // File should be created with empty project
+    // File should be created with a random civilization-scale default name
     const project = await readProject(testFile);
     expect(project).toEqual({
       version: 1,
-      name: "",
-      description: undefined,
+      name: expect.stringMatching(/^[A-Z][a-z]+ [A-Z][a-z]+$/),
+      groups: [],
+    });
+  });
+
+  it("backfills a civilization-scale name onto legacy empty-name projects", async () => {
+    await writeProject(testFile, { version: 1, name: "", groups: [] });
+    const { exitCode, shutdown } = await editCommand([testFile], {
+      launchBrowser: vi.fn().mockResolvedValue(false),
+    });
+    shutdown();
+    expect(await exitCode).toBe(0);
+
+    const project = await readProject(testFile);
+    expect(project).toEqual({
+      version: 1,
+      name: expect.stringMatching(/^[A-Z][a-z]+ [A-Z][a-z]+$/),
       groups: [],
     });
   });
@@ -93,6 +108,11 @@ describe("edit command", () => {
     expect(fetched.html).toContain('id="editor-root"');
     expect(fetched.html).toContain('type="importmap"');
     expect(fetched.html).toContain('"/vendor/editor.js"');
+    // Inline browser script must be plain JS — TypeScript annotations blank the page.
+    expect(fetched.html).not.toMatch(/\(\s*\w+\s*:\s*any\s*\)/);
+    // Host validate is sync; async validate returns a Promise and blanks init.
+    expect(fetched.html).not.toMatch(/validate:\s*async\s*\(/);
+    expect(fetched.html).toContain("XMLHttpRequest");
     expect(fetched.js).toContain("createEditor");
 
     result.shutdown();

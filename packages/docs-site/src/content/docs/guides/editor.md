@@ -9,7 +9,7 @@ editor.
 ## Editing
 
 - Edit project metadata.
-- Create, reorder, and remove rules; create and remove groups (groups are selected from the rail, not reordered).
+- Create, copy, reorder, and remove rules; create, copy, and remove groups (groups are selected from the rail, not reordered).
 - Convert URLs to exact-match regular expressions.
 - Validate, save, or cancel unsaved changes.
 - Inspect field-level errors.
@@ -22,8 +22,8 @@ editor.
   / Create using AI when a provider is configured via `rogatio ai`) and a **Workspace**
   for rule editing.
 - A contextual command bar (Validate / Save / Cancel and route actions) and a desktop route
-  rail; a compact mobile navigation. Add rule, rule reorder/remove, and Remove group sit
-  next to their section or entity.
+  rail; a compact mobile navigation. Add/copy rule, rule reorder/remove, and Copy/Remove
+  group sit next to their section or entity.
 - Full keyboard use, screen-reader support, forced-colors support, and 200% zoom support.
 
 ## Validate and save
