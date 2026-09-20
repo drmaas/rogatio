@@ -41,6 +41,7 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 - `docs/architecture.md` — package boundaries, per-package decisions, and rejected alternatives.
 - `README.md` and `packages/*/README.md` — user-facing overview and usage.
 - `CONTRIBUTING.md` — setup, branching, coding standards, commit/issue policy, and validation workflow.
+- `.agents/skills/docs-accuracy-sync/SKILL.md` — agent workflow to sync orientation docs and the Starlight site with shipped code.
 
 ## Durable Documentation
 
