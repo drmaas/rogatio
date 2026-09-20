@@ -360,41 +360,85 @@ function generateEditorHtml(
     
     const project = await fetchProject();
     
-    const editor = createEditor({
-      root,
-      initialProject: project,
-      validate: async (value) => {
-        const result = await validateProject(value);
-        return result.diagnostics.map((d: any) => ({
-          code: d.code,
-          severity: d.severity,
-          path: d.path,
-          message: d.message,
-        }));
-      },
-      save: async (project) => {
-        const result = await saveProject(project);
-        if (result.ok) {
-          return { ok: true };
-        }
-        return { ok: false, code: result.code, message: result.message };
-      },
-      dryRun: async (currentProject, cases, options) => {
-        const res = await fetch(apiBase + '/api/dry-run', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrfToken,
-          },
-          body: JSON.stringify({ project: currentProject, cases, options }),
-        });
-        return res.json();
-      },
-      onCancel: () => {
-        cancel();
-      },
-      ${aiAssistHandler}
-    });
+    try {
+      const editor = createEditor({
+        root,
+        initialProject: project,
+        // Host validate is sync by contract; use sync XHR on loopback.
+        validate: (value) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', apiBase + '/api/validate', false);
+          xhr.setRequestHeader('Content-Type', 'application/json');
+          xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+          try {
+            xhr.send(JSON.stringify(value));
+          } catch {
+            return [{
+              code: 'editor.validation-failed',
+              severity: 'error',
+              path: '',
+              message: 'Project validation could not be completed.',
+            }];
+          }
+          if (xhr.status < 200 || xhr.status >= 300) {
+            return [{
+              code: 'editor.validation-failed',
+              severity: 'error',
+              path: '',
+              message: 'Project validation could not be completed.',
+            }];
+          }
+          let result;
+          try {
+            result = JSON.parse(xhr.responseText);
+          } catch {
+            return [{
+              code: 'editor.validation-failed',
+              severity: 'error',
+              path: '',
+              message: 'Project validation could not be completed.',
+            }];
+          }
+          const diagnostics = Array.isArray(result.diagnostics)
+            ? result.diagnostics
+            : [];
+          return diagnostics.map((d) => ({
+            code: d.code,
+            severity: d.severity,
+            path: d.path,
+            message: d.message,
+          }));
+        },
+        save: async (project) => {
+          const result = await saveProject(project);
+          if (result.ok) {
+            return { ok: true };
+          }
+          return { ok: false, code: result.code, message: result.message };
+        },
+        dryRun: async (currentProject, cases, options) => {
+          const res = await fetch(apiBase + '/api/dry-run', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': csrfToken,
+            },
+            body: JSON.stringify({ project: currentProject, cases, options }),
+          });
+          return res.json();
+        },
+        onCancel: () => {
+          cancel();
+        },
+        ${aiAssistHandler}
+      });
+      void editor;
+    } catch (error) {
+      const message = error && typeof error === 'object' && 'message' in error
+        ? String(error.message)
+        : 'Rogatio editor could not initialize';
+      root.textContent = message;
+    }
   </script>
 </body>
 </html>`;

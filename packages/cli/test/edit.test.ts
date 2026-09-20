@@ -93,6 +93,11 @@ describe("edit command", () => {
     expect(fetched.html).toContain('id="editor-root"');
     expect(fetched.html).toContain('type="importmap"');
     expect(fetched.html).toContain('"/vendor/editor.js"');
+    // Inline browser script must be plain JS — TypeScript annotations blank the page.
+    expect(fetched.html).not.toMatch(/\(\s*\w+\s*:\s*any\s*\)/);
+    // Host validate is sync; async validate returns a Promise and blanks init.
+    expect(fetched.html).not.toMatch(/validate:\s*async\s*\(/);
+    expect(fetched.html).toContain("XMLHttpRequest");
     expect(fetched.js).toContain("createEditor");
 
     result.shutdown();

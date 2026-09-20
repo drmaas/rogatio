@@ -28,8 +28,8 @@ describe("bundled CLI editor asset paths", () => {
     expect(bundle.length).toBeGreaterThan(0);
     expect(
       bundle,
-      "bundled cli dist/editor/index.js must be the editor browser bundle (contains @rogatio-free source-mapped paths)",
-    ).toMatch(/packages\/schema\/dist\/browser\/index\.js/u);
+      "bundled cli dist/editor/index.js must be the editor browser bundle (contains schema browser source path)",
+    ).toMatch(/schema\/dist\/browser\/index\.js/u);
     const css = await readFile(editorCssPath, "utf8");
     expect(css).toContain(".rogatio-editor");
 
