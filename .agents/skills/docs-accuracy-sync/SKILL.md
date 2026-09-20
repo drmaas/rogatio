@@ -5,6 +5,7 @@ description: >-
   Use when updating README, AGENTS.md, docs/architecture.md, rogatio-overview.md,
   packages/docs-site content, package READMEs, or when docs drift from CLI/runtime/
   extension behavior (pnpm pin, package DAG, install commands, host vs CA).
+  Lives at .agents/skills/ for multi-agent discovery (Cursor, Claude Code, etc.).
 ---
 
 # Rogatio docs accuracy sync
