@@ -17,6 +17,7 @@ import type { DnrInstallError, DnrInstallerWithMatchIndex } from "./dnr.js";
 
 import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
+  checkAISupport,
   type NativeRuntimeConfig,
   requestAIComplete,
   startNativeSession,
@@ -414,6 +415,23 @@ export function createExtensionApplication(
     const data = request as Record<string, unknown>;
     if (request.command === "get-state" || request.command === "refresh") {
       return state();
+    }
+    if (request.command === "check-ai-support") {
+      if (
+        !options.nativeRuntime ||
+        !options.extensionId ||
+        nativePhase !== "started" ||
+        !options.nativeRuntime.send
+      ) {
+        return { ok: true, value: { supported: false } };
+      }
+      const supported = await checkAISupport({
+        extensionId: options.extensionId,
+        nativeRuntime: options.nativeRuntime,
+        getProject: async () => null,
+        getGrantedOrigins: async () => [],
+      });
+      return { ok: true, value: { supported } };
     }
     if (request.command === "generate-project") {
       const prompt = stringValue(data.prompt)?.trim();

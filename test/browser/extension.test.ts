@@ -265,13 +265,8 @@ test("shows AI needs runtime before start and ready after a successful start", a
         if (message.command === "start-native-runtime") {
           state.nativeRuntimeState = { phase: "started" };
           callback({ ok: true, value: state });
-        } else if (message.type === "ai.complete") {
-          callback({
-            protocol: "v1",
-            type: "ai.complete",
-            timestamp: Date.now(),
-            metadata: { content: "{}" },
-          });
+        } else if (message.command === "check-ai-support") {
+          callback({ ok: true, value: { supported: true } });
         } else callback({ ok: true, value: state });
       },
       onMessage: { addListener() {} },

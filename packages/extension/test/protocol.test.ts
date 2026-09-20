@@ -35,6 +35,29 @@ describe("F7 message protocol", () => {
     });
   });
 
+  it("accepts the versioned check-ai-support request", () => {
+    expect(
+      parseRequest({ version: 1, command: "check-ai-support" }),
+    ).toMatchObject({
+      ok: true,
+      value: { version: 1, command: "check-ai-support" },
+    });
+  });
+
+  it("rejects raw native AI envelopes as extension requests", () => {
+    expect(
+      parseRequest({
+        protocol: "v1",
+        type: "ai.complete",
+        timestamp: Date.now(),
+        metadata: { messages: [], model: "test" },
+      }),
+    ).toMatchObject({
+      ok: false,
+      code: "extension.invalid-message",
+    });
+  });
+
   it("rejects cycles without invoking arbitrary properties", () => {
     const value: Record<string, unknown> = { version: 1, command: "refresh" };
     value.self = value;

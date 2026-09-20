@@ -205,4 +205,48 @@ describe("extension AI project generation", () => {
       },
     });
   });
+
+  it("reports AI support via check-ai-support when the native host answers", async () => {
+    const { app, send } = harness();
+    await start(app);
+
+    const result = await app.handle({
+      version: 1,
+      command: "check-ai-support",
+    });
+
+    expect(result).toEqual({ ok: true, value: { supported: true } });
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "ai.complete" }),
+    );
+  });
+
+  it("reports unsupported when AI is not configured", async () => {
+    const { app } = harness({
+      protocol: "v1",
+      type: "ai.error",
+      metadata: {
+        code: "ai.not-configured",
+        message: "AI provider not configured",
+        retryable: false,
+      },
+    });
+    await start(app);
+
+    await expect(
+      app.handle({ version: 1, command: "check-ai-support" }),
+    ).resolves.toEqual({ ok: true, value: { supported: false } });
+  });
+
+  it("reports unsupported when the native runtime is not started", async () => {
+    const { app, send } = harness();
+    await app.handle({ version: 1, command: "create-project", data: project });
+
+    await expect(
+      app.handle({ version: 1, command: "check-ai-support" }),
+    ).resolves.toEqual({ ok: true, value: { supported: false } });
+    expect(send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "ai.complete" }),
+    );
+  });
 });
