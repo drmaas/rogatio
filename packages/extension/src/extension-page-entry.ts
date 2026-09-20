@@ -6,11 +6,6 @@ import {
   readMatchLoggingEnabledFromStorageResult,
 } from "./match-logging-enabled.js";
 import { createMatchLoggingToggle } from "./match-logging-toggle.js";
-import {
-  checkAISupport,
-  type NativeEnvelope,
-  type NativeSessionOptions,
-} from "./native-session.js";
 import { runtimeControlDisabled } from "./runtime-controls.js";
 import { shouldRemountEditorAfterGroupEnablement } from "./workspace-enablement-refresh.js";
 
@@ -1390,69 +1385,15 @@ async function copyText(value: string): Promise<boolean> {
 
 async function checkNativeAISupport(): Promise<void> {
   try {
-    const adapter: NativeSessionOptions = {
-      extensionId: extensionId(),
-      nativeRuntime: {
-        start: async () => ({
-          state: "unsupported",
-          message: "not implemented",
-        }),
-        stop: async () => ({ state: "stopped" }),
-        status: async () => ({ state: "stopped" }),
-        sendPolicy: async () => {},
-        send: async (envelope) => {
-          return new Promise((resolve) => {
-            chrome.runtime.sendMessage(envelope, (response: unknown) => {
-              const error = chrome.runtime.lastError;
-              if (error) {
-                resolve({
-                  protocol: "v1",
-                  type: "ai.error",
-                  timestamp: Date.now(),
-                  metadata: {
-                    code: "extension.message-failed",
-                    message: error.message,
-                    retryable: false,
-                  },
-                });
-              } else {
-                const extResponse = response as ExtensionResponse;
-                if (extResponse.ok && extResponse.value !== undefined) {
-                  resolve(extResponse.value as NativeEnvelope);
-                } else {
-                  resolve({
-                    protocol: "v1",
-                    type: "ai.error",
-                    timestamp: Date.now(),
-                    metadata: {
-                      code:
-                        extResponse.diagnostic?.code ??
-                        "extension.message-failed",
-                      message: "AI request failed",
-                      retryable: false,
-                    },
-                  });
-                }
-              }
-            });
-          });
-        },
-      },
-      getProject: async () => {
-        if (!state.activeProjectId) return null;
-        const project = state.projects[state.activeProjectId];
-        if (!project) return null;
-        return { data: project.data, enabledGroupIds: project.enabledGroupIds };
-      },
-      getGrantedOrigins: async () => {
-        const projectId = state.activeProjectId;
-        return projectId
-          ? (state.projects[projectId]?.grantedOrigins ?? [])
-          : [];
-      },
-    };
-    const supported = await checkAISupport(adapter);
-    aiSupported = supported;
+    const response = await client.send({
+      version: 1,
+      command: "check-ai-support",
+    });
+    aiSupported =
+      response?.ok === true &&
+      typeof response.value === "object" &&
+      response.value !== null &&
+      (response.value as { supported?: unknown }).supported === true;
     aiStatusChecked = true;
   } catch {
     aiSupported = false;
