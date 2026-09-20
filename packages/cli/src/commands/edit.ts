@@ -14,7 +14,7 @@ import {
   type ProjectStorage,
   ProjectStorageError,
 } from "../utils/file.js";
-import { emptyProjectDocument } from "../utils/project-storage.js";
+import { randomCivilizationProjectName } from "../utils/project-storage.js";
 
 export interface EditCommandOptions {
   launchBrowser?: (url: string) => Promise<boolean>;
@@ -98,7 +98,7 @@ export async function editCommand(
     if (e instanceof ProjectStorageError && e.code === "not-found") {
       try {
         await storage.create({ id: filePath });
-        projectData = emptyProjectDocument();
+        projectData = await storage.get(filePath);
       } catch (createError) {
         console.error(`Error writing initial project: ${createError}`);
         return { exitCode: Promise.resolve(2), shutdown: () => {} };
@@ -107,6 +107,17 @@ export async function editCommand(
       console.error(`Error: ${e}`);
       return { exitCode: Promise.resolve(2), shutdown: () => {} };
     }
+  }
+
+  try {
+    projectData = await ensureCivilizationProjectName(
+      storage,
+      filePath,
+      projectData,
+    );
+  } catch (e) {
+    console.error(`Error: ${e}`);
+    return { exitCode: Promise.resolve(2), shutdown: () => {} };
   }
 
   // Read AI provider config
@@ -217,6 +228,37 @@ export async function editCommand(
     exitCode: exitCodePromise,
     shutdown,
   };
+}
+
+/** True when the project name is missing or only whitespace. */
+function needsCivilizationProjectName(data: unknown): boolean {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    return false;
+  }
+  if (!Object.hasOwn(data, "name")) return true;
+  const name = (data as { name: unknown }).name;
+  return typeof name !== "string" || name.trim() === "";
+}
+
+/**
+ * Persist a random civilization-scale name when the loaded document has none.
+ * Covers legacy empty-name files created before default naming existed.
+ */
+async function ensureCivilizationProjectName(
+  storage: ProjectStorage,
+  filePath: string,
+  data: unknown,
+): Promise<unknown> {
+  if (!needsCivilizationProjectName(data)) return data;
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    return data;
+  }
+  const named = {
+    ...(data as Record<string, unknown>),
+    name: randomCivilizationProjectName(),
+  };
+  await storage.update(filePath, named);
+  return named;
 }
 
 function generateEditorHtml(

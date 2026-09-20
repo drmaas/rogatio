@@ -41,6 +41,22 @@ describe("edit command", () => {
     });
   });
 
+  it("backfills a civilization-scale name onto legacy empty-name projects", async () => {
+    await writeProject(testFile, { version: 1, name: "", groups: [] });
+    const { exitCode, shutdown } = await editCommand([testFile], {
+      launchBrowser: vi.fn().mockResolvedValue(false),
+    });
+    shutdown();
+    expect(await exitCode).toBe(0);
+
+    const project = await readProject(testFile);
+    expect(project).toEqual({
+      version: 1,
+      name: expect.stringMatching(/^[A-Z][a-z]+ [A-Z][a-z]+$/),
+      groups: [],
+    });
+  });
+
   it("reads existing project file", async () => {
     await writeProject(testFile, validProject);
     const { exitCode, shutdown } = await editCommand([testFile], {
