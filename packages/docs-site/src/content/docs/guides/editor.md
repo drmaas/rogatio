@@ -9,15 +9,15 @@ editor.
 ## Editing
 
 - Edit project metadata.
-- Create, reorder, and remove groups and rules.
+- Create, reorder, and remove rules; create and remove groups (groups are selected from the rail, not reordered).
 - Convert URLs to exact-match regular expressions.
 - Validate, save, or cancel unsaved changes.
 - Inspect field-level errors.
 
 ## Navigation and accessibility
 
-- Project destination, one destination per group, and project-wide group/rule **search**.
-- A contextual command bar and a desktop route rail; a compact mobile navigation.
+- Project destination, one destination per group, **Test console**, and project-wide group/rule **search**.
+- A contextual command bar (Validate / Save / Cancel and route actions) and a desktop route rail; a compact mobile navigation. Add rule, rule reorder/remove, and Remove group sit next to their section or entity.
 - Full keyboard use, screen-reader support, forced-colors support, and 200% zoom support.
 
 ## Validate and save
