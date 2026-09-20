@@ -278,8 +278,8 @@ describe("formatMatchRecord", () => {
       { url: "https://example.com/" },
       { ...redirectEntry, name: "" },
     );
-    expect(line).toContain("redirect-rule redirect");
-    expect(line).not.toContain("redirect-rule  redirect");
+    expect(line).toContain("ruleId=redirect-rule kind=redirect");
+    expect(line).not.toContain("name=");
   });
 
   it("uses lowercase [rogatio], ANSI SGR, and no %c or hex colors", () => {
@@ -310,8 +310,29 @@ describe("formatMatchRecord", () => {
       { url: "https://example.com/" },
       redirectEntry,
     );
+    expect(line).toContain("url=https://example.com/");
+    expect(line).not.toContain("method=");
+    expect(line).not.toContain("type=");
     expect(line).not.toContain("initiator=");
-    expect(line).not.toMatch(/matched [A-Z]+ /);
+  });
+
+  it("labels live and dim fields with keys", () => {
+    const line = formatMatchRecord(
+      {
+        url: "https://example.com/old/",
+        method: "GET",
+        resourceType: "main_frame",
+        initiator: "https://example.com/",
+      },
+      redirectEntry,
+    );
+    expect(line).toContain("method=GET");
+    expect(line).toContain("type=main_frame");
+    expect(line).toContain("url=https://example.com/old/");
+    expect(line).toContain("ruleId=redirect-rule");
+    expect(line).toContain("name=Redirect Rule");
+    expect(line).toContain("kind=redirect");
+    expect(line).toContain("initiator=https://example.com/");
   });
 
   it("re-applies deny-list and bounds on tampered index values at format time", () => {
@@ -417,7 +438,7 @@ describe("formatMatchRecord", () => {
       { url: "https://example.com/" },
       brokenRedirect,
     );
-    expect(redirectLine).toContain("broken-redirect redirect");
+    expect(redirectLine).toContain("ruleId=broken-redirect kind=redirect");
     expect(redirectLine).not.toContain("→");
 
     const brokenHeader = {

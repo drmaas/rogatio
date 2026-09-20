@@ -167,8 +167,8 @@ describe("match log listener", () => {
     const redirectLine = redirectCall?.args?.[0];
     expect(typeof redirectLine).toBe("string");
     expect(redirectLine).toContain("https://dest.example/path");
-    expect(redirectLine).toContain("GET");
-    expect(redirectLine).toContain("main_frame");
+    expect(redirectLine).toContain("method=GET");
+    expect(redirectLine).toContain("type=main_frame");
     expect(redirectLine).toContain("initiator=https://init.example/");
 
     const queryCall = executeScript.mock.calls[1]?.[0];
@@ -181,8 +181,8 @@ describe("match log listener", () => {
     expect(typeof queryLine).toBe("string");
     expect(queryLine).toContain("set a=1");
     expect(queryLine).toContain("remove b");
-    expect(queryLine).toContain("POST");
-    expect(queryLine).toContain("xmlhttprequest");
+    expect(queryLine).toContain("method=POST");
+    expect(queryLine).toContain("type=xmlhttprequest");
     expect(queryLine).toContain("initiator=https://init.example/app");
   });
 
@@ -197,6 +197,9 @@ describe("match log listener", () => {
     });
 
     const line = executeScript.mock.calls[0]?.[0]?.args?.[0] as string;
+    expect(line).toContain("url=https://example.com/page");
+    expect(line).not.toContain("method=");
+    expect(line).not.toContain("type=");
     expect(line).not.toContain("initiator=");
     expect(line).not.toMatch(/\bGET\b/);
     expect(line).not.toContain("main_frame");
