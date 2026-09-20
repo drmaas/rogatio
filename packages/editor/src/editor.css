@@ -330,16 +330,45 @@
   align-items: end;
   margin-bottom: 0.5rem;
 }
+.rogatio-editor [data-editor-hint] {
+  margin: 0 0 0.75rem;
+  color: var(--rogatio-muted);
+  font-size: 0.8125rem;
+}
+.rogatio-editor [data-editor-check-groups] {
+  display: grid;
+  gap: 0.85rem;
+}
+.rogatio-editor [data-editor-check-group-label] {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rogatio-muted);
+}
 .rogatio-editor [data-editor-checks] {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: 0.35rem 0.7rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.45rem 0.7rem;
 }
 .rogatio-editor [data-editor-checks] label {
   display: flex;
   gap: 0.4rem;
-  align-items: center;
+  align-items: flex-start;
   font-weight: 500;
+  color: var(--rogatio-muted);
+}
+.rogatio-editor [data-editor-check-text] {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.rogatio-editor [data-editor-check-text] small {
+  font-weight: 400;
+  font-size: 0.75rem;
+  line-height: 1.25;
   color: var(--rogatio-muted);
 }
 .rogatio-editor [data-group-heading],
