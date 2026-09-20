@@ -44,9 +44,11 @@ for unpacked extensions, so no lines appear under packed or store distribution.
 **Coverage:** redirect, query, and header rules. Matcher and body rules are not logged
 (body-rule match logging is tracked in [GitHub issue #163](https://github.com/drmaas/rogatio/issues/163)).
 
-**Live vs intended:** the line includes live URL, method, initiator, and resource type from
-the Chrome match event, plus rule id, display name (when set), kind, and the **intended**
-redirect destination, query transform, or header operation from your rule config. It reports a **match** and **intended action** — not
+**Live vs intended:** the line labels present fields (`method=`, `type=`, `url=`,
+`ruleId=`, `name=`, `kind=`, `initiator=`) with live URL, method, initiator, and resource
+type from the Chrome match event, plus rule id, display name (when set), kind, and the
+**intended** redirect destination, query transform, or header operation from your rule
+config. Absent fields omit their key. It reports a **match** and **intended action** — not
 proof the network operation succeeded. Request and response bodies are **not** logged; neither
 are wire-applied header values.
 

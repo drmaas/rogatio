@@ -49,6 +49,12 @@ function nonEmpty(value: string): boolean {
   return value.length > 0;
 }
 
+function keyed(key: string, value: string): string {
+  if (!nonEmpty(value)) return "";
+  // Bound applies to the emitted segment (key=value), not the bare value.
+  return truncateLogString(`${key}=${value}`);
+}
+
 function formatRedirectAction(
   intent: unknown,
   redactSensitive: boolean,
@@ -124,12 +130,22 @@ export function formatMatchRecord(
   const kind = logString(readString(entry, "kind"));
   const action = formatIntendedAction(entry, redactSensitive);
   const initiatorUrl = logUrl(optionalString(event.initiator), redactSensitive);
-  const initiator = nonEmpty(initiatorUrl) ? `initiator=${initiatorUrl}` : "";
 
-  const live = ["matched", method, resourceType, requestUrl]
+  const live = [
+    "matched",
+    keyed("method", method),
+    keyed("type", resourceType),
+    keyed("url", requestUrl),
+  ]
     .filter(nonEmpty)
     .join(" ");
-  const detail = [ruleId, displayName, kind, action, initiator]
+  const detail = [
+    keyed("ruleId", ruleId),
+    keyed("name", displayName),
+    keyed("kind", kind),
+    action,
+    keyed("initiator", initiatorUrl),
+  ]
     .filter(nonEmpty)
     .join(" ");
 
