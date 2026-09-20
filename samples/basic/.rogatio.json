@@ -23,20 +23,20 @@
         {
           "id": "rule-query",
           "name": "Add tracking param",
-          "urlRegex": "^https://example\\.com/page/([^/]+)",
+          "urlRegex": "^https://example\\.com/page",
           "origins": [],
           "resourceTypes": ["main_frame"],
           "priority": 200,
           "type": "query",
           "action": {
             "type": "query",
-            "params": [{ "name": "ref", "value": "$1" }]
+            "params": [{ "name": "ref", "value": "rogatio" }]
           }
         },
         {
           "id": "rule-header-set",
           "name": "Set request header",
-          "urlRegex": "^https://example\\.com/api/([^/]+)/",
+          "urlRegex": "^https://example\\.com/api/",
           "origins": [],
           "resourceTypes": ["xmlhttprequest"],
           "priority": 300,
@@ -45,12 +45,12 @@
           "headerDirection": "request",
           "headerOperation": "set",
           "headerName": "X-Rogatio-Sample",
-          "headerValue": "user-$1"
+          "headerValue": "enabled"
         },
         {
           "id": "rule-header-remove",
           "name": "Remove response header",
-          "urlRegex": "^https://example\\.com/api/([^/]+)/",
+          "urlRegex": "^https://example\\.com/api/",
           "origins": [],
           "resourceTypes": ["main_frame"],
           "priority": 310,
