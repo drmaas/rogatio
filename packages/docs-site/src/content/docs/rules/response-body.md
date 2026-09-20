@@ -16,12 +16,13 @@ rewriting via native messaging to the explicitly started local runtime.
 
 ## Requirements
 
-- Requires the native runtime to be started (see [Local runtime](/guides/runtime/)).
-  Without the runtime, response-body rules report `unsupported`.
-- Requires the device-local CA trust installed via `rogatio runtime install`. CA trust
-  installation requires elevated privileges: Linux (`sudo`), macOS (keychain password),
-  Windows (Administrator).
-- Activation is capability-based; where required capabilities are absent, activation reports
-  `unsupported`.
+- Requires the native-messaging host to be registered (`rogatio runtime install --extension-id <id>`)
+  and the runtime session to be started from the extension's **Start runtime** control
+  (see [Local runtime](/guides/runtime/)).
+- Enabled, granted response-body rules report `needs runtime` until the host session is
+  started. They report `unsupported` only when the platform/native adapter reports that
+  phase (not merely because the session is stopped).
+- Response-body rules do **not** require device-local CA trust. CA trust is for
+  request-body interception only.
 - Observed bodies are never persisted, logged, exported, or transferred through native
   messaging.

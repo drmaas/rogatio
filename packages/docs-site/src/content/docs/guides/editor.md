@@ -16,8 +16,14 @@ editor.
 
 ## Navigation and accessibility
 
-- Project destination, one destination per group, **Test console**, and project-wide group/rule **search**.
-- A contextual command bar (Validate / Save / Cancel and route actions) and a desktop route rail; a compact mobile navigation. Add rule, rule reorder/remove, and Remove group sit next to their section or entity.
+- In the CLI editor and extension Workspace: project destination, one destination per
+  group, **Test console**, and project-wide group/rule **search**.
+- The extension management shell also provides a **Dashboard** overview (including AI Assist
+  / Create using AI when a provider is configured via `rogatio ai`) and a **Workspace**
+  for rule editing.
+- A contextual command bar (Validate / Save / Cancel and route actions) and a desktop route
+  rail; a compact mobile navigation. Add rule, rule reorder/remove, and Remove group sit
+  next to their section or entity.
 - Full keyboard use, screen-reader support, forced-colors support, and 200% zoom support.
 
 ## Validate and save

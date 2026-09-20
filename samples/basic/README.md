@@ -23,7 +23,7 @@ deterministically offline with `rogatio test`.
 
 ## Prerequisites
 
-- **Node.js 24+** and **pnpm 10.32.1** (see the repository `README.md` for the exact
+- **Node.js 24+** and **pnpm 12.4.1** (see the repository `README.md` for the exact
   toolchain; `node -v` and `pnpm -v` should report compatible versions).
 - **Google Chrome** (the only supported browser).
 - The Chrome extension is built locally from source in this repository — there is no

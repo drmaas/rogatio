@@ -54,8 +54,8 @@ or export.
     server, no round trips to a third party.
   </Card>
   <Card title="Local runtime, on demand" icon="puzzle">
-    Response- and request-body rules use a device-local runtime that activates only when you
-    explicitly start and connect it.
+    Response- and request-body rules use a device-local runtime that you start and stop
+    explicitly from the extension's **Start runtime** / **Stop runtime** controls.
   </Card>
   <Card title="Safe by default" icon="shield">
     No accounts, hosted runtime, cloud sync, telemetry, or retained traffic history. Your
@@ -75,7 +75,7 @@ or export.
 
 ```sh
 # Install the CLI (requires Node 24+)
-npm install -g @drmaas/rogatio
+npm install -g @rogatio/cli
 
 # Open the visual editor and edit .rogatio.json
 rogatio edit
@@ -83,8 +83,10 @@ rogatio edit
 # Validate the project file
 rogatio verify
 
-# Start the local runtime for body-rewriting rules
-rogatio runtime
+# Register the native-messaging host (use the extension ID from chrome://extensions)
+rogatio runtime install --extension-id <your-extension-id>
+
+# Start/stop body-rule runtime from the extension's Start runtime / Stop runtime controls
 ```
 
 ## Explore the docs

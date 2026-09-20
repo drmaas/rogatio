@@ -2,13 +2,15 @@
 
 > Code is the source of truth for current behavior. Links to `docs/specs/`, `docs/plans/`, and `docs/workflows/` point to frozen decision records; see `AGENTS.md` "Source-of-truth priority".
 
-**Status:** F23 unified native-host runtime direction approved and implemented for the current activate/deactivate extension control surface.
+**Status:** F23 unified native-host runtime direction approved and implemented for the extension Start/Stop runtime control surface.
 
 ## F23 Unified Native-Host Runtime Direction
 
 One extension-launched native host owns response-body, request-body, internal proxy/TLS, and upstream forwarding. Native messaging carries lifecycle, policy, and metadata/control; observed traffic bodies remain in the host-owned interception path. The host is launched by the browser via the native-messaging manifest when the user clicks **Start runtime** in the extension; clicking **Stop runtime** unregisters the session. Only owned routing is removed on stop, active operations are aborted, transient body buffers are cleared, and prior proxy state is restored.
 
-The extension exposes only Start runtime and Stop runtime during normal use. The CLI has no lifecycle subcommand; the previous `rogatio runtime activate` / `deactivate` / `status` commands were removed because they were pure ceremony over an empty-preset controller and did not control the real session. Separate Check and connect actions and mock connection state are removed. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. CLI functionality remains limited to one-time host installation, CA trust, and administrative diagnostics; it is not required to connect or operate a browser session.
+The extension exposes only Start runtime and Stop runtime during normal use. The CLI has no session lifecycle subcommand; the previous `rogatio runtime activate` / `deactivate` / `status` commands were removed because they were pure ceremony over an empty-preset controller and did not control the real session. Separate Check and connect actions and mock connection state are removed. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. CLI functionality remains limited to one-time host installation (`install` / `uninstall`), CA trust, and administrative diagnostics; it is not required to start or operate a browser session.
+
+See [F23 Host Session Details](#f23-host-session-details-pac-and-pass-through) below for PAC collision checks, transactional start/rollback, and internal proxy scope.
 
 
 ## Package Boundaries
@@ -25,33 +27,32 @@ The extension exposes only Start runtime and Stop runtime during normal use. The
 │  Validated source → browser-neutral operations + diagnostics    │
 └──────────────────────────┬──────────────────────────────────────┘
                            │
-           ┌───────────────┼───────────────┐
-           ▼               ▼               ▼
-┌──────────────────┐ ┌──────────────┐ ┌────────────────────┐
-│ @rogatio/        │ │ @rogatio/    │ │ @rogatio/          │
-│ browser-core     │ │ editor        │ │ runtime            │
-│ Storage, perms,  │ │ Framework-   │ │ Mock/response      │
-│ enablement, CAS  │ │ free DOM     │ │ server foundation  │
-└────────┬─────────┘ └──────┬───────┘ └────────┬───────────┘
-         │                  │                   │
-         └──────────────────┼───────────────────┘
-                            ▼
-                 ┌──────────────────────┐
-                 │ @rogatio/cli        │ ◄── NEW
-                 │ edit, verify, runtime│
-                 └──────────┬───────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              ▼                           ▼
-     ┌─────────────────┐           ┌───────────────┐
-     │ Chrome MV3 Ext  │           │ Native Runtime │
-     │                 │           │                │
-     └─────────────────┘           └───────────────┘
+     ┌─────────────┬───────┴───────┬─────────────┬────────────────┐
+     ▼             ▼               ▼             ▼                ▼
+┌──────────┐ ┌──────────┐ ┌──────────────┐ ┌──────────┐ ┌────────────────┐
+│ editor   │ │ dry-run  │ │ browser-core │ │ runtime  │ │ (schema+comp.  │
+│ DOM UI   │ │ offline  │ │ storage,     │ │ body/TLS │ │  deps only)    │
+│          │ │ matcher  │ │ perms, CAS   │ │ host     │ │                │
+└────┬─────┘ └────┬─────┘ └──────┬───────┘ └────┬─────┘ └────────────────┘
+     │            │              │              │
+     │            │              │              │
+     └────────────┼──────────────┼──────────────┘
+                  │              │
+         ┌────────┴──────┐      │
+         ▼               ▼      │
+┌────────────────┐ ┌────────────────────┐
+│ @rogatio/cli   │ │ @rogatio/extension │
+│ edit, verify,  │ │ Chrome MV3: DNR,   │
+│ test, runtime, │ │ popup, management, │
+│ ai             │ │ native-session     │
+└────────────────┘ └────────────────────┘
+
+Off DAG: @rogatio/docs-site (Astro/Starlight). Stubs: @rogatio/smoke, @rogatio/sanity.
 ```
 
 ## Security and Privacy Boundaries
 
-The project introduces only development and validation tooling plus the local-first product packages described below. It must not add credentials, telemetry, hosted endpoints, traffic capture, native messaging, proxies, TLS handling, or persistent user data beyond the version-controlled `.rogatio.json` project file. Dependencies are controlled by the committed pnpm lockfile, exact or explicitly governed tool versions, separated development dependencies, and a reviewed install-script policy. Generated files and secrets must not enter version control.
+The project is local-first: no accounts, no hosted Rogatio runtime, no cloud sync, no telemetry, and no retained traffic history. Persistent product state is the version-controlled `.rogatio.json` project file (plus optional local AI provider config under the CLI's ai commands). Body rules may use Chrome native messaging, a loopback-only proxy, and a device-local CA for TLS interception; those capabilities are confined to `127.0.0.1`, capability/digest pairing, exact rule authorization, and the Start/Stop session model — they must not become a general forward proxy, file server, or traffic archive. Dependencies are controlled by the committed pnpm lockfile, exact or explicitly governed tool versions, separated development dependencies, and a reviewed install-script policy. Generated files and secrets must not enter version control.
 
 ## Schema Architecture
 
@@ -359,11 +360,11 @@ The request-body trust lifecycle touches only device-local trust material: the m
 
 The complete proposed contract and acceptance criteria are in `docs/specs/f16-request-body-trust.md`; the staged workflow record is in `docs/f16-workflow.md`.
 
-## F23 Unified Native-Host Runtime Direction
+## F23 Host Session Details (PAC and pass-through)
 
 F23 consolidates runtime-dependent behavior behind one extension-launched native host. The host owns the internal loopback proxy and TLS interception, while native messaging carries lifecycle, policy, and metadata/control only; observed traffic bodies remain in the host-owned interception path. Start is transactional: it validates the immutable active policy, opens the host/provider, and installs exact scoped PAC routing only after collision, trust, and capability checks. Failure rolls back all Rogatio-owned state. Stop removes only owned PAC/proxy state, aborts active operations, invalidates capabilities, clears transient body buffers, and restores the prior browser proxy configuration.
 
-The extension exposes only Start runtime and Stop runtime during normal use. The CLI has no lifecycle subcommand; see the append-only decision record at `docs/specs/cli-activate-deactivate-removal.md` (when frozen) for the removal rationale. A separate Check and connect action and separate mock-connection state are not part of the target model. Response-body and request-body rules share one runtime session. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. The CLI remains available for one-time native-host installation, CA trust, and administrative diagnostics, but it is not required to connect or operate a browser session.
+The extension exposes only Start runtime and Stop runtime during normal use. The CLI has no session lifecycle subcommand; see the append-only decision record at `docs/specs/cli-activate-deactivate-removal.md` for the removal rationale. A separate Check and connect action and separate mock-connection state are not part of the target model. Response-body and request-body rules share one runtime session. Host start (after manifest install) is unconditional; request-body PAC/CA activation remains capability-gated. Non-matching or unsupported requests pass through untouched, and only the highest-priority matching request-body rule applies. The CLI remains available for one-time native-host installation, CA trust, and administrative diagnostics, but it is not required to start or operate a browser session.
 
 The internal proxy remains narrowly scoped: exact authorized origins, bounded HTTP/1.1 request handling, strict TLS/target/address validation, no redirects or proxy recursion, and no traffic persistence. Unsupported signed, compressed, multipart, binary, or otherwise unsafe transformations do not produce a partial request; they pass through untouched where protocol-safe. See `docs/specs/f23-unified-native-host-runtime.md` and `docs/plans/f23-unified-native-host-runtime.md` for the approved requirements and implementation sequence.
 
@@ -373,7 +374,7 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 
 **1. CLI Entry Point (`src/index.ts`)**
 - Command router using minimal argument parsing (no external deps)
-- Subcommands: `edit`, `verify`, `runtime` (stub)
+- Subcommands: `edit`, `verify`, `test`, `runtime`, `ai`
 - Global options: `--help`, `--version`
 
 **2. Edit Command (`src/commands/edit.ts`)**
@@ -384,6 +385,9 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
   - `POST /api/validate` → runs schema + compiler validation
   - `POST /api/save` → writes project to file
   - `POST /api/cancel` → shuts down server
+  - `POST /api/dry-run` → offline dry-run against bounded URL cases
+  - `POST /api/ai/complete` → non-streaming AI completion (local provider config)
+  - `POST /api/ai/stream` → streaming AI completion (SSE)
 - Cross-platform browser launch (macOS `open`, Linux `xdg-open`, Windows `start`)
 - CSRF protection via random token in HTML and validated on mutating endpoints
 - Cleanup on SIGINT/SIGTERM, save, cancel, or browser close detection
@@ -397,13 +401,27 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
   - JSON (`--json`): structured array for scripting
 - Exit codes: 0=valid, 1=invalid (diagnostics), 2=error (IO/parse)
 
-**4. Editor Hosting (`src/server/`, `src/commands/edit.ts`)**
+**4. Test Command (`src/commands/test.ts`)**
+- Offline dry-run via `@rogatio/dry-run` against `--urls` / `--urls-file` cases
+- Never contacts tested URLs, requests permission, or starts a runtime
+
+**5. Runtime Command (`src/commands/runtime.ts`)**
+- `install --extension-id <id>`: register native-messaging host manifest; on capable platforms also provision/trust device-local CA
+- `uninstall`: remove host manifest, CA files, and trust (idempotent)
+- `host <path>`: stdio native-messaging host entry (browser-launched; manual use for debugging)
+
+**6. AI Command (`src/commands/ai.ts`)**
+- Provider configuration: `setup | ls | show | delete | test`
+- Local-only OpenAI-compatible providers; keys stay on the machine
+- Editor/extension Dashboard "Create using AI" / AI Assist call the edit-server AI routes when configured; see root `README.md` for user-facing setup
+
+**7. Editor Hosting (`src/server/`, `src/commands/edit.ts`)**
 - `editor.html` is generated inline (`generateEditorHtml`) with embedded config (API base URL, CSRF token, file path) plus an import map
 - The import map maps `@rogatio/editor` to `/vendor/editor.js`, served by the CLI's own HTTP server
 - The `@rogatio/editor` browser bundle is resolved at runtime via `import.meta.resolve("@rogatio/editor")` and streamed from disk on `GET /vendor/editor.js` — no separate CLI browser build target is required
 - Editor instantiates via `createEditor(root, options)` with HTTP-based callbacks (`validate`, `save`, `onCancel`)
 
-**5. Utilities (`src/utils/`)**
+**8. Utilities (`src/utils/`)**
 - `project-storage.ts`: CLI-owned `ProjectStorage` port (`list` / `get` / `create` / `import` / `update` / `delete`) plus the JSON-file adapter (`createJsonFileProjectStorage`). Path-as-id; atomic write (pretty JSON, mkdir, temp + rename). Production `edit` / `verify` / `test` / `runtime` and save use the port for file-backed I/O. This surface is separate from browser-core `ProjectRepository` / `StorageAdapter` (envelope store); the two are not unified.
 - `file.ts`: thin façade re-exporting the port/adapter and retaining compat `readProject` / `writeProject` wrappers for tests.
 - `browser.ts`: cross-platform `open` with fallback handling
@@ -461,10 +479,11 @@ rogatio edit [path]
 
 ### Security Boundaries
 - Server binds only to `127.0.0.1` (never `0.0.0.0`)
-- CSRF token required for mutating endpoints (`/api/save`, `/api/cancel`)
+- CSRF token required for mutating endpoints (`/api/save`, `/api/cancel`, `/api/dry-run`, `/api/ai/complete`, `/api/ai/stream`)
 - No authentication (local-only, short-lived)
 - File access confined to target `.rogatio.json` path
-- No network requests except browser launch
+- AI routes use the locally configured provider only; they do not introduce Rogatio-hosted inference
+- No other network requests except browser launch and optional AI provider calls the user configured
 
 ### Error Handling
 - Schema validation errors → structured diagnostics
@@ -756,16 +775,12 @@ The version-1 schema keeps `action` optional to preserve backward compatibility 
 
 ## Mock Rules
 
-> **Superseded (F23):** the sections below record the original F13 HTTP mock-server design.
-> Under the unified native-host runtime direction, mock delivery moved into the native host
-> (`rogatio runtime host`) over the `mock.connect` native-messaging handshake; the standalone
-> HTTP mock server, `/v1/connection` endpoint, and Check-and-connect flow were removed. The
-> rule payload, editor extension, and dry-run preview described here remain accurate.
+> **Fully superseded.** The `mock` rule type and F13 standalone mock-server design are **removed** from the product schema and UI. Historical text below is decision archaeology only — do not treat rule payloads, editor surfaces, dry-run previews, or statuses described here as current behavior. Under F23, response-body and request-body rules share the unified native host (`rogatio runtime host`) with Start/Stop lifecycle; there is no `mock` discriminant, no `/v1/connection` endpoint, and no Check-and-connect flow.
 
-The mock-rules package adds the `mock` rule type as a vertical slice: a configured HTTP status, optional
+The historical F13 mock-rules package added a `mock` rule type as a vertical slice: a configured HTTP status, optional
 response headers, an optional delay, and either an inline body or a live UTF-8 snapshot
 of one approved local file, served to matched browser requests without ever contacting
-upstream. It integrates the rule slice with the runtime server, the editor, the CLI,
+upstream. It integrated the rule slice with the runtime server, the editor, the CLI,
 and the extension, including the extension's native-host `mock.connect` handshake during runtime activation.
 
 ### Rule payload and compiler
@@ -1160,9 +1175,9 @@ the npm/extension release pipeline (handled later by the release pipeline).
   existing `packages/*` pnpm workspace. It introduces `astro` and `@astrojs/starlight`
   as dependencies — the only new third-party dependencies the feature adds, and the ones
   the documentation-site specification explicitly requires.
-- Content lives in `src/content/docs/**` as Markdown (`.md`); Starlight's built-in docs
-  collection is used, so no custom `src/content.config.ts` is required. This keeps the
-  package free of product `.ts` source that would otherwise be pulled into the root
+- Content lives in `src/content/docs/**` as Markdown (`.md` / `.mdx`). Starlight's docs
+  collection is wired through `src/content.config.ts` (`docsLoader`). The package remains
+  free of product `.ts` source that would otherwise be pulled into the root
   `tsc --noEmit` and Biome passes.
 - Build produces a static site in `dist/` (gitignored). Scripts: `dev`, `build`
   (`astro build`), `preview`, and `check` (`astro check`).
@@ -1344,8 +1359,10 @@ runtime need (spec REQ-001).
   unconditionally; new `host.ts` is the stdio native-messaging loop plus a loopback
   mock-body faucet (`--mock-port`); `proxy.ts` retained (request-body markers).
 - `packages/cli/src/commands/runtime.ts`: removed the `rogatio runtime [path]` HTTP
-  mock-server path; added `rogatio runtime host <path>` (with `--mock-port`); kept native
-  activate/deactivate/status and trust lifecycle. The CLI `rogatio` binary also exposes
+  mock-server path; added `rogatio runtime host <path>` (with `--mock-port`); kept
+  `install` / `uninstall` trust lifecycle (session Start/Stop is extension-owned; the
+  former `activate` / `deactivate` / `status` CLI subcommands were later removed — see
+  `docs/specs/cli-activate-deactivate-removal.md`). The CLI `rogatio` binary also exposes
   `rogatio runtime host <path>` (with `--mock-port`) as the user-facing way to run the
   host entry point; the native-messaging manifest's `runtime-host` executable basename
   routes to the same entry point so the browser-spawned process works.

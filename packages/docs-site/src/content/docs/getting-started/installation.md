@@ -30,7 +30,7 @@ Verify the install:
 rogatio --help
 ```
 
-The public CLI consists exactly of `edit`, `verify`, and `runtime`. See the
+The public CLI consists of `edit`, `verify`, `test`, `runtime`, and `ai`. See the
 [CLI reference](/reference/cli/).
 
 ## Chrome extension

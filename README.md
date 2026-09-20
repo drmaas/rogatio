@@ -75,8 +75,8 @@ Verify the install:
 rogatio --help
 ```
 
-The public CLI consists exactly of `edit`, `verify`, `test`, and `runtime` (which
-includes the `host` subcommand).
+The public CLI consists of `edit`, `verify`, `test`, `runtime` (with
+`install`, `uninstall`, and `host` subcommands), and `ai`.
 
 ## Chrome extension
 
@@ -250,14 +250,17 @@ This is a strict-TypeScript 7, ESM/NodeNext pnpm monorepo.
 | `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
 | `@rogatio/extension` | Chrome MV3 service worker and extension page (WebExtensions/DNR translation). |
 | `@rogatio/runtime` | Reusable response-body and request-body transformation components. |
-| `@rogatio/cli` | Editor host, file verification, test runner, and runtime dispatch (`rogatio` binary). |
+| `@rogatio/cli` | Editor host, file verification, test runner, AI config, and runtime dispatch (`rogatio` binary). |
+| `@rogatio/docs-site` | Astro + Starlight user documentation site (not on the product package DAG). |
+| `@rogatio/smoke` | Tiny workspace stub used by package wiring checks. |
+| `@rogatio/sanity` | Tiny workspace stub that depends on `@rogatio/smoke`. |
 
 ## Local development
 
 Prerequisites:
 
 - Node.js **24** or newer (Node 24 is the CI baseline)
-- pnpm **10.32.1**
+- pnpm **12.4.1**
 - Chrome for Testing, for browser e2e (`pnpm browser:install`)
 
 Install dependencies and the browser test binary:
