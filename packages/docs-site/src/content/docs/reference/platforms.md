@@ -16,22 +16,23 @@ supported browser.
 | Response-body replacement/rewriting | Local runtime via native messaging. |
 | Request-body replacement/modification | Local runtime via native messaging (TLS proxy). |
 
-## Capability-based activation
+## Host install and Start/Stop
 
-- **Response-body** and **request-body** rules use the unified native host, started
-  by the browser via the extension's Start/Stop controls; the host itself runs as
-  `rogatio runtime host <path>`. Request-body rules additionally use
-  `rogatio runtime install | uninstall`; the same `install` command
-  also provisions the device-local CA on capable platforms. `uninstall` removes
-  the host manifest, the device-local CA files, and the trust installation (idempotent).
-- Response-body and request-body rules share one runtime session.
+- Register the native-messaging host with
+  `rogatio runtime install --extension-id <id>` (and remove it with `uninstall`).
+  On capable platforms the same `install` also provisions and trusts the device-local CA.
+- After install, the extension starts and stops the host via **Start runtime** /
+  **Stop runtime**. Host start is unconditional once the manifest is registered.
+- Response-body and request-body rules share one runtime session. The host itself runs as
+  `rogatio runtime host <path>` (normally browser-launched).
 
-## Limitations
+## Request-body capability gate
 
-- Request-body activation is capability-based, excludes private browsing, and cannot compose
-  with another controlling proxy, PAC, extension, or enterprise policy.
-- The runtime activates only where a trusted device-local CA can be provisioned and Chrome PAC
-  routing does not collide with an existing controlling proxy/PAC/extension/enterprise policy.
-- macOS is the reference supported platform. Linux and Windows may also activate when those
-  capabilities are present; where they are absent, activation reports `unsupported`, and
-  Linux/Windows can still verify, edit, import, export, and dry-run request-body rules.
+- Request-body interception is separately capability-based: it excludes private browsing,
+  cannot compose with another controlling proxy, PAC, extension, or enterprise policy, and
+  requires a trusted device-local CA plus non-colliding Chrome PAC routing.
+- macOS is the reference supported platform. Linux and Windows may also activate
+  request-body interception when those capabilities are present; where they are absent,
+  request-body activation reports `unsupported`, while the host can still start for
+  response-body rules. Linux/Windows can still verify, edit, import, export, and dry-run
+  request-body rules.

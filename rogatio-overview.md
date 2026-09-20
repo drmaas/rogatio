@@ -39,14 +39,14 @@ When Chrome authoritatively reports a Rogatio-installed DNR rule match (unpacked
 
 ## Architecture and technology
 
-Rogatio is a strict TypeScript 7, ESM/NodeNext monorepo using pnpm 10.32.1 as its package manager:
+Rogatio is a strict TypeScript 7, ESM/NodeNext monorepo using pnpm 12.4.1 as its package manager:
 
 - **`schema`** owns the version-1 JSON Schema, generated AJV validation, origins, bounds, and forbidden headers.
 - **`compiler`** converts validated source into browser-neutral operations and stable diagnostics.
 - **`browser-core`** owns versioned project storage, migrations, permissions, enablement, compare-and-swap lifecycle, atomic rule installation and recovery, runtime state, diagnostics, and badge state.
 - **`editor`** provides the shared framework-free DOM controller and accessible view.
 - The Chrome Manifest V3 package translates neutral rules to WebExtensions and Declarative Net Request APIs. The extension boundary is designed to accommodate additional browser extensions in the future.
-- **`cli`** bundles the editor host, file verification, runtime dispatch, and macOS runtime lifecycle.
+- **`cli`** bundles the editor host, file verification, offline dry-run (`test`), AI provider configuration (`ai`), and runtime dispatch (`install` / `uninstall` / `host`).
 - **`runtime`** supplies reusable bounded response-body and request-body transformation/runtime components. The native host and runtime-owned request-body TLS proxy remain separate processes.
 
 The native runtime binds only `127.0.0.1`, pairs through a random capability and preset digest, authorizes the exact rule, confines file access, and enforces SSRF, DNS-rebinding, redirects, credentials, method, timeout, and size controls. It is never a general forward proxy or file server. The macOS runtime uses native messaging for control and response-body and request-body transformation routing, along with scoped Chrome PAC or proxy routing, an ephemeral TLS proxy, and a device-local CA. It independently revalidates project, rule, URL, method, initiator, target, permission, and grant authority; observed bodies are never persisted, logged, exported, or transferred through native messaging.
@@ -57,6 +57,6 @@ Builds use esbuild. Quality gates use Biome for formatting and linting, strict T
 
 Supported operating systems are Linux, Windows, and macOS. Chrome is the currently supported browser. The application is designed to support adding additional browser extensions in the future.
 
-The public CLI consists exactly of `edit`, `verify`, `test`, and `runtime`. It is distributed as an npm package from the public npm registry. The Chrome extension is unsigned and manually loaded from a GitHub Release ZIP, with no browser-store installation or automatic updates. Chrome sideloading may require the organization's extension entitlement.
+The public CLI consists of `edit`, `verify`, `test`, `runtime`, and `ai`. It is distributed as an npm package from the public npm registry. The Chrome extension is unsigned and manually loaded from a GitHub Release ZIP, with no browser-store installation or automatic updates. Chrome sideloading may require the organization's extension entitlement.
 
-Request-body activation is capability-based, excludes private browsing, and cannot compose with another controlling proxy, PAC, extension, or enterprise policy. The runtime activates only where a trusted device-local CA can be provisioned and Chrome PAC routing does not collide with an existing controlling proxy/PAC/extension/enterprise policy; macOS is the reference supported platform and Linux/Windows may also activate when those capabilities are present. Where the capabilities are absent, activation reports `unsupported`; Linux and Windows can still verify, edit, import, export, and dry-run request-body rules.
+After `rogatio runtime install --extension-id <id>` registers the native-messaging host, the extension can start and stop the host unconditionally via **Start runtime** / **Stop runtime**. Request-body interception is separately capability-based: it excludes private browsing, cannot compose with another controlling proxy, PAC, extension, or enterprise policy, and requires a trusted device-local CA plus non-colliding Chrome PAC routing. macOS is the reference supported platform; Linux and Windows may also activate request-body interception when those capabilities are present. Where they are absent, request-body activation reports `unsupported` while the host can still start for response-body rules; Linux and Windows can still verify, edit, import, export, and dry-run request-body rules.

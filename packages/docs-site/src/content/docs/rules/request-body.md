@@ -19,15 +19,20 @@ runtime-owned TLS proxy.
 
 ## Requirements and capabilities
 
-- Requires the native runtime to be started. Without the runtime, request-body rules
-  report `unsupported`.
-- Activation is **capability-based** and cannot compose with another controlling proxy,
-  PAC, extension, or enterprise policy.
-- Where the required capabilities are absent, activation reports `unsupported`; Linux and
-  Windows may still verify, edit, import, export, and dry-run request-body rules.
-- Requires the device-local CA trust installed via `rogatio runtime install`. CA trust
-  installation requires elevated privileges: Linux (`sudo`), macOS (keychain password),
-  Windows (Administrator). On incapable platforms the install completes without CA trust.
+- Requires the native-messaging host registered via
+  `rogatio runtime install --extension-id <id>` and the runtime session started from the
+  extension's **Start runtime** control. Without a started session, enabled granted
+  request-body rules report `needs runtime`.
+- Request-body interception is **capability-based**: it needs a trusted device-local CA
+  and non-colliding Chrome PAC routing, excludes private browsing, and cannot compose with
+  another controlling proxy, PAC, extension, or enterprise policy.
+- Where those capabilities are absent, request-body activation reports `unsupported`;
+  Linux and Windows may still verify, edit, import, export, and dry-run request-body rules.
+  The host can still start for response-body rules.
+- CA trust is installed by the same `rogatio runtime install --extension-id <id>` command
+  on capable platforms. Elevation: Linux (`sudo`), macOS (keychain authorization), Windows
+  (Administrator). When elevation is unavailable the command prints
+  `trust unsupported: <reasons>` and exits `0` (manifest installed; CA skipped).
   See [Local runtime](/guides/runtime/).
 - Observed bodies are processed in-process only and never persisted, logged, exported, or
   transferred through native messaging.

@@ -6,14 +6,14 @@ Read `rogatio-overview.md` and `docs/architecture.md` before changing scope. Res
 
 ## Codebase Structure
 
-Strict TS 7, ESM/NodeNext monorepo, pnpm 10.32.1, Node 24. Built with esbuild (`scripts/build.ts`); linted/formatted by Biome; tested by Vitest (unit) and Selenium (browser journeys via Chrome for Testing); docs site uses Astro 7 + Starlight.
+Strict TS 7, ESM/NodeNext monorepo, pnpm 12.4.1, Node 24. Built with esbuild (`scripts/build.ts`); linted/formatted by Biome; tested by Vitest (unit) and Selenium (browser journeys via Chrome for Testing); docs site uses Astro 7 + Starlight.
 
 Dependency direction (no cycles, no skipping):
 
 ```
 schema → compiler → { editor, dry-run, browser-core } → { cli, extension }
-                                                          ↑
-                              runtime (depends on schema + compiler only)
+ ↑
+ runtime (depends on schema + compiler only; cli depends on runtime)
 ```
 
 Package roles — when reading code, start here to know which boundary you are in:
@@ -23,10 +23,10 @@ Package roles — when reading code, start here to know which boundary you are i
 - `packages/browser-core` — browser-neutral core: versioned project storage, migrations, per-project permissions/enablement, compare-and-swap lifecycle, atomic install with recovery, in-memory runtime state model, rule statuses (`active | disabled | needs permission | needs runtime | unsupported | error`), badge math. Platform-specific work enters through injected `StorageAdapter` / `RuleInstallerAdapter` ports.
 - `packages/editor` — framework-free DOM editor (view + controller + draft state). Public boundary is `createEditor(options) → EditorController`; host supplies `validate` and `save` adapters. Browser bundle must contain no `node:` imports or Ajv — hosts wire validation through the `browser-schema`/compiler adapter.
 - `packages/extension` — Chrome MV3 boundary: service worker, popup, management page, DNR projection (`extension/src/dnr.ts`, `projection.ts`), native-session bridge, popup model. Owns Chrome API adapters and the browser-safe `browser-schema.ts` mirror.
-- `packages/cli` — public surface: `rogatio edit | verify | test | runtime`. Hosts the editor over a loopback HTTP server (`127.0.0.1`, random port, CSRF token). `runtime` subcommands: `install | uninstall | host`.
+- `packages/cli` — public surface: `rogatio edit | verify | test | runtime | ai`. Hosts the editor over a loopback HTTP server (`127.0.0.1`, random port, CSRF token). `runtime` subcommands: `install | uninstall | host`. `ai` subcommands: `setup | ls | show | delete | test`.
 - `packages/runtime` — private Node ESM runtime foundation: loopback mock/response server (`policy`, `protocol`, `outbound`, `confined-file`), macOS native-messaging host (`lifecycle`, `revalidate`, `interception`, `pac`, `proxy`, `tls`, `x509`, `trust`), capability-based activation gate. Owns the F23 unified native host.
 - `packages/dry-run` — pure offline rule matcher: `dryRunProject(operations, cases)` with 4-dimension results (regex, origin, method, resourceType) and `previewAction` seam. No network, no FS, no permission, no runtime.
-- `packages/sanity` / `packages/smoke` — small focused test/utility packages; check `packages/<name>/README.md` before assuming role.
+- `packages/sanity` / `packages/smoke` — tiny workspace stubs used by package wiring checks (`sanity` depends on `smoke`); not product packages and not browser e2e fixtures.
 - `packages/docs-site` — Astro/Starlight docs site. Excluded from root `tsc`/`biome` (see `tsconfig.json` `exclude`, `.biomeignore`); isolated by design.
 
 Workspace-wide files: `scripts/build.ts` (esbuild build), `scripts/validate.ts` (canonical pre-commit/CI gate, also `pnpm validate`), `scripts/serve-smoke.ts` (smoke HTTP server), `scripts/release-*.mjs` (semantic-release plugins), `biome.json`, `tsconfig.base.json`, `vitest.config.ts`, `vitest.browser.config.ts`, `pnpm-workspace.yaml`, `build-manifest.json` (canonical artifact list asserted by the validator).
@@ -59,7 +59,7 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 
 ## Repository Rules
 
-- Preserve the documented pnpm `10.32.1`, Node 24 baseline, TypeScript 7, and ESM/NodeNext constraints unless the specification is explicitly revised.
+- Preserve the documented pnpm `12.4.1`, Node 24 baseline, TypeScript 7, and ESM/NodeNext constraints unless the specification is explicitly revised.
 - Keep package boundaries and dependency direction explicit.
 - Do not commit generated build output, coverage, browser binaries, dependency directories, environment files, or secrets.
 - Every commit must reference an open issue (`#<NN>` or `Closes #<NN>`) and follow Conventional Commits format; the `.husky/commit-msg` hook enforces both. Before committing, reuse an existing issue or create one automatically, and confirm the issue number with the user rather than inventing one. See `CONTRIBUTING.md`.

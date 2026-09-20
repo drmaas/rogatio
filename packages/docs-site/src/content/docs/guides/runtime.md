@@ -9,20 +9,25 @@ native-messaging envelope (spec REQ-001..REQ-005).
 
 ## `rogatio runtime` lifecycle
 
-- The runtime (start/stop) is driven from the extension's **Start runtime** and
-  **Stop runtime** controls. The CLI has no lifecycle subcommand; the host is
+- The runtime session (start/stop) is driven from the extension's **Start runtime** and
+  **Stop runtime** controls. The CLI has no session lifecycle subcommand; the host is
   launched by the browser via the native-messaging manifest once `install` has
   registered it.
-- `rogatio runtime install | uninstall` manage the device-local
-  native-messaging host registration. The same `install` invocation also
-  provisions and trusts the device-local CA on which request-body interception
-  depends; on incapable platforms, the install completes without CA trust and
-  the caller is informed. CA trust installation requires elevated privileges:
-  Linux (`sudo`), macOS (keychain password), Windows (Administrator).
-  `uninstall` removes the host manifest, the device-local
-  CA files, and the trust installation (idempotent).
-- `rogatio runtime host <path>` launches the consolidated native-messaging host for a project
-  on stdio. The browser extension connects to it for pairing, authorization, and body transforms.
+- `rogatio runtime install --extension-id <id>` registers the device-local
+  native-messaging host for your loaded extension ID. The same invocation also
+  provisions and trusts the device-local CA on capable platforms (required for
+  request-body interception). When elevation is unavailable the command prints
+  `trust unsupported: <reasons>` and exits `0` — the host manifest is still installed;
+  only the CA trust step is skipped. CA trust requires elevated privileges: Linux
+  (`sudo`), macOS (keychain authorization), Windows (Administrator).
+  `rogatio runtime uninstall` removes the host manifest, the device-local CA files, and
+  the trust installation (idempotent).
+- If the host manifest is missing, the extension's Start control shows the ready-to-run
+  `rogatio runtime install --extension-id <your extension ID>` command with a copy
+  affordance (the browser-assigned extension ID is shown in the UI).
+- `rogatio runtime host <path>` launches the consolidated native-messaging host for a
+  project on stdio. The browser extension connects to it for pairing, authorization, and
+  body transforms.
 
 ## Activation is unconditional for the host
 

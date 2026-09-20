@@ -9,10 +9,20 @@ to WebExtensions Declarative Net Request (DNR) rules and manages project lifecyc
 ## Project management
 
 - **Create, import/update, switch, edit, export, and remove** projects from the extension
-  selector.
+  management page.
 - Merely choosing a project in the selector has no effect until you select **Switch
   project**.
 - Creation, import/update, and browser save leave every group disabled.
+
+The toolbar **popup** lists the active project's saved groups with one enable/disable
+switch each, truthful runtime status, **Match logging**, **Open app** (management page
+Overview / Dashboard), and a pencil that opens the management page on that group. It also
+offers **New project** (inline name form) and **Import project** (file picker). The popup
+has no editor, search, proxy, permission, or rule-authoring controls.
+
+The management page uses a **Dashboard** overview and a **Workspace** editor shell. When a
+rule fails to install, the status word `error` is an activatable control that opens that
+rule in the workspace, and a distinct error card shows the concrete install failure reason.
 
 ## Permissions and activation
 

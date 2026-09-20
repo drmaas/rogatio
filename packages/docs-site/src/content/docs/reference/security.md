@@ -7,11 +7,19 @@ Rogatio is local-first by design.
 
 ## What Rogatio does not do
 
-- No accounts, hosted runtime, cloud sync, or telemetry.
+- No accounts, hosted Rogatio runtime, cloud sync, or telemetry.
 - No retained traffic history.
-- No credentials, telemetry, hosted endpoints, traffic capture, native messaging, proxies,
-  TLS handling, or persistent user data beyond the version-controlled `.rogatio.json`
-  project file.
+- No general-purpose forward proxy, open file server, or traffic archive.
+- Persistent product state is the version-controlled `.rogatio.json` project file
+  (plus optional local AI provider config configured via `rogatio ai`).
+
+## What body rules may use (still local)
+
+When you start the local runtime for response-body or request-body rules, Rogatio may use
+Chrome native messaging, a loopback-only proxy, and a device-local CA for TLS
+interception. Those capabilities are confined to `127.0.0.1`, capability/digest pairing,
+exact rule authorization, and the extension Start/Stop session — they are not a general
+network middlebox.
 
 ## Boundaries
 
@@ -22,8 +30,7 @@ Rogatio is local-first by design.
   membership, method, resource type, initiator scope, target origin).
 - The **native runtime** binds only `127.0.0.1`, pairs through a random capability and
   preset digest, authorizes the exact rule, confines file access, and enforces SSRF,
-  DNS-rebinding, redirect, credential, method, timeout, and size controls. It is never a
-  general forward proxy or file server.
+  DNS-rebinding, redirect, credential, method, timeout, and size controls.
 - The **local runtime** independently revalidates project, rule, URL, method, initiator,
   target, permission, and grant authority.
 - **Console match logging** is live-only: each reported match writes one bounded, redacted
