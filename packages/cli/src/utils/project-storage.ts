@@ -79,13 +79,88 @@ export interface ProjectStorage {
 /**
  * Fresh empty project document for create-without-data and edit bootstrap.
  * Storage-module only — not re-exported from file.ts; not a schema API.
+ * Name is a random two-word civilization-scale phrase (schema-valid).
  */
 export function emptyProjectDocument(): {
   version: number;
   name: string;
   groups: [];
 } {
-  return { version: 1, name: "", groups: [] };
+  return { version: 1, name: randomCivilizationProjectName(), groups: [] };
+}
+
+/** Adjective / epithet half of a default project name. */
+const PROJECT_NAME_LEADS = Object.freeze([
+  "Apollo",
+  "Atlas",
+  "Aurora",
+  "Beacon",
+  "Chronos",
+  "Cosmos",
+  "Dawn",
+  "Epoch",
+  "Genesis",
+  "Helios",
+  "Horizon",
+  "Lumen",
+  "Meridian",
+  "Nova",
+  "Olympus",
+  "Orion",
+  "Pax",
+  "Prometheus",
+  "Quantum",
+  "Solaris",
+  "Summit",
+  "Terra",
+  "Titan",
+  "Verdant",
+  "Zenith",
+] as const);
+
+/** Noun half of a default project name. */
+const PROJECT_NAME_TAILS = Object.freeze([
+  "Accord",
+  "Archive",
+  "Ascension",
+  "Bridge",
+  "Charter",
+  "Circuit",
+  "Codex",
+  "Continuum",
+  "Covenant",
+  "Engine",
+  "Fabric",
+  "Foundation",
+  "Grid",
+  "Lattice",
+  "Legacy",
+  "Mandate",
+  "Nexus",
+  "Orbit",
+  "Protocol",
+  "Relay",
+  "Renaissance",
+  "Spire",
+  "Threshold",
+  "Vault",
+  "Weave",
+] as const);
+
+/**
+ * Random Title-Case two-word name for a civilization-changing project.
+ * Uses CSPRNG; length stays well under schema label limits.
+ */
+export function randomCivilizationProjectName(): string {
+  const bytes = randomBytes(2);
+  const lead = pickWord(PROJECT_NAME_LEADS, bytes[0] ?? 0);
+  const tail = pickWord(PROJECT_NAME_TAILS, bytes[1] ?? 0);
+  return `${lead} ${tail}`;
+}
+
+function pickWord(words: readonly string[], byte: number): string {
+  const word = words[byte % words.length];
+  return word ?? words[0] ?? "Nova";
 }
 
 function isRogatioProjectFilename(name: string): boolean {

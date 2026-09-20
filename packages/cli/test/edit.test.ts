@@ -32,12 +32,11 @@ describe("edit command", () => {
     const code = await exitCode;
     expect(code).toBe(0);
 
-    // File should be created with empty project
+    // File should be created with a random civilization-scale default name
     const project = await readProject(testFile);
     expect(project).toEqual({
       version: 1,
-      name: "",
-      description: undefined,
+      name: expect.stringMatching(/^[A-Z][a-z]+ [A-Z][a-z]+$/),
       groups: [],
     });
   });

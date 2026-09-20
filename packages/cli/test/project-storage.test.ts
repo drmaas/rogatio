@@ -81,10 +81,11 @@ describe("ProjectStorage (JSON-file)", () => {
     it("persists the default empty document when data is omitted", async () => {
       const ref = await storage.create({ id: testFile });
 
-      expect(ref).toEqual({ id: testFile, name: "" });
+      expect(ref.id).toBe(testFile);
+      expect(ref.name).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
       await expect(storage.get(testFile)).resolves.toEqual({
         version: 1,
-        name: "",
+        name: ref.name,
         groups: [],
       });
     });
