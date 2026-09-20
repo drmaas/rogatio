@@ -1,4 +1,4 @@
-import type { MatcherOperation } from "@rogatio/compiler";
+import type { RogatioOperation } from "@rogatio/compiler";
 import type { HttpMethod, ResourceType } from "@rogatio/schema";
 import { compileUrlRegex, HTTP_METHODS, RESOURCE_TYPES } from "@rogatio/schema";
 import type {
@@ -133,7 +133,7 @@ function validateCase(
 
 function safePreview(
   fn: PreviewActionFn,
-  operation: MatcherOperation,
+  operation: RogatioOperation,
   url: string,
   testCase: DryRunTestCase,
 ): ActionPreview | null {
@@ -215,7 +215,7 @@ function normalizeOptions(
 }
 
 export function dryRunProject(
-  operations: readonly MatcherOperation[],
+  operations: readonly RogatioOperation[],
   cases: readonly DryRunTestCase[],
   options?: DryRunOptions,
 ): DryRunResult {

@@ -50,8 +50,8 @@ or export.
     are reviewable, diffable, and revertible like any other code.
   </Card>
   <Card title="Runs in the browser" icon="rocket">
-    Redirect, query, and header rules execute entirely in Chrome — no proxy, no
-    server, no round trips to a third party.
+    Static redirect, query, and header rules execute entirely in Chrome. Capture-dependent
+    action values use the device-local runtime and never become literal templates.
   </Card>
   <Card title="Local runtime, on demand" icon="puzzle">
     Response- and request-body rules use a device-local runtime that you start and stop
@@ -62,8 +62,8 @@ or export.
     traffic stays on your machine.
   </Card>
   <Card title="Test before you save" icon="approve-check">
-    Dry-run any rule against a bounded batch of URLs offline to preview redirects and
-    rewritten queries before committing.
+    Dry-run any rule against a bounded batch of URLs offline to preview captures,
+    redirects, rewritten queries, headers, and replace-mode bodies before committing.
   </Card>
   <Card title="Auditable & diffable" icon="git-branch">
     Because rules live in your repo, every change ships through the same pull request and

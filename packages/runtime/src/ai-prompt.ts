@@ -114,19 +114,19 @@ ${formatHttpMethods()}
 Each rule has: id, name, urlRegex, origins[], resourceTypes[], priority, method?, action
 
 ### redirect
-Action: { destination: string } - Absolute URL with $1, $2 capture substitution
+Action: destination string. Use $1 through $9 for URL regex captures. $$ is a literal dollar sign. Existing redirect \\1 references remain compatible.
 
 ### query
-Action: { parameters: Record<string, string> } - Add/replace query parameters
+Action: query parameters with name, operation, and value. Set values may use URL captures.
 
 ### header
-Action: { name: string, value: string, direction: "request" | "response", operation: "set" | "append" | "remove" }
+Action: header direction, operation, name, and value. Set and append values may use URL captures.
 
 ### response-body
-Action: { replacement: string } - Regex replacement on response body (GET/HEAD only)
+Replace-mode body may use URL captures. Regex-mode replacement strings use captures from the body pattern, not the URL pattern.
 
 ### request-body
-Action: { replacement: string } - Regex replacement on request body (POST/PUT/PATCH XHR only)
+Replace-mode body may use URL captures. Regex-mode replacement strings use captures from the body pattern, not the URL pattern.
 
 ## Compiler Diagnostic Codes (stable)
 - schema.invalid-regex - Invalid regex syntax
@@ -173,7 +173,8 @@ interface AIProposal {
 6. Methods must be from the allowed list
 7. Priority: higher = more specific (100 default)
 8. Action object must match the rule kind schema exactly
-9. Before proposing, mentally validate against dry-run: would this rule match the intended URLs?
-10. Explanation should be 1-2 sentences describing what the rules do
+9. Use $1–$9 only when urlRegex defines those capture groups; use $$ for a literal dollar sign
+10. Before proposing, mentally validate against dry-run: would this rule match the intended URLs?
+11. Explanation should be 1-2 sentences describing what the rules do
 `;
 }

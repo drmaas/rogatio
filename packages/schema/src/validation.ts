@@ -1,5 +1,6 @@
 import type { ErrorObject, ValidateFunction } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
+import { validateCaptureTemplate } from "./captures.js";
 import { type HeaderDirection, isForbiddenHeader } from "./headers.js";
 import { LIMITS } from "./limits.js";
 import { isSiteOrigin, normalizeSiteOrigin } from "./origins.js";
@@ -247,17 +248,25 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
             params: {},
           });
         } else {
+          const destinationPath = `${rulePath}/redirect/destination`;
           for (const issue of validateRedirectDestination(
             destination,
             rule.urlRegex,
           )) {
             issues.push({
-              instancePath: `${rulePath}/redirect/destination`,
+              instancePath: destinationPath,
               keyword: issue.code,
               message: issue.message,
               params: {},
             });
           }
+          issues.push(
+            ...captureValidationIssues(
+              destination,
+              rule.urlRegex,
+              destinationPath,
+            ),
+          );
         }
       }
 
@@ -319,6 +328,14 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
                 message: "query param value is required for set",
                 params: {},
               });
+            } else {
+              issues.push(
+                ...captureValidationIssues(
+                  param.value,
+                  rule.urlRegex,
+                  `${rulePath}/action/params/${p}/value`,
+                ),
+              );
             }
           } else if (param.value !== undefined) {
             issues.push({
@@ -342,6 +359,18 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
               headerDirection: direction,
             },
           });
+        }
+        if (
+          (rule.headerOperation ?? "set") !== "remove" &&
+          typeof rule.headerValue === "string"
+        ) {
+          issues.push(
+            ...captureValidationIssues(
+              rule.headerValue,
+              rule.urlRegex,
+              `${rulePath}/headerValue`,
+            ),
+          );
         }
       }
 
@@ -377,6 +406,14 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
               message: "Replace body must not contain lone UTF-16 surrogates.",
               params: {},
             });
+          } else {
+            issues.push(
+              ...captureValidationIssues(
+                action.body,
+                rule.urlRegex,
+                `${actionPath}/body`,
+              ),
+            );
           }
         } else if (
           "replacements" in action &&
@@ -462,6 +499,14 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
                   "Replace body must not contain lone UTF-16 surrogates.",
                 params: {},
               });
+            } else {
+              issues.push(
+                ...captureValidationIssues(
+                  action.body,
+                  rule.urlRegex,
+                  `${actionPath}/body`,
+                ),
+              );
             }
           }
           if (action.mode === "regex") {
@@ -622,6 +667,25 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
 export interface RedirectDestinationIssue {
   readonly code: string;
   readonly message: string;
+}
+
+function captureValidationIssues(
+  value: string,
+  urlRegex: string,
+  instancePath: string,
+): ValidationIssue[] {
+  return validateCaptureTemplate(value, urlRegex).map((issue) => ({
+    instancePath,
+    keyword: `schema.capture-${issue.code}`,
+    message: issue.message,
+    params: {
+      offset: issue.offset,
+      groups: issue.groups,
+      ...(issue.referenced === undefined
+        ? {}
+        : { referenced: issue.referenced }),
+    },
+  }));
 }
 
 function skipBalancedGroup(source: string, start: number): number {

@@ -1,10 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
+import type { RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject, parseTestUrl } from "@rogatio/dry-run";
-import { validateProjectDetailed } from "@rogatio/schema";
+import {
+  matchUrlCaptures,
+  substituteUrlCaptures,
+  validateProjectDetailed,
+} from "@rogatio/schema";
 import {
   createJsonFileProjectStorage,
   type ProjectStorage,
@@ -31,19 +35,59 @@ function usageError(message: string): string {
   return `Error: ${message}\n`;
 }
 
-function toMatcherOperations(
-  operations: readonly RogatioOperation[],
-): readonly MatcherOperation[] {
-  return operations.map(
-    ({ groupId, ruleId, name, matcher, redactSensitiveInLogs }) => ({
-      kind: "matcher",
-      groupId,
-      ruleId,
-      name,
-      matcher,
-      redactSensitiveInLogs,
-    }),
-  );
+function previewAction(
+  operation: RogatioOperation,
+  url: string,
+): { kind: string; summary: string } | null {
+  const captures = matchUrlCaptures(operation.matcher.urlRegex.source, url);
+  if (captures === null) return null;
+  const expand = (value: string): string =>
+    substituteUrlCaptures(value, captures);
+  if (operation.kind === "redirect") {
+    return {
+      kind: "redirect",
+      summary: expand(operation.redirect.destination),
+    };
+  }
+  if (operation.kind === "query") {
+    const values = operation.action.params
+      .map((param) =>
+        param.operation === "remove"
+          ? `${param.name}=<removed>`
+          : `${param.name}=${expand(param.value ?? "")}`,
+      )
+      .join(", ");
+    return { kind: "query", summary: values };
+  }
+  if (operation.kind === "header") {
+    if (operation.header.operation === "remove") {
+      return { kind: "header", summary: `${operation.header.name}=<removed>` };
+    }
+    return {
+      kind: "header",
+      summary: `${operation.header.name}=${expand(operation.header.value ?? "")}`,
+    };
+  }
+  if (
+    operation.kind === "request-body" &&
+    operation.requestBody.mode === "replace"
+  ) {
+    return {
+      kind: operation.kind,
+      summary: expand(operation.requestBody.body),
+    };
+  }
+  if (
+    operation.kind === "response-body" &&
+    "mode" in operation.responseBody &&
+    operation.responseBody.mode === "replace"
+  ) {
+    return {
+      kind: operation.kind,
+      summary: expand(operation.responseBody.body),
+    };
+  }
+  return null;
 }
 
 function isUrl(value: string): boolean {
@@ -119,7 +163,7 @@ function addDefaults(
 }
 
 function resultOptions(maxCases: number | undefined): DryRunOptions {
-  const options: DryRunOptions = {};
+  const options: DryRunOptions = { previewAction };
   if (maxCases !== undefined) options.maxCases = maxCases;
   return options;
 }
@@ -370,7 +414,7 @@ async function testCommandImpl(
     defaultResourceType,
   ) as DryRunTestCase[];
   const dryRunResult = dryRunProject(
-    toMatcherOperations(compileResult.operations),
+    compileResult.operations,
     testCases,
     resultOptions(maxCases),
   );

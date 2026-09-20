@@ -54,6 +54,7 @@ export type QueryParamOperation = "set" | "remove";
 export interface RogatioQueryParam {
   name: string;
   operation?: QueryParamOperation;
+  /** Set value may contain `$1`..`$9` URL captures and `$$` for a literal `$`. */
   value?: string;
 }
 
@@ -68,6 +69,7 @@ export interface HeaderAction {
   headerDirection: HeaderDirection;
   headerOperation: HeaderOperationKind;
   headerName: string;
+  /** Set/append value may contain `$1`..`$9` URL captures. */
   headerValue?: string;
 }
 
@@ -80,6 +82,7 @@ export type ResponseBodyMode = "replace" | "regex";
 
 export interface ResponseBodyReplaceAction {
   mode: "replace";
+  /** May contain `$1`..`$9` URL captures. */
   body: string;
 }
 
@@ -101,6 +104,7 @@ export type RequestBodyMode = "replace" | "regex";
 
 export interface RequestBodyReplaceAction {
   mode: "replace";
+  /** May contain `$1`..`$9` URL captures. */
   body: string;
 }
 

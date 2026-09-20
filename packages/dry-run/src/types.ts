@@ -1,4 +1,4 @@
-import type { MatcherOperation } from "@rogatio/compiler";
+import type { RogatioOperation } from "@rogatio/compiler";
 import type { HttpMethod, ResourceType } from "@rogatio/schema";
 
 export type MatchState = "matched" | "unmatched" | "not-applicable";
@@ -51,7 +51,7 @@ export interface DryRunSummary {
 }
 
 export type PreviewActionFn = (
-  operation: MatcherOperation,
+  operation: RogatioOperation,
   url: string,
   testCase: DryRunTestCase,
 ) => ActionPreview | null;

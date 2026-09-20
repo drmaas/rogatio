@@ -31,21 +31,22 @@ Rules belong to named groups. Each rule can target a stable ID, a case-sensitive
 expression, resource types, priority, and (where supported) an HTTP method.
 
 - **Redirects** — send matching HTTP(S) requests to an absolute destination, including
-  regular-expression capture substitution.
+  `$1`–`$9` regular-expression capture substitution (`\\1` remains compatible).
 - **Query parameters** — set or remove configured names. Set adds missing parameters and
-  replaces existing values; remove drops configured names. Unrelated parameters and the
-  rest of the URL stay intact.
+  replaces existing values; remove drops configured names. Set values can use `$1`–`$9`
+  URL captures. Unrelated parameters and the rest of the URL stay intact.
 - **Headers** — set, append, or remove a named request/response header, subject to
-  immutable forbidden-header lists.
+  immutable forbidden-header lists. Set and append values can use `$1`–`$9` URL captures.
 - **Response body** — fetch an authorized public GET, then either replace the entire
-  body or apply bounded regex rewrites through a local runtime. Upstream status and
-  headers are preserved.
+  body or apply bounded regex rewrites through a local runtime. Replace bodies can use
+  `$1`–`$9` URL captures. Upstream status and headers are preserved.
 - **Request-body modification** — replace or apply bounded regex replacement to eligible
-  POST/PUT/PATCH XHR bodies, via native messaging to a local runtime.
+  POST/PUT/PATCH XHR bodies, via native messaging to a local runtime. Replace bodies can
+  use `$1`–`$9` URL captures; regex-mode `$1`–`$9` remain body captures.
 
 Every rule can be dry-run against a bounded batch of URLs before saving. The offline check
-reports regex, origin, method, and resource-type results without contacting the target or
-changing installed rules.
+reports regex, origin, method, and resource-type results, plus substituted action
+previews, without contacting the target or changing installed rules.
 
 ## CLI
 

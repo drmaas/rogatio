@@ -3,6 +3,12 @@ export {
   countCapturingGroups,
   validateRedirectDestination,
 } from "./browser-validation.js";
+export {
+  containsUrlCaptureReference,
+  matchUrlCaptures,
+  substituteUrlCaptures,
+  validateCaptureTemplate,
+} from "./captures.js";
 export { safeClone } from "./clone.js";
 export { hasControl } from "./control.js";
 export type { Sha256Digest } from "./digest.js";

@@ -5,14 +5,17 @@ description: Test rules against a bounded batch of URLs without contacting them.
 
 Every rule can be tested against a bounded batch of URLs before saving. The offline
 dry-run reports regular-expression, effective-origin, method, and resource-type results,
-and previews redirect destinations or resulting query URLs.
+and previews redirect destinations, resulting query URLs, header values, and
+replace-mode body values with URL captures expanded.
 
 ## What it does
 
 - Evaluates matcher operations for each test URL.
 - Reports, per rule, the four matching dimensions: URL regex, effective origin, method,
   and resource type.
-- Previews redirect destinations and resulting query URLs.
+- Previews redirect destinations, resulting query URLs, header values, and
+  replace-mode body values.
+- Shows `$1` through `$9` values from the matched URL when an action uses captures.
 
 ## What it never does
 

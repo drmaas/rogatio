@@ -15,7 +15,10 @@ Header rules set, append, or remove a named request or response header.
 
 - Subject to immutable **forbidden-header lists** (frozen, matched case-insensitively).
 - Subject to browser limitations on which headers can be modified.
-- Header rules run entirely in the browser via DNR.
+- Static header rules run entirely in the browser via DNR.
+- Header values may use `$1` through `$9` from the rule's `urlRegex` and `$$` for
+  a literal dollar sign. Capture-dependent values require the native runtime path.
+- Header names do not support capture substitution.
 
 ## Notes
 

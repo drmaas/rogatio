@@ -48,4 +48,5 @@ export type {
   RuntimeResult,
 } from "./types.js";
 export * from "./types.js";
+export * from "./url-captures.js";
 export * from "./wire.js";
