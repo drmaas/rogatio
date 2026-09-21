@@ -14,7 +14,12 @@ Amended: product wanted bodies in the record. Coverage still excludes body kinds
 
 Amended (P6 probe, 2026-09-16): the real-Chromium probe passed — `onRuleMatchedDebug` fires for `modifyHeaders` — so shipped coverage is `redirect`, `query`, and `header`. Evidence: `test/browser/header-match-probe.spec.ts`.
 
+Amended (2026-09-20, #163 body-rule-match-logging): Extend coverage to `request-body` and `response-body` once session (or documented dynamic-fallback) URL-match markers are indexed. Log **intended** body action from the match index (mode + bounded rewrite summary), never live body bytes. Do not log from the native host. `matcher` stays out (no fake DNR). Response-body (and request-body marker class) ship only after a real-Chromium probe shows (1) `onRuleMatchedDebug` fires and (2) marker headers do not leak upstream.
+
+Amended (Phase 1 probe, 2026-09-20): real-Chromium probe passed for both body shapes — session `modifyHeaders` remove-when-present on reserved request header; event fires; no upstream leak. Evidence: `test/browser/body-match-probe.test.ts`.
+
 ## Consequences
 
-- Header coverage is shipped (`redirect` + `query` + `header`). Docs must not promise body-rule console lines until GitHub issue #163 ships.
+- Shipped coverage is `redirect` + `query` + `header`; body kinds land with #163 after probe + marker install.
 - Unknown numeric ids stay silent.
+- Intended body text is config-derived and hard-bounded; live bodies remain impossible on this event.

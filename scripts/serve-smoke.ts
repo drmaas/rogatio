@@ -39,6 +39,13 @@ const server = createServer(async (request, response) => {
     response.end("Invalid request");
     return;
   }
+  // Probe endpoints: echo inbound request headers so browser probes can assert
+  // DNR marker strip (no X-Rogatio-Dispatch-* leak upstream).
+  if (pathname.startsWith("/body-match-probe")) {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ seenRequestHeaders: request.headers }));
+    return;
+  }
   const requestPath = pathname.slice(1);
   const filePath = requestPath.startsWith("browser/")
     ? resolveWithin(browserRoot, requestPath.slice("browser/".length))
