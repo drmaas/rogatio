@@ -238,6 +238,12 @@ const application = createExtensionApplication({
   installer: createDnrInstaller(api),
   badge: (value) => setBadge(value, api),
   extensionId: api.runtime.id,
+  chromeApi: api,
+  // Fail-closed: stripReservedMarkers is wired inside proxyRequest, but that
+  // helper has no live caller yet (no PAC / session-proxy routing). Claiming
+  // "available" would install DNR set markers that can reach the origin.
+  // Flip true only when session traffic actually traverses the strip path.
+  runtimeStripPathAvailable: false,
   nativeRuntime: createNativeRuntimeAdapter(),
 });
 

@@ -28,16 +28,16 @@ Track implement progress. Update checkboxes as work lands. Strategy: **TDD** (§
 
 ## §3 Lifecycle + index merge — AC4, AC8, AC9, AC10
 
-- [ ] Hook marker install into native-session start only when **runtime strip path is available**; only kinds that passed probe
-- [ ] Confirm/wire reserved-marker strip on session proxy path (reuse scaffolding; no F17 capability mint)
-- [ ] Hook marker remove into stop **and** start-failure rollback (no orphans)
-- [ ] Merge body marker ids into match-index write so lookup sees them; on remove, drop those index ids
-- [ ] Keep redirect/query/header in dynamic `createDnrInstaller` only; no PAC / pending-auth / capability mint (AC9)
-- [ ] **TDD:** start → session body-band present + index hit by id
-- [ ] **TDD:** stop → session body-band empty + index lacks those ids (orphan-on-stop)
-- [ ] **TDD:** start-failure rollback → no orphan session body rules + index clean
-- [ ] **TDD:** no strip path → no marker install
-- [ ] **TDD:** response-body skipped when probe gate false; non-body DNR tests unchanged
+- [x] Hook marker install into native-session start only when **runtime strip path is available**; only kinds that passed probe
+- [x] Confirm/wire reserved-marker strip on session proxy path (reuse scaffolding; no F17 capability mint)
+- [x] Hook marker remove into stop **and** start-failure rollback (no orphans)
+- [x] Merge body marker ids into match-index write so lookup sees them; on remove, drop those index ids
+- [x] Keep redirect/query/header in dynamic `createDnrInstaller` only; no PAC / pending-auth / capability mint (AC9)
+- [x] **TDD:** start → session body-band present + index hit by id
+- [x] **TDD:** stop → session body-band empty + index lacks those ids (orphan-on-stop)
+- [x] **TDD:** start-failure rollback → no orphan session body rules + index clean
+- [x] **TDD:** no strip path → no marker install
+- [x] **TDD:** response-body skipped when probe gate false; non-body DNR tests unchanged
 
 **Done when:** AC4 gated install, AC8 no cross-wipe, AC9 no #170 coupling in path, AC10 remove-on-stop/failure + no-leak via runtime strip — all proven by tests above.
 

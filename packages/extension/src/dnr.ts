@@ -14,9 +14,11 @@ import { containsUrlCaptureReference } from "@rogatio/schema";
 import type { ChromeApi } from "./chrome.js";
 import { type DnrHeaderRule, toDnrRule } from "./installer.js";
 import {
+  bodyMarkerEntriesFromSnapshot,
   buildInstallIndexSnapshot,
   type MatchIndexSnapshot,
   readMatchIndexSnapshot,
+  withMatchIndexWriteLock,
   writeMatchIndex,
 } from "./match-index.js";
 import { projectHeaders } from "./projection.js";
@@ -195,16 +197,6 @@ export interface DnrInstallerWithMatchIndex extends RuleInstallerAdapter {
 export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
   const tracked = new Map<number, RogatioOperation>();
   let lastInstallErrors: DnrInstallError[] = [];
-  let matchIndexWriteTail: Promise<void> = Promise.resolve();
-
-  function withMatchIndexWriteLock<T>(operation: () => Promise<T>): Promise<T> {
-    const previous = matchIndexWriteTail;
-    let release!: () => void;
-    matchIndexWriteTail = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    return previous.then(operation).finally(release);
-  }
 
   async function writeWholesaleMatchIndex(): Promise<void> {
     await withMatchIndexWriteLock(async () => {
@@ -226,9 +218,11 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
           redirectQueryEntries.push({ ruleId, operation });
         }
       }
+      const prior = await readMatchIndexSnapshot(api);
       const snapshot: MatchIndexSnapshot = {
         ...buildInstallIndexSnapshot(redirectQueryEntries),
         ...buildInstallIndexSnapshot(trackedHeaderEntries),
+        ...bodyMarkerEntriesFromSnapshot(prior),
       };
       try {
         await writeMatchIndex(api, snapshot);

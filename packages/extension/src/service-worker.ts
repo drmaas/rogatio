@@ -15,6 +15,7 @@ import {
   parseAIProposal,
 } from "./ai-assist.js";
 import { validateProjectDetailed } from "./browser-schema.js";
+import type { ChromeApi } from "./chrome.js";
 import {
   type ExtensionDiagnostic,
   extensionDiagnostic,
@@ -67,6 +68,18 @@ export interface ExtensionApplicationOptions {
   readonly generateId?: () => string;
   readonly now?: () => number;
   readonly extensionId?: string;
+  /**
+   * Chrome adapter for session body-marker install (match logging).
+   * When set, native-session start/stop owns markers + index merge.
+   * Strip path is available only when session traffic reaches
+   * `stripReservedMarkers` (fail-closed; no F17 capability mint / PAC).
+   */
+  readonly chromeApi?: ChromeApi;
+  /**
+   * Opt-in: must be explicitly `true` to install markers.
+   * Default / omit → no install (fail-closed until live strip routing exists).
+   */
+  readonly runtimeStripPathAvailable?: boolean;
   readonly nativeRuntime?: {
     start(config: NativeRuntimeConfig): Promise<{
       readonly state: NativeRuntimePhase | "unsupported";
@@ -731,6 +744,14 @@ export function createExtensionApplication(
                 operations: compileResult.operations,
               });
             },
+            bodyMarkers:
+              options.chromeApi === undefined
+                ? undefined
+                : {
+                    api: options.chromeApi,
+                    runtimeStripPathAvailable:
+                      options.runtimeStripPathAvailable === true,
+                  },
           });
         } catch (error) {
           nativePhase = "failed";
@@ -786,6 +807,14 @@ export function createExtensionApplication(
             };
           },
           getGrantedOrigins: async () => [],
+          bodyMarkers:
+            options.chromeApi === undefined
+              ? undefined
+              : {
+                  api: options.chromeApi,
+                  runtimeStripPathAvailable:
+                    options.runtimeStripPathAvailable === true,
+                },
         });
         nativePhase = "stopped";
         nativeRuntimeError = null;

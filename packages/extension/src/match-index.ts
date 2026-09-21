@@ -6,6 +6,11 @@ import {
   sanitizeQueryTransformValue,
   truncateLogString,
 } from "./match-log-redaction.js";
+import {
+  type BodyMarkerOperation,
+  bodyMarkerIdForIndex,
+  isBodyMarkerBandId,
+} from "./session-body-markers.js";
 
 export const MATCH_LOGGING_INDEX_KEY = "rogatio.matchLogging.index";
 
@@ -30,12 +35,26 @@ export interface HeaderIntent {
   readonly value?: string;
 }
 
-export type MatchIndexIntent = RedirectIntent | QueryIntent | HeaderIntent;
+/** Mode only for §3 index hit; rewrite summary lands in §4 format. */
+export interface BodyIntent {
+  readonly mode: string;
+}
+
+export type MatchIndexIntent =
+  | RedirectIntent
+  | QueryIntent
+  | HeaderIntent
+  | BodyIntent;
 
 export interface MatchIndexEntry {
   readonly ruleId: string;
   readonly name: string;
-  readonly kind: "redirect" | "query" | "header";
+  readonly kind:
+    | "redirect"
+    | "query"
+    | "header"
+    | "request-body"
+    | "response-body";
   readonly redactSensitiveInLogs: boolean;
   readonly intent: MatchIndexIntent;
 }
@@ -72,16 +91,38 @@ function isHeaderIntent(intent: MatchIndexIntent): intent is HeaderIntent {
   );
 }
 
+function isBodyIntent(intent: MatchIndexIntent): intent is BodyIntent {
+  return intentHasOwnString(intent, "mode");
+}
+
 function boundStoredKind(kind: string): MatchIndexEntry["kind"] {
   const truncated = truncateLogString(kind);
   if (
     truncated === "redirect" ||
     truncated === "query" ||
-    truncated === "header"
+    truncated === "header" ||
+    truncated === "request-body" ||
+    truncated === "response-body"
   ) {
     return truncated;
   }
   return truncated as MatchIndexEntry["kind"];
+}
+
+function bodyModeFromOperation(operation: BodyMarkerOperation): string {
+  if (operation.kind === "request-body") {
+    return operation.requestBody.mode;
+  }
+  const action = operation.responseBody;
+  if (
+    action !== null &&
+    typeof action === "object" &&
+    Object.hasOwn(action, "mode") &&
+    typeof (action as { mode?: unknown }).mode === "string"
+  ) {
+    return (action as { mode: string }).mode;
+  }
+  return "regex";
 }
 
 function sanitizeQueryParams(
@@ -142,6 +183,9 @@ function sanitizeIntentByShape(
   }
   if (isHeaderIntent(intent)) {
     return sanitizeHeaderIntent(intent, redactSensitive);
+  }
+  if (isBodyIntent(intent)) {
+    return { mode: truncateLogString(intent.mode) };
   }
   if (intent === null || typeof intent !== "object" || Array.isArray(intent)) {
     return intent;
@@ -215,6 +259,15 @@ function rawEntryFromOperation(
       intent: { direction, operation: headerOperation, name, value },
     };
   }
+  if (operation.kind === "request-body" || operation.kind === "response-body") {
+    return {
+      ruleId: operation.ruleId,
+      name: operation.name,
+      kind: operation.kind,
+      redactSensitiveInLogs,
+      intent: { mode: bodyModeFromOperation(operation) },
+    };
+  }
   return undefined;
 }
 
@@ -260,6 +313,18 @@ export function sanitizeMatchIndexEntry(
       intent: sanitizeHeaderIntent(entry.intent, redactSensitiveInLogs),
     };
   }
+  if (
+    (entry.kind === "request-body" || entry.kind === "response-body") &&
+    isBodyIntent(entry.intent)
+  ) {
+    return {
+      ruleId,
+      name,
+      kind,
+      redactSensitiveInLogs,
+      intent: { mode: truncateLogString(entry.intent.mode) },
+    };
+  }
   return {
     ruleId,
     name,
@@ -293,6 +358,80 @@ export async function writeMatchIndex(
     sanitized[id] = sanitizeMatchIndexEntry(entry);
   }
   await api.storage.local.set({ [MATCH_LOGGING_INDEX_KEY]: sanitized });
+}
+
+/**
+ * Serialize match-index read-modify-write across dynamic DNR wholesale writes
+ * and session body-marker merge/drop (avoids wiping body band under concurrency).
+ */
+let matchIndexWriteTail: Promise<void> = Promise.resolve();
+
+export function withMatchIndexWriteLock<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  const previous = matchIndexWriteTail;
+  let release!: () => void;
+  matchIndexWriteTail = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return previous.then(operation).finally(release);
+}
+
+/**
+ * Merge body-marker install ids into the durable match index (lockstep with
+ * session install order: `bodyMarkerIdForIndex(i)`).
+ */
+export async function mergeBodyMarkerIndexEntries(
+  api: ChromeApi,
+  operations: readonly BodyMarkerOperation[],
+): Promise<void> {
+  await withMatchIndexWriteLock(async () => {
+    const current = await readMatchIndexSnapshot(api);
+    const next: MatchIndexSnapshot = { ...current };
+    for (const [key] of Object.entries(next)) {
+      const numeric = Number(key);
+      if (isBodyMarkerBandId(numeric)) delete next[key];
+    }
+    for (let index = 0; index < operations.length; index += 1) {
+      const operation = operations[index];
+      const entry = rawEntryFromOperation(operation);
+      if (entry === undefined) continue;
+      next[String(bodyMarkerIdForIndex(index))] = entry;
+    }
+    await writeMatchIndex(api, next);
+  });
+}
+
+/** Drop all body-band ids from the match index (session stop / start-failure). */
+export async function dropBodyMarkerBandFromMatchIndex(
+  api: ChromeApi,
+): Promise<void> {
+  await withMatchIndexWriteLock(async () => {
+    const current = await readMatchIndexSnapshot(api);
+    const next: MatchIndexSnapshot = {};
+    for (const [key, entry] of Object.entries(current)) {
+      const numeric = Number(key);
+      if (isBodyMarkerBandId(numeric)) continue;
+      next[key] = entry;
+    }
+    await writeMatchIndex(api, next);
+  });
+}
+
+/** Body-band slice of a snapshot (for wholesale DNR index preserve). */
+export function bodyMarkerEntriesFromSnapshot(
+  snapshot: MatchIndexSnapshot,
+): MatchIndexSnapshot {
+  const body: MatchIndexSnapshot = {};
+  for (const [key, entry] of Object.entries(snapshot)) {
+    const numeric = Number(key);
+    if (!isBodyMarkerBandId(numeric)) continue;
+    if (entry.kind !== "request-body" && entry.kind !== "response-body") {
+      continue;
+    }
+    body[key] = entry;
+  }
+  return body;
 }
 
 // Inherited members of a tampered stored object are not data.
@@ -358,6 +497,12 @@ function parseHeaderIntent(
     : { direction, operation, name, value };
 }
 
+function parseBodyIntent(raw: Record<string, unknown>): BodyIntent | undefined {
+  const mode = own(raw, "mode");
+  if (typeof mode !== "string") return undefined;
+  return { mode };
+}
+
 function parseStoredEntry(raw: unknown): MatchIndexEntry | undefined {
   const entry = ownRecord(raw);
   if (entry === undefined) return undefined;
@@ -367,7 +512,13 @@ function parseStoredEntry(raw: unknown): MatchIndexEntry | undefined {
   const redactSensitiveInLogs = own(entry, "redactSensitiveInLogs");
   if (typeof ruleId !== "string") return undefined;
   const name = typeof nameRaw === "string" ? nameRaw : "";
-  if (kind !== "redirect" && kind !== "query" && kind !== "header") {
+  if (
+    kind !== "redirect" &&
+    kind !== "query" &&
+    kind !== "header" &&
+    kind !== "request-body" &&
+    kind !== "response-body"
+  ) {
     return undefined;
   }
   if (typeof redactSensitiveInLogs !== "boolean") return undefined;
@@ -376,7 +527,8 @@ function parseStoredEntry(raw: unknown): MatchIndexEntry | undefined {
   let intent: MatchIndexIntent | undefined;
   if (kind === "redirect") intent = parseRedirectIntent(intentRaw);
   else if (kind === "query") intent = parseQueryIntent(intentRaw);
-  else intent = parseHeaderIntent(intentRaw);
+  else if (kind === "header") intent = parseHeaderIntent(intentRaw);
+  else intent = parseBodyIntent(intentRaw);
   if (intent === undefined) return undefined;
   return { ruleId, name, kind, redactSensitiveInLogs, intent };
 }

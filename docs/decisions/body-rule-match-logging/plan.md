@@ -180,3 +180,10 @@ Approved with recommendations. Locked:
 
 - Amend mechanism: **DNR session set (inert) + non-DNR runtime/proxy strip** — never DNR set + DNR strip of the same header.
 - Rebase feature branch onto `main` before more browser work.
+
+## §3 implementation-review gate (2026-09-20)
+
+Approved. Locked:
+
+- Production `runtimeStripPathAvailable` stays fail-closed (`false`) until live traffic hits strip.
+- Continue §4–§5 (format + seam) under unit path while gate is false.
