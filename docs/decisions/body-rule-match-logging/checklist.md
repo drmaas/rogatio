@@ -63,9 +63,9 @@ Track implement progress. Update checkboxes as work lands. Strategy: **TDD** (§
 
 ## §6 Editor checkbox — AC7
 
-- [ ] Show `redactSensitiveInLogs` on body rule cards (remove `isBodyRuleType` hide)
-- [ ] **TDD:** flip `redact-sensitive-in-logs.test.ts` (expect visible + toggle on body cards)
-- [ ] Confirm schema already accepts field (no schema change unless gap found)
+- [x] Show `redactSensitiveInLogs` on body rule cards (remove `isBodyRuleType` hide)
+- [x] **TDD:** flip `redact-sensitive-in-logs.test.ts` (expect visible + toggle on body cards)
+- [x] Confirm schema already accepts field (no schema change unless gap found)
 
 **Done when:** AC7 met.
 

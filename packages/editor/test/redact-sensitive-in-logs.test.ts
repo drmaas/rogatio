@@ -98,7 +98,27 @@ function matcherProject(redact?: boolean | "omit") {
   };
 }
 
-function bodyProject(type: "request-body" | "response-body") {
+function bodyProject(
+  type: "request-body" | "response-body",
+  redact?: boolean | "omit",
+) {
+  const rule: Record<string, unknown> = {
+    id: "rule-body",
+    name: "Body rule",
+    urlRegex: "^https://example\\.com/api$",
+    origins: [],
+    resourceTypes:
+      type === "request-body" ? ["xmlhttprequest"] : ["main_frame"],
+    priority: 100,
+    ...(type === "request-body" ? { method: "POST" } : {}),
+    type,
+    ...(type === "request-body"
+      ? { requestBody: { mode: "replace", body: '{"debug":false}' } }
+      : { responseBody: { mode: "replace", body: '{"debug":false}' } }),
+  };
+  if (redact !== "omit" && redact !== undefined) {
+    rule.redactSensitiveInLogs = redact;
+  }
   return {
     version: 1,
     name: "Editor project",
@@ -107,22 +127,7 @@ function bodyProject(type: "request-body" | "response-body") {
         id: "group-one",
         name: "One",
         origins: ["https://one.example"],
-        rules: [
-          {
-            id: "rule-body",
-            name: "Body rule",
-            urlRegex: "^https://example\\.com/api$",
-            origins: [],
-            resourceTypes:
-              type === "request-body" ? ["xmlhttprequest"] : ["main_frame"],
-            priority: 100,
-            ...(type === "request-body" ? { method: "POST" } : {}),
-            type,
-            ...(type === "request-body"
-              ? { requestBody: { mode: "replace", body: '{"debug":false}' } }
-              : { responseBody: { mode: "replace", body: '{"debug":false}' } }),
-          },
-        ],
+        rules: [rule],
       },
     ],
   };
@@ -138,22 +143,19 @@ function selectRuleType(root: HTMLElement, typeId: string): void {
 }
 
 describe("@rogatio/editor redact sensitive logs checkbox", () => {
-  it("shows one checkbox on redirect and matcher cards", () => {
+  it("shows one checkbox on redirect, matcher, and body cards", () => {
     expect(
       findRedactLabel(createTestEditor(redirectProject("omit")).root),
     ).toBeDefined();
     expect(
       findRedactLabel(createTestEditor(matcherProject("omit")).root),
     ).toBeDefined();
-  });
-
-  it("hides the checkbox on request-body and response-body cards", () => {
     expect(
       findRedactLabel(createTestEditor(bodyProject("request-body")).root),
-    ).toBeUndefined();
+    ).toBeDefined();
     expect(
       findRedactLabel(createTestEditor(bodyProject("response-body")).root),
-    ).toBeUndefined();
+    ).toBeDefined();
   });
 
   it("is unchecked when omitted or false and checked only for boolean true", () => {
@@ -192,7 +194,7 @@ describe("@rogatio/editor redact sensitive logs checkbox", () => {
     );
   });
 
-  it("keeps the flag across type changes and hides it on body kinds", () => {
+  it("keeps the flag across type changes including body kinds", () => {
     const { root, editor } = createTestEditor(matcherProject(true));
     selectRuleType(root, "query");
     expect(editor.getDraft().groups[0]?.rules[0]?.redactSensitiveInLogs).toBe(
@@ -204,7 +206,30 @@ describe("@rogatio/editor redact sensitive logs checkbox", () => {
     expect(editor.getDraft().groups[0]?.rules[0]?.redactSensitiveInLogs).toBe(
       true,
     );
-    expect(findRedactLabel(root)).toBeUndefined();
+    expect(findRedactLabel(root)).toBeDefined();
+  });
+
+  it("toggles and saves redactSensitiveInLogs on body cards", () => {
+    for (const type of ["request-body", "response-body"] as const) {
+      const { root, editor, saved } = createTestEditor(
+        bodyProject(type, false),
+      );
+      const checkbox = redactCheckbox(root);
+      expect(checkbox.checked).toBe(false);
+
+      checkbox.checked = true;
+      checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+      expect(editor.getDraft().groups[0]?.rules[0]?.redactSensitiveInLogs).toBe(
+        true,
+      );
+
+      clickSave(root);
+      expect(saved).toHaveLength(1);
+      const snapshot = saved[0] as {
+        groups: Array<{ rules: Array<Record<string, unknown>> }>;
+      };
+      expect(snapshot.groups[0]?.rules[0]?.redactSensitiveInLogs).toBe(true);
+    }
   });
 
   it("includes the flag in the save snapshot", () => {

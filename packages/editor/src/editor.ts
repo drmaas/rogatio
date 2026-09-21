@@ -332,10 +332,6 @@ const CREATABLE_RULE_FIELDS = new Set<string>([
   "redactSensitiveInLogs",
 ]);
 
-function isBodyRuleType(type: unknown): boolean {
-  return type === "request-body" || type === "response-body";
-}
-
 function setValueAtPath(root: unknown, path: string, value: unknown): boolean {
   const segments = decodePointer(path);
   if (!segments || segments.length === 0) return false;
@@ -2760,25 +2756,23 @@ class EditorControllerImpl implements EditorController {
     matcherFields.append(matcherGrid);
     card.append(matcherFields);
 
-    if (!isBodyRuleType(rule.type)) {
-      const redactFieldset = this.document.createElement("fieldset");
-      const redactLegend = this.document.createElement("legend");
-      redactLegend.textContent = "Match logging";
-      redactFieldset.append(redactLegend);
-      const redactGrid = this.document.createElement("div");
-      redactGrid.dataset.editorFields = "true";
-      const redactCheckbox = this.document.createElement("input");
-      redactCheckbox.type = "checkbox";
-      redactCheckbox.checked = rule.redactSensitiveInLogs === true;
-      this.renderField(
-        redactGrid,
-        "Redact sensitive fields in logs",
-        `${rulePath}/redactSensitiveInLogs`,
-        redactCheckbox,
-      );
-      redactFieldset.append(redactGrid);
-      card.append(redactFieldset);
-    }
+    const redactFieldset = this.document.createElement("fieldset");
+    const redactLegend = this.document.createElement("legend");
+    redactLegend.textContent = "Match logging";
+    redactFieldset.append(redactLegend);
+    const redactGrid = this.document.createElement("div");
+    redactGrid.dataset.editorFields = "true";
+    const redactCheckbox = this.document.createElement("input");
+    redactCheckbox.type = "checkbox";
+    redactCheckbox.checked = rule.redactSensitiveInLogs === true;
+    this.renderField(
+      redactGrid,
+      "Redact sensitive fields in logs",
+      `${rulePath}/redactSensitiveInLogs`,
+      redactCheckbox,
+    );
+    redactFieldset.append(redactGrid);
+    card.append(redactFieldset);
 
     if (this.extensions.length > 0) {
       const currentType =
