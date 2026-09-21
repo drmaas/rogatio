@@ -258,6 +258,133 @@ describe("API routes", () => {
     });
   });
 
+  describe("POST /api/ai/assist", () => {
+    const assistBody = JSON.stringify({
+      kind: "generate",
+      prompt: "Add a redirect",
+      context: {
+        project: {
+          version: 1,
+          name: "Test Project",
+          groups: [
+            {
+              id: "group1",
+              name: "Group 1",
+              origins: ["https://example.com"],
+              rules: [],
+            },
+          ],
+        },
+      },
+    });
+
+    const proposal = {
+      rules: [
+        {
+          kind: "redirect",
+          groupId: "group1",
+          name: "Redirect",
+          urlRegex: "^https://example\\.com/old$",
+          origins: [],
+          resourceTypes: ["main_frame"],
+          priority: 100,
+          action: { destination: "https://example.com/new" },
+        },
+      ],
+      explanation: "Redirects old to new",
+    };
+
+    it("returns 403 without CSRF", async () => {
+      context.aiClient = {
+        complete: vi.fn(),
+        stream: vi.fn(),
+      };
+      context.aiProviderConfig = {
+        providerUrl: "https://api.example.com/v1",
+        model: "configured-model",
+        apiKey: "sk-test",
+      };
+      handler = createRoutes(context);
+      const req = createMockReq("POST", "/api/ai/assist", {}, assistBody);
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(403, {
+        "Content-Type": "application/json",
+      });
+    });
+
+    it("returns 404 ai-not-configured when AI is absent", async () => {
+      const req = createMockReq(
+        "POST",
+        "/api/ai/assist",
+        { "x-csrf-token": "test-csrf-token" },
+        assistBody,
+      );
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(404, {
+        "Content-Type": "application/json",
+      });
+      const data = JSON.parse(String(vi.mocked(res.end).mock.calls[0][0]));
+      expect(data.code).toBe("ai-not-configured");
+    });
+
+    it("returns 400 for invalid body", async () => {
+      context.aiClient = {
+        complete: vi.fn(),
+        stream: vi.fn(),
+      };
+      context.aiProviderConfig = {
+        providerUrl: "https://api.example.com/v1",
+        model: "configured-model",
+        apiKey: "sk-test",
+      };
+      handler = createRoutes(context);
+      const req = createMockReq(
+        "POST",
+        "/api/ai/assist",
+        { "x-csrf-token": "test-csrf-token" },
+        JSON.stringify({ prompt: "no kind" }),
+      );
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(400, {
+        "Content-Type": "application/json",
+      });
+    });
+
+    it("returns proposal using configured model (AC-001, AC-002, AC-003)", async () => {
+      const complete = vi.fn().mockResolvedValue({
+        content: JSON.stringify(proposal),
+        usage: undefined,
+      });
+      const stream = vi.fn().mockRejectedValue(new Error("no stream"));
+      context.aiClient = { complete, stream };
+      context.aiProviderConfig = {
+        providerUrl: "https://api.example.com/v1",
+        model: "configured-model",
+        apiKey: "sk-test",
+      };
+      handler = createRoutes(context);
+      const req = createMockReq(
+        "POST",
+        "/api/ai/assist",
+        { "x-csrf-token": "test-csrf-token" },
+        assistBody,
+      );
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(200, {
+        "Content-Type": "application/json",
+      });
+      const data = JSON.parse(String(vi.mocked(res.end).mock.calls[0][0]));
+      expect(data.proposal).toEqual(proposal);
+      expect(complete).toHaveBeenCalledWith(
+        expect.objectContaining({ model: "configured-model" }),
+      );
+    });
+  });
+
   describe("404 for unknown routes", () => {
     it("returns 404 for unknown path", async () => {
       const req = createMockReq("GET", "/api/unknown");

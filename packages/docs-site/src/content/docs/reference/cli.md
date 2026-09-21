@@ -55,8 +55,10 @@ Local AI provider configuration for the editor's AI Assist / Create using AI sur
 - `delete` — remove configuration
 - `test` — connection check
 
-Keys and endpoints stay on your machine. See the repository root `README.md` for setup
-detail and supported OpenAI-compatible providers.
+Keys and endpoints stay on your machine. CLI Assist (`rogatio edit`) uses the edit-server
+`/api/ai/assist` route; the Chrome extension Assist / Create using AI surfaces use the
+native messaging host. See the repository root `README.md` for setup detail and supported
+OpenAI-compatible providers.
 
 ## Notes
 

@@ -44,6 +44,21 @@ describe("F7 message protocol", () => {
     });
   });
 
+  it("accepts the versioned ai-assist request", () => {
+    expect(
+      parseRequest({
+        version: 1,
+        command: "ai-assist",
+        kind: "generate",
+        prompt: "add redirect",
+        context: { project: { version: 1, name: "p", groups: [] } },
+      }),
+    ).toMatchObject({
+      ok: true,
+      value: { version: 1, command: "ai-assist" },
+    });
+  });
+
   it("rejects raw native AI envelopes as extension requests", () => {
     expect(
       parseRequest({

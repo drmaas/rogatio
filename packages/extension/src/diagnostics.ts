@@ -19,7 +19,10 @@ export type ExtensionDiagnosticCode =
   | "extension.ai-invalid-prompt"
   | "extension.ai-generation-failed"
   | "extension.ai-invalid-response"
-  | "extension.ai-invalid-project";
+  | "extension.ai-invalid-project"
+  | "extension.ai-assist-failed"
+  | "extension.ai-invalid-proposal"
+  | "extension.ai-request-too-large";
 
 export interface ExtensionDiagnostic {
   readonly code: ExtensionDiagnosticCode;
@@ -63,6 +66,12 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.ai-invalid-response": "AI returned an invalid project response.",
   "extension.ai-invalid-project":
     "AI returned a project that failed Rogatio validation.",
+  "extension.ai-assist-failed":
+    "AI Assist failed. Check the native runtime and provider configuration.",
+  "extension.ai-invalid-proposal":
+    "AI Assist returned a proposal that failed Rogatio validation.",
+  "extension.ai-request-too-large":
+    "AI Assist request is too large for the native messaging envelope.",
 };
 
 export function extensionDiagnostic(

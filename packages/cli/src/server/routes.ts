@@ -6,7 +6,12 @@ import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject } from "@rogatio/dry-run";
-import type { AIClient, AICompletionOptions } from "@rogatio/runtime";
+import type {
+  AIClient,
+  AICompletionOptions,
+  AIProviderConfig,
+} from "@rogatio/runtime";
+import { runAIAssist } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import type { ProjectStorage } from "../utils/file.js";
 export interface RouteContext {
@@ -25,6 +30,8 @@ export interface RouteContext {
   editorFontsPath: string;
   /** AI client for completions (optional, when AI is configured). */
   aiClient?: AIClient;
+  /** Provider config (model/url/key) when AI is configured. */
+  aiProviderConfig?: AIProviderConfig;
 }
 
 export function generateCsrfToken(): string {
@@ -152,6 +159,55 @@ function parseDiagnostics(
     }));
   }
   return [];
+}
+
+function schemaDiagnosticsForAssist(value: unknown): readonly {
+  readonly code: string;
+  readonly severity: "error";
+  readonly path: string;
+  readonly message: string;
+}[] {
+  const result = validateProjectDetailed(value);
+  if (result.valid) return [];
+  return result.errors.map((error) => ({
+    code: `schema.${error.keyword}`,
+    severity: "error" as const,
+    path: error.instancePath || "/",
+    message: error.message ?? "The project contains invalid data.",
+  }));
+}
+
+function isAIAssistRequestBody(body: unknown): body is {
+  kind: "generate" | "fix" | "explain";
+  prompt: string;
+  context: {
+    project: { groups?: unknown[] } & Record<string, unknown>;
+    activeGroupId?: string;
+    focusedRuleId?: string;
+    diagnostics?: readonly {
+      code: string;
+      severity: "error";
+      path: string;
+      message: string;
+    }[];
+    dryRunCases?: readonly {
+      url: string;
+      method?: string;
+      resourceType?: string;
+    }[];
+  };
+} {
+  if (!isRecord(body)) return false;
+  if (
+    body.kind !== "generate" &&
+    body.kind !== "fix" &&
+    body.kind !== "explain"
+  ) {
+    return false;
+  }
+  if (typeof body.prompt !== "string") return false;
+  if (!isRecord(body.context) || !isRecord(body.context.project)) return false;
+  return true;
 }
 
 function parseCompilerDiagnostics(
@@ -634,6 +690,74 @@ export function createRoutes(context: RouteContext) {
         })}\n\n`;
         res.write(errorData);
         res.end();
+      }
+      return;
+    }
+
+    // POST /api/ai/assist — validated Assist proposal (editor contract)
+    if (pathname === "/api/ai/assist" && method === "POST") {
+      if (!validateCsrf(req, context.csrfToken)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "csrf-invalid",
+            message: "Invalid CSRF token",
+          }),
+        );
+        return;
+      }
+
+      if (!context.aiClient || !context.aiProviderConfig) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "ai-not-configured",
+            message: "AI provider not configured",
+          }),
+        );
+        return;
+      }
+
+      let body: unknown;
+      try {
+        const bodyText = await getRequestBody(req);
+        body = JSON.parse(bodyText);
+      } catch (error) {
+        const failure = bodyErrorResponse(error);
+        res.writeHead(failure.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(failure.body));
+        return;
+      }
+
+      if (!isAIAssistRequestBody(body)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "invalid-request",
+            message: "Missing or invalid AI Assist request",
+          }),
+        );
+        return;
+      }
+
+      try {
+        const proposal = await runAIAssist(
+          body,
+          context.aiProviderConfig,
+          schemaDiagnosticsForAssist,
+          undefined,
+          context.aiClient,
+        );
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ proposal }));
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "ai-error",
+            message: e instanceof Error ? e.message : "AI Assist failed",
+          }),
+        );
       }
       return;
     }

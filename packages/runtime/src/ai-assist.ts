@@ -106,6 +106,130 @@ export interface AIAssistChunk {
 
 const MAX_FIX_ATTEMPTS = 3;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function ownString(
+  record: Record<string, unknown>,
+  ...keys: readonly string[]
+): string | undefined {
+  for (const key of keys) {
+    if (!Object.hasOwn(record, key)) continue;
+    const value = record[key];
+    if (typeof value === "string") return value;
+  }
+  return undefined;
+}
+
+/** Map a RuleProposal onto a schema-shaped rule object. */
+export function ruleFromProposal(
+  proposal: RuleProposal,
+  ruleId: string,
+): Record<string, unknown> {
+  const rule: Record<string, unknown> = {
+    id: ruleId,
+    name: proposal.name,
+    urlRegex: proposal.urlRegex,
+    origins: proposal.origins ? [...proposal.origins] : [],
+    resourceTypes: proposal.resourceTypes
+      ? [...proposal.resourceTypes]
+      : ["main_frame"],
+    priority: proposal.priority ?? 100,
+  };
+  if (proposal.method !== undefined) {
+    rule.method = proposal.method;
+  }
+
+  switch (proposal.kind) {
+    case "redirect":
+      rule.type = "redirect";
+      rule.redirect = proposal.action;
+      break;
+    case "query":
+      rule.type = "query";
+      rule.action = proposal.action;
+      break;
+    case "header": {
+      rule.type = "header";
+      if (isRecord(proposal.action)) {
+        const direction = ownString(
+          proposal.action,
+          "headerDirection",
+          "direction",
+        );
+        const operation = ownString(
+          proposal.action,
+          "headerOperation",
+          "operation",
+        );
+        const name = ownString(proposal.action, "headerName", "name");
+        const value = ownString(proposal.action, "headerValue", "value");
+        if (direction !== undefined) rule.headerDirection = direction;
+        if (operation !== undefined) rule.headerOperation = operation;
+        if (name !== undefined) rule.headerName = name;
+        if (value !== undefined) rule.headerValue = value;
+      }
+      break;
+    }
+    case "response-body":
+      rule.type = "response-body";
+      rule.responseBody = proposal.action;
+      break;
+    case "request-body":
+      rule.type = "request-body";
+      rule.requestBody = proposal.action;
+      break;
+    default: {
+      const _exhaustive: never = proposal.kind;
+      void _exhaustive;
+    }
+  }
+
+  return rule;
+}
+
+/**
+ * Insert proposal rules into a copy of the project (schema-shaped groups/rules).
+ * Creates a group when `groupId` is missing.
+ */
+export function mergeProposalIntoProject(
+  project: { groups?: unknown[] } & Record<string, unknown>,
+  proposal: AIProposal,
+): Record<string, unknown> {
+  const groups: Record<string, unknown>[] = Array.isArray(project.groups)
+    ? project.groups.map((group) => {
+        if (!isRecord(group)) {
+          return { id: "invalid", name: "invalid", origins: [], rules: [] };
+        }
+        return {
+          ...group,
+          rules: Array.isArray(group.rules) ? [...group.rules] : [],
+        };
+      })
+    : [];
+
+  let seq = 0;
+  for (const ruleProposal of proposal.rules) {
+    let group = groups.find(
+      (candidate) => candidate.id === ruleProposal.groupId,
+    );
+    if (!group) {
+      group = {
+        id: ruleProposal.groupId,
+        name: "AI Group",
+        origins: [],
+        rules: [],
+      };
+      groups.push(group);
+    }
+    const rules = group.rules as unknown[];
+    rules.push(ruleFromProposal(ruleProposal, `ai-${Date.now()}-${seq++}`));
+  }
+
+  return { ...project, groups };
+}
+
 function parseProposal(content: string): AIProposal | null {
   try {
     const parsed = JSON.parse(content);
@@ -204,17 +328,9 @@ export async function runAIAssist(
     const isFixAttempt = attempts > 1 || request.kind === "fix";
     const validationErrors = (() => {
       if (!isFixAttempt || !currentProposal) return [];
-      const cp = currentProposal;
-      return validate({
-        ...request.context.project,
-        groups: [
-          ...(request.context.project.groups ?? []),
-          ...cp.rules.map((r) => ({
-            ...r,
-            id: `temp-${Date.now()}-${Math.random()}`,
-          })),
-        ],
-      });
+      return validate(
+        mergeProposalIntoProject(request.context.project, currentProposal),
+      );
     })();
 
     const messages = buildMessages(
@@ -252,19 +368,10 @@ export async function runAIAssist(
 
     currentProposal = proposal;
 
-    // Validate the proposal by adding it to a copy of the project
-    const proposalRules: readonly RuleProposal[] = proposal.rules;
-    const testProject = {
-      ...request.context.project,
-      groups: [
-        ...(request.context.project.groups ?? []),
-        ...proposalRules.map((r, i) => ({
-          ...r,
-          id: `ai-${Date.now()}-${i}`,
-        })),
-      ],
-    };
-
+    const testProject = mergeProposalIntoProject(
+      request.context.project,
+      proposal,
+    );
     const diagnostics = validate(testProject);
 
     if (diagnostics.length === 0) {

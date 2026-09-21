@@ -1,4 +1,9 @@
-import { createEditor, type EditorController } from "@rogatio/editor";
+import {
+  type AIAssistRequest,
+  type AIProposal,
+  createEditor,
+  type EditorController,
+} from "@rogatio/editor";
 import { attentionFromRuleStatuses } from "./attention.js";
 import { validateProjectDetailed } from "./browser-schema.js";
 import {
@@ -1083,6 +1088,31 @@ function renderShell(): void {
                 : "The project could not be saved.",
           };
         },
+        ...(aiSupported
+          ? {
+              aiAssist: async (request: AIAssistRequest) => {
+                const response = await client.send({
+                  version: 1,
+                  command: "ai-assist",
+                  kind: request.kind,
+                  prompt: request.prompt,
+                  context: request.context,
+                });
+                if (response?.ok !== true || !response.value) {
+                  throw new Error(
+                    response?.diagnostic?.code
+                      ? `AI Assist failed (${response.diagnostic.code}).`
+                      : "AI Assist failed.",
+                  );
+                }
+                const value = response.value as { proposal?: AIProposal };
+                if (!value.proposal) {
+                  throw new Error("AI Assist returned no proposal.");
+                }
+                return { proposal: value.proposal };
+              },
+            }
+          : {}),
       });
       if (deepLinkGroup) editor.navigateToGroup(deepLinkGroup);
     }
@@ -1559,6 +1589,7 @@ async function refresh(
   if (pendingProjectId && !Object.hasOwn(state.projects, pendingProjectId))
     pendingProjectId = state.activeProjectId;
 
+  const previousAiSupported = aiSupported;
   // Check AI support when runtime is running
   if (state.nativeRuntimeState?.phase === "started") {
     await checkNativeAISupport();
@@ -1566,10 +1597,16 @@ async function refresh(
     aiSupported = false;
     aiStatusChecked = false;
   }
+  const aiSupportChanged = previousAiSupported !== aiSupported;
 
   // Never soft-patch across an active-project change: the mounted draft belongs
   // to the previous project and must not be saved against the new active id.
-  if (options.remountEditor === false && !activeProjectChanged) {
+  // Also remount when AI Assist availability flips so Workspace gets/loses aiAssist.
+  if (
+    options.remountEditor === false &&
+    !activeProjectChanged &&
+    !aiSupportChanged
+  ) {
     patchWorkspaceEnablementChrome();
     return;
   }
