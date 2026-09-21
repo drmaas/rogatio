@@ -8,6 +8,12 @@ import {
 } from "@rogatio/browser-core";
 import { compileProject, type RogatioOperation } from "@rogatio/compiler";
 import { normalizeSiteOrigin } from "@rogatio/schema";
+import {
+  buildAssistSystemPrompt,
+  MAX_AI_ASSIST_ENVELOPE_BYTES,
+  mergeProposalIntoProject,
+  parseAIProposal,
+} from "./ai-assist.js";
 import { validateProjectDetailed } from "./browser-schema.js";
 import {
   type ExtensionDiagnostic,
@@ -473,6 +479,89 @@ export function createExtensionApplication(
       const compiled = compileProject(validation.data);
       if (!compiled.ok) return failure("extension.ai-invalid-project");
       return { ok: true, value: structuredClone(validation.data) };
+    }
+    if (request.command === "ai-assist") {
+      const kind = stringValue(data.kind);
+      const prompt = stringValue(data.prompt)?.trim();
+      if (
+        (kind !== "generate" && kind !== "fix" && kind !== "explain") ||
+        !prompt ||
+        prompt.length > MAX_AI_PROMPT_LENGTH
+      ) {
+        return failure("extension.ai-invalid-prompt");
+      }
+      if (
+        !options.nativeRuntime ||
+        !options.extensionId ||
+        nativePhase !== "started" ||
+        !options.nativeRuntime.send
+      ) {
+        return failure("extension.ai-unavailable");
+      }
+      const context = data.context;
+      if (
+        typeof context !== "object" ||
+        context === null ||
+        Array.isArray(context) ||
+        typeof (context as { project?: unknown }).project !== "object" ||
+        (context as { project?: unknown }).project === null
+      ) {
+        return failure("extension.ai-invalid-prompt");
+      }
+      const project = (context as { project: Record<string, unknown> }).project;
+      const systemPrompt = buildAssistSystemPrompt(project);
+      const diagnostics = (context as { diagnostics?: unknown }).diagnostics;
+      let userContent = prompt;
+      if (kind === "fix" && Array.isArray(diagnostics)) {
+        userContent = `Fix validation errors for this Assist request.\nPrompt: ${prompt}\nDiagnostics: ${JSON.stringify(diagnostics)}`;
+      }
+      const messages = [
+        { role: "system" as const, content: systemPrompt },
+        { role: "user" as const, content: userContent },
+      ];
+      const envelopeProbe = {
+        protocol: "v1",
+        type: "ai.complete",
+        requestId: "size-probe",
+        timestamp: Date.now(),
+        metadata: {
+          messages,
+          model: "",
+          temperature: 0.2,
+          responseFormat: { type: "json_object" },
+        },
+      };
+      const envelopeBytes = new TextEncoder().encode(
+        JSON.stringify(envelopeProbe),
+      ).length;
+      if (envelopeBytes > MAX_AI_ASSIST_ENVELOPE_BYTES) {
+        return failure("extension.ai-request-too-large");
+      }
+      const aiResponse = await requestAIComplete(
+        {
+          extensionId: options.extensionId,
+          nativeRuntime: options.nativeRuntime,
+          getProject: async () => null,
+          getGrantedOrigins: async () => [],
+        },
+        messages,
+        "",
+        0.2,
+        { type: "json_object" },
+      );
+      if (!aiResponse) return failure("extension.ai-assist-failed");
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(aiResponse.metadata.content) as unknown;
+      } catch {
+        return failure("extension.ai-invalid-response");
+      }
+      const proposal = parseAIProposal(parsed);
+      if (!proposal) return failure("extension.ai-invalid-response");
+      const merged = mergeProposalIntoProject(project, proposal);
+      const validation = validateProjectDetailed(merged);
+      if (!validation.valid) return failure("extension.ai-invalid-proposal");
+      return { ok: true, value: { proposal } };
     }
     if (request.command === "select-project") {
       const projectId = stringValue(data.projectId);

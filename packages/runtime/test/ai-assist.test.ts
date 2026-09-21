@@ -1,8 +1,11 @@
+import { validateProjectDetailed } from "@rogatio/schema";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AIAssistRequest,
   type AIProposal,
   type DryRunResult,
+  type EditorDiagnostic,
+  mergeProposalIntoProject,
   runAIAssist,
 } from "../src/ai-assist.js";
 import type { AIClient, AIProviderConfig } from "../src/ai-client.js";
@@ -47,7 +50,7 @@ describe("ai-assist", () => {
           resourceTypes: ["main_frame", "xmlhttprequest"],
           priority: 100,
           method: "GET",
-          action: { destination: "https://mock.example.com/$1" },
+          action: { destination: "https://mock.example.com/" },
         },
       ],
       explanation: "Redirects API calls to mock server",
@@ -290,6 +293,58 @@ describe("ai-assist", () => {
       expect(result).toEqual(fixedProposal);
       expect(mockClient.complete).toHaveBeenCalled();
     });
+
+    it("passes real schema validation after merge (AC-001)", async () => {
+      const proposal = createMockProposal();
+      mockClient.stream = vi.fn().mockImplementation(async function* () {
+        yield { delta: JSON.stringify(proposal), done: true };
+      });
+
+      const schemaValidate = (value: unknown): readonly EditorDiagnostic[] => {
+        const result = validateProjectDetailed(value);
+        if (result.valid) return [];
+        return result.errors.map((error) => ({
+          code: `schema.${error.keyword}`,
+          severity: "error" as const,
+          path: error.instancePath,
+          message: error.message ?? "invalid",
+        }));
+      };
+
+      const request: AIAssistRequest = {
+        kind: "generate",
+        prompt: "Create a redirect rule",
+        context: { project: createValidProject() },
+      };
+
+      const result = await runAIAssist(
+        request,
+        mockConfig,
+        schemaValidate,
+        undefined,
+        mockClient,
+      );
+
+      expect(result).toEqual(proposal);
+      const merged = mergeProposalIntoProject(createValidProject(), proposal);
+      expect(validateProjectDetailed(merged).valid).toBe(true);
+    });
+  });
+
+  describe("mergeProposalIntoProject", () => {
+    it("maps kind to type and inserts into the target group", () => {
+      const proposal = createMockProposal();
+      const merged = mergeProposalIntoProject(createValidProject(), proposal);
+      const group = (merged.groups as Record<string, unknown>[])[0];
+      const rules = group.rules as Record<string, unknown>[];
+      expect(rules).toHaveLength(1);
+      expect(rules[0].type).toBe("redirect");
+      expect(rules[0].redirect).toEqual({
+        destination: "https://mock.example.com/",
+      });
+      expect(Object.hasOwn(rules[0], "kind")).toBe(false);
+      expect(validateProjectDetailed(merged).valid).toBe(true);
+    });
   });
 
   describe("buildSystemPrompt", () => {
@@ -342,10 +397,3 @@ describe("ai-assist", () => {
     });
   });
 });
-
-interface EditorDiagnostic {
-  readonly code: string;
-  readonly severity: "error";
-  readonly path: string;
-  readonly message: string;
-}

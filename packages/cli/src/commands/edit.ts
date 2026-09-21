@@ -143,6 +143,7 @@ export async function editCommand(
     editorCssPath: "",
     editorFontsPath: "",
     aiClient,
+    aiProviderConfig: providerConfig ?? undefined,
   };
 
   // Create and start server (optionally on a fixed port)
@@ -269,64 +270,26 @@ function generateEditorHtml(
 ): string {
   const aiAssistHandler = aiConfigured
     ? `
-    aiAssist: async function*(request) {
-      const res = await fetch(apiBase + '/api/ai/stream', {
+    aiAssist: async function(request) {
+      const res = await fetch(apiBase + '/api/ai/assist', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRF-Token': csrfToken,
         },
-        body: JSON.stringify({
-          messages: request.context.project ? [
-            { role: 'system', content: 'You are an expert Rogatio rule author.' },
-            { role: 'user', content: request.prompt }
-          ] : [{ role: 'user', content: request.prompt }],
-          model: 'gpt-4o-mini',
-          stream: true,
-        }),
+        body: JSON.stringify(request),
       });
-      
+      const payload = await res.json().catch(function() { return null; });
       if (!res.ok) {
-        const error = await res.json();
-        yield { type: 'error', error: error.message };
-        return;
+        var message = payload && payload.message
+          ? payload.message
+          : 'AI Assist failed';
+        throw new Error(message);
       }
-      
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) {
-        yield { type: 'error', error: 'No response body' };
-        return;
+      if (!payload || !payload.proposal) {
+        throw new Error('AI Assist returned no proposal');
       }
-      
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'token' && parsed.content) {
-              yield { type: 'token', content: parsed.content };
-            } else if (parsed.done) {
-              yield { type: 'done', proposal: parsed.proposal };
-              return;
-            } else if (parsed.error) {
-              yield { type: 'error', error: parsed.error };
-              return;
-            }
-          } catch {
-            // Ignore parse errors
-          }
-        }
-      }
-      yield { type: 'done', proposal: null };
+      return { proposal: payload.proposal };
     },`
     : "";
 

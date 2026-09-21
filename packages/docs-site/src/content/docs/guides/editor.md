@@ -18,9 +18,7 @@ editor.
 
 - In the CLI editor and extension Workspace: project destination, one destination per
   group, **Test console**, and project-wide group/rule **search**.
-- The extension management shell also provides a **Dashboard** overview (including AI Assist
-  / Create using AI when a provider is configured via `rogatio ai`) and a **Workspace**
-  for rule editing.
+- The extension management shell also provides a **Dashboard** overview (including **Create using AI** when the native runtime is started and a provider is configured via `rogatio ai`) and a **Workspace** for rule editing. Workspace **AI Assist** uses the same native-host path when available; the CLI editor uses `rogatio edit`'s local `/api/ai/assist` route instead.
 - A contextual command bar (Validate / Save / Cancel and route actions) and a desktop route
   rail; a compact mobile navigation. Add/copy rule, rule reorder/remove, and Copy/Remove
   group sit next to their section or entity.

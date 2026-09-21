@@ -177,7 +177,7 @@ The config file has `600` permissions (owner read/write only). The API key never
    - "Create a redirect rule for api.example.com to staging.example.com"
    - "Add a response-body replace rule that returns {'status': 'ok'}"
    - "Fix the invalid regex on rule xyz"
-4. AI streams the proposal token-by-token
+4. AI returns a validated proposal (CLI Assist uses the configured model; token streaming is optional and may be absent)
 5. Click **Apply** to add the rule to your project, or **Reject** to discard
 
 ### AI Capabilities
@@ -185,13 +185,13 @@ The config file has `600` permissions (owner read/write only). The API key never
 | Feature | Description |
 |---------|-------------|
 | **Generate** | Create new rules from natural language |
-| **Fix** | Automatically fix schema validation errors (max 3 iterations) |
+| **Fix** | Automatically fix schema validation errors (max 3 iterations on CLI; extension validates once) |
 | **Fix dry-run** | Modify rules to match failing test cases |
 | **Explain** | Describe what a rule or project does |
 
 ### In the Chrome Extension
 
-When the native runtime is started (`Start runtime`), the extension management page shows an **AI Status** indicator. AI Assist is available in the management page when the runtime is running.
+When the native runtime is started (`Start runtime`) and a provider is configured (`rogatio ai setup`), the extension management page shows an **AI Status** indicator. **Create using AI** on the Dashboard and **AI Assist** in the Workspace editor both go through the service worker to the native host — they do not call the CLI edit server. If you configure AI while the management page is already open, use **Refresh** (or restart the runtime) so Workspace remounts with Assist available.
 
 ### Security & Privacy
 
