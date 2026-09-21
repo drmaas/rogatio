@@ -61,6 +61,11 @@ export interface ChromeDeclarativeNetRequest {
     removeRuleIds: number[];
     addRules: unknown[];
   }): Promise<void>;
+  getSessionRules?(): Promise<Array<ChromeDynamicRule>>;
+  updateSessionRules?(details: {
+    removeRuleIds: number[];
+    addRules: unknown[];
+  }): Promise<void>;
   onRuleMatchedDebug?: {
     addListener(listener: (info: ChromeRuleMatchedDebugInfo) => void): void;
   };

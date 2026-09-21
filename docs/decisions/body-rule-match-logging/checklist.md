@@ -18,11 +18,11 @@ Track implement progress. Update checkboxes as work lands. Strategy: **TDD** (§
 
 ## §2 Session API + marker helper + id band — AC8, AC10
 
-- [ ] Extend `ChromeApi` / `chrome.ts` with session-rule update/get ports
-- [ ] Define body-marker id band (`3_000_001+` or approved alternate) in **session** store; document vs ADR 0009 dynamic bands
-- [ ] Add session-rules helper: build **set-only** inert marker rules from body operations (reserved name + opaque id); **no** DNR remove of same header; install/remove `getSessionRules ∩` owned band only; never `updateDynamicRules`
-- [ ] **TDD:** band ownership; no wipe of dynamic redirect/query/header ids; harness chrome adapter
-- [ ] **TDD:** built rules are set-only; values match inert sentinel; never capability/digest; never paired DNR strip
+- [x] Extend `ChromeApi` / `chrome.ts` with session-rule update/get ports
+- [x] Define body-marker id band (`3_000_001+` or approved alternate) in **session** store; document vs ADR 0009 dynamic bands
+- [x] Add session-rules helper: build **set-only** inert marker rules from body operations (reserved name + opaque id); **no** DNR remove of same header; install/remove `getSessionRules ∩` owned band only; never `updateDynamicRules`
+- [x] **TDD:** band ownership; no wipe of dynamic redirect/query/header ids; harness chrome adapter
+- [x] **TDD:** built rules are set-only; values match inert sentinel; never capability/digest; never paired DNR strip
 
 **Done when:** AC8 + AC10 (inert set-only build) met; helper unit tests red→green.
 
