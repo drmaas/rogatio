@@ -15,9 +15,11 @@ export function createAIAssistPanel(
   },
   onApply: (proposal: AIProposal) => void,
   onClose: () => void,
+  onSend: (prompt: string) => void | Promise<void>,
 ): {
   show: () => void;
   hide: () => void;
+  destroy: () => void;
   isVisible: () => boolean;
   addMessage: (message: AIMessage) => void;
   clearMessages: () => void;
@@ -155,6 +157,7 @@ export function createAIAssistPanel(
   panel.appendChild(inputContainer);
 
   const closeBtn = header.querySelector(".ai-close-btn") as HTMLButtonElement;
+  let sending = false;
 
   function show(): void {
     if (!visible) {
@@ -180,11 +183,19 @@ export function createAIAssistPanel(
     }
   }
 
+  function destroy(): void {
+    visible = false;
+    if (panel.parentNode) {
+      panel.parentNode.removeChild(panel);
+    }
+    onClose();
+  }
+
   function isVisible(): boolean {
     return visible;
   }
 
-  function addMessage(message: AIMessage): void {
+  function renderMessage(message: AIMessage): void {
     const messageEl = document.createElement("div");
     messageEl.style.cssText = `
       display: flex;
@@ -217,6 +228,11 @@ export function createAIAssistPanel(
 
     messagesContainer.appendChild(messageEl);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
+  function addMessage(message: AIMessage): void {
+    messages.push(message);
+    renderMessage(message);
   }
 
   function createProposalElement(proposal: AIProposal): HTMLElement {
@@ -346,26 +362,24 @@ export function createAIAssistPanel(
 
   function updateStreamingContent(content: string): void {
     if (streamingMessageIndex >= 0 && streamingMessageIndex < messages.length) {
+      streamingContent += content;
       const message = messages[streamingMessageIndex];
-      message.content = streamingContent + content;
+      message.content = streamingContent;
 
-      // Re-render just the last message
-      const bubbles = messagesContainer.querySelectorAll(
-        "div > div:first-child",
-      );
-      if (bubbles[streamingMessageIndex]) {
-        (bubbles[streamingMessageIndex] as HTMLElement).textContent =
-          message.content;
+      const messageEl = messagesContainer.children[streamingMessageIndex];
+      const bubble = messageEl?.firstElementChild;
+      if (bubble instanceof HTMLElement) {
+        bubble.textContent = message.content;
       }
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
   }
 
   function startStreaming(role: "assistant"): void {
     streamingContent = "";
     const message: AIMessage = { role, content: "", isStreaming: true };
-    messages.push(message);
-    streamingMessageIndex = messages.length - 1;
     addMessage(message);
+    streamingMessageIndex = messages.length - 1;
   }
 
   function finishStreaming(proposal?: AIProposal): void {
@@ -395,13 +409,17 @@ export function createAIAssistPanel(
 
   function handleSend(): void {
     const prompt = textarea.value.trim();
-    if (!prompt) return;
+    if (!prompt || sending) return;
 
-    // This will be connected to the actual AI handler via the editor
-    // The actual streaming is handled by the editor's aiAssist handler
-    // This UI just displays the streamed content
+    sending = true;
+    sendButton.disabled = true;
     textarea.value = "";
     textarea.style.height = "auto";
+    addMessage({ role: "user", content: prompt });
+    void Promise.resolve(onSend(prompt)).finally(() => {
+      sending = false;
+      sendButton.disabled = false;
+    });
   }
 
   closeBtn.addEventListener("click", hide);
@@ -416,6 +434,7 @@ export function createAIAssistPanel(
   return {
     show,
     hide,
+    destroy,
     isVisible,
     addMessage,
     clearMessages,

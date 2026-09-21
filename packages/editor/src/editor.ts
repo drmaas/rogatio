@@ -3,6 +3,9 @@ import { hasControl, LIMITS } from "@rogatio/schema";
 import { createAIAssistPanel } from "./ai-assist-panel.js";
 import { builtInRuleTypes } from "./rule-types/index.js";
 import {
+  type AIAssistChunk,
+  type AIAssistRequest,
+  type AIAssistResponse,
   type AIProposal,
   type DryRunResult,
   type DryRunTestCase,
@@ -11,6 +14,7 @@ import {
   EditorInitializationError,
   type EditorOptions,
   type EditorProjectSnapshot,
+  type RuleProposal,
   type RuleTypeFieldContext,
   type RuleTypeFieldExtension,
 } from "./types.js";
@@ -521,6 +525,84 @@ function isHTMLElement(value: unknown): value is HTMLElement {
   );
 }
 
+function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T> {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    Symbol.asyncIterator in value &&
+    typeof (value as AsyncIterable<T>)[Symbol.asyncIterator] === "function"
+  );
+}
+
+function aiAssistErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.length > 0) return error.message;
+  if (typeof error === "string" && error.length > 0) return error;
+  return "AI Assist failed.";
+}
+
+function ownString(
+  record: JsonRecord,
+  ...keys: readonly string[]
+): string | undefined {
+  for (const key of keys) {
+    if (!Object.hasOwn(record, key)) continue;
+    if (FORBIDDEN_EXTENSION_FIELDS.has(key)) continue;
+    const value = record[key];
+    if (typeof value === "string") return value;
+  }
+  return undefined;
+}
+
+function applyRuleProposalAction(
+  rule: DraftRule,
+  ruleProposal: RuleProposal,
+): void {
+  const action = ruleProposal.action;
+  switch (ruleProposal.kind) {
+    case "redirect": {
+      rule.type = "redirect";
+      const snap = snapshotOwnData(action);
+      if (snap.valid) rule.redirect = snap.value;
+      return;
+    }
+    case "query": {
+      rule.type = "query";
+      const snap = snapshotOwnData(action);
+      if (snap.valid) rule.action = snap.value;
+      return;
+    }
+    case "header": {
+      rule.type = "header";
+      if (!isRecord(action)) return;
+      const direction = ownString(action, "headerDirection", "direction");
+      const operation = ownString(action, "headerOperation", "operation");
+      const name = ownString(action, "headerName", "name");
+      const value = ownString(action, "headerValue", "value");
+      if (direction !== undefined) rule.headerDirection = direction;
+      if (operation !== undefined) rule.headerOperation = operation;
+      if (name !== undefined) rule.headerName = name;
+      if (value !== undefined) rule.headerValue = value;
+      return;
+    }
+    case "response-body": {
+      rule.type = "response-body";
+      const snap = snapshotOwnData(action);
+      if (snap.valid) rule.responseBody = snap.value;
+      return;
+    }
+    case "request-body": {
+      rule.type = "request-body";
+      const snap = snapshotOwnData(action);
+      if (snap.valid) rule.requestBody = snap.value;
+      return;
+    }
+    default: {
+      const _exhaustive: never = ruleProposal.kind;
+      void _exhaustive;
+    }
+  }
+}
+
 function normalizeExtensions(
   value: readonly RuleTypeFieldExtension[] | undefined,
 ): readonly RuleTypeFieldExtension[] {
@@ -610,6 +692,7 @@ class EditorControllerImpl implements EditorController {
   private testRunning = false;
   private testRequestId = 0;
   private aiAssistPanel: ReturnType<typeof createAIAssistPanel> | null = null;
+  private aiAssistInFlight = false;
 
   constructor(
     options: EditorOptions,
@@ -643,7 +726,8 @@ class EditorControllerImpl implements EditorController {
           navigateToGroup: (groupId) => this.navigateToGroup(groupId),
         },
         (proposal: AIProposal) => this.applyAIProposal(proposal),
-        () => {}, // onClose
+        () => {},
+        (prompt) => this.runAIAssist(prompt),
       );
     }
 
@@ -734,7 +818,7 @@ class EditorControllerImpl implements EditorController {
     if (this.destroyed) return;
     this.destroyed = true;
     if (this.aiAssistPanel) {
-      this.aiAssistPanel.hide();
+      this.aiAssistPanel.destroy();
       this.aiAssistPanel = null;
     }
     this.cleanupExtensions();
@@ -1627,11 +1711,7 @@ class EditorControllerImpl implements EditorController {
         rule.method = ruleProposal.method;
       }
 
-      // Set the action based on rule kind
-      const actionField =
-        ruleProposal.kind === "redirect" ? ruleProposal.kind : "action";
-
-      rule[actionField] = ruleProposal.action;
+      applyRuleProposalAction(rule, ruleProposal);
 
       // Add the rule to the group
       group.rules.push(rule);
@@ -1650,6 +1730,77 @@ class EditorControllerImpl implements EditorController {
 
     this.statusMessage = `Applied ${proposal.rules.length} rule${proposal.rules.length === 1 ? "" : "s"} from AI.`;
     this.render();
+  }
+
+  private async runAIAssist(prompt: string): Promise<void> {
+    const handler = this.options.aiAssist;
+    const panel = this.aiAssistPanel;
+    if (!handler || !panel || this.aiAssistInFlight || this.destroyed) return;
+
+    this.aiAssistInFlight = true;
+    const diagnostics = this.validateCurrent();
+    const hasErrors = diagnostics.some(
+      (diagnostic) => diagnostic.severity === "error",
+    );
+    const request: AIAssistRequest = {
+      kind: hasErrors ? "fix" : "generate",
+      prompt,
+      context: {
+        project: this.getDraft(),
+        activeGroupId: this.currentGroupId(),
+        diagnostics: diagnostics.length > 0 ? diagnostics : undefined,
+      },
+    };
+
+    panel.startStreaming("assistant");
+    try {
+      const result = handler(request);
+      if (isAsyncIterable(result)) {
+        let proposal: AIProposal | undefined;
+        for await (const chunk of result) {
+          if (this.destroyed) return;
+          const handled = this.consumeAIAssistChunk(panel, chunk);
+          if (handled === "error") return;
+          if (handled.proposal) proposal = handled.proposal;
+        }
+        panel.finishStreaming(proposal);
+        return;
+      }
+
+      const response = (await result) as AIAssistResponse;
+      if (this.destroyed) return;
+      panel.finishStreaming(response.proposal);
+    } catch (error) {
+      if (this.destroyed) return;
+      panel.finishStreaming();
+      panel.addMessage({
+        role: "system",
+        content: aiAssistErrorMessage(error),
+      });
+    } finally {
+      this.aiAssistInFlight = false;
+    }
+  }
+
+  private consumeAIAssistChunk(
+    panel: NonNullable<EditorControllerImpl["aiAssistPanel"]>,
+    chunk: AIAssistChunk,
+  ): "error" | { proposal?: AIProposal } {
+    if (chunk.type === "token") {
+      if (typeof chunk.content === "string" && chunk.content.length > 0) {
+        panel.updateStreamingContent(chunk.content);
+      }
+      return {};
+    }
+    if (chunk.type === "error") {
+      panel.finishStreaming();
+      panel.addMessage({
+        role: "system",
+        content: chunk.error?.message ?? "AI Assist failed.",
+      });
+      return "error";
+    }
+    return { proposal: chunk.proposal };
   }
 
   private addGroupOrigin(groupId: string): void {
