@@ -13,10 +13,13 @@ import {
   injectMatchLogLine,
   MAIN_FRAME_INJECT_RETRY_DELAYS_MS,
   MATCH_LOGGING_ENABLED_KEY,
+  registerMatchAppendConsumer,
   registerMatchLogListener,
 } from "../src/match-listener.js";
+import { BODY_MARKER_ID_MIN } from "../src/session-body-markers.js";
 
 const HEADER_DNR_ID = 2_000_001;
+const BODY_MARKER_DNR_ID = BODY_MARKER_ID_MIN;
 
 function redirectEntry(
   overrides: Partial<MatchIndexEntry> = {},
@@ -61,6 +64,32 @@ function queryEntry(overrides: Partial<MatchIndexEntry> = {}): MatchIndexEntry {
         { name: "b", operation: "remove" },
       ],
     },
+    ...overrides,
+  };
+}
+
+function requestBodyEntry(
+  overrides: Partial<MatchIndexEntry> = {},
+): MatchIndexEntry {
+  return {
+    ruleId: "body-1",
+    name: "Body One",
+    kind: "request-body",
+    redactSensitiveInLogs: false,
+    intent: { mode: "replace", rewrite: '{"debug":false}' },
+    ...overrides,
+  };
+}
+
+function responseBodyEntry(
+  overrides: Partial<MatchIndexEntry> = {},
+): MatchIndexEntry {
+  return {
+    ruleId: "body-2",
+    name: "Body Two",
+    kind: "response-body",
+    redactSensitiveInLogs: false,
+    intent: { mode: "regex", rewrite: "password=secret" },
     ...overrides,
   };
 }
@@ -718,5 +747,262 @@ describe("match log listener", () => {
     injectMatchLogLine(line);
     expect(log).toHaveBeenCalledWith("%s", line);
     log.mockRestore();
+  });
+
+  it("notifies the append seam with entry + live fields then injects for body kinds", async () => {
+    const seam = vi.fn();
+    const unregister = registerMatchAppendConsumer(seam);
+    try {
+      const { executeScript, fireMatch } = createHarness({
+        [MATCH_LOGGING_INDEX_KEY]: {
+          [String(BODY_MARKER_DNR_ID)]: requestBodyEntry(),
+          [String(BODY_MARKER_DNR_ID + 1)]: responseBodyEntry(),
+        },
+      });
+
+      await fireMatch({
+        rule: { ruleId: BODY_MARKER_DNR_ID },
+        request: {
+          tabId: 12,
+          url: "https://example.com/api",
+          method: "POST",
+          initiator: "https://example.com/",
+          type: "xmlhttprequest",
+        },
+      });
+      await fireMatch({
+        rule: { ruleId: BODY_MARKER_DNR_ID + 1 },
+        request: {
+          tabId: 13,
+          url: "https://example.com/page",
+          method: "GET",
+          type: "main_frame",
+        },
+      });
+
+      expect(seam).toHaveBeenCalledTimes(2);
+      expect(seam).toHaveBeenNthCalledWith(1, requestBodyEntry(), {
+        tabId: 12,
+        url: "https://example.com/api",
+        method: "POST",
+        initiator: "https://example.com/",
+        resourceType: "xmlhttprequest",
+      });
+      expect(seam).toHaveBeenNthCalledWith(2, responseBodyEntry(), {
+        tabId: 13,
+        url: "https://example.com/page",
+        method: "GET",
+        resourceType: "main_frame",
+      });
+
+      expect(executeScript).toHaveBeenCalledTimes(2);
+      const requestLine = executeScript.mock.calls[0]?.[0]?.args?.[0] as string;
+      expect(requestLine).toContain("kind=request-body");
+      expect(requestLine).toContain("replace");
+      expect(requestLine).toContain('{"debug":false}');
+      const responseLine = executeScript.mock.calls[1]?.[0]
+        ?.args?.[0] as string;
+      expect(responseLine).toContain("kind=response-body");
+      expect(responseLine).toContain("regex");
+    } finally {
+      unregister();
+    }
+  });
+
+  it("keeps the append seam fail-closed and silent for the matrix", async () => {
+    const seam = vi.fn();
+    const unregister = registerMatchAppendConsumer(seam);
+    try {
+      const off = createHarness({
+        [MATCH_LOGGING_ENABLED_KEY]: false,
+        [MATCH_LOGGING_INDEX_KEY]: {
+          [String(BODY_MARKER_DNR_ID)]: requestBodyEntry(),
+        },
+      });
+      await off.fireMatch({
+        rule: { ruleId: BODY_MARKER_DNR_ID },
+        request: { tabId: 1, url: "https://example.com/" },
+      });
+      expect(seam).not.toHaveBeenCalled();
+      expect(off.executeScript).not.toHaveBeenCalled();
+
+      const unknown = createHarness({
+        [MATCH_LOGGING_INDEX_KEY]: {
+          [String(BODY_MARKER_DNR_ID)]: requestBodyEntry(),
+        },
+      });
+      await unknown.fireMatch({
+        rule: { ruleId: 999 },
+        request: { tabId: 1, url: "https://example.com/" },
+      });
+      expect(seam).not.toHaveBeenCalled();
+      expect(unknown.executeScript).not.toHaveBeenCalled();
+
+      const serviceWorker = createHarness({
+        [MATCH_LOGGING_INDEX_KEY]: {
+          [String(BODY_MARKER_DNR_ID)]: requestBodyEntry(),
+        },
+      });
+      await serviceWorker.fireMatch({
+        rule: { ruleId: BODY_MARKER_DNR_ID },
+        request: { tabId: -1, url: "https://example.com/" },
+      });
+      expect(seam).not.toHaveBeenCalled();
+      expect(serviceWorker.executeScript).not.toHaveBeenCalled();
+
+      const injectThrow = createHarness({
+        [MATCH_LOGGING_INDEX_KEY]: {
+          [String(BODY_MARKER_DNR_ID)]: requestBodyEntry(),
+        },
+      });
+      injectThrow.executeScript.mockRejectedValueOnce(
+        new Error("injection failed"),
+      );
+      await expect(
+        injectThrow.fireMatch({
+          rule: { ruleId: BODY_MARKER_DNR_ID },
+          request: {
+            tabId: 2,
+            url: "https://example.com/",
+            type: "xmlhttprequest",
+          },
+        }),
+      ).resolves.toBeUndefined();
+      expect(seam).toHaveBeenCalledTimes(1);
+      expect(injectThrow.executeScript).toHaveBeenCalledTimes(1);
+    } finally {
+      unregister();
+    }
+  });
+
+  it("swallows a throwing append consumer and still injects", async () => {
+    const bad = vi.fn(() => {
+      throw new Error("seam consumer boom");
+    });
+    const unregister = registerMatchAppendConsumer(bad);
+    try {
+      const { executeScript, fireMatch } = createHarness({
+        [MATCH_LOGGING_INDEX_KEY]: {
+          [String(BODY_MARKER_DNR_ID)]: requestBodyEntry(),
+        },
+      });
+      await expect(
+        fireMatch({
+          rule: { ruleId: BODY_MARKER_DNR_ID },
+          request: {
+            tabId: 8,
+            url: "https://example.com/",
+            type: "xmlhttprequest",
+          },
+        }),
+      ).resolves.toBeUndefined();
+      expect(bad).toHaveBeenCalledTimes(1);
+      expect(executeScript).toHaveBeenCalledTimes(1);
+      expect(executeScript.mock.calls[0]?.[0]?.args?.[0]).toContain(
+        "kind=request-body",
+      );
+    } finally {
+      unregister();
+    }
+  });
+
+  it("notifies the seam when scripting is missing but does not inject", async () => {
+    const seam = vi.fn();
+    const unregister = registerMatchAppendConsumer(seam);
+    try {
+      const api = {
+        storage: {
+          local: {
+            get: async (key?: string) => {
+              if (key === MATCH_LOGGING_INDEX_KEY) {
+                return {
+                  [MATCH_LOGGING_INDEX_KEY]: {
+                    [String(BODY_MARKER_DNR_ID)]: requestBodyEntry(),
+                  },
+                };
+              }
+              return {};
+            },
+            set: async () => {},
+          },
+        },
+        permissions: {
+          contains: async () => false,
+          request: async () => true,
+          remove: async () => true,
+        },
+        action: {
+          setBadgeText: async () => {},
+          setBadgeBackgroundColor: async () => {},
+        },
+        runtime: {
+          sendMessage: () => {},
+          onMessage: { addListener: () => {} },
+        },
+        declarativeNetRequest: {
+          getDynamicRules: async () => [],
+          updateDynamicRules: async () => {},
+        },
+      } as unknown as ChromeApi;
+
+      await expect(
+        handleRuleMatchedDebug(api, {
+          rule: { ruleId: BODY_MARKER_DNR_ID },
+          request: {
+            tabId: 4,
+            url: "https://example.com/",
+            method: "POST",
+            type: "xmlhttprequest",
+          },
+        }),
+      ).resolves.toBeUndefined();
+      expect(seam).toHaveBeenCalledTimes(1);
+      expect(seam).toHaveBeenCalledWith(requestBodyEntry(), {
+        tabId: 4,
+        url: "https://example.com/",
+        method: "POST",
+        resourceType: "xmlhttprequest",
+      });
+    } finally {
+      unregister();
+    }
+  });
+
+  it("does not write history storage from the append seam", async () => {
+    const seam = vi.fn();
+    const unregister = registerMatchAppendConsumer(seam);
+    try {
+      const indexSnapshot = {
+        [String(BODY_MARKER_DNR_ID)]: requestBodyEntry(),
+      };
+      const { store, fireMatch, executeScript } = createHarness({
+        rogatio: { version: 1, projects: [] },
+        [MATCH_LOGGING_INDEX_KEY]: indexSnapshot,
+      });
+
+      await fireMatch({
+        rule: { ruleId: BODY_MARKER_DNR_ID },
+        request: {
+          tabId: 9,
+          url: "https://example.com/secret-event-url",
+          method: "POST",
+          type: "xmlhttprequest",
+        },
+      });
+
+      expect(seam).toHaveBeenCalledTimes(1);
+      expect(executeScript).toHaveBeenCalledTimes(1);
+      expect(Object.keys(store).sort()).toEqual([
+        "rogatio",
+        MATCH_LOGGING_INDEX_KEY,
+      ]);
+      expect(Object.keys(store).some((key) => /history/i.test(key))).toBe(
+        false,
+      );
+      expect(JSON.stringify(store)).not.toContain("secret-event-url");
+      expect(store[MATCH_LOGGING_INDEX_KEY]).toEqual(indexSnapshot);
+    } finally {
+      unregister();
+    }
   });
 });

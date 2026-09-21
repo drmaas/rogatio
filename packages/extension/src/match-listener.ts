@@ -4,7 +4,7 @@ import type {
   ChromeScripting,
 } from "./chrome.js";
 import { formatMatchRecord } from "./match-format.js";
-import { lookupMatchIndexEntry } from "./match-index.js";
+import { lookupMatchIndexEntry, type MatchIndexEntry } from "./match-index.js";
 import {
   MATCH_LOGGING_ENABLED_KEY,
   readMatchLoggingEnabled,
@@ -14,6 +14,56 @@ export { MATCH_LOGGING_ENABLED_KEY };
 
 /** Delays after the first failed main_frame inject (navigation race). */
 export const MAIN_FRAME_INJECT_RETRY_DELAYS_MS = [50, 150, 350] as const;
+
+/** Live request fields passed to the post-lookup append seam. */
+export interface MatchAppendLiveFields {
+  readonly tabId: number;
+  readonly url?: string;
+  readonly method?: string;
+  readonly initiator?: string;
+  readonly resourceType?: string;
+}
+
+/**
+ * In-process post-lookup side-notify consumer (#204 history later).
+ * Sync only — async console inject stays a separate hard-wired path so a
+ * bad/slow side consumer cannot own delivery. Product path today: inject only;
+ * no history store/UI registers here.
+ */
+export type MatchAppendConsumer = (
+  entry: MatchIndexEntry,
+  live: MatchAppendLiveFields,
+) => void;
+
+const matchAppendConsumers: MatchAppendConsumer[] = [];
+
+/**
+ * Register an in-process append-seam consumer. Returns an unregister
+ * function. Consumers must not throw across the service-worker boundary;
+ * throws are swallowed fail-closed.
+ */
+export function registerMatchAppendConsumer(
+  consumer: MatchAppendConsumer,
+): () => void {
+  matchAppendConsumers.push(consumer);
+  return () => {
+    const index = matchAppendConsumers.indexOf(consumer);
+    if (index >= 0) matchAppendConsumers.splice(index, 1);
+  };
+}
+
+function notifyMatchAppend(
+  entry: MatchIndexEntry,
+  live: MatchAppendLiveFields,
+): void {
+  for (const consumer of matchAppendConsumers) {
+    try {
+      consumer(entry, live);
+    } catch {
+      // Fail closed: a bad consumer must not break inject or the SW.
+    }
+  }
+}
 
 /** Closure-free injected func: all content arrives through serializable args. */
 export function injectMatchLogLine(line: string): void {
@@ -66,6 +116,31 @@ async function injectMatchLog(
   }
 }
 
+/**
+ * Product match-log path: format + console inject. Runs after side-notify;
+ * not registered via `registerMatchAppendConsumer` (async + sole delivery).
+ */
+async function consoleInjectMatch(
+  api: ChromeApi,
+  entry: MatchIndexEntry,
+  live: MatchAppendLiveFields,
+): Promise<void> {
+  const line = formatMatchRecord(
+    {
+      url: live.url,
+      method: live.method,
+      initiator: live.initiator,
+      resourceType: live.resourceType,
+    },
+    entry,
+  );
+
+  const scripting = api.scripting;
+  if (scripting === undefined) return;
+
+  await injectMatchLog(scripting, live.tabId, line, live.resourceType);
+}
+
 export async function handleRuleMatchedDebug(
   api: ChromeApi,
   info: ChromeRuleMatchedDebugInfo,
@@ -82,20 +157,21 @@ export async function handleRuleMatchedDebug(
     const entry = await lookupMatchIndexEntry(api, info.rule.ruleId);
     if (entry === undefined) return;
 
-    const line = formatMatchRecord(
-      {
-        url: request.url,
-        method: request.method,
-        initiator: request.initiator,
-        resourceType: request.type,
-      },
-      entry,
-    );
+    const live: MatchAppendLiveFields = {
+      tabId,
+      ...(typeof request.url === "string" ? { url: request.url } : {}),
+      ...(typeof request.method === "string" ? { method: request.method } : {}),
+      ...(typeof request.initiator === "string"
+        ? { initiator: request.initiator }
+        : {}),
+      ...(typeof request.type === "string"
+        ? { resourceType: request.type }
+        : {}),
+    };
 
-    const scripting = api.scripting;
-    if (scripting === undefined) return;
-
-    await injectMatchLog(scripting, tabId, line, request.type);
+    // Post-lookup append seam: notify in-process consumers, then console-inject.
+    notifyMatchAppend(entry, live);
+    await consoleInjectMatch(api, entry, live);
   } catch {
     // Fail closed: malformed event payloads or unexpected throws stay silent.
   }

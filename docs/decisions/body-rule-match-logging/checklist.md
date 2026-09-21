@@ -53,11 +53,11 @@ Track implement progress. Update checkboxes as work lands. Strategy: **TDD** (§
 
 ## §5 Append seam — AC2, AC6
 
-- [ ] Extract post-lookup seam from `handleRuleMatchedDebug` (entry + live fields)
-- [ ] Wire console inject as sole consumer (in-process only; no native match feed)
-- [ ] **TDD:** seam invoked for body-kind index hit; inject still works
-- [ ] **TDD fail-closed (silent):** toggle off; unknown id; `tabId === -1`; missing API; inject throw
-- [ ] **TDD:** no history UI/storage write
+- [x] Extract post-lookup seam from `handleRuleMatchedDebug` (entry + live fields)
+- [x] Wire console inject as sole consumer (in-process only; no native match feed)
+- [x] **TDD:** seam invoked for body-kind index hit; inject still works
+- [x] **TDD fail-closed (silent):** toggle off; unknown id; `tabId === -1`; missing API; inject throw
+- [x] **TDD:** no history UI/storage write
 
 **Done when:** AC2 fail-closed + AC6 seam — unit evidence green.
 
