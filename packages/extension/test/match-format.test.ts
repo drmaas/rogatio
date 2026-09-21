@@ -466,16 +466,117 @@ describe("formatMatchRecord", () => {
     ).not.toThrow();
   });
 
-  it("ignores extra body fields and never emits body sentinels", () => {
+  it("formats body kinds with live fields + mode + ≤200 rewrite from config", () => {
+    const bodyEntry: MatchIndexEntry = {
+      ruleId: "body-rule",
+      name: "Body Rule",
+      kind: "request-body",
+      redactSensitiveInLogs: false,
+      intent: {
+        mode: "replace",
+        rewrite: '{"debug":false}',
+      },
+    };
+    const line = formatMatchRecord(
+      {
+        url: "https://example.com/api",
+        method: "POST",
+        resourceType: "xmlhttprequest",
+        initiator: "https://example.com/",
+      },
+      bodyEntry,
+    );
+    expect(line).toContain("matched");
+    expect(line).toContain("method=POST");
+    expect(line).toContain("type=xmlhttprequest");
+    expect(line).toContain("url=https://example.com/api");
+    expect(line).toContain("ruleId=body-rule");
+    expect(line).toContain("name=Body Rule");
+    expect(line).toContain("kind=request-body");
+    expect(line).toContain("replace");
+    expect(line).toContain('{"debug":false}');
+    expect(line).toContain("initiator=https://example.com/");
+
+    const longRewrite = "w".repeat(250);
+    const longLine = formatMatchRecord(
+      { url: "https://example.com/" },
+      {
+        ...bodyEntry,
+        intent: { mode: "replace", rewrite: longRewrite },
+      },
+    );
+    expect(longLine).not.toContain(longRewrite);
+    expect(longLine).toContain("...");
+    const rewriteSegment = longLine
+      .replaceAll(PREFIX, "[rogatio]")
+      .replaceAll(DIM, "")
+      .replaceAll(RESET, "")
+      .split(" ")
+      .find((segment) => segment.startsWith("w") || segment.includes("..."));
+    expect(rewriteSegment?.length).toBeLessThanOrEqual(LOG_STRING_MAX);
+  });
+
+  it("redacts body rewrite text when redactSensitiveInLogs is true", () => {
+    const line = formatMatchRecord(
+      { url: "https://example.com/" },
+      {
+        ruleId: "body-redact",
+        name: "",
+        kind: "response-body",
+        redactSensitiveInLogs: true,
+        intent: {
+          mode: "regex",
+          rewrite: "password=super-secret-value",
+        },
+      },
+    );
+    expect(line).toContain("kind=response-body");
+    expect(line).toContain("regex");
+    expect(line).toContain("[redacted]");
+    expect(line).not.toContain("super-secret-value");
+    expect(line).not.toContain("password=");
+
+    const emptyRewrite = formatMatchRecord(
+      { url: "https://example.com/" },
+      {
+        ruleId: "body-empty",
+        name: "",
+        kind: "request-body",
+        redactSensitiveInLogs: true,
+        intent: { mode: "replace", rewrite: "" },
+      },
+    );
+    expect(emptyRewrite).toContain("kind=request-body");
+    expect(emptyRewrite).toContain("replace");
+    expect(emptyRewrite).not.toContain("[redacted]");
+  });
+
+  it("never emits live body bytes or marker header values on body lines", () => {
+    const markerValue = "3000001";
+    const liveBody = "LIVE-REQUEST-BODY-BYTES-SHOULD-NOT-APPEAR";
     const entry = {
-      ...redirectEntry,
-      body: "BODY-SENTINEL-12345",
-      requestBody: "REQUEST-BODY-SENTINEL-67890",
-    } as MatchIndexEntry & { body: string; requestBody: string };
-    const line = formatMatchRecord({ url: "https://example.com/" }, entry);
-    expect(line).not.toContain("BODY-SENTINEL-12345");
-    expect(line).not.toContain("REQUEST-BODY-SENTINEL-67890");
-    expect(line.toLowerCase()).not.toContain("body");
+      ruleId: "body-rule",
+      name: "Body Rule",
+      kind: "request-body",
+      redactSensitiveInLogs: false,
+      intent: { mode: "replace", rewrite: '{"from":"config"}' },
+      body: liveBody,
+      requestBody: liveBody,
+      "X-Rogatio-Dispatch-BodyMatch": markerValue,
+    } as unknown as MatchIndexEntry;
+    const line = formatMatchRecord(
+      {
+        url: "https://example.com/",
+        method: "POST",
+        // Hostile extras on the live event must not leak into the line.
+        ...({ body: liveBody, requestBody: liveBody } as object),
+      } as Parameters<typeof formatMatchRecord>[0],
+      entry,
+    );
+    expect(line).toContain('{"from":"config"}');
+    expect(line).not.toContain(liveBody);
+    expect(line).not.toContain(markerValue);
+    expect(line).not.toContain("X-Rogatio-Dispatch-BodyMatch");
   });
 
   it("handles adversarial non-string event fields without throwing", () => {

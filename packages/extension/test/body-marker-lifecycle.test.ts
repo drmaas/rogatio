@@ -190,7 +190,7 @@ describe("body-marker lifecycle + index merge", () => {
         name: "orphan",
         kind: "request-body",
         redactSensitiveInLogs: false,
-        intent: { mode: "replace" },
+        intent: { mode: "replace", rewrite: "" },
       },
     });
 

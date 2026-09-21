@@ -43,11 +43,11 @@ Track implement progress. Update checkboxes as work lands. Strategy: **TDD** (§
 
 ## §4 Index + format body kinds — AC1, AC2 (redact), AC3
 
-- [ ] Extend `MatchIndexEntry.kind` + body intent types
-- [ ] Teach `rawEntryFromOperation` / sanitize / `boundStoredKind` for body kinds; unknown kinds fail-closed
-- [ ] `formatIntendedAction`: mode + ≤200 rewrite summary from config; never live body bytes; never marker header values
-- [ ] **TDD:** `match-index.test.ts` — body round-trip; sanitize drops unknown/malformed body kind
-- [ ] **TDD:** `match-format.test.ts` — body line has URL/method/initiator/type + mode + ≤200; no live `body`; redact flag honored on rewrite text
+- [x] Extend `MatchIndexEntry.kind` + body intent types
+- [x] Teach `rawEntryFromOperation` / sanitize / `boundStoredKind` for body kinds; unknown kinds fail-closed
+- [x] `formatIntendedAction`: mode + ≤200 rewrite summary from config; never live body bytes; never marker header values
+- [x] **TDD:** `match-index.test.ts` — body round-trip; sanitize drops unknown/malformed body kind
+- [x] **TDD:** `match-format.test.ts` — body line has URL/method/initiator/type + mode + ≤200; no live `body`; redact flag honored on rewrite text
 
 **Done when:** AC1 (format path), AC3, AC2 redaction — unit evidence green.
 

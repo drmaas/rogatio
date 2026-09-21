@@ -1,6 +1,7 @@
 import type { RogatioOperation } from "@rogatio/compiler";
 import type { ChromeApi } from "./chrome.js";
 import {
+  sanitizeBodyRewriteForLog,
   sanitizeDestinationForLog,
   sanitizeHeaderLogValue,
   sanitizeQueryTransformValue,
@@ -35,9 +36,10 @@ export interface HeaderIntent {
   readonly value?: string;
 }
 
-/** Mode only for §3 index hit; rewrite summary lands in §4 format. */
+/** Intended body action from rule config (never live body bytes). */
 export interface BodyIntent {
   readonly mode: string;
+  readonly rewrite: string;
 }
 
 export type MatchIndexIntent =
@@ -95,6 +97,12 @@ function isBodyIntent(intent: MatchIndexIntent): intent is BodyIntent {
   return intentHasOwnString(intent, "mode");
 }
 
+function bodyRewriteFromIntent(intent: BodyIntent): string {
+  if (!Object.hasOwn(intent, "rewrite")) return "";
+  const rewrite = (intent as { rewrite?: unknown }).rewrite;
+  return typeof rewrite === "string" ? rewrite : "";
+}
+
 function boundStoredKind(kind: string): MatchIndexEntry["kind"] {
   const truncated = truncateLogString(kind);
   if (
@@ -123,6 +131,47 @@ function bodyModeFromOperation(operation: BodyMarkerOperation): string {
     return (action as { mode: string }).mode;
   }
   return "regex";
+}
+
+function bodyRewriteFromOperation(operation: BodyMarkerOperation): string {
+  if (operation.kind === "request-body") {
+    const action = operation.requestBody;
+    if (action.mode === "replace") return action.body;
+    return `${action.pattern} → ${action.replacement}`;
+  }
+  const action = operation.responseBody;
+  if (
+    action !== null &&
+    typeof action === "object" &&
+    Object.hasOwn(action, "mode") &&
+    (action as { mode?: unknown }).mode === "replace" &&
+    Object.hasOwn(action, "body") &&
+    typeof (action as { body?: unknown }).body === "string"
+  ) {
+    return (action as { body: string }).body;
+  }
+  const replacements =
+    action !== null &&
+    typeof action === "object" &&
+    Object.hasOwn(action, "replacements") &&
+    Array.isArray((action as { replacements?: unknown }).replacements)
+      ? (
+          action as {
+            replacements: ReadonlyArray<{
+              pattern?: unknown;
+              replacement?: unknown;
+            }>;
+          }
+        ).replacements
+      : [];
+  return replacements
+    .map((entry) => {
+      const pattern = typeof entry?.pattern === "string" ? entry.pattern : "";
+      const replacement =
+        typeof entry?.replacement === "string" ? entry.replacement : "";
+      return `${pattern} → ${replacement}`;
+    })
+    .join("; ");
 }
 
 function sanitizeQueryParams(
@@ -185,7 +234,13 @@ function sanitizeIntentByShape(
     return sanitizeHeaderIntent(intent, redactSensitive);
   }
   if (isBodyIntent(intent)) {
-    return { mode: truncateLogString(intent.mode) };
+    return {
+      mode: truncateLogString(intent.mode),
+      rewrite: sanitizeBodyRewriteForLog(
+        bodyRewriteFromIntent(intent),
+        redactSensitive,
+      ),
+    };
   }
   if (intent === null || typeof intent !== "object" || Array.isArray(intent)) {
     return intent;
@@ -265,7 +320,10 @@ function rawEntryFromOperation(
       name: operation.name,
       kind: operation.kind,
       redactSensitiveInLogs,
-      intent: { mode: bodyModeFromOperation(operation) },
+      intent: {
+        mode: bodyModeFromOperation(operation),
+        rewrite: bodyRewriteFromOperation(operation),
+      },
     };
   }
   return undefined;
@@ -322,7 +380,13 @@ export function sanitizeMatchIndexEntry(
       name,
       kind,
       redactSensitiveInLogs,
-      intent: { mode: truncateLogString(entry.intent.mode) },
+      intent: {
+        mode: truncateLogString(entry.intent.mode),
+        rewrite: sanitizeBodyRewriteForLog(
+          bodyRewriteFromIntent(entry.intent),
+          redactSensitiveInLogs,
+        ),
+      },
     };
   }
   return {
@@ -500,7 +564,15 @@ function parseHeaderIntent(
 function parseBodyIntent(raw: Record<string, unknown>): BodyIntent | undefined {
   const mode = own(raw, "mode");
   if (typeof mode !== "string") return undefined;
-  return { mode };
+  const rewriteRaw = own(raw, "rewrite");
+  // Absent rewrite (legacy §3 mode-only) → empty string; non-string → drop.
+  if (rewriteRaw !== undefined && typeof rewriteRaw !== "string") {
+    return undefined;
+  }
+  return {
+    mode,
+    rewrite: typeof rewriteRaw === "string" ? rewriteRaw : "",
+  };
 }
 
 function parseStoredEntry(raw: unknown): MatchIndexEntry | undefined {
