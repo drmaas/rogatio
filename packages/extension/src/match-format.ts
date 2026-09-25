@@ -1,6 +1,7 @@
 import type { MatchIndexEntry } from "./match-index.js";
 import {
   redactUrl,
+  sanitizeBodyRewriteForLog,
   sanitizeHeaderLogValue,
   sanitizeQueryTransformValue,
   truncateLogString,
@@ -103,6 +104,16 @@ function formatHeaderAction(intent: unknown, redactSensitive: boolean): string {
   return [direction, operation, target].filter(nonEmpty).join(" ");
 }
 
+function formatBodyAction(intent: unknown, redactSensitive: boolean): string {
+  const mode = logString(readString(intent, "mode"));
+  const rawRewrite = readString(intent, "rewrite");
+  const rewrite =
+    rawRewrite === undefined
+      ? ""
+      : sanitizeBodyRewriteForLog(rawRewrite, redactSensitive);
+  return [mode, rewrite].filter(nonEmpty).join(" ");
+}
+
 function formatIntendedAction(
   entry: MatchIndexEntry,
   redactSensitive: boolean,
@@ -112,6 +123,9 @@ function formatIntendedAction(
   if (kind === "redirect") return formatRedirectAction(intent, redactSensitive);
   if (kind === "query") return formatQueryAction(intent, redactSensitive);
   if (kind === "header") return formatHeaderAction(intent, redactSensitive);
+  if (kind === "request-body" || kind === "response-body") {
+    return formatBodyAction(intent, redactSensitive);
+  }
   return "";
 }
 

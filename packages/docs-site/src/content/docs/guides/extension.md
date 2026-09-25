@@ -51,24 +51,31 @@ Match logging requires an **unpacked** extension load. Chrome fires the underlyi
 `onRuleMatchedDebug` event (granted by the `declarativeNetRequestFeedback` permission) only
 for unpacked extensions, so no lines appear under packed or store distribution.
 
-**Coverage:** redirect, query, and header rules. Matcher and body rules are not logged
-(body-rule match logging is tracked in [GitHub issue #163](https://github.com/drmaas/rogatio/issues/163)).
+**Coverage:** redirect, query, and header rules, plus body (`request-body` /
+`response-body`) when session URL-match markers are installed and indexed on the same
+`onRuleMatchedDebug` pipeline; matcher rules are not logged. Body markers install only
+while a native session is active and the runtime strip path is available — production
+keeps that strip gate fail-closed (`false`) until live traffic hits strip, so body kinds
+stay silent until the gate flips. When a body line does appear, it means URL match ⇒ will
+attempt rewrite — not rewrite success. Native-host events are never a match-logging
+source.
 
 **Live vs intended:** the line labels present fields (`method=`, `type=`, `url=`,
 `ruleId=`, `name=`, `kind=`, `initiator=`) with live URL, method, initiator, and resource
 type from the Chrome match event, plus rule id, display name (when set), kind, and the
-**intended** redirect destination, query transform, or header operation from your rule
-config. Absent fields omit their key. It reports a **match** and **intended action** — not
-proof the network operation succeeded. Request and response bodies are **not** logged; neither
-are wire-applied header values.
+**intended** redirect destination, query transform, header operation, or body rewrite
+summary from your rule config. Absent fields omit their key. It reports a **match** and
+**intended action** — not proof the network operation succeeded. Live request and response
+bodies are **not** logged; neither are wire-applied header values.
 
-**Redaction:** on non-body rule cards, optional **Redact sensitive fields in logs** (default
-off) applies a deny-list to sensitive query and header values when enabled. URLs are always
-stripped of userinfo and fragments and truncated per field.
+**Redaction:** on any rule card, optional **Redact sensitive fields in logs** (default
+off) applies a deny-list to sensitive query, header, and intended body-rewrite values when
+enabled. URLs are always stripped of userinfo and fragments and truncated per field.
 
 **Limitations:** logging is skipped when Chrome supplies `tabId === -1`, when the top-level tab
-URL is outside granted origins (even if a granted-origin subresource matched), or when
-injection into that tab fails. Iframe/subframe matches depend on Chrome supplying a real tab
+URL is outside granted origins (even if a granted-origin subresource matched), when
+injection into that tab fails, or when body markers were not installed (no strip path /
+fail-closed gate). Iframe/subframe matches depend on Chrome supplying a real tab
 id and successful top-frame injection. Matches that arrive while Chrome has the extension's
 service worker terminated and does not wake it are dropped; no keepalive is used.
 

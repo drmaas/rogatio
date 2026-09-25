@@ -36,8 +36,8 @@ Every rule can specify:
 - Allowed **resource types**.
 - A **priority**.
 - Where supported, an HTTP **method**.
-- On non-body rules, **Redact sensitive fields in logs** (default off), which applies a
-  deny-list to sensitive query and header values in
+- **Redact sensitive fields in logs** (default off), which applies a deny-list to
+  sensitive query, header, and intended body-rewrite values in
   [match logging](/guides/extension/#match-logging).
 
 Rules visibly report one of: `active`, `disabled`, `needs permission`,

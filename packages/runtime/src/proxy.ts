@@ -124,8 +124,9 @@ export async function proxyRequest(
   const urlObj = new URL(targetUrl);
   const targetHost = urlObj.hostname;
 
+  const strippedHeaders = stripReservedMarkers(headers);
   const forwardHeaders = buildForwardHeaders(
-    headers,
+    strippedHeaders,
     body.byteLength,
     "application/json",
     targetHost,

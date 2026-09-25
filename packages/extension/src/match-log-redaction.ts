@@ -149,3 +149,14 @@ export function sanitizeInitiatorForLog(
 ): string {
   return redactUrl(initiator, { redactSensitive });
 }
+
+/** Intended body rewrite from rule config — never live body bytes. */
+export function sanitizeBodyRewriteForLog(
+  rewrite: string,
+  redactSensitive: boolean,
+): string {
+  // Empty summary stays empty (omit from format); do not invent "[redacted]".
+  if (rewrite.length === 0) return "";
+  if (redactSensitive) return "[redacted]";
+  return truncateLogString(rewrite);
+}

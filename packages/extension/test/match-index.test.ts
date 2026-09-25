@@ -2,11 +2,15 @@ import type {
   HeaderOperation,
   QueryOperation,
   RedirectOperation,
+  RequestBodyOperation,
+  ResponseBodyOperation,
 } from "@rogatio/compiler";
 import { describe, expect, it, vi } from "vitest";
 import type { ChromeApi } from "../src/chrome.js";
 import { createDnrInstaller } from "../src/dnr.js";
 import {
+  type BodyIntent,
+  buildInstallIndexSnapshot,
   type HeaderIntent,
   lookupMatchIndexEntry,
   MATCH_LOGGING_INDEX_KEY,
@@ -15,7 +19,11 @@ import {
   sanitizeMatchIndexEntry,
   writeMatchIndex,
 } from "../src/match-index.js";
-import { truncateLogString } from "../src/match-log-redaction.js";
+import {
+  LOG_STRING_MAX,
+  truncateLogString,
+} from "../src/match-log-redaction.js";
+import { bodyMarkerIdForIndex } from "../src/session-body-markers.js";
 
 function storageApi(initial: Record<string, unknown> = {}): {
   api: ChromeApi;
@@ -826,6 +834,155 @@ describe("match index", () => {
         (entry) => entry.kind === "redirect" && entry.ruleId === "r1",
       ),
     ).toBe(false);
+  });
+
+  it("body kinds round-trip with mode + rewrite from config", async () => {
+    const requestOp: RequestBodyOperation = {
+      kind: "request-body",
+      groupId: "g1",
+      ruleId: "body-req",
+      name: "body-req",
+      redactSensitiveInLogs: false,
+      matcher: {
+        urlRegex: { source: "^https://example\\.com/api$", flags: "" },
+        origins: ["https://example.com"],
+        resourceTypes: ["xmlhttprequest"],
+        priority: 50,
+        method: "POST",
+      },
+      requestBody: { mode: "replace", body: '{"secret":"token-value"}' },
+    };
+    const responseOp: ResponseBodyOperation = {
+      kind: "response-body",
+      groupId: "g1",
+      ruleId: "body-res",
+      name: "body-res",
+      redactSensitiveInLogs: true,
+      matcher: {
+        urlRegex: { source: "^https://example\\.com/page$", flags: "" },
+        origins: ["https://example.com"],
+        resourceTypes: ["xmlhttprequest"],
+        priority: 40,
+      },
+      responseBody: {
+        mode: "regex",
+        replacements: [{ pattern: "old", replacement: "new" }],
+      },
+    };
+    const longRewrite = "z".repeat(250);
+    const longRequest: RequestBodyOperation = {
+      ...requestOp,
+      ruleId: "body-long",
+      name: "body-long",
+      requestBody: { mode: "replace", body: longRewrite },
+    };
+
+    const snapshot = buildInstallIndexSnapshot([
+      { ruleId: bodyMarkerIdForIndex(0), operation: requestOp },
+      { ruleId: bodyMarkerIdForIndex(1), operation: responseOp },
+      { ruleId: bodyMarkerIdForIndex(2), operation: longRequest },
+    ]);
+    const { api, store } = storageApi();
+    await writeMatchIndex(api, snapshot);
+
+    const stored = store[MATCH_LOGGING_INDEX_KEY] as Record<
+      string,
+      {
+        kind: string;
+        redactSensitiveInLogs: boolean;
+        intent: BodyIntent;
+      }
+    >;
+    expect(stored[String(bodyMarkerIdForIndex(0))]).toMatchObject({
+      kind: "request-body",
+      redactSensitiveInLogs: false,
+      intent: { mode: "replace", rewrite: '{"secret":"token-value"}' },
+    });
+    expect(stored[String(bodyMarkerIdForIndex(1))]).toMatchObject({
+      kind: "response-body",
+      redactSensitiveInLogs: true,
+      intent: { mode: "regex", rewrite: "[redacted]" },
+    });
+    const longIntent = stored[String(bodyMarkerIdForIndex(2))]?.intent;
+    expect(longIntent?.mode).toBe("replace");
+    expect(longIntent?.rewrite.length).toBeLessThanOrEqual(LOG_STRING_MAX);
+    expect(longIntent?.rewrite.endsWith("...")).toBe(true);
+
+    expect(
+      await lookupMatchIndexEntry(api, bodyMarkerIdForIndex(0)),
+    ).toMatchObject({
+      kind: "request-body",
+      intent: { mode: "replace", rewrite: '{"secret":"token-value"}' },
+    });
+    expect(
+      await lookupMatchIndexEntry(api, bodyMarkerIdForIndex(1)),
+    ).toMatchObject({
+      kind: "response-body",
+      intent: { mode: "regex", rewrite: "[redacted]" },
+    });
+  });
+
+  it("sanitize / lookup drop unknown and malformed body kinds", async () => {
+    const { api } = storageApi();
+
+    await api.storage.local.set({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        "1": {
+          ruleId: "unknown",
+          name: "",
+          kind: "body",
+          redactSensitiveInLogs: false,
+          intent: { mode: "replace", rewrite: "x" },
+        },
+        "2": {
+          ruleId: "malformed",
+          name: "",
+          kind: "request-body",
+          redactSensitiveInLogs: false,
+          intent: { rewrite: "missing-mode" },
+        },
+        "3": {
+          ruleId: "bad-rewrite",
+          name: "",
+          kind: "response-body",
+          redactSensitiveInLogs: false,
+          intent: { mode: "replace", rewrite: 123 },
+        },
+        "4": {
+          ruleId: "ok",
+          name: "",
+          kind: "request-body",
+          redactSensitiveInLogs: false,
+          intent: { mode: "replace", rewrite: '{"ok":true}' },
+        },
+      },
+    });
+
+    expect(await lookupMatchIndexEntry(api, 1)).toBeUndefined();
+    expect(await lookupMatchIndexEntry(api, 2)).toBeUndefined();
+    expect(await lookupMatchIndexEntry(api, 3)).toBeUndefined();
+    expect(await lookupMatchIndexEntry(api, 4)).toEqual({
+      ruleId: "ok",
+      name: "",
+      kind: "request-body",
+      redactSensitiveInLogs: false,
+      intent: { mode: "replace", rewrite: '{"ok":true}' },
+    });
+
+    const sanitized = sanitizeMatchIndexEntry({
+      ruleId: "s1",
+      name: "",
+      kind: "request-body",
+      redactSensitiveInLogs: true,
+      intent: {
+        mode: "replace",
+        rewrite: `https://example.com/?token=${"s".repeat(10)}`,
+      },
+    });
+    expect(sanitized.intent).toEqual({
+      mode: "replace",
+      rewrite: "[redacted]",
+    });
   });
 
   it("clears stored header identity when a redirect-only install rewrites the index", async () => {

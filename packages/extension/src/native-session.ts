@@ -1,5 +1,12 @@
 import { compileProject } from "@rogatio/compiler";
 import { formatSha256, validateProjectDetailed } from "@rogatio/schema";
+import {
+  type BodyMarkerProbeGates,
+  DEFAULT_BODY_MARKER_PROBE_GATES,
+  installSessionBodyMarkers,
+  removeSessionBodyMarkers,
+} from "./body-marker-lifecycle.js";
+import type { ChromeApi } from "./chrome.js";
 
 /**
  * Local structural copy of the native host envelope wire shape. The extension
@@ -128,6 +135,15 @@ export interface NativeSessionOptions {
     enabledGroupIds: readonly string[];
   } | null>;
   readonly getGrantedOrigins: () => Promise<readonly string[]>;
+  /**
+   * Session body URL-match markers for match logging. Install only when
+   * `runtimeStripPathAvailable` is true (fail-closed). No F17 capability mint.
+   */
+  readonly bodyMarkers?: {
+    readonly api: ChromeApi;
+    readonly runtimeStripPathAvailable: boolean;
+    readonly probeGates?: BodyMarkerProbeGates;
+  };
 }
 
 export interface NativeRuntimeConfig {
@@ -186,6 +202,44 @@ function stableStartFailureReason(error: unknown): string {
   return "extension.native-runtime-transition";
 }
 
+async function rollbackBodyMarkers(
+  bodyMarkers: NativeSessionOptions["bodyMarkers"],
+): Promise<void> {
+  if (bodyMarkers === undefined) return;
+  await removeSessionBodyMarkers(bodyMarkers.api);
+}
+
+async function syncBodyMarkersAfterStart(
+  options: NativeSessionOptions,
+  projectData: unknown,
+  enabledGroupIds: readonly string[],
+): Promise<void> {
+  const bodyMarkers = options.bodyMarkers;
+  if (bodyMarkers === undefined) return;
+
+  const schemaResult = validateProjectDetailed(projectData);
+  if (!schemaResult.valid) {
+    await rollbackBodyMarkers(bodyMarkers);
+    return;
+  }
+  const compileResult = compileProject(schemaResult.data);
+  if (!compileResult.ok) {
+    await rollbackBodyMarkers(bodyMarkers);
+    return;
+  }
+  const enabled = new Set(enabledGroupIds);
+  const operations = compileResult.operations.filter((op) =>
+    enabled.has(op.groupId),
+  );
+
+  await installSessionBodyMarkers({
+    api: bodyMarkers.api,
+    operations,
+    runtimeStripPathAvailable: bodyMarkers.runtimeStripPathAvailable,
+    probeGates: bodyMarkers.probeGates ?? DEFAULT_BODY_MARKER_PROBE_GATES,
+  });
+}
+
 export async function startNativeSession(
   options: NativeSessionOptions,
 ): Promise<
@@ -210,6 +264,7 @@ export async function startNativeSession(
   );
   if (!policyResult.ok) {
     console.log("[rogatio] policy build failed:", policyResult.reason);
+    await rollbackBodyMarkers(options.bodyMarkers);
     return { ok: false, reason: policyResult.reason };
   }
 
@@ -241,6 +296,7 @@ export async function startNativeSession(
           "[rogatio] project.set failed:",
           projectSetResponse.metadata.error,
         );
+        await rollbackBodyMarkers(options.bodyMarkers);
         return {
           ok: false,
           reason: String(
@@ -250,6 +306,7 @@ export async function startNativeSession(
       }
     } catch (error) {
       console.log("[rogatio] project.set exception:", error);
+      await rollbackBodyMarkers(options.bodyMarkers);
       return { ok: false, reason: stableStartFailureReason(error) };
     }
   }
@@ -272,8 +329,15 @@ export async function startNativeSession(
 
   const startResult = await options.nativeRuntime.start(config);
   if (startResult.state !== "started") {
+    await rollbackBodyMarkers(options.bodyMarkers);
     return { ok: false, reason: startResult.message ?? "start-failed" };
   }
+
+  await syncBodyMarkersAfterStart(
+    options,
+    project.data,
+    project.enabledGroupIds,
+  );
 
   return { ok: true, sessionId, policyDigest: config.policyDigest };
 }
@@ -281,6 +345,7 @@ export async function startNativeSession(
 export async function stopNativeSession(
   options: NativeSessionOptions,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await rollbackBodyMarkers(options.bodyMarkers);
   await options.nativeRuntime.stop();
   return { ok: true };
 }
