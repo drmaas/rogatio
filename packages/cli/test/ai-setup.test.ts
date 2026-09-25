@@ -2,8 +2,22 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
+import { getProviderConfigPath } from "@rogatio/runtime";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { aiCommand } from "../src/commands/ai.js";
+
+/**
+ * `getConfigDir` is platform-specific (XDG_CONFIG_HOME on Linux,
+ * `~/Library/Application Support` on macOS, `%LOCALAPPDATA%` on Windows), so
+ * the test redirects whichever variable the current platform honors — never
+ * the real user config. The expected path comes from `getProviderConfigPath`
+ * so the platform branches stay in the product, not in the test.
+ */
+function configEnvKey(): "LOCALAPPDATA" | "HOME" | "XDG_CONFIG_HOME" {
+  if (process.platform === "win32") return "LOCALAPPDATA";
+  if (process.platform === "darwin") return "HOME";
+  return "XDG_CONFIG_HOME";
+}
 
 /**
  * Regression: `rogatio ai setup` asks several prompts in sequence. Reading the
@@ -13,12 +27,13 @@ import { aiCommand } from "../src/commands/ai.js";
  */
 describe("rogatio ai setup stdin prompts", () => {
   let temp: string | undefined;
-  const originalXdg = process.env.XDG_CONFIG_HOME;
+  let originalEnvValue: string | undefined;
+  const envKey = configEnvKey();
   const originalStdin = Object.getOwnPropertyDescriptor(process, "stdin");
 
   afterEach(async () => {
-    if (originalXdg === undefined) delete process.env.XDG_CONFIG_HOME;
-    else process.env.XDG_CONFIG_HOME = originalXdg;
+    if (originalEnvValue === undefined) delete process.env[envKey];
+    else process.env[envKey] = originalEnvValue;
     if (originalStdin) {
       Object.defineProperty(process, "stdin", originalStdin);
     }
@@ -27,10 +42,15 @@ describe("rogatio ai setup stdin prompts", () => {
     temp = undefined;
   });
 
-  it("reads URL, model, and key sequentially and writes the config (0600)", async () => {
+  async function isolateConfigDir(): Promise<void> {
     temp = await mkdtemp(join(tmpdir(), "rogatio-ai-"));
-    process.env.XDG_CONFIG_HOME = temp;
+    originalEnvValue = process.env[envKey];
+    process.env[envKey] = temp;
+  }
 
+  function installFakeStdin(): PassThrough & {
+    setRawMode: (mode: boolean) => void;
+  } {
     const fakeStdin = new PassThrough() as PassThrough & {
       setRawMode: (mode: boolean) => void;
     };
@@ -43,6 +63,12 @@ describe("rogatio ai setup stdin prompts", () => {
     });
     vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     vi.spyOn(console, "log").mockImplementation(() => {});
+    return fakeStdin;
+  }
+
+  it("reads URL, model, and key sequentially and writes the config (0600)", async () => {
+    await isolateConfigDir();
+    const fakeStdin = installFakeStdin();
 
     const done = aiCommand(["setup"]);
     // The whole answer batch is available up front (pasted input): each prompt
@@ -51,32 +77,23 @@ describe("rogatio ai setup stdin prompts", () => {
 
     await expect(done).resolves.toBe(0);
 
-    const configPath = join(temp, "rogatio", "provider.json");
+    const configPath = getProviderConfigPath();
     const config = JSON.parse(await readFile(configPath, "utf8")) as unknown;
     expect(config).toEqual({
       providerUrl: "https://provider.test/v1",
       model: "test-model",
       apiKey: "test-key-123",
     });
-    expect((await stat(configPath)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") {
+      // Windows maps chmod to the read-only bit; POSIX modes are meaningless
+      // there and `stat().mode` reports 0666.
+      expect((await stat(configPath)).mode & 0o777).toBe(0o600);
+    }
   });
 
   it("reads answers typed as separate chunks", async () => {
-    temp = await mkdtemp(join(tmpdir(), "rogatio-ai-"));
-    process.env.XDG_CONFIG_HOME = temp;
-
-    const fakeStdin = new PassThrough() as PassThrough & {
-      setRawMode: (mode: boolean) => void;
-    };
-    fakeStdin.setRawMode = () => {
-      // Echo suppression is not observable on a pipe.
-    };
-    Object.defineProperty(process, "stdin", {
-      configurable: true,
-      value: fakeStdin,
-    });
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    vi.spyOn(console, "log").mockImplementation(() => {});
+    await isolateConfigDir();
+    const fakeStdin = installFakeStdin();
 
     const done = aiCommand(["setup"]);
     fakeStdin.write("https://provider.test/v1\n");
@@ -85,7 +102,7 @@ describe("rogatio ai setup stdin prompts", () => {
 
     await expect(done).resolves.toBe(0);
 
-    const configPath = join(temp, "rogatio", "provider.json");
+    const configPath = getProviderConfigPath();
     const config = JSON.parse(await readFile(configPath, "utf8")) as {
       apiKey?: unknown;
     };
