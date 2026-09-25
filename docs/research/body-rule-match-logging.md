@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-25
+
 # Research: body-rule-match-logging
 
 Phase: research. Inputs: `docs/decisions/body-rule-match-logging/prd.md`. Claims verified in worktree source.

@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-25
+
 # PRD: body-rule-match-logging
 
 ## Status
