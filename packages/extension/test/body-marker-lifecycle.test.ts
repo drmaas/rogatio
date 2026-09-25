@@ -2,7 +2,7 @@ import type {
   RequestBodyOperation,
   ResponseBodyOperation,
 } from "@rogatio/compiler";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   DEFAULT_BODY_MARKER_PROBE_GATES,
   installSessionBodyMarkers,
@@ -10,20 +10,12 @@ import {
 } from "../src/body-marker-lifecycle.js";
 import type { ChromeApi } from "../src/chrome.js";
 import { createDnrInstaller } from "../src/dnr.js";
-import {
-  lookupMatchIndexEntry,
-  MATCH_LOGGING_INDEX_KEY,
-  writeMatchIndex,
-} from "../src/match-index.js";
+import { lookupMatchIndexEntry, writeMatchIndex } from "../src/match-index.js";
 import {
   BODY_MARKER_ID_MIN,
   bodyMarkerIdForIndex,
 } from "../src/session-body-markers.js";
-import {
-  chromeHeldInstaller,
-  HEADER_BAND_ID,
-  storageLocal,
-} from "./dnr-harness.js";
+import { chromeHeldInstaller, HEADER_BAND_ID } from "./dnr-harness.js";
 
 const requestBodyOp: RequestBodyOperation = {
   kind: "request-body",
@@ -318,29 +310,28 @@ describe("installSessionBodyMarkers / removeSessionBodyMarkers", () => {
     ).toBeUndefined();
   });
 
-  it("no-op when strip path unavailable", async () => {
-    const api = {
-      storage: { local: storageLocal() },
-      declarativeNetRequest: {
-        updateSessionRules: vi.fn(),
-        getSessionRules: vi.fn(async () => []),
-        updateDynamicRules: vi.fn(),
-        getDynamicRules: vi.fn(async () => []),
-      },
-    } as unknown as ChromeApi;
+  it("strip unavailable → clears stale markers/index (no new install)", async () => {
+    const held = chromeHeldInstaller();
+    await installSessionBodyMarkers({
+      api: held.api,
+      operations: [requestBodyOp],
+      runtimeStripPathAvailable: true,
+    });
+    expect(held.sessionIds()).toEqual([BODY_MARKER_ID_MIN]);
+    expect(
+      await lookupMatchIndexEntry(held.api, BODY_MARKER_ID_MIN),
+    ).toBeDefined();
 
     await installSessionBodyMarkers({
-      api,
+      api: held.api,
       operations: [requestBodyOp],
       runtimeStripPathAvailable: false,
     });
+    expect(held.sessionIds()).toEqual([]);
     expect(
-      api.declarativeNetRequest?.updateSessionRules,
-    ).not.toHaveBeenCalled();
-    const stored = await api.storage.local.get(MATCH_LOGGING_INDEX_KEY);
-    expect(
-      (stored as Record<string, unknown>)[MATCH_LOGGING_INDEX_KEY],
+      await lookupMatchIndexEntry(held.api, BODY_MARKER_ID_MIN),
     ).toBeUndefined();
+    expect(held.updateDynamicRules).not.toHaveBeenCalled();
   });
 
   it("strip available + no gated body ops → clears stale markers/index", async () => {

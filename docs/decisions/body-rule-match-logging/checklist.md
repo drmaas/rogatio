@@ -82,9 +82,56 @@ Track implement progress. Update checkboxes as work lands. Strategy: **TDD** (§
 
 ## §8 End-to-end verify — AC1–AC10
 
-- [ ] Run focused match-* / editor / probe / lifecycle orphan tests
-- [ ] Run `pnpm validate`
-- [ ] Spot-check each AC1–AC10 against evidence (probe notes, unit names, doc cites)
-- [ ] Confirm no #170 PAC / capability mint in shipped marker path (AC9 review)
+- [x] Run focused match-* / editor / probe / lifecycle orphan tests
+- [x] Run `pnpm validate`
+- [x] Spot-check each AC1–AC10 against evidence (probe notes, unit names, doc cites)
+- [x] Confirm no #170 PAC / capability mint in shipped marker path (AC9 review)
 
 **Done when:** All AC1–AC10 have named evidence; validate green; ready for implementation review.
+
+### §8 run evidence (2026-09-24)
+
+Focused units (131 passed):
+`packages/extension/test/match-{format,index,listener,logging-enabled}.test.ts`,
+`session-body-markers.test.ts`, `body-marker-lifecycle.test.ts`,
+`packages/editor/test/redact-sensitive-in-logs.test.ts`.
+
+Probe (1 passed): `test/browser/body-match-probe.test.ts`
+(`body-match probe — request-body and response-body URL markers`).
+
+`pnpm validate`: green — format/lint/typecheck/build; vitest 118 files / 1025 tests;
+browser 11 files / 55 tests (+4 skipped). Transient format fail from local
+`.vitest/json/output.json` (probe artifact) removed before re-run; not product code.
+
+Optional live console journey: **skipped** (plan lock — production
+`runtimeStripPathAvailable: false` in `packages/extension/src/background.ts:246`;
+no strip gate / #170). Unit path covers AC1 format+seam.
+
+### AC1–AC10 evidence map
+
+| AC | Verdict | Evidence |
+| --- | --- | --- |
+| AC1 | Pass (unit only; live skipped) | Format + seam + inject unit path. Live console journey **skipped** — production `runtimeStripPathAvailable: false` (`background.ts:246`) so body markers never install → no live body `[rogatio]` line until strip gate flips. Plan-review lock: unit covers AC1. |
+| AC2 | Pass | Listener fail-closed matrix + redact body format; ADR 0001 / architecture: no native-host match feed |
+| AC3 | Pass | `formats body kinds with live fields + mode + ≤200`; `never emits live body bytes or marker header values` |
+| AC4 | Pass | Probe both shapes event+no-leak; lifecycle `response-body skipped when probe gate false`; session install gated on strip |
+| AC5 | Pass | ADR 0001/0006/0007/0009 amendments + `docs/architecture.md` single-pipeline; ADR 0006 cites probe |
+| AC6 | Pass | Seam invoke + fail-closed tests; `does not write history storage from the append seam` |
+| AC7 | Pass | Editor `shows… body cards`; `toggles and saves… on body cards` |
+| AC8 | Pass | `owns 3_000_001+…`; `never calls updateDynamicRules`; lifecycle `createDnrInstaller never emits body rules` |
+| AC9 | Pass (#170 independent) | See AC9 review below |
+| AC10 | Pass | Probe inert markers; `uses inert sentinel values`; orphan-on-stop + start-failure rollback tests |
+
+### AC9 #170 independence review
+
+Shipped marker path (`body-marker-lifecycle.ts`, `session-body-markers.ts`,
+`native-session.ts` bodyMarkers hook) installs **set-only inert** session DNR
+markers + index merge only. Explicit non-goals in code comments: no capability
+mint, no pending-auth, no PAC. Production gate stays `runtimeStripPathAvailable:
+false` (fail-closed; no live body console lines until strip path exists). No
+product flip of strip gate in this feature. #170 rewrite/PAC/capability remains
+separate.
+
+Follow-up from §8 review (fixed in PR): `installSessionBodyMarkers` with
+strip unavailable clears owned session markers + body-band index (same as
+empty gated-ops path), so true→false without stop cannot leave orphans.

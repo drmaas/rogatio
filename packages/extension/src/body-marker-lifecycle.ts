@@ -41,7 +41,8 @@ export function filterBodyOpsForMarkers(
 
 /**
  * Install set-only session body markers and merge ids into the match index.
- * Fail-closed: no strip path → no install (silence).
+ * Fail-closed: no strip path → clear any owned markers/index and skip install
+ * (silence; avoids stale markers if the gate flips true→false without stop).
  * Does not mint capability tokens / pending-auth / PAC.
  */
 export async function installSessionBodyMarkers(options: {
@@ -51,6 +52,7 @@ export async function installSessionBodyMarkers(options: {
   readonly probeGates?: BodyMarkerProbeGates;
 }): Promise<{ readonly installedIds: readonly number[] }> {
   if (!options.runtimeStripPathAvailable) {
+    await removeSessionBodyMarkers(options.api);
     return { installedIds: [] };
   }
 
