@@ -6,6 +6,8 @@ import {
   type DryRunResult,
   type EditorDiagnostic,
   mergeProposalIntoProject,
+  repairProposalIntoProject,
+  repairTargetsFromDiagnostics,
   runAIAssist,
 } from "../src/ai-assist.js";
 import type { AIClient, AIProviderConfig } from "../src/ai-client.js";
@@ -328,6 +330,189 @@ describe("ai-assist", () => {
       expect(result).toEqual(proposal);
       const merged = mergeProposalIntoProject(createValidProject(), proposal);
       expect(validateProjectDetailed(merged).valid).toBe(true);
+    });
+  });
+
+  describe("repairProposalIntoProject", () => {
+    function brokenProject(): { groups?: unknown[] } & Record<string, unknown> {
+      return {
+        version: 1,
+        name: "Broken project",
+        groups: [
+          {
+            id: "group-1",
+            name: "API Rules",
+            origins: ["https://api.example.com"],
+            rules: [
+              {
+                id: "rule-broken",
+                name: "Broken",
+                urlRegex: "[",
+                origins: [],
+                resourceTypes: ["main_frame"],
+                priority: 100,
+                type: "redirect",
+                redirect: { destination: "https://mock.example.com/" },
+              },
+            ],
+          },
+        ],
+      };
+    }
+
+    const fixDiagnostics: EditorDiagnostic[] = [
+      {
+        code: "schema.invalid-regex",
+        severity: "error",
+        path: "/groups/0/rules/0/urlRegex",
+        message: "Invalid regex",
+      },
+    ];
+
+    function rulesOf(
+      project: Record<string, unknown>,
+    ): Record<string, unknown>[] {
+      return (project.groups as Record<string, unknown>[])[0].rules as Record<
+        string,
+        unknown
+      >[];
+    }
+
+    it("extracts de-duplicated rule targets in stable order", () => {
+      expect(
+        repairTargetsFromDiagnostics([
+          { path: "/groups/1/rules/0/name" },
+          { path: "/groups/0/rules/2/urlRegex" },
+          { path: "/groups/0/rules/2/action" },
+          { path: "/groups/0" },
+          { path: "/name" },
+          { path: 42 },
+          null,
+        ]),
+      ).toEqual([
+        { groupIndex: 0, ruleIndex: 2 },
+        { groupIndex: 1, ruleIndex: 0 },
+      ]);
+    });
+
+    it("replaces the offending rule in place, keeping its id", () => {
+      const proposal = createMockProposal();
+      const repaired = repairProposalIntoProject(
+        brokenProject(),
+        fixDiagnostics,
+        proposal,
+      );
+      const rules = rulesOf(repaired);
+      expect(rules).toHaveLength(1);
+      expect(rules[0].id).toBe("rule-broken");
+      expect(rules[0].urlRegex).toBe("^https://api\\.example\\.com/");
+      expect(rules[0].type).toBe("redirect");
+      expect(validateProjectDetailed(repaired).valid).toBe(true);
+    });
+
+    it("maps proposals group-scoped FIFO and appends surplus rules", () => {
+      const project = brokenProject();
+      const group = (project.groups as Record<string, unknown>[])[0];
+      (group.rules as unknown[]).push({
+        id: "rule-broken-2",
+        name: "Broken 2",
+        urlRegex: "(",
+        origins: [],
+        resourceTypes: ["main_frame"],
+        priority: 100,
+        type: "redirect",
+        redirect: { destination: "https://mock.example.com/" },
+      });
+      const proposal: AIProposal = {
+        rules: [
+          createMockProposal().rules[0],
+          createMockProposal().rules[0],
+          { ...createMockProposal().rules[0], name: "Surplus" },
+        ],
+        explanation: "fixes",
+      };
+      const repaired = repairProposalIntoProject(
+        project,
+        [
+          { path: "/groups/0/rules/1/urlRegex" },
+          { path: "/groups/0/rules/0/urlRegex" },
+        ],
+        proposal,
+      );
+      const rules = rulesOf(repaired);
+      expect(rules).toHaveLength(3);
+      expect(rules[0].id).toBe("rule-broken");
+      expect(rules[1].id).toBe("rule-broken-2");
+      expect(rules[0].name).toBe("Redirect API");
+      expect(rules[2].name).toBe("Surplus");
+      expect(String(rules[2].id)).toMatch(/^ai-/);
+    });
+
+    it("appends like the merge when no repair target exists", () => {
+      const repaired = repairProposalIntoProject(
+        createValidProject(),
+        [{ path: "/groups/0/rules/5/urlRegex" }],
+        createMockProposal(),
+      );
+      const rules = rulesOf(repaired);
+      expect(rules).toHaveLength(1);
+      expect(String(rules[0].id)).toMatch(/^ai-/);
+    });
+
+    it("skips malformed proposal rules defensively", () => {
+      const proposal = {
+        rules: [
+          null,
+          42,
+          { kind: "redirect" },
+          { ...createMockProposal().rules[0], origins: 7 },
+        ],
+        explanation: "junk",
+      } as unknown as AIProposal;
+      const repaired = repairProposalIntoProject(
+        brokenProject(),
+        fixDiagnostics,
+        proposal,
+      );
+      const rules = rulesOf(repaired);
+      // The last rule is structurally valid; it repairs the broken rule and
+      // drops the malformed origins value.
+      expect(rules).toHaveLength(1);
+      expect(rules[0].id).toBe("rule-broken");
+      expect(rules[0].origins).toEqual([]);
+    });
+
+    it("runAIAssist validates the repaired project for fix requests (AC-004)", async () => {
+      const fixedProposal = createMockProposal();
+      mockClient.complete = vi
+        .fn()
+        .mockResolvedValue({ content: JSON.stringify(fixedProposal) });
+      validateMock = vi.fn().mockReturnValue([]);
+
+      const request: AIAssistRequest = {
+        kind: "fix",
+        prompt: "Fix the regex",
+        context: { project: brokenProject(), diagnostics: fixDiagnostics },
+      };
+
+      const result = await runAIAssist(
+        request,
+        mockConfig,
+        validateMock,
+        dryRunMock,
+        mockClient,
+      );
+
+      expect(result).toEqual(fixedProposal);
+      expect(validateMock).toHaveBeenCalledOnce();
+      const validated = validateMock.mock.calls[0][0] as Record<
+        string,
+        unknown
+      >;
+      const rules = rulesOf(validated);
+      expect(rules).toHaveLength(1);
+      expect(rules[0].id).toBe("rule-broken");
+      expect(rules[0].urlRegex).toBe("^https://api\\.example\\.com/");
     });
   });
 

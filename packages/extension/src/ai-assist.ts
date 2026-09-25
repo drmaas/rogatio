@@ -150,6 +150,111 @@ export function ruleFromProposal(
   return rule;
 }
 
+const RULE_PATH_PATTERN =
+  /^\/groups\/(0|[1-9][0-9]*)\/rules\/(0|[1-9][0-9]*)(?:\/|$)/;
+
+export interface ExtensionRepairTarget {
+  readonly groupIndex: number;
+  readonly ruleIndex: number;
+}
+
+/**
+ * Rule-level repair targets from editor diagnostics (JSON-pointer rule paths),
+ * sorted by path position and de-duplicated. Mirrors the runtime helper.
+ */
+export function repairTargetsFromDiagnostics(
+  diagnostics: readonly unknown[] | undefined,
+): ExtensionRepairTarget[] {
+  if (!Array.isArray(diagnostics)) return [];
+  const seen = new Set<string>();
+  const targets: ExtensionRepairTarget[] = [];
+  for (const diagnostic of diagnostics) {
+    if (!isRecord(diagnostic) || typeof diagnostic.path !== "string") continue;
+    const match = RULE_PATH_PATTERN.exec(diagnostic.path);
+    if (!match) continue;
+    const groupIndex = Number(match[1]);
+    const ruleIndex = Number(match[2]);
+    if (!Number.isSafeInteger(groupIndex) || !Number.isSafeInteger(ruleIndex)) {
+      continue;
+    }
+    const key = `${groupIndex}/${ruleIndex}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    targets.push({ groupIndex, ruleIndex });
+  }
+  targets.sort(
+    (left, right) =>
+      left.groupIndex - right.groupIndex || left.ruleIndex - right.ruleIndex,
+  );
+  return targets;
+}
+
+/**
+ * Insert proposal rules into a copy of the project, repairing the rules that
+ * carry diagnostics (group-scoped FIFO, keeping repaired rule ids). Proposal
+ * rules without a remaining target append like `mergeProposalIntoProject`.
+ * Mirrors the runtime helper without importing @rogatio/runtime.
+ */
+export function repairProposalIntoProject(
+  project: { groups?: unknown[] } & Record<string, unknown>,
+  diagnostics: readonly unknown[] | undefined,
+  proposal: ExtensionAIProposal,
+): Record<string, unknown> {
+  const groups: Record<string, unknown>[] = Array.isArray(project.groups)
+    ? project.groups.map((group) => {
+        if (!isRecord(group)) {
+          return { id: "invalid", name: "invalid", origins: [], rules: [] };
+        }
+        return {
+          ...group,
+          rules: Array.isArray(group.rules) ? [...group.rules] : [],
+        };
+      })
+    : [];
+
+  const queues = new Map<number, number[]>();
+  for (const target of repairTargetsFromDiagnostics(diagnostics)) {
+    const group = groups[target.groupIndex];
+    if (!group) continue;
+    const rules = group.rules as unknown[];
+    if (target.ruleIndex >= rules.length) continue;
+    if (!isRecord(rules[target.ruleIndex])) continue;
+    const queue = queues.get(target.groupIndex) ?? [];
+    queue.push(target.ruleIndex);
+    queues.set(target.groupIndex, queue);
+  }
+
+  let seq = 0;
+  const newId = (): string => `ai-${Date.now()}-${seq++}`;
+  for (const ruleProposal of proposal.rules) {
+    const groupIndex = groups.findIndex(
+      (candidate) => candidate.id === ruleProposal.groupId,
+    );
+    const queue = groupIndex >= 0 ? queues.get(groupIndex) : undefined;
+    const targetIndex = queue?.shift();
+    if (groupIndex >= 0 && targetIndex !== undefined) {
+      const rules = groups[groupIndex].rules as unknown[];
+      const existing = rules[targetIndex] as Record<string, unknown>;
+      const keptId = typeof existing.id === "string" ? existing.id : newId();
+      rules[targetIndex] = ruleFromProposal(ruleProposal, keptId);
+      continue;
+    }
+    let group = groupIndex >= 0 ? groups[groupIndex] : undefined;
+    if (!group) {
+      group = {
+        id: ruleProposal.groupId,
+        name: "AI Group",
+        origins: [],
+        rules: [],
+      };
+      groups.push(group);
+    }
+    (group.rules as unknown[]).push(ruleFromProposal(ruleProposal, newId()));
+  }
+
+  return { ...project, groups };
+}
+
 export function mergeProposalIntoProject(
   project: { groups?: unknown[] } & Record<string, unknown>,
   proposal: ExtensionAIProposal,

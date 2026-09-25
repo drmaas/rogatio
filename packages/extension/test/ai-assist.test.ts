@@ -190,6 +190,102 @@ describe("extension AI Assist", () => {
     });
   });
 
+  it("accepts a fix proposal that repairs the offending rule (AC-001)", async () => {
+    const broken = structuredClone(project) as unknown as {
+      groups: Array<{ rules: Array<Record<string, unknown>> }>;
+    } & Record<string, unknown>;
+    broken.groups[0].rules[0].urlRegex = "[";
+    const { app } = harness();
+    await start(app);
+
+    const result = await app.handle({
+      version: 1,
+      command: "ai-assist",
+      kind: "fix",
+      prompt: "Fix the broken rule",
+      context: {
+        project: broken,
+        diagnostics: [
+          {
+            code: "schema.invalid-regex",
+            severity: "error",
+            path: "/groups/0/rules/0/urlRegex",
+            message: "Invalid regex",
+          },
+        ],
+      },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { proposal },
+    });
+  });
+
+  it("rejects a fix proposal that does not repair the project (AC-002)", async () => {
+    const broken = structuredClone(project) as unknown as {
+      groups: Array<{ rules: Array<Record<string, unknown>> }>;
+    } & Record<string, unknown>;
+    broken.groups[0].rules[0].urlRegex = "[";
+    // Structurally valid proposal, but targeting a new group: it appends
+    // instead of repairing, so the merged project stays invalid.
+    const nonRepairing = {
+      ...proposal,
+      rules: [{ ...proposal.rules[0], groupId: "group-new" }],
+    };
+    const { app } = harness({
+      protocol: "v1",
+      type: "ai.complete",
+      metadata: { content: JSON.stringify(nonRepairing) },
+    });
+    await start(app);
+
+    await expect(
+      app.handle({
+        version: 1,
+        command: "ai-assist",
+        kind: "fix",
+        prompt: "Fix the broken rule",
+        context: {
+          project: broken,
+          diagnostics: [
+            {
+              code: "schema.invalid-regex",
+              severity: "error",
+              path: "/groups/0/rules/0/urlRegex",
+              message: "Invalid regex",
+            },
+          ],
+        },
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      diagnostic: { code: "extension.ai-invalid-proposal" },
+    });
+  });
+
+  it("keeps append validation for generate requests with a broken draft", async () => {
+    const broken = structuredClone(project) as unknown as {
+      groups: Array<{ rules: Array<Record<string, unknown>> }>;
+    } & Record<string, unknown>;
+    broken.groups[0].rules[0].urlRegex = "[";
+    const { app } = harness();
+    await start(app);
+
+    await expect(
+      app.handle({
+        version: 1,
+        command: "ai-assist",
+        kind: "generate",
+        prompt: "Add a redirect",
+        context: { project: broken },
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      diagnostic: { code: "extension.ai-invalid-proposal" },
+    });
+  });
+
   it("requires a started native runtime", async () => {
     const { app } = harness();
     await app.handle({ version: 1, command: "create-project", data: project });

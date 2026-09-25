@@ -49,12 +49,13 @@ function mountEditor(
     | ReturnType<
         NonNullable<Parameters<typeof createEditor>[0]["validate"]>
       > = () => [],
+  initialProject?: Parameters<typeof createEditor>[0]["initialProject"],
 ): { root: HTMLElement; editor: EditorController } {
   const root = document.createElement("div");
   document.body.append(root);
   const editor = createEditor({
     root,
-    initialProject: structuredClone(baseProject),
+    initialProject: initialProject ?? structuredClone(baseProject),
     validate,
     save: () => ({ ok: true }),
     aiAssist,
@@ -269,6 +270,152 @@ describe("@rogatio/editor AI Assist wire", () => {
         expect(fields?.action).toBeUndefined();
       }
     }
+  });
+
+  it("Apply repairs the offending rule in place for fix requests (AC-003)", async () => {
+    const brokenProject = {
+      version: 1,
+      name: "Fix project",
+      groups: [
+        {
+          id: "group-one",
+          name: "One",
+          origins: ["https://one.example"],
+          rules: [
+            {
+              id: "rule-broken",
+              name: "Broken",
+              urlRegex: "[",
+              origins: [],
+              resourceTypes: ["main_frame"],
+              priority: 100,
+              type: "redirect",
+              redirect: { destination: "https://mock.example/old" },
+            },
+          ],
+        },
+      ],
+    };
+    const requests: AIAssistRequest[] = [];
+    const { editor } = mountEditor(
+      async (request) => {
+        requests.push(request);
+        return {
+          proposal: proposalFor({
+            kind: "redirect",
+            groupId: "group-one",
+            name: "Fixed",
+            urlRegex: "^https://one\\.example/ok$",
+            action: { destination: "https://mock.example/new" },
+          }),
+        };
+      },
+      () => [
+        {
+          code: "schema.invalid-regex",
+          severity: "error",
+          path: "/groups/0/rules/0/urlRegex",
+          message: "bad regex",
+        },
+      ],
+      brokenProject,
+    );
+
+    const { panel, textarea, send } = openAssistPanel();
+    textarea.value = "Fix the broken rule";
+    send.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    expect(requests[0]?.kind).toBe("fix");
+
+    Array.from(panel.querySelectorAll("button"))
+      .find((el) => el.textContent === "Apply Rule")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    const group = editor.getDraft().groups.find((g) => g.id === "group-one");
+    expect(group?.rules).toHaveLength(1);
+    const rule = group?.rules[0] as unknown as Record<string, unknown>;
+    expect(rule.id).toBe("rule-broken");
+    expect(rule.name).toBe("Fixed");
+    expect(rule.urlRegex).toBe("^https://one\\.example/ok$");
+    expect(rule.type).toBe("redirect");
+    expect(rule.redirect).toEqual({ destination: "https://mock.example/new" });
+  });
+
+  it("Apply appends surplus fix-proposal rules beyond the repair targets (AC-003)", async () => {
+    const brokenProject = {
+      version: 1,
+      name: "Fix project",
+      groups: [
+        {
+          id: "group-one",
+          name: "One",
+          origins: ["https://one.example"],
+          rules: [
+            {
+              id: "rule-broken",
+              name: "Broken",
+              urlRegex: "[",
+              origins: [],
+              resourceTypes: ["main_frame"],
+              priority: 100,
+              type: "redirect",
+              redirect: { destination: "https://mock.example/old" },
+            },
+          ],
+        },
+      ],
+    };
+    const { editor } = mountEditor(
+      async () => ({
+        proposal: {
+          explanation: "fix plus extra",
+          rules: [
+            {
+              kind: "redirect",
+              groupId: "group-one",
+              name: "Fixed",
+              urlRegex: "^https://one\\.example/ok$",
+              action: { destination: "https://mock.example/new" },
+            },
+            {
+              kind: "redirect",
+              groupId: "group-one",
+              name: "Surplus",
+              urlRegex: "^https://one\\.example/extra$",
+              action: { destination: "https://mock.example/extra" },
+            },
+          ] as RuleProposal[],
+        },
+      }),
+      () => [
+        {
+          code: "schema.invalid-regex",
+          severity: "error",
+          path: "/groups/0/rules/0/urlRegex",
+          message: "bad regex",
+        },
+      ],
+      brokenProject,
+    );
+
+    const { panel, textarea, send } = openAssistPanel();
+    textarea.value = "Fix the broken rule";
+    send.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+    Array.from(panel.querySelectorAll("button"))
+      .find((el) => el.textContent === "Apply Rule")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    const group = editor.getDraft().groups.find((g) => g.id === "group-one");
+    expect(group?.rules).toHaveLength(2);
+    const rules = (group?.rules ?? []) as unknown as Array<
+      Record<string, unknown>
+    >;
+    const [first, second] = rules;
+    expect(first.id).toBe("rule-broken");
+    expect(first.name).toBe("Fixed");
+    expect(second.name).toBe("Surplus");
+    expect(String(second.id)).not.toBe("rule-broken");
   });
 
   it("accepts schema-shaped header action keys (AC-004)", async () => {

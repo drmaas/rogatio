@@ -104,7 +104,9 @@ export async function startValidateServer(): Promise<{
 
   await new Promise<void>((resolveListen, reject) => {
     server.once("error", reject);
-    server.listen(8080, "127.0.0.1", () => resolveListen());
+    // Bind dual-stack so `localhost` (which may resolve to ::1 first) works
+    // alongside the IP-literal origin used by existing journeys.
+    server.listen(8080, () => resolveListen());
   });
 
   return {

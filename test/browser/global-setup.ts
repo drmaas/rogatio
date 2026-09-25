@@ -32,13 +32,23 @@ export async function setup(): Promise<void> {
   server.stderr?.on("data", (chunk: Buffer) => {
     stderr += chunk.toString();
   });
-  server.on("exit", (code, signal) => {
-    if (code && code !== 0) {
-      console.error(`Smoke server exited (${code}/${signal}): ${stderr}`);
-    }
+  // Fail fast when the spawned server dies (e.g. EADDRINUSE from a leaked
+  // smoke server): readiness must come from OUR server, never a foreign one.
+  const exited = new Promise<never>((_, reject) => {
+    server?.on("exit", (code, signal) => {
+      if (code && code !== 0) {
+        console.error(`Smoke server exited (${code}/${signal}): ${stderr}`);
+      }
+      reject(
+        new Error(
+          `Smoke server exited before ready (${code}/${signal}): ${stderr}\n` +
+            "If a previous run leaked a smoke server on port 4173, kill it and re-run.",
+        ),
+      );
+    });
   });
   try {
-    await waitForReady();
+    await Promise.race([waitForReady(), exited]);
   } catch (error) {
     server.kill("SIGTERM");
     server = undefined;

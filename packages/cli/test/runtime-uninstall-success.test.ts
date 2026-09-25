@@ -1,5 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
+// Never touch the real install root (~/.local/share/rogatio): the CLI removes
+// the runtime-host wrapper outside the mocked trust controller.
+vi.mock("node:fs/promises", async () => {
+  const actual =
+    await vi.importActual<typeof import("node:fs/promises")>(
+      "node:fs/promises",
+    );
+  return {
+    ...actual,
+    mkdir: async () => undefined,
+    writeFile: async () => undefined,
+    chmod: async () => undefined,
+    rm: async () => undefined,
+  };
+});
+
 vi.mock("@rogatio/runtime", async () => {
   const actual =
     await vi.importActual<typeof import("@rogatio/runtime")>(

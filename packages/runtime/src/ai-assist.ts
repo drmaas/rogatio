@@ -230,6 +230,158 @@ export function mergeProposalIntoProject(
   return { ...project, groups };
 }
 
+const RULE_PATH_PATTERN =
+  /^\/groups\/(0|[1-9][0-9]*)\/rules\/(0|[1-9][0-9]*)(?:\/|$)/;
+
+export interface RepairTarget {
+  readonly groupIndex: number;
+  readonly ruleIndex: number;
+}
+
+/**
+ * Rule-level repair targets extracted from editor diagnostics. Diagnostics whose
+ * path points inside a rule (`/groups/<gi>/rules/<ri>/...`) identify the rule to
+ * repair; results are sorted by path position and de-duplicated.
+ */
+export function repairTargetsFromDiagnostics(
+  diagnostics: readonly unknown[] | undefined,
+): RepairTarget[] {
+  if (!Array.isArray(diagnostics)) return [];
+  const seen = new Set<string>();
+  const targets: RepairTarget[] = [];
+  for (const diagnostic of diagnostics) {
+    if (!isRecord(diagnostic) || typeof diagnostic.path !== "string") continue;
+    const match = RULE_PATH_PATTERN.exec(diagnostic.path);
+    if (!match) continue;
+    const groupIndex = Number(match[1]);
+    const ruleIndex = Number(match[2]);
+    if (!Number.isSafeInteger(groupIndex) || !Number.isSafeInteger(ruleIndex)) {
+      continue;
+    }
+    const key = `${groupIndex}/${ruleIndex}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    targets.push({ groupIndex, ruleIndex });
+  }
+  targets.sort(
+    (left, right) =>
+      left.groupIndex - right.groupIndex || left.ruleIndex - right.ruleIndex,
+  );
+  return targets;
+}
+
+const RULE_KINDS = new Set<RuleProposal["kind"]>([
+  "redirect",
+  "query",
+  "header",
+  "response-body",
+  "request-body",
+]);
+
+function stringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const items = value.filter(
+    (item): item is string => typeof item === "string",
+  );
+  return items.length === value.length ? items : undefined;
+}
+
+/** Defensive structural parse of one untrusted proposal rule. */
+function parseProposalRule(value: unknown): RuleProposal | null {
+  if (!isRecord(value)) return null;
+  const kind = value.kind;
+  if (
+    typeof kind !== "string" ||
+    !RULE_KINDS.has(kind as RuleProposal["kind"]) ||
+    typeof value.groupId !== "string" ||
+    typeof value.name !== "string" ||
+    typeof value.urlRegex !== "string" ||
+    !Object.hasOwn(value, "action")
+  ) {
+    return null;
+  }
+  return {
+    kind: kind as RuleProposal["kind"],
+    groupId: value.groupId,
+    name: value.name,
+    urlRegex: value.urlRegex,
+    origins: stringArray(value.origins),
+    resourceTypes: stringArray(value.resourceTypes),
+    priority: typeof value.priority === "number" ? value.priority : undefined,
+    method: typeof value.method === "string" ? value.method : undefined,
+    action: value.action,
+  };
+}
+
+/**
+ * Insert proposal rules into a copy of the project, repairing the rules that
+ * carry diagnostics. Repair targets are replaced in place (keeping their rule
+ * ids and positions) group-scoped FIFO; proposal rules without a remaining
+ * target append exactly like `mergeProposalIntoProject`.
+ */
+export function repairProposalIntoProject(
+  project: { groups?: unknown[] } & Record<string, unknown>,
+  diagnostics: readonly unknown[] | undefined,
+  proposal: AIProposal,
+): Record<string, unknown> {
+  const groups: Record<string, unknown>[] = Array.isArray(project.groups)
+    ? project.groups.map((group) => {
+        if (!isRecord(group)) {
+          return { id: "invalid", name: "invalid", origins: [], rules: [] };
+        }
+        return {
+          ...group,
+          rules: Array.isArray(group.rules) ? [...group.rules] : [],
+        };
+      })
+    : [];
+
+  const queues = new Map<number, number[]>();
+  for (const target of repairTargetsFromDiagnostics(diagnostics)) {
+    const group = groups[target.groupIndex];
+    if (!group) continue;
+    const rules = group.rules as unknown[];
+    if (target.ruleIndex >= rules.length) continue;
+    if (!isRecord(rules[target.ruleIndex])) continue;
+    const queue = queues.get(target.groupIndex) ?? [];
+    queue.push(target.ruleIndex);
+    queues.set(target.groupIndex, queue);
+  }
+
+  let seq = 0;
+  const newId = (): string => `ai-${Date.now()}-${seq++}`;
+  const proposed = Array.isArray(proposal.rules) ? proposal.rules : [];
+  for (const entry of proposed as readonly unknown[]) {
+    const ruleProposal = parseProposalRule(entry);
+    if (!ruleProposal) continue;
+    const groupIndex = groups.findIndex(
+      (candidate) => candidate.id === ruleProposal.groupId,
+    );
+    const queue = groupIndex >= 0 ? queues.get(groupIndex) : undefined;
+    const targetIndex = queue?.shift();
+    if (groupIndex >= 0 && targetIndex !== undefined) {
+      const rules = groups[groupIndex].rules as unknown[];
+      const existing = rules[targetIndex] as Record<string, unknown>;
+      const keptId = typeof existing.id === "string" ? existing.id : newId();
+      rules[targetIndex] = ruleFromProposal(ruleProposal, keptId);
+      continue;
+    }
+    let group = groupIndex >= 0 ? groups[groupIndex] : undefined;
+    if (!group) {
+      group = {
+        id: ruleProposal.groupId,
+        name: "AI Group",
+        origins: [],
+        rules: [],
+      };
+      groups.push(group);
+    }
+    (group.rules as unknown[]).push(ruleFromProposal(ruleProposal, newId()));
+  }
+
+  return { ...project, groups };
+}
+
 function parseProposal(content: string): AIProposal | null {
   try {
     const parsed = JSON.parse(content);
@@ -319,6 +471,20 @@ export async function runAIAssist(
   const aiClient = client ?? createAIClient(config);
   const systemPrompt = buildSystemPromptImpl(request.context.project);
 
+  // Fix requests repair the rules that carry diagnostics; other requests only
+  // append proposal rules (merge semantics).
+  const merge = (
+    project: { groups?: unknown[] } & Record<string, unknown>,
+    proposal: AIProposal,
+  ): Record<string, unknown> =>
+    request.kind === "fix"
+      ? repairProposalIntoProject(
+          project,
+          request.context.diagnostics,
+          proposal,
+        )
+      : mergeProposalIntoProject(project, proposal);
+
   let currentProposal: AIProposal | null = null;
   let attempts = 0;
 
@@ -328,9 +494,7 @@ export async function runAIAssist(
     const isFixAttempt = attempts > 1 || request.kind === "fix";
     const validationErrors = (() => {
       if (!isFixAttempt || !currentProposal) return [];
-      return validate(
-        mergeProposalIntoProject(request.context.project, currentProposal),
-      );
+      return validate(merge(request.context.project, currentProposal));
     })();
 
     const messages = buildMessages(
@@ -368,10 +532,7 @@ export async function runAIAssist(
 
     currentProposal = proposal;
 
-    const testProject = mergeProposalIntoProject(
-      request.context.project,
-      proposal,
-    );
+    const testProject = merge(request.context.project, proposal);
     const diagnostics = validate(testProject);
 
     if (diagnostics.length === 0) {

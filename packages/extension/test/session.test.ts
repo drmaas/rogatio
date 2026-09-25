@@ -97,6 +97,19 @@ describe(" request-body extension session (future API)", () => {
     // On failure: stops acceptance, removes owned markers, restores PAC only if owned, stops session, clears transient state
   });
 
+  it("starts without an active project so first-run AI flows can reach the native host", async () => {
+    const { app, nativeRuntime } = harness();
+
+    // No project exists yet (fresh install): Dashboard "Create using AI"
+    // needs the runtime and its AI channel up before any project is saved.
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started.ok).toBe(true);
+    expect(nativeRuntime.start).toHaveBeenCalledOnce();
+  });
+
   it("stop is idempotent and invalidates policy, capabilities, sockets, timers, workers, removes owned routing", async () => {
     const { app, nativeRuntime } = harness();
     await prepare(app);
