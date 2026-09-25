@@ -80,6 +80,41 @@ export interface ChromeScripting {
   }): Promise<unknown>;
 }
 
+export interface ChromeProxySettings {
+  get(
+    details: { incognito?: boolean },
+    callback: (config: {
+      value: unknown;
+      levelOfControl:
+        | "not_controllable"
+        | "controlled_by_other_extensions"
+        | "controllable_by_this_extension"
+        | "controlled_by_this_extension";
+    }) => void,
+  ): void;
+  set(
+    details: {
+      value: {
+        mode:
+          | "pac_script"
+          | "direct"
+          | "auto_detect"
+          | "fixed_servers"
+          | "system";
+        pacScript?: { data?: string; url?: string };
+      };
+      scope?: "regular" | "incognito_persistent" | "incognito_session_only";
+    },
+    callback?: () => void,
+  ): void;
+  clear(
+    details: {
+      scope?: "regular" | "incognito_persistent" | "incognito_session_only";
+    },
+    callback?: () => void,
+  ): void;
+}
+
 export interface ChromeApi {
   storage: { local: ChromeStorageArea };
   permissions: ChromePermissions;
@@ -87,6 +122,7 @@ export interface ChromeApi {
   runtime: ChromeRuntime;
   declarativeNetRequest?: ChromeDeclarativeNetRequest;
   scripting?: ChromeScripting;
+  proxy?: { settings: ChromeProxySettings };
 }
 
 declare global {
@@ -176,4 +212,75 @@ export async function setBadge(
   await api.action.setBadgeBackgroundColor({
     color: badge.attention ? "#b42318" : "#1559a6",
   });
+}
+
+export type ProxyCollisionReason =
+  | "controlling-proxy"
+  | "controlling-pac"
+  | "controlled_by_other"
+  | "not_controllable"
+  | "proxy-unavailable";
+
+export interface ProxyAdapter {
+  installPac(script: string): Promise<void>;
+  clearPac(): Promise<void>;
+  detectCollision(): Promise<ProxyCollisionReason | null>;
+}
+
+function proxyLastError(api: ChromeApi): string | undefined {
+  return api.runtime.lastError?.message;
+}
+
+/**
+ * chrome.proxy.settings adapter for PAC install/clear and collision detection.
+ */
+export function createProxyAdapter(api: ChromeApi = chromeApi()): ProxyAdapter {
+  const settings = api.proxy?.settings;
+  return {
+    async detectCollision() {
+      if (!settings) return "proxy-unavailable";
+      return new Promise((resolve) => {
+        settings.get({}, (config) => {
+          const err = proxyLastError(api);
+          if (err) {
+            resolve("proxy-unavailable");
+            return;
+          }
+          if (config.levelOfControl === "controlled_by_other_extensions") {
+            resolve("controlled_by_other");
+            return;
+          }
+          if (config.levelOfControl === "not_controllable") {
+            resolve("not_controllable");
+            return;
+          }
+          resolve(null);
+        });
+      });
+    },
+    async installPac(script: string) {
+      if (!settings) throw new Error("proxy-unavailable");
+      const collision = await this.detectCollision();
+      if (collision) throw new Error(collision);
+      return new Promise<void>((resolve, reject) => {
+        settings.set(
+          {
+            value: { mode: "pac_script", pacScript: { data: script } },
+            scope: "regular",
+          },
+          () => {
+            const err = proxyLastError(api);
+            if (err) reject(new Error(err));
+            else resolve();
+          },
+        );
+      });
+    },
+    async clearPac() {
+      if (!settings) return;
+      return new Promise<void>((resolve) => {
+        settings.clear({ scope: "regular" }, () => resolve());
+      });
+    },
+  };
 }

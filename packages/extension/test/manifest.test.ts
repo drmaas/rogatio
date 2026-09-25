@@ -17,6 +17,7 @@ describe("extension manifest", () => {
         "declarativeNetRequestFeedback",
         "scripting",
         "nativeMessaging",
+        "proxy",
       ]),
     );
     expect(manifest.permissions).not.toContain("tabs");

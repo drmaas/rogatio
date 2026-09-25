@@ -63,20 +63,22 @@
         {
           "id": "rule-response-body",
           "name": "Rewrite response body",
-          "urlRegex": "^https://example\\.com/data\\.json/([^/]+)",
+          "urlRegex": "^https://example\\.com/data\\.json$",
           "origins": [],
           "resourceTypes": ["main_frame"],
           "priority": 500,
           "type": "response-body",
           "responseBody": {
-            "mode": "replace",
-            "body": "{\"user\":\"$1\"}"
+            "mode": "regex",
+            "replacements": [
+              { "pattern": "oldValue", "replacement": "newValue" }
+            ]
           }
         },
         {
           "id": "rule-request-body",
           "name": "Replace request body",
-          "urlRegex": "^https://example\\.com/submit/([^/]+)",
+          "urlRegex": "^https://example\\.com/submit$",
           "origins": [],
           "resourceTypes": ["xmlhttprequest"],
           "priority": 600,
@@ -84,7 +86,7 @@
           "type": "request-body",
           "requestBody": {
             "mode": "replace",
-            "body": "{\"user\":\"$1\"}"
+            "body": "{\"replaced\":true}"
           }
         }
       ]

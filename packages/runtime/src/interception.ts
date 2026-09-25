@@ -1,15 +1,25 @@
 import type { CapabilityProfile, RuntimeActivation } from "./lifecycle.js";
 import { generatePacScript } from "./pac.js";
 
+export interface ProxyEndpoint {
+  readonly host: string;
+  readonly port: number;
+}
+
 export interface InterceptionProvider {
   readonly platform: string;
   detect(): CapabilityProfile;
-  start(activation: RuntimeActivation): Promise<void>;
+  /** Returns the loopback proxy endpoint when interception becomes active. */
+  start(activation: RuntimeActivation): Promise<ProxyEndpoint | undefined>;
   stop(): Promise<void>;
 }
 
 export type InterceptionOutcome =
-  | { readonly kind: "active"; readonly provider: string }
+  | {
+      readonly kind: "active";
+      readonly provider: string;
+      readonly proxy: ProxyEndpoint;
+    }
   | { readonly kind: "unsupported"; readonly reasons: string[] };
 
 /**
@@ -78,9 +88,24 @@ export async function startInterception(
 
   const sessionId = `session-${activation.startedAt}-${Math.random().toString(36).slice(2)}`;
 
-  // Start provider in non-accepting mode first
+  let proxy: ProxyEndpoint;
   try {
-    await registeredProvider.start(activation);
+    const started = await registeredProvider.start(activation);
+    if (
+      started &&
+      typeof started === "object" &&
+      typeof started.host === "string" &&
+      typeof started.port === "number"
+    ) {
+      proxy = started;
+    } else if (activation.proxy) {
+      proxy = activation.proxy;
+    } else {
+      return {
+        kind: "unsupported",
+        reasons: ["provider-start-failed", "missing-proxy-endpoint"],
+      };
+    }
   } catch (error) {
     return {
       kind: "unsupported",
@@ -92,7 +117,7 @@ export async function startInterception(
   currentSession = {
     sessionId,
     provider: registeredProvider,
-    activation,
+    activation: { ...activation, proxy, pacOrigins },
     policyDigest,
     extensionId,
     pacOrigins,
@@ -100,7 +125,7 @@ export async function startInterception(
     startedAt: activation.startedAt,
   };
 
-  return { kind: "active", provider: registeredProvider.platform };
+  return { kind: "active", provider: registeredProvider.platform, proxy };
 }
 
 export async function stopInterception(): Promise<void> {
@@ -140,7 +165,7 @@ export interface PlatformInterceptionAdapter {
   provisionOrVerifyCa(): Promise<boolean>;
   installPac(script: string): Promise<void>;
   removePac(): Promise<void>;
-  startTlsProxy(activation: RuntimeActivation): Promise<void>;
+  startTlsProxy(activation: RuntimeActivation): Promise<ProxyEndpoint>;
   stopTlsProxy(): Promise<void>;
 }
 
@@ -150,7 +175,7 @@ export interface PlatformInterceptionProvider {
   start(
     activation: RuntimeActivation,
     origins: readonly string[],
-  ): Promise<void>;
+  ): Promise<ProxyEndpoint>;
   stop(): Promise<void>;
   status(): "stopped" | "running" | "unsupported";
 }
@@ -192,17 +217,19 @@ export function createPlatformInterceptionProvider(
         state = "unsupported";
         throw new Error("runtime.platform-unsupported");
       }
-      const pac = generatePacScript(
-        origins,
-        activation.proxy ?? { host: "127.0.0.1", port: 0 },
-      );
-      await adapter.installPac(pac);
+      // Proxy first so PAC can target a real listening endpoint.
+      const endpoint = await adapter.startTlsProxy(activation);
+      const pac = generatePacScript(origins, endpoint);
       try {
-        await adapter.startTlsProxy(activation);
+        await adapter.installPac(pac);
         active = true;
         state = "running";
+        return endpoint;
       } catch (error) {
-        await adapter.removePac();
+        // PAC never installed successfully — tear down proxy only.
+        await adapter.stopTlsProxy();
+        active = false;
+        state = "stopped";
         throw error;
       }
     },
@@ -211,8 +238,9 @@ export function createPlatformInterceptionProvider(
         state = state === "unsupported" ? "unsupported" : "stopped";
         return;
       }
-      await adapter.stopTlsProxy();
+      // Stop routing before tearing down the listener.
       await adapter.removePac();
+      await adapter.stopTlsProxy();
       active = false;
       state = "stopped";
     },
@@ -237,7 +265,7 @@ export function createUnsupportedPlatformProvider(): PlatformInterceptionProvide
     provisionOrVerifyCa: async () => false,
     installPac: async () => undefined,
     removePac: async () => undefined,
-    startTlsProxy: async () => undefined,
+    startTlsProxy: async () => ({ host: "127.0.0.1", port: 0 }),
     stopTlsProxy: async () => undefined,
   });
 }

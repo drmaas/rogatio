@@ -16,7 +16,8 @@
     "declarativeNetRequest",
     "declarativeNetRequestFeedback",
     "scripting",
-    "nativeMessaging"
+    "nativeMessaging",
+    "proxy"
   ],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "content_security_policy": {

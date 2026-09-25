@@ -7,6 +7,12 @@ export { authorizeExact } from "./authorization.js";
 export { isConfinedFileSupported, readConfinedFile } from "./confined-file.js";
 export * from "./envelope.js";
 export * from "./host.js";
+export {
+  type InterceptProxyHandle,
+  type InterceptProxyOptions,
+  type InterceptProxyPolicy,
+  startInterceptProxy,
+} from "./intercept-proxy.js";
 export * from "./interception.js";
 export * from "./lifecycle.js";
 export { RUNTIME_LIMITS } from "./limits.js";

@@ -284,12 +284,15 @@ if (LIVE_E2E && SUDO_OK) {
         }
         vitestExpect(SAMPLE_GROUP_ID).toBe("grp-sample");
 
-        // Activation is the LIVE_E2E gate. Network rewrite needs F23 PAC/proxy
-        // (extension currently sends pacOrigins: [] and has no chrome.proxy).
         const dataJson = await withNewTab(driver, async (tab) => {
           await tab.goto(`${VALIDATE_ORIGIN}/data.json`);
           return tab.locator("body").textContent();
         });
+        vitestExpect(
+          dataJson,
+          `response-body rewrite missing newValue: ${JSON.stringify(dataJson)}`,
+        ).toContain("newValue");
+
         const submitEcho = await withNewTab(driver, async (tab) => {
           await tab.goto(`${VALIDATE_ORIGIN}/`);
           return tab.evaluate(async (origin) => {
@@ -301,20 +304,10 @@ if (LIVE_E2E && SUDO_OK) {
             return response.json() as Promise<{ receivedBody?: string }>;
           }, VALIDATE_ORIGIN);
         });
-        const responseBodyRewrote = dataJson.includes("newValue");
-        const requestBodyReplaced =
-          submitEcho.receivedBody === '{"replaced":true}';
-        if (responseBodyRewrote && requestBodyReplaced) {
-          console.log("LIVE_E2E body network rewrite observed");
-        } else {
-          console.warn(
-            [
-              "LIVE_E2E: body rules active after runtime start; network rewrite skipped (F23 PAC/proxy not wired).",
-              `response-body=${JSON.stringify(dataJson)}`,
-              `request-body=${JSON.stringify(submitEcho)}`,
-            ].join(" "),
-          );
-        }
+        vitestExpect(
+          submitEcho.receivedBody,
+          `request-body rewrite failed: ${JSON.stringify(submitEcho)}`,
+        ).toBe('{"replaced":true}');
       } finally {
         await server.close();
       }

@@ -1,9 +1,22 @@
 import { Buffer } from "node:buffer";
+import { existsSync } from "node:fs";
 import { createServer, type Server } from "node:http";
+import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import type { AIProviderConfig } from "./ai-client.js";
 import { parseEnvelope, serializeEnvelope } from "./envelope.js";
+import {
+  type InterceptProxyHandle,
+  startInterceptProxy,
+} from "./intercept-proxy.js";
+import {
+  clearSession,
+  createPlatformInterceptionProvider,
+  type PlatformInterceptionAdapter,
+  registerInterceptionProvider,
+} from "./interception.js";
 import { createNativeRuntimeController } from "./lifecycle.js";
+import { defaultTrustInstallRoot } from "./trust.js";
 import type {
   Envelope,
   NormalizedRuntimePreset,
@@ -17,6 +30,8 @@ export interface NativeHostOptions {
   readonly mockPort?: number;
   readonly aiProviderConfig?: AIProviderConfig;
   readonly clock?: () => number;
+  /** Override CA material root used by provisionOrVerifyCa (tests). */
+  readonly trustRoot?: string;
 }
 
 export interface NativeHostHandle {
@@ -95,6 +110,10 @@ function startMockFaucet(
   );
 }
 
+function defaultTrustRoot(): string {
+  return defaultTrustInstallRoot(process.platform);
+}
+
 /**
  * Create a long-lived native-messaging host that reads envelope frames from
  * stdin and writes response frames to stdout (spec REQ-001). All pairing,
@@ -112,8 +131,151 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
   });
 
   let faucet: Server | null = null;
+  let interceptProxy: InterceptProxyHandle | null = null;
+  let outboundWrite: ((frame: Uint8Array) => void) | null = null;
+  let hostRequestCounter = 0;
+  const pendingHost = new Map<
+    string,
+    {
+      resolve: (envelope: Envelope) => void;
+      reject: (error: Error) => void;
+    }
+  >();
 
-  return {
+  function sendHostRequest(
+    type: "runtime.pac.install" | "runtime.pac.remove",
+    metadata: Record<string, unknown>,
+  ): Promise<Envelope> {
+    const requestId = `host-${++hostRequestCounter}`;
+    const envelope: Envelope = {
+      protocol: "v1",
+      type,
+      requestId,
+      timestamp: Date.now(),
+      metadata,
+    };
+    return new Promise<Envelope>((resolve, reject) => {
+      if (!outboundWrite) {
+        reject(new Error("host stdout not attached"));
+        return;
+      }
+      pendingHost.set(requestId, { resolve, reject });
+      try {
+        outboundWrite(encodeEnvelopeFrame(envelope));
+      } catch (error) {
+        pendingHost.delete(requestId);
+        reject(error instanceof Error ? error : new Error(String(error)));
+        return;
+      }
+      setTimeout(() => {
+        if (pendingHost.has(requestId)) {
+          pendingHost.delete(requestId);
+          reject(new Error("host pac request timed out"));
+        }
+      }, 10_000);
+    });
+  }
+
+  const trustRoot = options.trustRoot ?? defaultTrustRoot();
+  const caKeyFile = join(trustRoot, ".rogatio-ca.key");
+  const caCertFile = join(trustRoot, ".rogatio-ca.crt");
+
+  const platformAdapter: PlatformInterceptionAdapter = {
+    platform: process.platform,
+    detect() {
+      const trusted = existsSync(caKeyFile) && existsSync(caCertFile);
+      return {
+        supported: true,
+        reasons: [],
+        trustedDeviceLocalCa: trusted,
+        controllingProxy: false,
+        controllingPac: false,
+        controllingExtension: false,
+        enterprisePolicy: false,
+      };
+    },
+    async provisionOrVerifyCa() {
+      return existsSync(caKeyFile) && existsSync(caCertFile);
+    },
+    async installPac(script: string) {
+      const response = await sendHostRequest("runtime.pac.install", {
+        script,
+      });
+      if (response.metadata.ok !== true) {
+        const error =
+          typeof response.metadata.error === "string"
+            ? response.metadata.error
+            : "pac-install-failed";
+        throw new Error(error);
+      }
+    },
+    async removePac() {
+      try {
+        await sendHostRequest("runtime.pac.remove", {});
+      } catch {
+        // Best-effort clear.
+      }
+    },
+    async startTlsProxy() {
+      if (interceptProxy) {
+        await interceptProxy.stop();
+        interceptProxy = null;
+      }
+      const policy = controller.getActivePolicy();
+      interceptProxy = await startInterceptProxy({
+        policy: policy
+          ? { project: policy.project, operations: policy.operations }
+          : null,
+      });
+      return interceptProxy.endpoint;
+    },
+    async stopTlsProxy() {
+      if (interceptProxy) {
+        await interceptProxy.stop();
+        interceptProxy = null;
+      }
+    },
+  };
+
+  const platformProvider = createPlatformInterceptionProvider(platformAdapter);
+
+  // Session-scoped InterceptionProvider closes over pacOrigins from the
+  // activation/session start path via PlatformInterceptionProvider.start.
+  // startInterception calls provider.start(activation); we wrap so origins
+  // come from the SessionProvider registration arguments stored on activation.
+  let pendingOrigins: readonly string[] = [];
+  registerInterceptionProvider({
+    platform: platformProvider.platform,
+    detect: () => platformProvider.detect(),
+    async start(activation) {
+      const origins =
+        pendingOrigins.length > 0 ? pendingOrigins : activation.pacOrigins;
+      const endpoint = await platformProvider.start(activation, origins);
+      const policy = controller.getActivePolicy();
+      interceptProxy?.setPolicy(
+        policy
+          ? { project: policy.project, operations: policy.operations }
+          : null,
+      );
+      return endpoint;
+    },
+    async stop() {
+      await platformProvider.stop();
+    },
+  });
+
+  // Hook startInterception pacOrigins: lifecycle passes them into
+  // startInterception which does not forward to provider.start. Capture via
+  // a thin monkey-patch on register... Actually lifecycle calls
+  // startInterception(..., pacOrigins, ...) and provider.start(activation)
+  // only. Plan prefers host wrapper closing over pacOrigins — set pending
+  // origins before start by wrapping getCurrentSession path.
+  //
+  // The lifecycle stores pacOrigins on activation when provided in
+  // sessionConfig (activation.pacOrigins). Use that.
+  // Override: patch pendingOrigins from activation.pacOrigins in wrapper above.
+
+  const handle: NativeHostHandle = {
     controller,
     mockPort: options.mockPort ?? null,
     async start() {
@@ -128,6 +290,11 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
         faucet = null;
       }
       await controller.stop();
+      clearSession();
+      if (interceptProxy) {
+        await interceptProxy.stop();
+        interceptProxy = null;
+      }
     },
     async processFrame(frame: Uint8Array): Promise<Uint8Array | null> {
       let envelope: Envelope;
@@ -140,6 +307,28 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
         );
         return null;
       }
+
+      // Host-initiated PAC responses resolve the pending map; no reply.
+      if (
+        typeof envelope.requestId === "string" &&
+        envelope.requestId.startsWith("host-")
+      ) {
+        const pending = pendingHost.get(envelope.requestId);
+        if (pending) {
+          pendingHost.delete(envelope.requestId);
+          pending.resolve(envelope);
+          return null;
+        }
+      }
+
+      // Capture pacOrigins before controller binds interception.
+      if (envelope.type === "runtime.start") {
+        const origins = envelope.metadata.pacOrigins;
+        pendingOrigins = Array.isArray(origins)
+          ? origins.filter((o): o is string => typeof o === "string")
+          : [];
+      }
+
       console.error(
         "[rogatio-host] received envelope:",
         envelope.type,
@@ -163,6 +352,16 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
       }
     },
   };
+
+  // Attachable write hook used by runNativeHost / tests.
+  Object.defineProperty(handle, "__setOutboundWrite", {
+    value(write: (frame: Uint8Array) => void) {
+      outboundWrite = write;
+    },
+    enumerable: false,
+  });
+
+  return handle;
 }
 
 /** Run the host against Node stdio streams (used by the `runtime-host` binary). */
@@ -174,16 +373,28 @@ export async function runNativeHost(
   },
 ): Promise<void> {
   const host = createNativeHost(options);
+  const setOutbound = (
+    host as unknown as {
+      __setOutboundWrite?: (write: (frame: Uint8Array) => void) => void;
+    }
+  ).__setOutboundWrite;
+  const stdout = (options.stdout ??
+    (process.stdout as unknown as Writable)) as Writable;
+  if (setOutbound) {
+    setOutbound((frame) => {
+      if (stdout.writable) stdout.write(Buffer.from(frame));
+    });
+  }
   await host.start();
   const stdin = (options.stdin ??
     (process.stdin as unknown as Readable)) as Readable;
-  const stdout = (options.stdout ??
-    (process.stdout as unknown as Writable)) as Writable;
   if (options.onReady) options.onReady();
 
   let buffer = Buffer.alloc(0);
   stdin.on("data", (chunk: Buffer | string) => {
-    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    const buf = Buffer.isBuffer(chunk)
+      ? Buffer.from(chunk)
+      : Buffer.from(chunk);
     console.error(
       "[rogatio-host] stdin data:",
       buf.length,

@@ -171,11 +171,11 @@ From the monorepo root, after `pnpm install` and a successful `pnpm build` (or l
 # asserts network effects + match-debug events)
 pnpm test:browser -- test/browser/sample-basic-live.test.ts
 
-# Body rules (response-body + request-body): needs LIVE_E2E=1,
-# passwordless sudo for `rogatio runtime install` (CA trust on Linux),
-# and a completed F23 PAC/proxy path for network rewrite.
-# Without that, body cases skip; offline dry-run + runtime activation
-# still covered in the default path.
+# Body rules (response-body + request-body): needs `LIVE_E2E=1` and
+# passwordless sudo for `rogatio runtime install` (CA trust on Linux).
+# Asserts live network rewrite through the F23 PAC / chrome.proxy path.
+# Without `LIVE_E2E` (or sudo), body cases skip; offline dry-run + runtime
+# activation still covered in the default path.
 LIVE_E2E=1 pnpm test:browser -- test/browser/sample-basic-live.test.ts -t "body"
 ```
 

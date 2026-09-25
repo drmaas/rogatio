@@ -240,6 +240,31 @@ async function syncBodyMarkersAfterStart(
   });
 }
 
+/** Derive PAC-routed origins from compiled body-rule matcher origins. */
+function pacOriginsFromBodyOperations(
+  policy: unknown,
+  grantedOrigins: readonly string[],
+): string[] {
+  if (policy === null || typeof policy !== "object") return [];
+  const operations = (policy as { operations?: unknown }).operations;
+  if (!Array.isArray(operations)) return [];
+  const granted = new Set(grantedOrigins);
+  const origins = new Set<string>();
+  for (const op of operations) {
+    if (op === null || typeof op !== "object") continue;
+    const kind = (op as { kind?: unknown }).kind;
+    if (kind !== "request-body" && kind !== "response-body") continue;
+    const matcher = (op as { matcher?: { origins?: unknown } }).matcher;
+    if (!matcher || !Array.isArray(matcher.origins)) continue;
+    for (const origin of matcher.origins) {
+      if (typeof origin !== "string") continue;
+      if (granted.size > 0 && !granted.has(origin)) continue;
+      origins.add(origin);
+    }
+  }
+  return [...origins].sort();
+}
+
 export async function startNativeSession(
   options: NativeSessionOptions,
 ): Promise<
@@ -319,11 +344,13 @@ export async function startNativeSession(
 
   const policyDigest = await computeDigest(policyResult.value);
 
+  const pacOrigins = pacOriginsFromBodyOperations(policyResult.value, granted);
+
   const config: NativeRuntimeConfig = {
     sessionId,
     policyDigest,
     extensionId: options.extensionId,
-    pacOrigins: [],
+    pacOrigins,
     targetPolicy: { publicAllowed: true, localOrigins: [] },
   };
 

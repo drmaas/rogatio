@@ -1,7 +1,7 @@
 /**
  * Helpers for live Selenium validation of samples/basic against a local
- * validate-server. Body-rule network rewrite still depends on F23 PAC/proxy
- * wiring; helpers support status activation proofs and DNR live checks.
+ * validate-server. Body-rule network rewrite uses the F23 PAC / chrome.proxy
+ * path when LIVE_E2E + sudo/CA prerequisites hold.
  */
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
