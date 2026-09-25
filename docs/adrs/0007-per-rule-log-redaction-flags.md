@@ -2,7 +2,7 @@
 
 ## Context
 
-Product wants **one** editor checkbox on every rule kind except body rules: redact sensitive fields in logs. The previous plan kept `schema` / `compiler` / `editor` untouched, then briefly specified two checkboxes including a body-redact flag. Optional rule fields with `additionalProperties: false` must be declared in schema, compiled, mirrored in `browser-schema.ts`, and edited in the DOM editor. A second body-redact checkbox was rejected: this feature does not log bodies.
+Product wants **one** editor checkbox for redact-sensitive-in-logs (originally scoped to every rule kind except body; #163 later showed it on body cards too). The previous plan kept `schema` / `compiler` / `editor` untouched, then briefly specified two checkboxes including a body-redact flag. Optional rule fields with `additionalProperties: false` must be declared in schema, compiled, mirrored in `browser-schema.ts`, and edited in the DOM editor. A second body-redact checkbox was rejected: live body bytes are never logged.
 
 ## Decision
 

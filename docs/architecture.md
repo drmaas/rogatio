@@ -223,6 +223,8 @@ The view uses a semantic `main`, `nav`, `form`, headings, `fieldset`/`legend`, n
 
 The contextual command bar keeps Validate, Save, and Cancel available, plus route-scoped actions: Add group on Project and Run test on Test console. Entity actions live next to their content: Add rule in the Rules section, rule reorder/copy/remove beside each rule title, and Copy group / Remove group beside the group name (group page heading and Project group list). Group reorder is not exposed because groups are selected as independent rail tabs. Remove actions use a cancellable accessible alert dialog and name the affected group or rule. Rule reorder commands operate on the item's absolute source position even when search is active; announcements include the resulting position so hidden neighboring items cannot make the operation ambiguous.
 
+When `EditorOptions.aiAssist` is provided, the command bar shows **AI Assist**. The shared panel builds an `AIAssistRequest` (`generate` or `fix` from current diagnostics), invokes the host handler (async iterable chunks or a complete response), streams tokens into the panel when the host yields them, and Apply maps each `RuleProposal.kind` onto draft `type` plus the matching payload fields (`redirect`, `action`, header siblings, `responseBody`, `requestBody`). The editor does not call providers itself. Hosts wire `aiAssist`: CLI `rogatio edit` posts to `/api/ai/assist`; the extension Workspace sends the `ai-assist` command through the service worker to the native host (`ai.complete`).
+
 Command and entity buttons use tone tokens (`data-btn`: primary / secondary / danger). Rule cards use a raised surface with a teal signal edge so they read as distinct interception units against cooler group fieldsets.
 
 Search is project-wide, literal, case-insensitive, and NFKC-normalized for matching only. It searches common project, group, and rule fields, reports deterministic source-order results, and navigates to the selected group or field without changing project data. It never treats user text as a regular expression. Search updates are region-level updates rather than full document replacement on every keystroke.
@@ -388,6 +390,7 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
   - `POST /api/dry-run` → offline dry-run against bounded URL cases
   - `POST /api/ai/complete` → non-streaming AI completion (local provider config)
   - `POST /api/ai/stream` → streaming AI completion (SSE)
+  - `POST /api/ai/assist` → validated Assist proposal via `runAIAssist` (editor contract; uses configured model)
 - Cross-platform browser launch (macOS `open`, Linux `xdg-open`, Windows `start`)
 - CSRF protection via random token in HTML and validated on mutating endpoints
 - Cleanup on SIGINT/SIGTERM, save, cancel, or browser close detection
@@ -413,7 +416,7 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 **6. AI Command (`src/commands/ai.ts`)**
 - Provider configuration: `setup | ls | show | delete | test`
 - Local-only OpenAI-compatible providers; keys stay on the machine
-- Editor/extension Dashboard "Create using AI" / AI Assist call the edit-server AI routes when configured; see root `README.md` for user-facing setup
+- Editor/extension surfaces: CLI Assist uses edit-server `/api/ai/assist`; extension Dashboard "Create using AI" and Workspace Assist use native messaging (`ai.complete`) when the runtime is started and configured — not the CLI loopback HTTP server. See root `README.md` for user-facing setup.
 
 **7. Editor Hosting (`src/server/`, `src/commands/edit.ts`)**
 - `editor.html` is generated inline (`generateEditorHtml`) with embedded config (API base URL, CSRF token, file path) plus an import map
@@ -479,7 +482,7 @@ rogatio edit [path]
 
 ### Security Boundaries
 - Server binds only to `127.0.0.1` (never `0.0.0.0`)
-- CSRF token required for mutating endpoints (`/api/save`, `/api/cancel`, `/api/dry-run`, `/api/ai/complete`, `/api/ai/stream`)
+- CSRF token required for mutating endpoints (`/api/save`, `/api/cancel`, `/api/dry-run`, `/api/ai/complete`, `/api/ai/stream`, `/api/ai/assist`)
 - No authentication (local-only, short-lived)
 - File access confined to target `.rogatio.json` path
 - AI routes use the locally configured provider only; they do not introduce Rogatio-hosted inference
