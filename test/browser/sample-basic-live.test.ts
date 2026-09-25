@@ -11,7 +11,10 @@
  */
 import { spawnSync } from "node:child_process";
 import { it, expect as vitestExpect } from "vitest";
-import { extensionContext } from "./extension-context.js";
+import {
+  extensionContext,
+  seedNativeHostManifest,
+} from "./extension-context.js";
 import { expect, testStandalone } from "./fixtures.js";
 import type { Page } from "./page.js";
 import {
@@ -227,9 +230,10 @@ if (LIVE_E2E && SUDO_OK) {
     "samples/basic body rules: runtime install, start, activate, live rewrite",
     async ({ registerDriver }) => {
       const server = await startValidateServer();
-      const { driver, page, extensionId, close } = await extensionContext({
-        grantOrigins: [VALIDATE_HOST_PATTERN],
-      });
+      const { driver, page, extensionId, profile, close } =
+        await extensionContext({
+          grantOrigins: [VALIDATE_HOST_PATTERN],
+        });
       registerDriver(driver, close);
 
       try {
@@ -251,6 +255,9 @@ if (LIVE_E2E && SUDO_OK) {
         vitestExpect(installCode, `runtime install failed: ${installOut}`).toBe(
           0,
         );
+        // Chrome for Testing resolves user-level native-messaging hosts under
+        // the profile directory, not ~/.config/google-chrome.
+        await seedNativeHostManifest(profile, [extensionId]);
 
         await page.goto(`chrome-extension://${extensionId}/index.html`);
         await expect(

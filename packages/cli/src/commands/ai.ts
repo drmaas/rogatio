@@ -8,38 +8,88 @@ import {
 } from "@rogatio/runtime";
 import { showAIHelp } from "../help.js";
 
+/**
+ * Input read ahead by a prompt but not yet consumed (e.g. a pasted multi-line
+ * answer). Reading must never destroy `process.stdin`: the old `for await`
+ * early-return broke every subsequent prompt with `AbortError`.
+ */
+let pendingInput = "";
+
+function readLine(): Promise<string> {
+  return new Promise((resolve) => {
+    const take = (): boolean => {
+      const newline = pendingInput.search(/[\r\n]/u);
+      if (newline === -1) return false;
+      const line = pendingInput.slice(0, newline);
+      pendingInput = pendingInput.slice(newline + 1);
+      resolve(line);
+      return true;
+    };
+    if (take()) return;
+    const onData = (chunk: Buffer): void => {
+      pendingInput += chunk.toString();
+      if (!take()) return;
+      process.stdin.off("data", onData);
+      process.stdin.pause();
+    };
+    process.stdin.on("data", onData);
+    process.stdin.resume();
+  });
+}
+
 async function promptInput(prompt: string): Promise<string> {
   process.stdout.write(prompt);
-  for await (const chunk of process.stdin) {
-    return chunk.toString().trim();
-  }
-  return "";
+  return (await readLine()).trim();
 }
 
 async function promptSecret(prompt: string): Promise<string> {
   process.stdout.write(prompt);
   // Disable echo
   process.stdin.setRawMode(true);
-  let input = "";
-  for await (const chunk of process.stdin) {
-    const char = chunk.toString();
-    if (char === "\n" || char === "\r") {
-      process.stdout.write("\n");
-      break;
-    } else if (char === "\u0003") {
-      process.exit(1);
-    } else if (char === "\u007f" || char === "\b") {
-      if (input.length > 0) {
-        input = input.slice(0, -1);
-        process.stdout.write("\b \b");
-      }
-    } else {
-      input += char;
-      process.stdout.write("*");
-    }
+  try {
+    return await new Promise<string>((resolve) => {
+      let input = "";
+      let settled = false;
+      const finish = (): void => {
+        settled = true;
+        process.stdin.off("data", onData);
+        process.stdin.pause();
+        resolve(input.trim());
+      };
+      const consume = (text: string): void => {
+        if (settled) return;
+        for (let index = 0; index < text.length; index += 1) {
+          const char = text[index] as string;
+          if (char === "\n" || char === "\r") {
+            process.stdout.write("\n");
+            pendingInput = text.slice(index + 1);
+            finish();
+            return;
+          }
+          if (char === "\u0003") {
+            process.exit(1);
+          } else if (char === "\u007f" || char === "\b") {
+            if (input.length > 0) {
+              input = input.slice(0, -1);
+              process.stdout.write("\b \b");
+            }
+          } else {
+            input += char;
+            process.stdout.write("*");
+          }
+        }
+      };
+      const onData = (chunk: Buffer): void => consume(chunk.toString());
+      // Pasted answers may already be buffered from an earlier prompt.
+      consume(pendingInput);
+      if (settled) return;
+      pendingInput = "";
+      process.stdin.on("data", onData);
+      process.stdin.resume();
+    });
+  } finally {
+    process.stdin.setRawMode(false);
   }
-  process.stdin.setRawMode(false);
-  return input.trim();
 }
 
 export async function aiCommand(args: string[]): Promise<number> {

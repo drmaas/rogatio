@@ -13,6 +13,7 @@ import {
   MAX_AI_ASSIST_ENVELOPE_BYTES,
   mergeProposalIntoProject,
   parseAIProposal,
+  repairProposalIntoProject,
 } from "./ai-assist.js";
 import { validateProjectDetailed } from "./browser-schema.js";
 import type { ChromeApi } from "./chrome.js";
@@ -571,7 +572,12 @@ export function createExtensionApplication(
       }
       const proposal = parseAIProposal(parsed);
       if (!proposal) return failure("extension.ai-invalid-response");
-      const merged = mergeProposalIntoProject(project, proposal);
+      // Fix requests validate the repaired project (the offending rules are
+      // replaced by the proposal); other requests validate the append merge.
+      const merged =
+        kind === "fix" && Array.isArray(diagnostics)
+          ? repairProposalIntoProject(project, diagnostics, proposal)
+          : mergeProposalIntoProject(project, proposal);
       const validation = validateProjectDetailed(merged);
       if (!validation.valid) return failure("extension.ai-invalid-proposal");
       return { ok: true, value: { proposal } };
@@ -710,18 +716,28 @@ export function createExtensionApplication(
           return failure("extension.storage-failed");
         }
         const projectId = current.value.activeProjectId;
-        if (!projectId) {
-          console.log("[rogatio] no active project");
-          return failure("extension.not-found");
-        }
-        const project = current.value.projects[projectId];
-        if (!project) {
+        const project = projectId
+          ? current.value.projects[projectId]
+          : undefined;
+        if (projectId && !project) {
           console.log("[rogatio] project not found:", projectId);
           return failure("extension.not-found");
         }
+        // Starting without an active project is valid: first-run AI flows
+        // (Dashboard "Create using AI") need the native runtime and its AI
+        // channel before any project exists. Start against an empty project.
+        const projectData = project?.data ?? {
+          version: 1,
+          name: "Untitled project",
+          groups: [],
+        };
+        const enabledGroupIds = project?.enabledGroupIds ?? [];
 
-        console.log("[rogatio] compiling project:", project.data?.name);
-        const compileResult = compileProject(project.data);
+        console.log(
+          "[rogatio] compiling project:",
+          project ? project.data?.name : "(empty)",
+        );
+        const compileResult = compileProject(projectData);
         if (!compileResult.ok) {
           console.log("[rogatio] compile failed");
           return failure("extension.storage-failed");
@@ -735,10 +751,7 @@ export function createExtensionApplication(
           sessionResult = await startNativeSession({
             extensionId: options.extensionId,
             nativeRuntime: options.nativeRuntime,
-            getProject: async () => ({
-              data: project.data,
-              enabledGroupIds: project.enabledGroupIds,
-            }),
+            getProject: async () => ({ data: projectData, enabledGroupIds }),
             getGrantedOrigins: async () => {
               return declaredPermissionOrigins({
                 operations: compileResult.operations,

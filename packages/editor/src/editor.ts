@@ -549,6 +549,14 @@ function ownString(
   return undefined;
 }
 
+interface RuleRepairTarget {
+  readonly groupId: string;
+  readonly ruleId: string;
+}
+
+const RULE_PATH_PATTERN =
+  /^\/groups\/(0|[1-9][0-9]*)\/rules\/(0|[1-9][0-9]*)(?:\/|$)/;
+
 function applyRuleProposalAction(
   rule: DraftRule,
   ruleProposal: RuleProposal,
@@ -689,6 +697,7 @@ class EditorControllerImpl implements EditorController {
   private testRequestId = 0;
   private aiAssistPanel: ReturnType<typeof createAIAssistPanel> | null = null;
   private aiAssistInFlight = false;
+  private aiRepairTargets: readonly RuleRepairTarget[] = [];
 
   constructor(
     options: EditorOptions,
@@ -1672,6 +1681,8 @@ class EditorControllerImpl implements EditorController {
   }
 
   private applyAIProposal(proposal: AIProposal): void {
+    const repairs = [...this.aiRepairTargets];
+    this.aiRepairTargets = [];
     for (const ruleProposal of proposal.rules) {
       // Find or create the group
       let group = this.groupById(ruleProposal.groupId);
@@ -1687,9 +1698,24 @@ class EditorControllerImpl implements EditorController {
         group = this.groupById(groupId);
       }
       if (!group) return;
+      const rules = group.rules;
 
-      // Generate unique rule ID
-      const ruleId = this.nextId("rule-ai");
+      // A fix proposal repairs the offending rule in place (keeping its id);
+      // proposal rules without a repair target are added as new rules.
+      const repair = repairs.find(
+        (target) =>
+          target.groupId === ruleProposal.groupId &&
+          rules.some((existing) => String(existing.id) === target.ruleId),
+      );
+      let repairIndex = -1;
+      let ruleId = this.nextId("rule-ai");
+      if (repair) {
+        repairs.splice(repairs.indexOf(repair), 1);
+        ruleId = repair.ruleId;
+        repairIndex = rules.findIndex(
+          (existing) => String(existing.id) === repair.ruleId,
+        );
+      }
 
       // Build the rule object
       const rule: DraftRule = {
@@ -1709,8 +1735,12 @@ class EditorControllerImpl implements EditorController {
 
       applyRuleProposalAction(rule, ruleProposal);
 
-      // Add the rule to the group
-      group.rules.push(rule);
+      // Repair the offending rule in place, or add the rule to the group
+      if (repairIndex >= 0) {
+        rules[repairIndex] = rule;
+      } else {
+        rules.push(rule);
+      }
 
       // Mark as changed and update focus
       this.markChanged();
@@ -1719,13 +1749,52 @@ class EditorControllerImpl implements EditorController {
         "groups",
         this.groupIndex(groupIdStr),
         "rules",
-        group.rules.length - 1,
+        repairIndex >= 0 ? repairIndex : rules.length - 1,
         "name",
       );
     }
 
     this.statusMessage = `Applied ${proposal.rules.length} rule${proposal.rules.length === 1 ? "" : "s"} from AI.`;
     this.render();
+  }
+
+  /**
+   * Rules carrying validation errors, in stable path order. A fix proposal
+   * repairs these rules in place (keeping their ids) instead of adding new ones.
+   */
+  private repairTargetsFrom(
+    diagnostics: readonly EditorDiagnostic[],
+  ): RuleRepairTarget[] {
+    const seen = new Set<string>();
+    const positions: Array<{ groupIndex: number; ruleIndex: number }> = [];
+    for (const diagnostic of diagnostics) {
+      const match = RULE_PATH_PATTERN.exec(diagnostic.path);
+      if (!match) continue;
+      const groupIndex = Number(match[1]);
+      const ruleIndex = Number(match[2]);
+      if (
+        !Number.isSafeInteger(groupIndex) ||
+        !Number.isSafeInteger(ruleIndex)
+      ) {
+        continue;
+      }
+      const key = `${groupIndex}/${ruleIndex}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      positions.push({ groupIndex, ruleIndex });
+    }
+    positions.sort(
+      (left, right) =>
+        left.groupIndex - right.groupIndex || left.ruleIndex - right.ruleIndex,
+    );
+    const targets: RuleRepairTarget[] = [];
+    for (const position of positions) {
+      const group = this.draft.groups[position.groupIndex];
+      const rule = group?.rules[position.ruleIndex];
+      if (!group || !rule) continue;
+      targets.push({ groupId: String(group.id), ruleId: String(rule.id) });
+    }
+    return targets;
   }
 
   private async runAIAssist(prompt: string): Promise<void> {
@@ -1747,6 +1816,10 @@ class EditorControllerImpl implements EditorController {
         diagnostics: diagnostics.length > 0 ? diagnostics : undefined,
       },
     };
+    this.aiRepairTargets =
+      request.kind === "fix" && diagnostics.length > 0
+        ? this.repairTargetsFrom(diagnostics)
+        : [];
 
     panel.startStreaming("assistant");
     try {

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { WebDriver } from "selenium-webdriver";
 import { createDriver } from "./driver.js";
@@ -47,6 +47,99 @@ type PreferencesFile = {
     settings?: Record<string, ExtensionSetting>;
   };
 };
+
+const NATIVE_HOST_NAME = "com.rogatio.runtime";
+
+type NativeHostManifest = {
+  name?: string;
+  description?: string;
+  path?: string;
+  type?: string;
+  allowed_origins?: string[];
+};
+
+/** Directories `rogatio runtime install` writes the host manifest to per platform. */
+function installedManifestDirs(): string[] {
+  const home = homedir();
+  switch (process.platform) {
+    case "darwin":
+      return [
+        join(
+          home,
+          "Library",
+          "Application Support",
+          "Google",
+          "Chrome",
+          "NativeMessagingHosts",
+        ),
+      ];
+    case "win32": {
+      const appData = process.env.APPDATA ?? join(home, "AppData", "Roaming");
+      return [join(appData, "Google", "Chrome", "NativeMessagingHosts")];
+    }
+    default:
+      return [join(home, ".config", "google-chrome", "NativeMessagingHosts")];
+  }
+}
+
+/**
+ * Mirror the native-messaging host manifest registered by `rogatio runtime
+ * install` into the test profile. Since Chrome 146, Google Chrome for Testing
+ * resolves user-level hosts in NativeMessagingHosts/ under the user profile
+ * directory — the harness passes a temp `--user-data-dir` — so the manifest
+ * Chrome stable finds in ~/.config/google-chrome is invisible to the test
+ * browser. Chrome reads manifests at connectNative() time, so seeding after
+ * launch is fine.
+ */
+export async function seedNativeHostManifest(
+  profile: string,
+  extensionIds: readonly string[],
+): Promise<void> {
+  const dirs = installedManifestDirs();
+  const source = dirs
+    .map((dir) => join(dir, `${NATIVE_HOST_NAME}.json`))
+    .find((candidate) => existsSync(candidate));
+  if (source === undefined) {
+    throw new Error(
+      `native messaging host manifest ${NATIVE_HOST_NAME}.json not found in ${dirs.join(
+        ", ",
+      )}. Install it first: sudo rogatio runtime install --extension-id ${
+        extensionIds[0] ?? "<extension-id>"
+      }`,
+    );
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(source, "utf8")) as unknown;
+  } catch (error) {
+    throw new Error(
+      `native messaging host manifest ${source} is not valid JSON: ${String(error)}`,
+    );
+  }
+  if (
+    parsed === null ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed) ||
+    typeof (parsed as NativeHostManifest).name !== "string" ||
+    typeof (parsed as NativeHostManifest).path !== "string"
+  ) {
+    throw new Error(
+      `native messaging host manifest ${source} is not a native messaging host manifest object`,
+    );
+  }
+  const manifest = structuredClone(parsed) as NativeHostManifest;
+  const origins = new Set(
+    Array.isArray(manifest.allowed_origins) ? manifest.allowed_origins : [],
+  );
+  for (const id of extensionIds) origins.add(`chrome-extension://${id}/`);
+  manifest.allowed_origins = [...origins];
+  const dir = join(profile, "NativeMessagingHosts");
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    join(dir, `${NATIVE_HOST_NAME}.json`),
+    JSON.stringify(manifest, null, 2),
+  );
+}
 
 function computeExtensionId(extensionPath: string): string {
   const digest = createHash("sha256").update(extensionPath).digest();
