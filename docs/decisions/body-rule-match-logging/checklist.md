@@ -75,7 +75,7 @@ Track implement progress. Update checkboxes as work lands. Strategy: **TDD** (§
 - [x] Amend ADR 0006 — body kinds in coverage; probe-gated cite (plan review; add evidence path after §1)
 - [x] Amend ADR 0007 — body checkbox (plan review)
 - [x] Amend ADR 0009 — body marker session band; session DNR for match logging; no cross-store wipe (plan review)
-- [ ] Update `docs/architecture.md` match-logging + marker sections (logging-only inert markers; single pipeline)
+- [x] Update `docs/architecture.md` match-logging + marker sections (logging-only inert markers; single pipeline)
 - [x] After §1 green: add probe evidence cite to ADR 0006 amendment
 
 **Done when:** AC5 met (docs consistent; probe cite when §1 green).

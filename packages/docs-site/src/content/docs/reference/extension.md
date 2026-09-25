@@ -24,9 +24,10 @@ boundary is designed to accommodate additional browser extensions in the future.
 - Actionless matcher operations are reported as `unsupported` and are never sent to DNR.
 - Console **match logging** injects a bounded, redacted, live-only lowercase `[rogatio]`
   line into the matched page's DevTools Console when `onRuleMatchedDebug` fires (unpacked
-  load only). See [Chrome extension](/guides/extension/) for coverage, the **Match logging**
-  toggle (default on), per-rule redact checkbox, live vs intended fields, body exclusions,
-  and limitations.
+  load only; redirect/query/header, plus body via session markers when the strip path
+  gate allows install). See [Chrome extension](/guides/extension/) for coverage, the
+  **Match logging** toggle (default on), per-rule redact checkbox, live vs intended
+  fields, and limitations.
 
 ## Distribution
 

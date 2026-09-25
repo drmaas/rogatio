@@ -20,6 +20,7 @@ Amended (Phase 1 probe, 2026-09-20): real-Chromium probe passed for both body sh
 
 ## Consequences
 
-- Shipped coverage is `redirect` + `query` + `header`; body kinds land with #163 after probe + marker install.
+- Shipped coverage is `redirect` + `query` + `header`, plus `request-body` / `response-body` when session URL-match markers are indexed (Phase 1 probe green; product path is DNR set + runtime strip — never DNR set+DNR strip). Production `runtimeStripPathAvailable` stays fail-closed (`false`) until live traffic hits strip, so body kinds remain silent in the shipped wiring until that gate flips.
 - Unknown numeric ids stay silent.
 - Intended body text is config-derived and hard-bounded; live bodies remain impossible on this event.
+- Native host remains never a match-logging source.
