@@ -2,6 +2,7 @@ import type { NativeRuntimePhase } from "@rogatio/browser-core";
 import {
   type ChromePort,
   createPermissionAdapter,
+  createProxyAdapter,
   createStorageAdapter,
   setBadge,
 } from "./chrome.js";
@@ -16,6 +17,7 @@ import type {
 import { createExtensionApplication } from "./service-worker.js";
 
 const NATIVE_HOST_NAME = "com.rogatio.runtime";
+const api = chrome;
 
 /**
  * Raised when the native-messaging host manifest is not registered with
@@ -58,7 +60,10 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
   let connected = false;
   let counter = 0;
   let lastConnectError: string | null = null;
+  let pacInstalled = false;
   const pending = new Map<string, (envelope: NativeEnvelope) => void>();
+  const rejected = new Map<string, (reason: Error) => void>();
+  const proxy = createProxyAdapter(api);
 
   function rememberConnectError(error: unknown): Error {
     const message =
@@ -70,7 +75,67 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
     lastConnectError = message;
     return new Error(message);
   }
-  const rejected = new Map<string, (reason: Error) => void>();
+
+  function replyToHost(envelope: NativeEnvelopeInput & { requestId: string }) {
+    if (!port) return;
+    try {
+      port.postMessage(envelope);
+    } catch (error) {
+      console.log("[rogatio] replyToHost failed:", error);
+    }
+  }
+
+  async function handleHostRequest(message: NativeEnvelope): Promise<void> {
+    const requestId = message.requestId;
+    if (requestId === undefined) return;
+    try {
+      if (message.type === "runtime.pac.install") {
+        const script =
+          typeof message.metadata.script === "string"
+            ? message.metadata.script
+            : "";
+        await proxy.installPac(script);
+        pacInstalled = true;
+        replyToHost({
+          protocol: "v1",
+          type: "runtime.pac.install",
+          requestId,
+          timestamp: Date.now(),
+          metadata: { ok: true },
+        });
+        return;
+      }
+      if (message.type === "runtime.pac.remove") {
+        await proxy.clearPac();
+        pacInstalled = false;
+        replyToHost({
+          protocol: "v1",
+          type: "runtime.pac.remove",
+          requestId,
+          timestamp: Date.now(),
+          metadata: { ok: true },
+        });
+        return;
+      }
+      replyToHost({
+        protocol: "v1",
+        type: message.type,
+        requestId,
+        timestamp: Date.now(),
+        metadata: { ok: false, error: "runtime.request-malformed" },
+      });
+    } catch (error) {
+      const code =
+        error instanceof Error ? error.message : "pac-install-failed";
+      replyToHost({
+        protocol: "v1",
+        type: message.type,
+        requestId,
+        timestamp: Date.now(),
+        metadata: { ok: false, error: code },
+      });
+    }
+  }
 
   function ensurePort(): ChromePort {
     if (port) {
@@ -86,16 +151,18 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       lastConnectError = null;
       console.log("[rogatio] ensurePort: connected successfully");
     } catch (error) {
-      // Chrome throws synchronously when the native-messaging host manifest is
-      // not registered or the binary cannot be launched. Capture the actual
-      // error message so callers can distinguish missing manifest from missing
-      // binary, permission denied, etc.
       console.log("[rogatio] ensurePort: connectNative FAILED:", error);
       rememberConnectError(error);
       throw new NativeHostMissingError();
     }
     next.onMessage.addListener((message: unknown) => {
-      const envelope = message as { requestId?: unknown; type?: string };
+      const envelope = message as {
+        requestId?: unknown;
+        type?: string;
+        metadata?: Record<string, unknown>;
+        protocol?: string;
+        timestamp?: number;
+      };
       console.log(
         "[rogatio] onMessage:",
         envelope.type,
@@ -106,6 +173,10 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
         envelope.requestId !== undefined
           ? String(envelope.requestId)
           : undefined;
+      if (requestId?.startsWith("host-")) {
+        void handleHostRequest(message as NativeEnvelope);
+        return;
+      }
       if (requestId !== undefined) {
         const resolve = pending.get(requestId);
         const reject = rejected.get(requestId);
@@ -118,8 +189,6 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       }
     });
     next.onDisconnect.addListener(() => {
-      // Chrome exposes the native-host failure through runtime.lastError only
-      // while this callback is running. Preserve it for the diagnostics view.
       const disconnectError = rememberConnectError(
         api.runtime.lastError?.message ??
           "Native messaging host disconnected before responding.",
@@ -127,6 +196,10 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       console.log("[rogatio] port disconnected:", disconnectError.message);
       connected = false;
       port = null;
+      if (pacInstalled) {
+        void proxy.clearPac().catch(() => undefined);
+        pacInstalled = false;
+      }
       for (const reject of rejected.values()) reject(disconnectError);
       pending.clear();
       rejected.clear();
@@ -136,20 +209,94 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
     return next;
   }
 
+  function send(envelope: NativeEnvelopeInput): Promise<NativeEnvelope> {
+    console.log(
+      "[rogatio] send:",
+      envelope.type,
+      "requestId:",
+      envelope.requestId,
+    );
+    const active = ensurePort();
+    const requestId = String(++counter);
+    const full = { ...envelope, requestId } as NativeEnvelopeInput & {
+      requestId: string;
+    };
+    return new Promise<NativeEnvelope>((resolve, reject) => {
+      pending.set(requestId, resolve);
+      rejected.set(requestId, reject);
+      try {
+        active.postMessage(full);
+      } catch (error) {
+        const postError = rememberConnectError(error);
+        pending.delete(requestId);
+        rejected.delete(requestId);
+        reject(postError);
+        return;
+      }
+      setTimeout(() => {
+        if (pending.has(requestId)) {
+          console.log("[rogatio] send timeout for", envelope.type);
+          pending.delete(requestId);
+          rejected.delete(requestId);
+          reject(
+            rememberConnectError(
+              "Native messaging host timed out before responding.",
+            ),
+          );
+        }
+      }, 10000);
+    });
+  }
+
   return {
-    async start(): Promise<{
+    async start(config: NativeRuntimeConfig): Promise<{
       state: NativeRuntimePhase | "unsupported";
       message?: string;
     }> {
       try {
-        console.log("[rogatio] background.start: ensurePort");
-        const active = ensurePort();
-        console.log("[rogatio] background.start: posting runtime.start");
-        active.postMessage({
+        console.log("[rogatio] background.start: ensurePort + runtime.start");
+        const response = await send({
           protocol: "v1",
           type: "runtime.start",
-          metadata: {},
+          timestamp: Date.now(),
+          metadata: {
+            sessionId: config.sessionId,
+            policyDigest: config.policyDigest,
+            extensionId: config.extensionId,
+            pacOrigins: [...config.pacOrigins],
+            targetPolicy: {
+              publicAllowed: config.targetPolicy.publicAllowed,
+              localOrigins: [...config.targetPolicy.localOrigins],
+            },
+          },
         });
+        const interception = response.metadata.interception as
+          | { active?: boolean; reasons?: string[] }
+          | undefined;
+        const needsPac = config.pacOrigins.length > 0;
+        const active = interception?.active === true;
+        if (needsPac && !active) {
+          const reasons = Array.isArray(interception?.reasons)
+            ? interception.reasons.join(",")
+            : "interception-inactive";
+          console.log(
+            "[rogatio] background.start interception failed:",
+            reasons,
+          );
+          return {
+            state: "unsupported",
+            message: reasons || "interception-inactive",
+          };
+        }
+        if (response.metadata.ok === false && needsPac) {
+          return {
+            state: "failed",
+            message:
+              typeof response.metadata.error === "string"
+                ? response.metadata.error
+                : "runtime.start-failed",
+          };
+        }
         return { state: "started" };
       } catch (error) {
         console.log("[rogatio] background.start error:", error);
@@ -165,14 +312,22 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       }
     },
     async stop(): Promise<{ state: NativeRuntimePhase | "unsupported" }> {
+      try {
+        if (pacInstalled) {
+          await proxy.clearPac();
+          pacInstalled = false;
+        }
+      } catch {
+        // Best-effort PAC clear.
+      }
       if (port) {
         try {
-          port.postMessage({
+          await send({
             protocol: "v1",
             type: "runtime.stop",
+            timestamp: Date.now(),
             metadata: {},
           });
-          // Chrome closes the native port when the service worker releases it.
         } catch {
           // The browser may already have disconnected the host.
         }
@@ -187,51 +342,13 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
     async sendPolicy(): Promise<void> {
       return;
     },
-    send(envelope: NativeEnvelopeInput): Promise<NativeEnvelope> {
-      console.log(
-        "[rogatio] send:",
-        envelope.type,
-        "requestId:",
-        envelope.requestId,
-      );
-      const active = ensurePort();
-      const requestId = String(++counter);
-      const full = { ...envelope, requestId } as NativeEnvelopeInput & {
-        requestId: string;
-      };
-      return new Promise<NativeEnvelope>((resolve, reject) => {
-        pending.set(requestId, resolve);
-        rejected.set(requestId, reject);
-        try {
-          active.postMessage(full);
-        } catch (error) {
-          const postError = rememberConnectError(error);
-          pending.delete(requestId);
-          rejected.delete(requestId);
-          reject(postError);
-          return;
-        }
-        setTimeout(() => {
-          if (pending.has(requestId)) {
-            console.log("[rogatio] send timeout for", envelope.type);
-            pending.delete(requestId);
-            rejected.delete(requestId);
-            reject(
-              rememberConnectError(
-                "Native messaging host timed out before responding.",
-              ),
-            );
-          }
-        }, 10000);
-      });
-    },
+    send,
     lastConnectError(): string | null {
       return lastConnectError;
     },
   };
 }
 
-const api = chrome;
 const application = createExtensionApplication({
   storage: createStorageAdapter(api),
   permissions: createPermissionAdapter(api),

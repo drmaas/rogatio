@@ -2,7 +2,7 @@
 
 > Code is the source of truth for current behavior. Links to `docs/specs/`, `docs/plans/`, and `docs/workflows/` point to frozen decision records; see `AGENTS.md` "Source-of-truth priority".
 
-**Status:** F23 unified native-host runtime direction approved and implemented for the extension Start/Stop runtime control surface.
+**Status:** F23 unified native-host runtime direction approved and implemented for the extension Start/Stop runtime control surface, including the PAC / `chrome.proxy` loopback-proxy path for HTTP body-rule rewrite (issue #170). HTTPS body rewrite still requires future TLS MITM work; CONNECT remains a blind tunnel.
 
 ## F23 Unified Native-Host Runtime Direction
 

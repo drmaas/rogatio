@@ -17,6 +17,8 @@ const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "runtime.stop",
   "runtime.status",
   "runtime.project.set",
+  "runtime.pac.install",
+  "runtime.pac.remove",
   "authority.grant",
   "authority.revoke",
   "transform.request",

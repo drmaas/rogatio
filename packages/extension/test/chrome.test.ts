@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type ChromeApi,
   createPermissionAdapter,
+  createProxyAdapter,
   createStorageAdapter,
 } from "../src/chrome.js";
 import { createDnrInstaller } from "../src/dnr.js";
@@ -102,5 +103,56 @@ describe("F7 Chrome adapters", () => {
     await expect(second).resolves.toBe(false);
     expect(value).toEqual({ version: 1 });
     expect(set).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("chrome proxy adapter", () => {
+  it("sets PAC script and clears it", async () => {
+    const set = vi.fn((_d: unknown, cb?: () => void) => cb?.());
+    const clear = vi.fn((_d: unknown, cb?: () => void) => cb?.());
+    const get = vi.fn(
+      (
+        _d: unknown,
+        cb: (c: { value: unknown; levelOfControl: string }) => void,
+      ) =>
+        cb({
+          value: {},
+          levelOfControl: "controllable_by_this_extension",
+        }),
+    );
+    const adapter = createProxyAdapter({
+      ...apiFor({ get: async () => ({}), set: async () => {} }),
+      proxy: { settings: { get, set, clear } },
+    } as never);
+    await adapter.installPac('function FindProxyForURL(){ return "DIRECT"; }');
+    expect(set).toHaveBeenCalledOnce();
+    await adapter.clearPac();
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("detects controlled_by_other collision", async () => {
+    const get = vi.fn(
+      (
+        _d: unknown,
+        cb: (c: { value: unknown; levelOfControl: string }) => void,
+      ) =>
+        cb({
+          value: {},
+          levelOfControl: "controlled_by_other_extensions",
+        }),
+    );
+    const adapter = createProxyAdapter({
+      ...apiFor({ get: async () => ({}), set: async () => {} }),
+      proxy: {
+        settings: {
+          get,
+          set: vi.fn(),
+          clear: vi.fn(),
+        },
+      },
+    } as never);
+    await expect(
+      adapter.installPac('function FindProxyForURL(){ return "DIRECT"; }'),
+    ).rejects.toThrow("controlled_by_other");
   });
 });

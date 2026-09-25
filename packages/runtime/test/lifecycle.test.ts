@@ -351,3 +351,88 @@ describe("mock faucet port and serveMock", () => {
     expect(result.error.code).toBe("runtime.mock-unknown");
   });
 });
+
+describe("runtime.start / runtime.stop envelopes and policy retention", () => {
+  const bodyProject = {
+    version: 1,
+    name: "body",
+    groups: [
+      {
+        id: "g1",
+        name: "g",
+        origins: ["http://127.0.0.1:8080"],
+        rules: [
+          {
+            id: "r1",
+            name: "resp",
+            urlRegex: "^http://127\\.0\\.0\\.1:8080/data\\.json$",
+            origins: [],
+            resourceTypes: ["main_frame"],
+            priority: 1,
+            type: "response-body",
+            responseBody: {
+              replacements: [{ pattern: "a", replacement: "b" }],
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  it("retains active policy on runtime.project.set", async () => {
+    const controller = createNativeRuntimeController({});
+    const set = await controller.handleEnvelope({
+      type: "runtime.project.set",
+      metadata: { project: bodyProject },
+    });
+    expect(set.metadata.ok).toBe(true);
+    const policy = controller.getActivePolicy();
+    expect(policy).not.toBeNull();
+    expect(policy?.operations.some((op) => op.kind === "response-body")).toBe(
+      true,
+    );
+  });
+
+  it("runtime.project.set while running returns already-started", async () => {
+    const controller = createNativeRuntimeController({ preset: buildPreset() });
+    await controller.start();
+    const again = await controller.handleEnvelope({
+      type: "runtime.project.set",
+      metadata: { project: bodyProject },
+    });
+    expect(again.metadata.error).toBe("runtime.already-started");
+  });
+
+  it("runtime.start without pacOrigins reports no-pac-origins", async () => {
+    const controller = createNativeRuntimeController({});
+    await controller.handleEnvelope({
+      type: "runtime.project.set",
+      metadata: { project: bodyProject },
+    });
+    const started = await controller.handleEnvelope({
+      type: "runtime.start",
+      metadata: {
+        policyDigest: "sha256:x",
+        extensionId: "ext",
+        pacOrigins: [],
+        targetPolicy: { publicAllowed: true, localOrigins: [] },
+      },
+    });
+    expect(started.type).toBe("runtime.start");
+    expect(started.metadata.interception).toEqual({
+      active: false,
+      reasons: ["no-pac-origins"],
+    });
+  });
+
+  it("runtime.stop is handled and leaves the controller stopped", async () => {
+    const controller = createNativeRuntimeController({ preset: buildPreset() });
+    await controller.start();
+    const stopped = await controller.handleEnvelope({
+      type: "runtime.stop",
+      metadata: {},
+    });
+    expect(stopped.metadata.ok).toBe(true);
+    expect(controller.status().state).toBe("stopped");
+  });
+});

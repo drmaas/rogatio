@@ -17,6 +17,7 @@ import {
 } from "./capability.js";
 import { failure } from "./errors.js";
 import {
+  getCurrentSession,
   hasActiveSession,
   type SessionProvider,
   startInterception,
@@ -90,11 +91,18 @@ export interface RuntimeStartResult {
   readonly session?: SessionProvider | null;
 }
 
+export interface ActiveRuntimePolicy {
+  readonly project: unknown;
+  readonly operations: readonly RogatioOperation[];
+}
+
 export interface NativeRuntimeController {
   start(sessionConfig?: SessionConfig): Promise<RuntimeStartResult>;
   stop(): Promise<{ readonly state: "stopped" | "unsupported" | "idle" }>;
   status(): { readonly state: NativeRuntimeState };
   getSession(): SessionProvider | null;
+  /** Immutable active policy retained from `runtime.project.set`. */
+  getActivePolicy(): ActiveRuntimePolicy | null;
   /** Resolve a stored mock token to rendered response bytes (loopback faucet). */
   serveMock(token: string): Promise<RuntimeResult<RenderedMock>>;
   /**
@@ -140,6 +148,7 @@ export function createNativeRuntimeController(
   let state: NativeRuntimeState = "idle";
   let activation: RuntimeActivation | undefined;
   let capability: CapabilityState | undefined;
+  let activePolicy: ActiveRuntimePolicy | null = null;
   const mockTokens = new Map<string, RuntimeMockConfig>();
 
   // Initialize AI client if config provided
@@ -148,9 +157,74 @@ export function createNativeRuntimeController(
     aiClient = createAIClient(options.aiProviderConfig);
   }
 
+  async function bindInterception(
+    current: RuntimeActivation,
+    sessionConfig: SessionConfig,
+  ): Promise<{
+    activation: RuntimeActivation;
+    session: SessionProvider | null;
+    interception: { active: boolean; reasons: string[] };
+  }> {
+    if (sessionConfig.pacOrigins.length === 0) {
+      return {
+        activation: { ...current, pacOrigins: [] },
+        session: null,
+        interception: { active: false, reasons: ["no-pac-origins"] },
+      };
+    }
+    if (hasActiveSession()) {
+      const session = getCurrentSession();
+      return {
+        activation: current,
+        session,
+        interception: {
+          active: session !== null,
+          reasons: session !== null ? [] : ["session-missing"],
+        },
+      };
+    }
+    const result = await startInterception(
+      current,
+      sessionConfig.policyDigest,
+      sessionConfig.extensionId,
+      sessionConfig.pacOrigins,
+      {
+        public: sessionConfig.targetPolicy.public,
+        localOrigins: sessionConfig.targetPolicy.localOrigins,
+      },
+    );
+    if (result.kind === "unsupported") {
+      return {
+        activation: current,
+        session: null,
+        interception: { active: false, reasons: [...result.reasons] },
+      };
+    }
+    const session = getCurrentSession();
+    const next: RuntimeActivation = {
+      ...current,
+      pacOrigins: sessionConfig.pacOrigins,
+      proxy: result.proxy,
+    };
+    return {
+      activation: next,
+      session,
+      interception: { active: true, reasons: [] },
+    };
+  }
+
   return {
     async start(sessionConfig?: SessionConfig): Promise<RuntimeStartResult> {
       if (state === "running" || state === "starting") {
+        if (sessionConfig && activation) {
+          const bound = await bindInterception(activation, sessionConfig);
+          activation = bound.activation;
+          return {
+            state: "running",
+            activation,
+            session: bound.session,
+          };
+        }
         if (activation) return { state: "running", activation };
         return { state };
       }
@@ -170,23 +244,14 @@ export function createNativeRuntimeController(
         state: "running",
         startedAt,
         presetDigest: preset.digest,
-        pacOrigins: [],
+        pacOrigins: sessionConfig?.pacOrigins ?? [],
       };
 
       let session: SessionProvider | null = null;
       if (sessionConfig) {
-        const result = await startInterception(
-          activation,
-          sessionConfig.policyDigest,
-          sessionConfig.extensionId,
-          sessionConfig.pacOrigins,
-          sessionConfig.targetPolicy,
-        );
-        if (result.kind !== "unsupported") {
-          session = hasActiveSession() ? getCurrentSession() : null;
-          if (session)
-            activation = { ...activation, pacOrigins: session.pacOrigins };
-        }
+        const bound = await bindInterception(activation, sessionConfig);
+        activation = bound.activation;
+        session = bound.session;
       }
 
       if (options.onStart) await options.onStart(activation, session);
@@ -208,6 +273,7 @@ export function createNativeRuntimeController(
       if (capability) closeCapabilityState(capability);
       mockTokens.clear();
       activation = undefined;
+      activePolicy = null;
       state = "stopped";
       return { state: "stopped" };
     },
@@ -218,6 +284,10 @@ export function createNativeRuntimeController(
 
     getSession() {
       return hasActiveSession() ? getCurrentSession() : null;
+    },
+
+    getActivePolicy() {
+      return activePolicy;
     },
 
     async serveMock(token: string): Promise<RuntimeResult<RenderedMock>> {
@@ -327,6 +397,10 @@ export function createNativeRuntimeController(
         }
 
         preset = normalized.value;
+        activePolicy = {
+          project: schemaResult.data,
+          operations: compileResult.operations,
+        };
 
         // Start the controller now that we have a preset
         const startResult = await this.start();
@@ -346,6 +420,84 @@ export function createNativeRuntimeController(
           ...(requestId !== undefined ? { requestId } : {}),
           timestamp,
           metadata: { ok: true, presetDigest: preset.digest },
+        };
+      }
+
+      if (input.type === "runtime.project.set" && state === "running") {
+        return {
+          protocol: "v1",
+          type: "runtime.project.set",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: { ok: false, error: "runtime.already-started" },
+        };
+      }
+
+      if (input.type === "runtime.start") {
+        if (state === "idle" || !preset || activation === undefined) {
+          return {
+            protocol: "v1",
+            type: "runtime.start",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: {
+              ok: false,
+              error: "runtime.not-ready",
+              interception: { active: false, reasons: ["not-ready"] },
+            },
+          };
+        }
+        const meta = input.metadata as {
+          policyDigest?: string;
+          extensionId?: string;
+          pacOrigins?: readonly string[];
+          targetPolicy?: {
+            public?: boolean;
+            publicAllowed?: boolean;
+            localOrigins?: readonly string[];
+          };
+        };
+        const sessionConfig: SessionConfig = {
+          policyDigest:
+            typeof meta.policyDigest === "string" ? meta.policyDigest : "",
+          extensionId:
+            typeof meta.extensionId === "string" ? meta.extensionId : "",
+          pacOrigins: Array.isArray(meta.pacOrigins) ? meta.pacOrigins : [],
+          targetPolicy: {
+            public:
+              meta.targetPolicy?.public === true ||
+              meta.targetPolicy?.publicAllowed === true,
+            localOrigins: Array.isArray(meta.targetPolicy?.localOrigins)
+              ? meta.targetPolicy.localOrigins
+              : [],
+          },
+        };
+        const bound = await bindInterception(activation, sessionConfig);
+        activation = bound.activation;
+        return {
+          protocol: "v1",
+          type: "runtime.start",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: {
+            ok: bound.interception.active,
+            interception: bound.interception,
+            ...(activation.proxy !== undefined
+              ? { proxy: activation.proxy }
+              : {}),
+            pacOrigins: activation.pacOrigins,
+          },
+        };
+      }
+
+      if (input.type === "runtime.stop") {
+        await this.stop();
+        return {
+          protocol: "v1",
+          type: "runtime.stop",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: { ok: true, state: "stopped" },
         };
       }
 
@@ -679,8 +831,4 @@ export function createNativeRuntimeController(
       metadata,
     };
   }
-}
-
-function getCurrentSession(): SessionProvider | null {
-  return null;
 }
