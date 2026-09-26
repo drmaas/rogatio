@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-25
+
 # Issue #197 Workflow
 
 > Audience: agent

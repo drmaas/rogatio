@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-25
+
 # AI fix-kind repair — spec
 
 ## Problem

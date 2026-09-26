@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-25
+
 # URL Capture Substitution Plan
 
 > Status: approved — implemented
