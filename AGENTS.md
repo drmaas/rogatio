@@ -106,4 +106,3 @@ All implementation work uses a dedicated git worktree created with `git worktree
 - Create with `git worktree add -b <branch> <path> <baseBranch>`.
 - After creating, run project setup in the new worktree (e.g. `pnpm install`) and confirm the shell is operating there.
 - Tear down with `git worktree remove <path>` (commit changes first).
-- Exception: the pre-existing manual worktree `~/Projects/github/drmaas/rogatio-f7` (branch `feature/f7-extension-shell`) remains in place.
