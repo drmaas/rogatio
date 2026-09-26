@@ -56,8 +56,13 @@ a {
 }
 
 /* Splash landing: center the intro and give it air */
-.starlight-viewport-split .hero,
 .hero {
+  text-align: center;
+}
+
+/* Starlight's split layout ships its own `.hero` rule, so keep the
+   higher-specificity selector to win over it. */
+.starlight-viewport-split .hero {
   text-align: center;
 }
 

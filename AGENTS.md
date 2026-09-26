@@ -27,7 +27,7 @@ Package roles — when reading code, start here to know which boundary you are i
 - `packages/runtime` — private Node ESM runtime foundation: loopback mock/response server (`policy`, `protocol`, `outbound`, `confined-file`), macOS native-messaging host (`lifecycle`, `revalidate`, `interception`, `intercept-proxy`, `pac`, `proxy`, `tls`, `x509`, `trust`), capability-based activation gate. Owns the F23 unified native host (PAC / `chrome.proxy` via host↔extension bridge for HTTP body rewrite; CONNECT is a blind tunnel).
 - `packages/dry-run` — pure offline rule matcher: `dryRunProject(operations, cases)` with 4-dimension results (regex, origin, method, resourceType) and `previewAction` seam. No network, no FS, no permission, no runtime.
 - `packages/sanity` / `packages/smoke` — tiny workspace stubs used by package wiring checks (`sanity` depends on `smoke`); not product packages and not browser e2e fixtures.
-- `packages/docs-site` — Astro/Starlight docs site. Excluded from root `tsc`/`biome` (see `tsconfig.json` `exclude`, `.biomeignore`); isolated by design.
+- `packages/docs-site` — Astro/Starlight docs site. Excluded from root `tsc` (see `tsconfig.json` `exclude`) and from root Biome only for generated output (`!!**/.astro` in `biome.json` `files.includes`); hand-written sources stay lint- and format-checked. Isolated by design.
 
 Workspace-wide files: `scripts/build.ts` (esbuild build), `scripts/validate.ts` (canonical pre-commit/CI gate, also `pnpm validate`), `scripts/serve-smoke.ts` (smoke HTTP server), `scripts/release-*.mjs` (semantic-release plugins), `biome.json`, `tsconfig.base.json`, `vitest.config.ts`, `vitest.browser.config.ts`, `pnpm-workspace.yaml`, `build-manifest.json` (canonical artifact list asserted by the validator).
 
