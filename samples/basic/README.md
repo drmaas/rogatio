@@ -12,7 +12,7 @@ end-to-end.
 | `query`           | `rule-query`        | Adds `ref=rogatio` param                  |
 | `header`          | `rule-header-set`   | Sets `X-Rogatio-Sample` request header     |
 | `header`          | `rule-header-remove`| Removes `X-Test-Header` response header    |
-| `request-body`    | `rule-request-body` | Replaces the POST body                  |
+| `request-body`    | `rule-request-body` | Replaces the POST body (URL capture `$1`) |
 | `response-body`   | `rule-response-body`| Replaces response body text             |
 
 The shipped sample targets `https://example.com`. `example.com` is a real, publicly
@@ -276,8 +276,9 @@ the group. Then:
 
 1. With the runtime installed, trusted, and started (step 6), run from the Console:
    `fetch("http://localhost:8080/submit", { method: "POST", body: '{"original":true}' })`.
-2. The `/submit` response JSON reports `"receivedBody": "{\"replaced\":true}"` — the POST
-   body was replaced before it reached the server.
+2. The `/submit` response JSON reports `"receivedBody": "{\"user\":\"submit\"}"` — the POST
+   body was replaced before it reached the server, with `$1` filled from the URL path
+   capture.
 
 ## File layout
 

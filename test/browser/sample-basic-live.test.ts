@@ -307,7 +307,7 @@ if (LIVE_E2E && SUDO_OK) {
         vitestExpect(
           submitEcho.receivedBody,
           `request-body rewrite failed: ${JSON.stringify(submitEcho)}`,
-        ).toBe('{"replaced":true}');
+        ).toBe('{"user":"submit"}');
       } finally {
         await server.close();
       }

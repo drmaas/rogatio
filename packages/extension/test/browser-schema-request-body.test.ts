@@ -53,6 +53,43 @@ describe(" request-body browser schema", () => {
   it("accepts a valid replace action", () =>
     expect(validateProjectDetailed(project(baseReplace)).valid).toBe(true));
 
+  it("accepts URL captures in replace bodies from source.value", () => {
+    const result = validateProjectDetailed(
+      project({
+        ...baseReplace,
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/users/([^/]+)$",
+        },
+        requestBody: { mode: "replace", body: '{"user":"$1"}' },
+      }),
+    );
+    expect(result).toMatchObject({ valid: true });
+  });
+
+  it("rejects out-of-range URL captures in replace bodies", () => {
+    const result = validateProjectDetailed(
+      project({
+        ...baseReplace,
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/users/([^/]+)$",
+        },
+        requestBody: { mode: "replace", body: '{"user":"$2"}' },
+      }),
+    );
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(
+        result.errors.some((error) =>
+          error.instancePath.endsWith("/requestBody/body"),
+        ),
+      ).toBe(true);
+    }
+  });
+
   it("accepts a valid regex action", () =>
     expect(validateProjectDetailed(project(baseRegex)).valid).toBe(true));
 

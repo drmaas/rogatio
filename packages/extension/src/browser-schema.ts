@@ -944,7 +944,7 @@ export function validateProjectDetailed(
               addCaptureIssues(
                 errors,
                 body,
-                typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+                sourcePattern(rule),
                 `${actionPath}/body`,
               );
             }
