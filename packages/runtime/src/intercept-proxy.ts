@@ -9,7 +9,7 @@ import type {
   ResponseBodyOperation,
   RogatioOperation,
 } from "@rogatio/compiler";
-import { compileUrlRegex, normalizeSiteOrigin } from "@rogatio/schema";
+import { sourceMatches } from "@rogatio/compiler";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { rewriteRequestBody } from "./request-body.js";
 import { rewriteResponseBody } from "./response-body.js";
@@ -37,14 +37,6 @@ export interface InterceptProxyHandle {
 
 type BodyOperation = RequestBodyOperation | ResponseBodyOperation;
 
-function originOf(url: string): string | null {
-  try {
-    return normalizeSiteOrigin(new URL(url).origin);
-  } catch {
-    return null;
-  }
-}
-
 function isBodyOp(op: RogatioOperation): op is BodyOperation {
   return op.kind === "request-body" || op.kind === "response-body";
 }
@@ -54,10 +46,7 @@ function matcherMatches(
   url: string,
   method: string,
 ): boolean {
-  const regex = compileUrlRegex(op.matcher.urlRegex.source);
-  if (regex === null || !regex.test(url)) return false;
-  const origin = originOf(url);
-  if (origin === null || !op.matcher.origins.includes(origin)) return false;
+  if (!sourceMatches(op.matcher.source, url)) return false;
   if (
     op.matcher.method !== undefined &&
     op.matcher.method !== method.toUpperCase()
@@ -346,18 +335,44 @@ function writeResponse(
   res.end(body);
 }
 
+function initiatorFromHeaders(
+  headers: IncomingMessage["headers"],
+  targetUrl: string,
+): string | undefined {
+  const origin = headerValue(headers, "origin");
+  if (typeof origin === "string" && /^https?:\/\//i.test(origin)) {
+    return origin.endsWith("/") ? origin.slice(0, -1) : origin;
+  }
+  const referer = headerValue(headers, "referer");
+  if (typeof referer === "string") {
+    try {
+      return new URL(referer).origin;
+    } catch {
+      // ignore malformed referer
+    }
+  }
+  try {
+    return new URL(targetUrl).origin;
+  } catch {
+    return undefined;
+  }
+}
+
 function authorizeOp(
   policy: InterceptProxyPolicy,
   op: BodyOperation,
   url: string,
   method: string,
+  headers: IncomingMessage["headers"],
 ): boolean {
   const resourceType = op.matcher.resourceTypes[0];
+  const initiator = initiatorFromHeaders(headers, url);
   const decision = revalidateAuthority(policy.project, policy.operations, {
     groupId: op.groupId,
     ruleId: op.ruleId,
     url,
     method,
+    ...(initiator !== undefined ? { initiator } : {}),
     ...(resourceType !== undefined ? { resourceType } : {}),
   });
   return decision.allowed;
@@ -442,7 +457,7 @@ export async function startInterceptProxy(
       let requestBody = bodyResult.body;
 
       if (needsRequestBody && requestOp !== null && active !== null) {
-        if (!authorizeOp(active, requestOp, targetUrl, method)) {
+        if (!authorizeOp(active, requestOp, targetUrl, method, req.headers)) {
           // Denied: pass through original body.
         } else {
           const rewritten = await rewriteRequestBody(
@@ -455,7 +470,7 @@ export async function startInterceptProxy(
             requestOp.requestBody,
             {
               url: targetUrl,
-              urlRegex: requestOp.matcher.urlRegex.source,
+              urlRegex: requestOp.matcher.source.value,
             },
           );
           if (rewritten.ok) {
@@ -481,7 +496,9 @@ export async function startInterceptProxy(
       if (responseOp !== null && active !== null) {
         if (responseBody.byteLength > RUNTIME_LIMITS.maxResponseBodyBytes) {
           // Oversized: pass through untouched.
-        } else if (!authorizeOp(active, responseOp, targetUrl, method)) {
+        } else if (
+          !authorizeOp(active, responseOp, targetUrl, method, req.headers)
+        ) {
           // Denied: pass through.
         } else {
           const action = responseOp.responseBody;
@@ -506,7 +523,7 @@ export async function startInterceptProxy(
             isReplace ? action : undefined,
             {
               url: targetUrl,
-              urlRegex: responseOp.matcher.urlRegex.source,
+              urlRegex: responseOp.matcher.source.value,
             },
           );
           if (rewritten.ok) {

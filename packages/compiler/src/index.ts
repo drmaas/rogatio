@@ -18,6 +18,11 @@ export {
   selectWinningOperation,
   type WinnerResult,
 } from "./selector.js";
+export {
+  literalHostname,
+  sameOrigin,
+  sourceMatches,
+} from "./source-match.js";
 export type {
   CompileResult,
   CompilerDiagnostic,

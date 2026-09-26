@@ -2,19 +2,21 @@ import { describe, expect, it, vi } from "vitest";
 import { createExtensionApplication } from "../src/service-worker.js";
 
 const requestBodyProject = {
-  version: 1,
+  version: 2,
   name: "Request body project",
   groups: [
     {
       id: "group-body",
       name: "Body group",
-      origins: ["https://example.com"],
       rules: [
         {
           id: "rule-replace",
           name: "Replace body",
-          urlRegex: "^https://example\\.com/api$",
-          origins: [],
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://example\\.com/api$",
+          },
           resourceTypes: ["xmlhttprequest"],
           priority: 50,
           method: "POST",
@@ -42,11 +44,6 @@ function harness() {
         stored = next;
         return true;
       },
-    },
-    permissions: {
-      contains: async () => true,
-      request: async () => true,
-      remove: async () => true,
     },
     installer: {
       current: async () => [],

@@ -16,6 +16,15 @@ export {
   isForbiddenHeader,
 } from "./headers.js";
 export { LIMITS } from "./limits.js";
+export type {
+  MigrateV1Result,
+  MigrationNotice,
+  MigrationNoticeCode,
+} from "./migrate-v1.js";
+export {
+  migrateV1Project,
+  regexProvenInsideOrigins,
+} from "./migrate-v1.js";
 export { isSiteOrigin, normalizeSiteOrigin } from "./origins.js";
 export { compileUrlRegex, isValidUrlRegex } from "./regex.js";
 export type { Result } from "./result.js";
@@ -45,6 +54,9 @@ export type {
   RogatioRule,
   RogatioRuleAction,
   RuleType,
+  SourceCondition,
+  SourceKey,
+  SourceOperator,
 } from "./types.js";
 export { HTTP_METHODS, PROJECT_VERSION, RESOURCE_TYPES } from "./types.js";
 export { hasLoneSurrogate } from "./utf16.js";

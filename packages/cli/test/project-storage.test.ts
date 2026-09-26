@@ -36,7 +36,7 @@ describe("ProjectStorage (JSON-file)", () => {
 
   describe("get / create / update round-trip", () => {
     it("round-trips a project document via create then get", async () => {
-      const project = { version: 1, name: "RoundTrip", groups: [] };
+      const project = { version: 2, name: "RoundTrip", groups: [] };
       const ref = await storage.create({ id: testFile, data: project });
 
       expect(ref).toEqual({ id: testFile, name: "RoundTrip" });
@@ -46,16 +46,16 @@ describe("ProjectStorage (JSON-file)", () => {
     it("update replaces the document for an existing id", async () => {
       await storage.create({
         id: testFile,
-        data: { version: 1, name: "Before", groups: [] },
+        data: { version: 2, name: "Before", groups: [] },
       });
       await storage.update(testFile, {
-        version: 1,
+        version: 2,
         name: "After",
         groups: [],
       });
 
       await expect(storage.get(testFile)).resolves.toEqual({
-        version: 1,
+        version: 2,
         name: "After",
         groups: [],
       });
@@ -64,12 +64,12 @@ describe("ProjectStorage (JSON-file)", () => {
     it("writes pretty JSON and leaves no leftover temp files", async () => {
       await storage.create({
         id: testFile,
-        data: { version: 1, name: "Atomic", groups: [] },
+        data: { version: 2, name: "Atomic", groups: [] },
       });
 
       const raw = await readFile(testFile, "utf-8");
       expect(raw).toBe(
-        `${JSON.stringify({ version: 1, name: "Atomic", groups: [] }, null, 2)}`,
+        `${JSON.stringify({ version: 2, name: "Atomic", groups: [] }, null, 2)}`,
       );
 
       const entries = await readdir(testDir);
@@ -84,7 +84,7 @@ describe("ProjectStorage (JSON-file)", () => {
       expect(ref.id).toBe(testFile);
       expect(ref.name).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
       await expect(storage.get(testFile)).resolves.toEqual({
-        version: 1,
+        version: 2,
         name: ref.name,
         groups: [],
       });
@@ -232,17 +232,17 @@ describe("ProjectStorage (JSON-file)", () => {
 
   describe("wrapper parity", () => {
     it("readProject delegates to storage.get", async () => {
-      const project = { version: 1, name: "ViaWrapper", groups: [] };
+      const project = { version: 2, name: "ViaWrapper", groups: [] };
       await storage.create({ id: testFile, data: project });
       await expect(readProject(testFile)).resolves.toEqual(project);
     });
 
     it("writeProject upserts (create when missing, update when present)", async () => {
-      const first = { version: 1, name: "First", groups: [] };
+      const first = { version: 2, name: "First", groups: [] };
       await writeProject(testFile, first);
       await expect(storage.get(testFile)).resolves.toEqual(first);
 
-      const second = { version: 1, name: "Second", groups: [] };
+      const second = { version: 2, name: "Second", groups: [] };
       await writeProject(testFile, second);
       await expect(storage.get(testFile)).resolves.toEqual(second);
       await expect(readProject(testFile)).resolves.toEqual(second);
@@ -258,7 +258,7 @@ describe("ProjectStorage (JSON-file)", () => {
 
   describe("import", () => {
     it("creates a new project when id is missing", async () => {
-      const data = { version: 1, name: "Imported", groups: [] };
+      const data = { version: 2, name: "Imported", groups: [] };
       const ref = await storage.import(data, { id: testFile });
 
       expect(ref).toEqual({ id: testFile, name: "Imported" });
@@ -268,9 +268,9 @@ describe("ProjectStorage (JSON-file)", () => {
     it("replaces an existing project at the same id", async () => {
       await storage.create({
         id: testFile,
-        data: { version: 1, name: "Original", groups: [] },
+        data: { version: 2, name: "Original", groups: [] },
       });
-      const replacement = { version: 1, name: "Replaced", groups: [] };
+      const replacement = { version: 2, name: "Replaced", groups: [] };
       const ref = await storage.import(replacement, { id: testFile });
 
       expect(ref).toEqual({ id: testFile, name: "Replaced" });
@@ -291,7 +291,7 @@ describe("ProjectStorage (JSON-file)", () => {
 
     it("persists provided data only (no network I/O)", async () => {
       const data = {
-        version: 1,
+        version: 2,
         name: "LocalOnly",
         groups: [],
         note: "caller-supplied",

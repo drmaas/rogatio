@@ -18,7 +18,11 @@ function networkOperation(
   );
   expect(normalized.ok).toBe(true);
   if (!normalized.ok) throw new Error("Expected a valid network grant");
-  const authorized = authorizeExact(normalized.value, makeGrant(overrides));
+  const authorized = authorizeExact(
+    normalized.value,
+    makeGrant(overrides),
+    "https://example.com/page",
+  );
   expect(authorized.ok).toBe(true);
   if (!authorized.ok) throw new Error("Expected an authorized operation");
   return authorized.value;

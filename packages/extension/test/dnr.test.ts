@@ -31,8 +31,11 @@ const queryOp: QueryOperation = {
   name: "query-1",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/",
+    },
     resourceTypes: ["main_frame"],
     priority: 10,
   },
@@ -46,8 +49,11 @@ const redirectOp: RedirectOperation = {
   name: "r1",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/(.*)$", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/(.*)$",
+    },
     resourceTypes: ["main_frame"],
     priority: 5,
   },
@@ -61,8 +67,11 @@ const headerOp: HeaderOperation = {
   name: "rule-header-set",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/",
+    },
     resourceTypes: ["main_frame"],
     priority: 100,
     method: "GET",
@@ -82,8 +91,11 @@ const bodyOp: ResponseBodyOperation = {
   name: "rule-response-body",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/data$", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/data$",
+    },
     resourceTypes: ["xmlhttprequest"],
     priority: 100,
   },
@@ -119,7 +131,6 @@ describe("F9 DNR translation", () => {
       condition: {
         regexFilter: "^https://example\\.com/(.*)$",
         resourceTypes: ["main_frame"],
-        requestDomains: ["example.com"],
       },
     });
   });
@@ -171,7 +182,6 @@ describe("F9 DNR translation", () => {
       condition: {
         regexFilter: "^https://example\\.com/",
         resourceTypes: ["main_frame"],
-        requestDomains: ["example.com"],
       },
     });
   });
@@ -198,7 +208,6 @@ describe("F9 DNR translation", () => {
       condition: {
         regexFilter: "^https://example\\.com/",
         resourceTypes: ["main_frame"],
-        requestDomains: ["example.com"],
       },
     });
   });

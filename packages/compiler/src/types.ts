@@ -9,11 +9,11 @@ import type {
 } from "@rogatio/schema";
 
 export interface NormalizedMatcher {
-  readonly urlRegex: {
-    readonly source: string;
-    readonly flags: "";
+  readonly source: {
+    readonly key: "url" | "host";
+    readonly operator: "regex";
+    readonly value: string;
   };
-  readonly origins: readonly string[];
   readonly resourceTypes: readonly ResourceType[];
   readonly priority: number;
   readonly method?: HttpMethod;
@@ -83,7 +83,6 @@ export type CompilerDiagnosticCode =
   | "schema.out-of-range"
   | "schema.invalid-structure"
   | "schema.duplicate-id"
-  | "schema.no-effective-origin"
   | "schema.rule-limit"
   | "compiler.invariant"
   | "compiler.forbidden-header"

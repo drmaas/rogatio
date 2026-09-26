@@ -13,8 +13,11 @@ const proposal = {
       kind: "redirect",
       groupId: "group-a",
       name: "Redirect old",
-      urlRegex: "^https://example\\.com/old$",
-      origins: [],
+      source: {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/old$",
+      },
       resourceTypes: ["main_frame"],
       priority: 100,
       action: { destination: "https://example.com/new" },
@@ -166,7 +169,7 @@ describe("extension AI Assist", () => {
               kind: "redirect",
               groupId: "g1",
               name: "Bad",
-              urlRegex: "[",
+              source: { key: "url", operator: "regex", value: "[" },
               action: { destination: "https://example.com/new" },
             },
           ],
@@ -194,7 +197,11 @@ describe("extension AI Assist", () => {
     const broken = structuredClone(project) as unknown as {
       groups: Array<{ rules: Array<Record<string, unknown>> }>;
     } & Record<string, unknown>;
-    broken.groups[0].rules[0].urlRegex = "[";
+    broken.groups[0].rules[0].source = {
+      key: "url",
+      operator: "regex",
+      value: "[",
+    };
     const { app } = harness();
     await start(app);
 
@@ -209,7 +216,7 @@ describe("extension AI Assist", () => {
           {
             code: "schema.invalid-regex",
             severity: "error",
-            path: "/groups/0/rules/0/urlRegex",
+            path: "/groups/0/rules/0/source/value",
             message: "Invalid regex",
           },
         ],
@@ -226,7 +233,11 @@ describe("extension AI Assist", () => {
     const broken = structuredClone(project) as unknown as {
       groups: Array<{ rules: Array<Record<string, unknown>> }>;
     } & Record<string, unknown>;
-    broken.groups[0].rules[0].urlRegex = "[";
+    broken.groups[0].rules[0].source = {
+      key: "url",
+      operator: "regex",
+      value: "[",
+    };
     // Structurally valid proposal, but targeting a new group: it appends
     // instead of repairing, so the merged project stays invalid.
     const nonRepairing = {
@@ -252,7 +263,7 @@ describe("extension AI Assist", () => {
             {
               code: "schema.invalid-regex",
               severity: "error",
-              path: "/groups/0/rules/0/urlRegex",
+              path: "/groups/0/rules/0/source/value",
               message: "Invalid regex",
             },
           ],
@@ -268,7 +279,11 @@ describe("extension AI Assist", () => {
     const broken = structuredClone(project) as unknown as {
       groups: Array<{ rules: Array<Record<string, unknown>> }>;
     } & Record<string, unknown>;
-    broken.groups[0].rules[0].urlRegex = "[";
+    broken.groups[0].rules[0].source = {
+      key: "url",
+      operator: "regex",
+      value: "[",
+    };
     const { app } = harness();
     await start(app);
 

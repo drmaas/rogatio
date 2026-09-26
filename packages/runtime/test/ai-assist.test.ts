@@ -47,8 +47,11 @@ describe("ai-assist", () => {
           kind: "redirect",
           groupId: "group-1",
           name: "Redirect API",
-          urlRegex: "^https://api\\.example\\.com/",
-          origins: ["https://api.example.com"],
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://api\\.example\\.com/",
+          },
           resourceTypes: ["main_frame", "xmlhttprequest"],
           priority: 100,
           method: "GET",
@@ -65,13 +68,12 @@ describe("ai-assist", () => {
     unknown
   > {
     return {
-      version: 1,
+      version: 2,
       name: "Test Project",
       groups: [
         {
           id: "group-1",
           name: "API Rules",
-          origins: ["https://api.example.com"],
           rules: [],
         },
       ],
@@ -142,7 +144,12 @@ describe("ai-assist", () => {
 
     it("retries with fix when validation fails", async () => {
       const invalidProposal = createMockProposal({
-        rules: [{ ...createMockProposal().rules[0], urlRegex: "[invalid" }],
+        rules: [
+          {
+            ...createMockProposal().rules[0],
+            source: { key: "url", operator: "regex", value: "[invalid" },
+          },
+        ],
       });
       const fixedProposal = createMockProposal();
 
@@ -159,7 +166,7 @@ describe("ai-assist", () => {
             {
               code: "schema.invalid-regex",
               severity: "error" as const,
-              path: "/groups/0/rules/0/urlRegex",
+              path: "/groups/0/rules/0/source/value",
               message: "Invalid regex",
             } as EditorDiagnostic,
           ];
@@ -188,7 +195,12 @@ describe("ai-assist", () => {
 
     it("fails after max fix attempts", async () => {
       const invalidProposal = createMockProposal({
-        rules: [{ ...createMockProposal().rules[0], urlRegex: "[invalid" }],
+        rules: [
+          {
+            ...createMockProposal().rules[0],
+            source: { key: "url", operator: "regex", value: "[invalid" },
+          },
+        ],
       });
 
       mockClient.complete = vi.fn().mockResolvedValue({
@@ -198,7 +210,7 @@ describe("ai-assist", () => {
         {
           code: "schema.invalid-regex",
           severity: "error",
-          path: "/groups/0/rules/0/urlRegex",
+          path: "/groups/0/rules/0/source/value",
           message: "Invalid regex",
         } as EditorDiagnostic,
       ]);
@@ -219,7 +231,12 @@ describe("ai-assist", () => {
 
     it("passes diagnostics to fix request", async () => {
       const invalidProposal = createMockProposal({
-        rules: [{ ...createMockProposal().rules[0], urlRegex: "[invalid" }],
+        rules: [
+          {
+            ...createMockProposal().rules[0],
+            source: { key: "url", operator: "regex", value: "[invalid" },
+          },
+        ],
       });
       const fixedProposal = createMockProposal();
 
@@ -236,7 +253,7 @@ describe("ai-assist", () => {
             {
               code: "schema.invalid-regex",
               severity: "error" as const,
-              path: "/groups/0/rules/0/urlRegex",
+              path: "/groups/0/rules/0/source/value",
               message: "Invalid regex",
             } as EditorDiagnostic,
           ];
@@ -277,7 +294,7 @@ describe("ai-assist", () => {
             {
               code: "schema.invalid-regex",
               severity: "error",
-              path: "/groups/0/rules/0/urlRegex",
+              path: "/groups/0/rules/0/source/value",
               message: "Invalid regex",
             } as EditorDiagnostic,
           ],
@@ -336,19 +353,17 @@ describe("ai-assist", () => {
   describe("repairProposalIntoProject", () => {
     function brokenProject(): { groups?: unknown[] } & Record<string, unknown> {
       return {
-        version: 1,
+        version: 2,
         name: "Broken project",
         groups: [
           {
             id: "group-1",
             name: "API Rules",
-            origins: ["https://api.example.com"],
             rules: [
               {
                 id: "rule-broken",
                 name: "Broken",
-                urlRegex: "[",
-                origins: [],
+                source: { key: "url", operator: "regex", value: "[" },
                 resourceTypes: ["main_frame"],
                 priority: 100,
                 type: "redirect",
@@ -364,7 +379,7 @@ describe("ai-assist", () => {
       {
         code: "schema.invalid-regex",
         severity: "error",
-        path: "/groups/0/rules/0/urlRegex",
+        path: "/groups/0/rules/0/source/value",
         message: "Invalid regex",
       },
     ];
@@ -382,7 +397,7 @@ describe("ai-assist", () => {
       expect(
         repairTargetsFromDiagnostics([
           { path: "/groups/1/rules/0/name" },
-          { path: "/groups/0/rules/2/urlRegex" },
+          { path: "/groups/0/rules/2/source/value" },
           { path: "/groups/0/rules/2/action" },
           { path: "/groups/0" },
           { path: "/name" },
@@ -405,7 +420,11 @@ describe("ai-assist", () => {
       const rules = rulesOf(repaired);
       expect(rules).toHaveLength(1);
       expect(rules[0].id).toBe("rule-broken");
-      expect(rules[0].urlRegex).toBe("^https://api\\.example\\.com/");
+      expect(rules[0].source).toEqual({
+        key: "url",
+        operator: "regex",
+        value: "^https://api\\.example\\.com/",
+      });
       expect(rules[0].type).toBe("redirect");
       expect(validateProjectDetailed(repaired).valid).toBe(true);
     });
@@ -416,8 +435,7 @@ describe("ai-assist", () => {
       (group.rules as unknown[]).push({
         id: "rule-broken-2",
         name: "Broken 2",
-        urlRegex: "(",
-        origins: [],
+        source: { key: "url", operator: "regex", value: "(" },
         resourceTypes: ["main_frame"],
         priority: 100,
         type: "redirect",
@@ -434,8 +452,8 @@ describe("ai-assist", () => {
       const repaired = repairProposalIntoProject(
         project,
         [
-          { path: "/groups/0/rules/1/urlRegex" },
-          { path: "/groups/0/rules/0/urlRegex" },
+          { path: "/groups/0/rules/1/source/value" },
+          { path: "/groups/0/rules/0/source/value" },
         ],
         proposal,
       );
@@ -451,7 +469,7 @@ describe("ai-assist", () => {
     it("appends like the merge when no repair target exists", () => {
       const repaired = repairProposalIntoProject(
         createValidProject(),
-        [{ path: "/groups/0/rules/5/urlRegex" }],
+        [{ path: "/groups/0/rules/5/source/value" }],
         createMockProposal(),
       );
       const rules = rulesOf(repaired);
@@ -465,7 +483,7 @@ describe("ai-assist", () => {
           null,
           42,
           { kind: "redirect" },
-          { ...createMockProposal().rules[0], origins: 7 },
+          { ...createMockProposal().rules[0], source: 7 },
         ],
         explanation: "junk",
       } as unknown as AIProposal;
@@ -476,10 +494,9 @@ describe("ai-assist", () => {
       );
       const rules = rulesOf(repaired);
       // The last rule is structurally valid; it repairs the broken rule and
-      // drops the malformed origins value.
+      // drops the malformed source value.
       expect(rules).toHaveLength(1);
       expect(rules[0].id).toBe("rule-broken");
-      expect(rules[0].origins).toEqual([]);
     });
 
     it("runAIAssist validates the repaired project for fix requests (AC-004)", async () => {
@@ -512,7 +529,11 @@ describe("ai-assist", () => {
       const rules = rulesOf(validated);
       expect(rules).toHaveLength(1);
       expect(rules[0].id).toBe("rule-broken");
-      expect(rules[0].urlRegex).toBe("^https://api\\.example\\.com/");
+      expect(rules[0].source).toEqual({
+        key: "url",
+        operator: "regex",
+        value: "^https://api\\.example\\.com/",
+      });
     });
   });
 
@@ -537,7 +558,7 @@ describe("ai-assist", () => {
       const prompt = buildSystemPrompt(createValidProject());
       expect(prompt.toLowerCase()).toContain("regex");
       expect(prompt.toLowerCase()).toContain("forbidden");
-      expect(prompt.toLowerCase()).toContain("origin");
+      expect(prompt.toLowerCase()).toContain("source");
       expect(prompt.toLowerCase()).toContain("resourcetypes");
       expect(prompt.toLowerCase()).toContain("method");
     });

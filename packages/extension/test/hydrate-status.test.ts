@@ -5,19 +5,21 @@ import { createExtensionApplication } from "../src/service-worker.js";
 import { chromeHeldInstaller, HEADER_BAND_ID } from "./dnr-harness.js";
 
 const redirectProject: RogatioProject = {
-  version: 1,
+  version: 2,
   name: "P2 hydrate project",
   groups: [
     {
       id: "group-a",
       name: "Group A",
-      origins: ["https://example.com"],
       rules: [
         {
           id: "rule-redirect",
           name: "Redirect rule",
-          urlRegex: "^https://example\\.com/(.*)$",
-          origins: [],
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://example\\.com/(.*)$",
+          },
           resourceTypes: ["main_frame"],
           priority: 100,
           type: "redirect",
@@ -41,11 +43,6 @@ describe("P2 projectState hydrate → installedRuleIds", () => {
           envelope = next;
           return true;
         },
-      },
-      permissions: {
-        contains: async () => true,
-        request: vi.fn(async () => true),
-        remove: async () => true,
       },
       installer: warm,
       generateId: () => "project-hydrate",
@@ -106,11 +103,6 @@ describe("P2 projectState hydrate → installedRuleIds", () => {
           return true;
         },
       },
-      permissions: {
-        contains: async () => true,
-        request: vi.fn(async () => true),
-        remove: async () => true,
-      },
       installer: cold,
       generateId: () => "project-hydrate",
       now: () => 1,
@@ -132,19 +124,21 @@ describe("P2 projectState hydrate → installedRuleIds", () => {
 
 describe("P3a projectState hydrate headers", () => {
   const headerProject: RogatioProject = {
-    version: 1,
+    version: 2,
     name: "P3a header hydrate project",
     groups: [
       {
         id: "group-a",
         name: "Group A",
-        origins: ["https://example.com"],
         rules: [
           {
             id: "rule-header-set",
             name: "Header rule",
-            urlRegex: "^https://example\\.com/",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/",
+            },
             resourceTypes: ["main_frame"],
             priority: 100,
             method: "GET",
@@ -171,11 +165,6 @@ describe("P3a projectState hydrate headers", () => {
           envelope = next;
           return true;
         },
-      },
-      permissions: {
-        contains: async () => true,
-        request: vi.fn(async () => true),
-        remove: async () => true,
       },
       installer: warm,
       generateId: () => "project-header-hydrate",
@@ -234,11 +223,6 @@ describe("P3a projectState hydrate headers", () => {
           return true;
         },
       },
-      permissions: {
-        contains: async () => true,
-        request: vi.fn(async () => true),
-        remove: async () => true,
-      },
       installer: cold,
       generateId: () => "project-header-hydrate",
       now: () => 1,
@@ -260,19 +244,21 @@ describe("P3a projectState hydrate headers", () => {
 
 describe("P3a body stays native overlay", () => {
   const mixedProject: RogatioProject = {
-    version: 1,
+    version: 2,
     name: "P3a mixed project",
     groups: [
       {
         id: "group-a",
         name: "Group A",
-        origins: ["https://example.com"],
         rules: [
           {
             id: "rule-header",
             name: "Header rule",
-            urlRegex: "^https://example\\.com/",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/",
+            },
             resourceTypes: ["main_frame"],
             priority: 100,
             method: "GET",
@@ -285,8 +271,11 @@ describe("P3a body stays native overlay", () => {
           {
             id: "rule-response-body",
             name: "Body rule",
-            urlRegex: "^https://example\\.com/data$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/data$",
+            },
             resourceTypes: ["xmlhttprequest"],
             priority: 100,
             method: "GET",
@@ -312,11 +301,6 @@ describe("P3a body stays native overlay", () => {
           envelope = next;
           return true;
         },
-      },
-      permissions: {
-        contains: async () => true,
-        request: vi.fn(async () => true),
-        remove: async () => true,
       },
       installer,
       nativeRuntime: {
@@ -394,19 +378,21 @@ describe("P3a body stays native overlay", () => {
 
 describe("P3a set-group-enabled uses full desired DNR set", () => {
   const twoGroupProject: RogatioProject = {
-    version: 1,
+    version: 2,
     name: "P3a two-group project",
     groups: [
       {
         id: "group-headers",
         name: "Headers",
-        origins: ["https://example.com"],
         rules: [
           {
             id: "rule-header",
             name: "Header rule",
-            urlRegex: "^https://example\\.com/",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/",
+            },
             resourceTypes: ["main_frame"],
             priority: 100,
             method: "GET",
@@ -421,13 +407,15 @@ describe("P3a set-group-enabled uses full desired DNR set", () => {
       {
         id: "group-redirect",
         name: "Redirect",
-        origins: ["https://example.com"],
         rules: [
           {
             id: "rule-redirect",
             name: "Redirect rule",
-            urlRegex: "^https://example\\.com/(.*)$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/(.*)$",
+            },
             resourceTypes: ["main_frame"],
             priority: 100,
             type: "redirect",
@@ -449,11 +437,6 @@ describe("P3a set-group-enabled uses full desired DNR set", () => {
           envelope = next;
           return true;
         },
-      },
-      permissions: {
-        contains: async () => true,
-        request: vi.fn(async () => true),
-        remove: async () => true,
       },
       installer,
       generateId: () => "project-two-group",

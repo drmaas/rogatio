@@ -23,8 +23,11 @@ function makeOperation(ruleId: string, priority = 100): MatcherOperation {
     name: ruleId,
     redactSensitiveInLogs: false,
     matcher: {
-      urlRegex: { source: "^https://example\\.com/", flags: "" },
-      origins: ["https://example.com"],
+      source: {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/",
+      },
       resourceTypes: ["main_frame"],
       priority,
     },

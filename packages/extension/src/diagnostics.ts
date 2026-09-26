@@ -11,6 +11,8 @@ export type ExtensionDiagnosticCode =
   | "extension.invalid-header"
   | "extension.forbidden-header"
   | "extension.dnr-error"
+  | "extension.source-unprojectable"
+  | "runtime.pac-unroutable"
   | "extension.native-runtime-unavailable"
   | "extension.native-runtime-transition"
   | "extension.native-host-missing"
@@ -50,6 +52,10 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.forbidden-header":
     "The header name is forbidden for the given direction.",
   "extension.dnr-error": "The declarativeNetRequest operation failed.",
+  "extension.source-unprojectable":
+    "The rule source condition cannot be projected to browser rules.",
+  "runtime.pac-unroutable":
+    "The body rule has no PAC route; traffic stays direct until runtime handles it.",
   "extension.native-runtime-unavailable":
     "The runtime is unavailable on this platform.",
   "extension.native-runtime-transition": "The runtime could not change state.",

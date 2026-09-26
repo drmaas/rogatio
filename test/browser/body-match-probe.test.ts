@@ -433,9 +433,7 @@ async function runBodyShapeProbe(
 test("body-match probe — request-body and response-body URL markers", async ({
   registerDriver,
 }) => {
-  const { driver, page, extensionId, close } = await extensionContext({
-    grantOrigins: [SMOKE_HOST_PATTERN],
-  });
+  const { driver, page, extensionId, close } = await extensionContext({});
   registerDriver(driver, close);
 
   expect(await waitForExtensionServiceWorker(driver, extensionId)).toBe(true);

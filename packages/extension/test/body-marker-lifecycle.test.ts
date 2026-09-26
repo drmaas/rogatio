@@ -24,8 +24,11 @@ const requestBodyOp: RequestBodyOperation = {
   name: "body-req-1",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/api$", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/api$",
+    },
     resourceTypes: ["xmlhttprequest"],
     priority: 50,
     method: "POST",
@@ -40,8 +43,11 @@ const responseBodyOp: ResponseBodyOperation = {
   name: "body-res-1",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/page$", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/page$",
+    },
     resourceTypes: ["xmlhttprequest"],
     priority: 40,
     method: "GET",
@@ -63,19 +69,21 @@ function sessionOptions(overrides: {
   } | null>;
 }) {
   const projectData = {
-    version: 1,
+    version: 2,
     name: "Body lifecycle",
     groups: [
       {
         id: "g1",
         name: "g1",
-        origins: ["https://example.com"],
         rules: [
           {
             id: "body-req-1",
             name: "body-req-1",
-            urlRegex: "^https://example\\.com/api$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/api$",
+            },
             resourceTypes: ["xmlhttprequest"],
             priority: 50,
             method: "POST",
@@ -85,8 +93,11 @@ function sessionOptions(overrides: {
           {
             id: "body-res-1",
             name: "body-res-1",
-            urlRegex: "^https://example\\.com/page$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/page$",
+            },
             resourceTypes: ["xmlhttprequest"],
             priority: 40,
             method: "GET",
@@ -112,7 +123,6 @@ function sessionOptions(overrides: {
         data: projectData,
         enabledGroupIds: ["g1"],
       })),
-    getGrantedOrigins: async () => ["https://example.com/"] as const,
     bodyMarkers: {
       api: overrides.api,
       runtimeStripPathAvailable: overrides.runtimeStripPathAvailable ?? true,
@@ -259,8 +269,11 @@ describe("body-marker lifecycle + index merge", () => {
       name: "h1",
       redactSensitiveInLogs: false,
       matcher: {
-        urlRegex: { source: "^https://example\\.com/", flags: "" as const },
-        origins: ["https://example.com"],
+        source: {
+          key: "url" as const,
+          operator: "regex" as const,
+          value: "^https://example\\.com/",
+        },
         resourceTypes: ["main_frame" as const],
         priority: 1,
       },

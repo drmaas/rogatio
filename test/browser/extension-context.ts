@@ -16,37 +16,9 @@ export interface ExtensionContext {
 }
 
 export interface ExtensionContextOptions {
-  /** Optional host patterns (e.g. `http://127.0.0.1:4173/*`) seeded before relaunch. */
-  readonly grantOrigins?: readonly string[];
+  /** Extra Chrome arguments for this profile (for example a proxy bypass override). */
+  readonly chromeArgs?: readonly string[];
 }
-
-type ExtensionSetting = {
-  path?: string;
-  active_permissions?: {
-    api?: string[];
-    explicit_host?: string[];
-    manifest_permissions?: string[];
-    scriptable_host?: string[];
-  };
-  granted_permissions?: {
-    api?: string[];
-    explicit_host?: string[];
-    manifest_permissions?: string[];
-    scriptable_host?: string[];
-  };
-  withheld_permissions?: {
-    api?: string[];
-    explicit_host?: string[];
-    manifest_permissions?: string[];
-    scriptable_host?: string[];
-  };
-};
-
-type PreferencesFile = {
-  extensions?: {
-    settings?: Record<string, ExtensionSetting>;
-  };
-};
 
 const NATIVE_HOST_NAME = "com.rogatio.runtime";
 
@@ -211,96 +183,13 @@ async function discoverExtensionId(
 async function launchExtensionDriver(
   profile: string,
   extensionPath: string,
+  chromeArgs: readonly string[] = [],
 ): Promise<WebDriver> {
   return createDriver({
     userDataDir: profile,
     extensionPath,
+    args: [...chromeArgs],
   });
-}
-
-async function waitForProfileUnlocked(
-  profile: string,
-  timeoutMs = 10_000,
-): Promise<void> {
-  const locks = ["SingletonLock", "SingletonCookie", "SingletonSocket"].map(
-    (name) => join(profile, name),
-  );
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!locks.some((path) => existsSync(path))) return;
-    await sleep(50);
-  }
-}
-
-async function readPreferences(profile: string): Promise<PreferencesFile> {
-  const prefsPath = join(profile, "Default", "Preferences");
-  return JSON.parse(await readFile(prefsPath, "utf8")) as PreferencesFile;
-}
-
-async function waitForExtensionSettings(
-  profile: string,
-  extensionPath: string,
-  preferredId: string,
-  timeoutMs = 15_000,
-): Promise<{ extensionId: string; prefs: PreferencesFile }> {
-  const prefsPath = join(profile, "Default", "Preferences");
-  const deadline = Date.now() + timeoutMs;
-  let lastError: unknown;
-  while (Date.now() < deadline) {
-    try {
-      const prefs = await readPreferences(profile);
-      const settings = prefs.extensions?.settings ?? {};
-      const preferred = settings[preferredId];
-      if (preferred?.active_permissions !== undefined) {
-        return { extensionId: preferredId, prefs };
-      }
-      for (const [id, setting] of Object.entries(settings)) {
-        if (
-          setting.active_permissions !== undefined &&
-          typeof setting.path === "string" &&
-          (setting.path === extensionPath ||
-            setting.path.includes("packages/extension/dist"))
-        ) {
-          return { extensionId: id, prefs };
-        }
-      }
-      for (const [id, setting] of Object.entries(settings)) {
-        if (setting.active_permissions !== undefined && id.length === 32) {
-          return { extensionId: id, prefs };
-        }
-      }
-    } catch (error) {
-      lastError = error;
-    }
-    await sleep(100);
-  }
-  throw new Error(
-    `extension settings missing under ${prefsPath}${
-      lastError ? ` (${String(lastError)})` : ""
-    }`,
-  );
-}
-
-async function seedGrantedOrigins(
-  profile: string,
-  extensionId: string,
-  grantOrigins: readonly string[],
-  prefs: PreferencesFile,
-): Promise<void> {
-  const prefsPath = join(profile, "Default", "Preferences");
-  const setting = prefs.extensions?.settings?.[extensionId];
-  if (setting?.active_permissions === undefined) {
-    throw new Error(`extension settings missing for ${extensionId}`);
-  }
-  setting.active_permissions.explicit_host = [...grantOrigins];
-  setting.granted_permissions = structuredClone(setting.active_permissions);
-  setting.withheld_permissions = {
-    api: [],
-    explicit_host: [],
-    manifest_permissions: [],
-    scriptable_host: [],
-  };
-  await writeFile(prefsPath, JSON.stringify(prefs));
 }
 
 // Launches Chrome with the built extension loaded. Callers own teardown via close().
@@ -311,30 +200,11 @@ export async function extensionContext(
   const extensionPath = resolveExtensionPath();
   let extensionId = computeExtensionId(extensionPath);
 
-  if (options.grantOrigins !== undefined && options.grantOrigins.length > 0) {
-    const bootstrap = await launchExtensionDriver(profile, extensionPath);
-    try {
-      const liveId = await discoverExtensionId(bootstrap);
-      if (liveId) extensionId = liveId;
-    } finally {
-      await bootstrap.quit().catch(() => undefined);
-    }
-    await waitForProfileUnlocked(profile);
-    const waited = await waitForExtensionSettings(
-      profile,
-      extensionPath,
-      extensionId,
-    );
-    extensionId = waited.extensionId;
-    await seedGrantedOrigins(
-      profile,
-      extensionId,
-      options.grantOrigins,
-      waited.prefs,
-    );
-  }
-
-  const driver = await launchExtensionDriver(profile, extensionPath);
+  const driver = await launchExtensionDriver(
+    profile,
+    extensionPath,
+    options.chromeArgs,
+  );
   const liveId = await discoverExtensionId(driver);
   if (liveId) extensionId = liveId;
   const page = new Page(driver);

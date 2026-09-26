@@ -3,6 +3,12 @@
  * Mirrors runtime merge semantics without importing @rogatio/runtime.
  */
 
+export interface ExtensionSourceProposal {
+  readonly key: "url" | "host";
+  readonly operator: "regex";
+  readonly value: string;
+}
+
 export interface ExtensionRuleProposal {
   readonly kind:
     | "redirect"
@@ -12,8 +18,7 @@ export interface ExtensionRuleProposal {
     | "request-body";
   readonly groupId: string;
   readonly name: string;
-  readonly urlRegex: string;
-  readonly origins?: readonly string[];
+  readonly source: ExtensionSourceProposal;
   readonly resourceTypes?: readonly string[];
   readonly priority?: number;
   readonly method?: string;
@@ -61,19 +66,27 @@ export function parseAIProposal(value: unknown): ExtensionAIProposal | null {
     if (typeof entry.groupId !== "string" || typeof entry.name !== "string") {
       return null;
     }
-    if (typeof entry.urlRegex !== "string" || !Object.hasOwn(entry, "action")) {
+    if (!isRecord(entry.source) || !Object.hasOwn(entry, "action")) {
+      return null;
+    }
+    const source = entry.source;
+    if (
+      (source.key !== "url" && source.key !== "host") ||
+      source.operator !== "regex" ||
+      typeof source.value !== "string" ||
+      source.value.length === 0
+    ) {
       return null;
     }
     rules.push({
       kind: entry.kind as ExtensionRuleProposal["kind"],
       groupId: entry.groupId,
       name: entry.name,
-      urlRegex: entry.urlRegex,
-      origins: Array.isArray(entry.origins)
-        ? entry.origins.filter(
-            (item): item is string => typeof item === "string",
-          )
-        : undefined,
+      source: {
+        key: source.key,
+        operator: "regex",
+        value: source.value,
+      },
       resourceTypes: Array.isArray(entry.resourceTypes)
         ? entry.resourceTypes.filter(
             (item): item is string => typeof item === "string",
@@ -94,8 +107,11 @@ export function ruleFromProposal(
   const rule: Record<string, unknown> = {
     id: ruleId,
     name: proposal.name,
-    urlRegex: proposal.urlRegex,
-    origins: proposal.origins ? [...proposal.origins] : [],
+    source: {
+      key: proposal.source.key,
+      operator: "regex",
+      value: proposal.source.value,
+    },
     resourceTypes: proposal.resourceTypes
       ? [...proposal.resourceTypes]
       : ["main_frame"],
@@ -203,7 +219,7 @@ export function repairProposalIntoProject(
   const groups: Record<string, unknown>[] = Array.isArray(project.groups)
     ? project.groups.map((group) => {
         if (!isRecord(group)) {
-          return { id: "invalid", name: "invalid", origins: [], rules: [] };
+          return { id: "invalid", name: "invalid", rules: [] };
         }
         return {
           ...group,
@@ -244,7 +260,6 @@ export function repairProposalIntoProject(
       group = {
         id: ruleProposal.groupId,
         name: "AI Group",
-        origins: [],
         rules: [],
       };
       groups.push(group);
@@ -262,7 +277,7 @@ export function mergeProposalIntoProject(
   const groups: Record<string, unknown>[] = Array.isArray(project.groups)
     ? project.groups.map((group) => {
         if (!isRecord(group)) {
-          return { id: "invalid", name: "invalid", origins: [], rules: [] };
+          return { id: "invalid", name: "invalid", rules: [] };
         }
         return {
           ...group,
@@ -280,7 +295,6 @@ export function mergeProposalIntoProject(
       group = {
         id: ruleProposal.groupId,
         name: "AI Group",
-        origins: [],
         rules: [],
       };
       groups.push(group);
@@ -302,11 +316,10 @@ export function buildAssistSystemPrompt(project: unknown): string {
   return [
     "You are an expert Rogatio rule author.",
     'Return ONLY valid JSON: {"rules":RuleProposal[],"explanation":string}.',
-    "RuleProposal: kind (redirect|query|header|response-body|request-body), groupId, name, urlRegex, optional origins/resourceTypes/priority/method, action.",
+    'RuleProposal: kind, groupId, name, source { key "url"|"host", operator "regex", value }, optional resourceTypes/priority/method, action.',
     "redirect action: {destination} (http/https absolute URL; $1-$9 for captures).",
     "query action: query parameter ops; header: direction/operation/name/value; body rules: replace or regex modes.",
-    "Origins must be explicit http(s) host origins (no wildcards/paths). Prefer existing groups. Minimal changes.",
-    "urlRegex must be valid ECMAScript, max 2048 chars, case-sensitive, no flags.",
+    "source.value must be valid ECMAScript regex, max 2048 chars, case-sensitive, no flags. Prefer existing groups. Minimal changes.",
     `Current project JSON: ${projectJson}`,
   ].join(" ");
 }

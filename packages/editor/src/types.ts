@@ -2,8 +2,11 @@ import type {
   HeaderDirection,
   HeaderOperationKind,
   HttpMethod,
+  MigrationNotice,
   ResourceType,
   RogatioProject,
+  SourceKey,
+  SourceOperator,
 } from "@rogatio/schema";
 
 export type { HeaderDirection, HeaderOperationKind };
@@ -54,8 +57,7 @@ export interface DryRunRuleMatchResult {
   readonly groupId: string;
   readonly ruleId: string;
   readonly matched: boolean;
-  readonly urlRegex: DryRunMatchDimension;
-  readonly effectiveOrigin: DryRunMatchDimension;
+  readonly source: DryRunMatchDimension;
   readonly method: DryRunMatchDimension;
   readonly resourceType: DryRunMatchDimension;
   readonly actionPreview: DryRunActionPreview | null;
@@ -116,6 +118,12 @@ export interface AIProposal {
   readonly explanation: string;
 }
 
+export interface SourceProposal {
+  readonly key: SourceKey;
+  readonly operator: SourceOperator;
+  readonly value: string;
+}
+
 export interface RuleProposal {
   readonly kind:
     | "redirect"
@@ -125,8 +133,7 @@ export interface RuleProposal {
     | "request-body";
   readonly groupId: string;
   readonly name: string;
-  readonly urlRegex: string;
-  readonly origins?: readonly string[];
+  readonly source: SourceProposal;
   readonly resourceTypes?: readonly string[];
   readonly priority?: number;
   readonly method?: string;
@@ -187,6 +194,8 @@ export interface EditorOptions {
   readonly ruleTypes?: readonly RuleTypeFieldExtension[];
   readonly dryRun?: EditorDryRunHandler;
   readonly aiAssist?: EditorAIAssistHandler;
+  readonly migrationNotices?: readonly MigrationNotice[];
+  readonly onDismissMigrationNotices?: () => void | Promise<void>;
 }
 
 export interface EditorController {

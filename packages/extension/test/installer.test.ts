@@ -10,8 +10,11 @@ function makeProjection(
     groupId: "g1",
     ruleId: "rule-header-set",
     matcher: {
-      urlRegex: { source: "^https://example\\.com/", flags: "" },
-      origins: ["https://example.com"],
+      source: {
+        key: "host",
+        operator: "regex",
+        value: "^example\\.com$",
+      },
       resourceTypes: ["main_frame"],
       priority: 100,
     },
@@ -27,7 +30,7 @@ function makeProjection(
 }
 
 describe("installer.ts — header DNR rule shape", () => {
-  it("toDnrRule scopes with requestDomains from origins", () => {
+  it("toDnrRule scopes with requestDomains from host source", () => {
     const projection = makeProjection();
     const rule = toDnrRule(projection);
 
@@ -78,8 +81,11 @@ describe("installer.ts — header DNR rule shape", () => {
   it("toDnrRule omits optional condition keys when unset", () => {
     const projection = makeProjection({
       matcher: {
-        urlRegex: { source: "^https://example\\.com/", flags: "" },
-        origins: [],
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/",
+        },
         resourceTypes: [],
         priority: 100,
       },
@@ -94,11 +100,14 @@ describe("installer.ts — header DNR rule shape", () => {
     }
   });
 
-  it("toDnrRule preserves requestDomains and excludedRequestDomains from origins", () => {
+  it("toDnrRule preserves requestDomains for host source projections", () => {
     const projection = makeProjection({
       matcher: {
-        urlRegex: { source: "^https://example\\.com/", flags: "" },
-        origins: ["https://example.com", "!https://blocked.com"],
+        source: {
+          key: "host",
+          operator: "regex",
+          value: "^example\\.com$",
+        },
         resourceTypes: ["main_frame"],
         priority: 100,
       },
@@ -106,9 +115,6 @@ describe("installer.ts — header DNR rule shape", () => {
     const rule = toDnrRule(projection);
 
     expect(rule.condition.requestDomains).toEqual(["example.com"]);
-    // excluded origins keep the full URL (toDnrDomains only strips '!' prefix)
-    expect(rule.condition.excludedRequestDomains).toEqual([
-      "https://blocked.com",
-    ]);
+    expect(rule.condition).not.toHaveProperty("excludedRequestDomains");
   });
 });

@@ -24,19 +24,21 @@ function decodeFrame(frame: Uint8Array): Envelope {
 }
 
 const bodyProject = {
-  version: 1,
+  version: 2,
   name: "body",
   groups: [
     {
       id: "g1",
       name: "g",
-      origins: ["http://127.0.0.1:8080"],
       rules: [
         {
           id: "r1",
           name: "resp",
-          urlRegex: "^http://127\\.0\\.0\\.1:8080/data\\.json$",
-          origins: [],
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^http://127\\.0\\.0\\.1:8080/data\\.json$",
+          },
           resourceTypes: ["main_frame"],
           priority: 1,
           type: "response-body",
@@ -117,7 +119,7 @@ describe("host PAC install round-trip", () => {
         metadata: {
           policyDigest: "sha256:x",
           extensionId: "ext",
-          pacOrigins: ["http://127.0.0.1:8080"],
+          pacRoutes: ["127.0.0.1"],
           targetPolicy: { publicAllowed: true, localOrigins: [] },
         },
       }),
@@ -136,7 +138,7 @@ describe("host PAC install round-trip", () => {
     });
     expect(pacScripts.length).toBeGreaterThanOrEqual(1);
     expect(pacScripts[0]).toContain("127.0.0.1:");
-    expect(pacScripts[0]).toContain("http://127.0.0.1:8080");
+    expect(pacScripts[0]).toContain('"127.0.0.1"');
 
     const stopReply = await host.processFrame(
       encodeFrame({

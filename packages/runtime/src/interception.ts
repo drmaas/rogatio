@@ -32,7 +32,7 @@ export interface SessionProvider {
   readonly activation: RuntimeActivation;
   readonly policyDigest: string;
   readonly extensionId: string;
-  readonly pacOrigins: readonly string[];
+  readonly pacRoutes: readonly string[];
   readonly targetPolicy: {
     readonly public: boolean;
     readonly localOrigins: readonly string[];
@@ -67,7 +67,7 @@ export async function startInterception(
   activation: RuntimeActivation,
   policyDigest: string,
   extensionId: string,
-  pacOrigins: readonly string[],
+  pacRoutes: readonly string[],
   targetPolicy: {
     readonly public: boolean;
     readonly localOrigins: readonly string[];
@@ -117,10 +117,10 @@ export async function startInterception(
   currentSession = {
     sessionId,
     provider: registeredProvider,
-    activation: { ...activation, proxy, pacOrigins },
+    activation: { ...activation, proxy, pacRoutes },
     policyDigest,
     extensionId,
-    pacOrigins,
+    pacRoutes,
     targetPolicy,
     startedAt: activation.startedAt,
   };
@@ -174,7 +174,7 @@ export interface PlatformInterceptionProvider {
   detect(): CapabilityProfile;
   start(
     activation: RuntimeActivation,
-    origins: readonly string[],
+    pacRoutes: readonly string[],
   ): Promise<ProxyEndpoint>;
   stop(): Promise<void>;
   status(): "stopped" | "running" | "unsupported";
@@ -206,7 +206,7 @@ export function createPlatformInterceptionProvider(
         reasons,
       };
     },
-    async start(activation, origins) {
+    async start(activation, pacRoutes) {
       const capabilities = adapter.detect();
       const reasons = unsupportedReasons(capabilities);
       if (!capabilities.supported || reasons.length > 0) {
@@ -219,7 +219,10 @@ export function createPlatformInterceptionProvider(
       }
       // Proxy first so PAC can target a real listening endpoint.
       const endpoint = await adapter.startTlsProxy(activation);
-      const pac = generatePacScript(origins, endpoint);
+      const pac = generatePacScript(
+        pacRoutes.map((hostname) => ({ hostname })),
+        endpoint,
+      );
       try {
         await adapter.installPac(pac);
         active = true;

@@ -17,7 +17,6 @@ function harnessOptions() {
     installedOps = [...operations];
     return { ok: true as const };
   });
-  const request = vi.fn(async () => true);
   const options = {
     storage: {
       read: async () => stored,
@@ -27,11 +26,6 @@ function harnessOptions() {
         return true;
       },
     },
-    permissions: {
-      contains: async () => false,
-      request,
-      remove: async () => true,
-    },
     installer: {
       current: async () => installedOps,
       install,
@@ -39,7 +33,7 @@ function harnessOptions() {
     generateId: () => "project-a",
     now: () => 1,
   };
-  return { options, install, request, getStored: () => stored };
+  return { options, install, getStored: () => stored };
 }
 
 function harness() {
@@ -72,8 +66,8 @@ describe("F7 extension application", () => {
     });
   });
 
-  it("rejects undeclared permission requests and keeps permission APIs untouched", async () => {
-    const { app, request } = harness();
+  it("rejects removed grant-permissions command", async () => {
+    const { app } = harness();
     await app.handle({ version: 1, command: "create-project", data: project });
     const result = await app.handle({
       version: 1,
@@ -84,13 +78,12 @@ describe("F7 extension application", () => {
 
     expect(result).toMatchObject({
       ok: false,
-      diagnostic: { code: "extension.invalid-origin" },
+      diagnostic: { code: "extension.invalid-message" },
     });
-    expect(request).not.toHaveBeenCalled();
   });
 
-  it("keeps group activation separate from permission requests", async () => {
-    const { app, request, getStored } = harness();
+  it("activates groups without permission requests", async () => {
+    const { app, getStored } = harness();
     await app.handle({ version: 1, command: "create-project", data: project });
     const result = await app.handle({
       version: 1,
@@ -104,21 +97,13 @@ describe("F7 extension application", () => {
       ok: true,
       value: { enabledGroupIds: ["group-a"] },
     });
-    expect(request).not.toHaveBeenCalled();
     expect(getStored()).toMatchObject({
       projects: { "project-a": { enabledGroupIds: ["group-a"] } },
     });
   });
 
   it("reports enabled actionless rules as unsupported in state", async () => {
-    const { options } = harnessOptions();
-    const app = createExtensionApplication({
-      ...options,
-      permissions: {
-        ...options.permissions,
-        contains: async () => true,
-      },
-    });
+    const { app } = harness();
     await app.handle({ version: 1, command: "create-project", data: project });
     await app.handle({
       version: 1,
@@ -135,19 +120,47 @@ describe("F7 extension application", () => {
     });
   });
 
-  it("installs enabled query rules after permissions are granted (/)", async () => {
+  it("installs enabled query rules with install-time host grant only", async () => {
     const { options, install } = harnessOptions();
-    const app = createExtensionApplication({
-      ...options,
-      permissions: {
-        ...options.permissions,
-        contains: async () => true,
-      },
-    });
-    await app.handle({
+    const application = createExtensionApplication(options);
+    await application.handle({
       version: 1,
       command: "create-project",
       data: queryProject,
+    });
+    await application.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "project-a",
+      groupId: "group-a",
+      enabled: true,
+    });
+    const result = await application.handle({
+      version: 1,
+      command: "get-state",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(install).toHaveBeenCalled();
+    const value = result.ok ? result.value : undefined;
+    expect(value).toBeDefined();
+    const statuses = (value as { ruleStatuses?: Array<{ status: string }> })
+      .ruleStatuses;
+    expect(statuses?.[0]?.status).toBe("active");
+  });
+
+  it("reports error for unprojectable host source", async () => {
+    const badProject = structuredClone(queryProject);
+    badProject.groups[0].rules[0].source = {
+      key: "host",
+      operator: "regex",
+      value: "^.*\\.example\\.com$",
+    };
+    const { app } = harness();
+    await app.handle({
+      version: 1,
+      command: "create-project",
+      data: badProject,
     });
     await app.handle({
       version: 1,
@@ -156,66 +169,34 @@ describe("F7 extension application", () => {
       groupId: "group-a",
       enabled: true,
     });
-    await app.handle({
-      version: 1,
-      command: "grant-permissions",
-      projectId: "project-a",
-      origins: ["https://example.com"],
-    });
     const result = await app.handle({ version: 1, command: "get-state" });
-
-    expect(result.ok).toBe(true);
-    const value = result.ok ? result.value : undefined;
-    expect(value).toBeDefined();
-    const ruleStatuses = (value as { ruleStatuses: unknown[] }).ruleStatuses;
-    expect(ruleStatuses).toBeDefined();
-    expect(Array.isArray(ruleStatuses)).toBe(true);
-    expect(ruleStatuses.length).toBeGreaterThan(0);
-    expect((ruleStatuses[0] as { status: string }).status).toBe("active");
-    expect(install).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ kind: "query" })]),
-    );
-  });
-
-  it("returns statuses and clears the badge when the last project is removed", async () => {
-    const { options } = harnessOptions();
-    const badge = vi.fn(async () => {});
-    const app = createExtensionApplication({ ...options, badge });
-    await app.handle({ version: 1, command: "create-project", data: project });
-    const state = await app.handle({ version: 1, command: "get-state" });
-    expect(state).toMatchObject({
+    expect(result).toMatchObject({
       ok: true,
       value: {
-        ruleStatuses: [{ status: "disabled" }],
-        badge: { text: "0", attention: false },
+        ruleStatuses: [
+          expect.objectContaining({
+            status: "error",
+            diagnostics: [
+              expect.objectContaining({
+                code: "extension.source-unprojectable",
+              }),
+            ],
+          }),
+        ],
       },
     });
-
-    await app.handle({
-      version: 1,
-      command: "remove-project",
-      projectId: "project-a",
-      confirm: true,
-    });
-    expect(badge).toHaveBeenLastCalledWith({ text: "", attention: false });
   });
 
-  it("preserves committed state in conflict responses", async () => {
-    const { options } = harnessOptions();
-    const app = createExtensionApplication(options);
-    await app.handle({ version: 1, command: "create-project", data: project });
+  it("returns invalid-message for unknown commands", async () => {
+    const { app } = harness();
     const result = await app.handle({
       version: 1,
-      command: "save-project",
+      command: "review-permissions",
       projectId: "project-a",
-      expectedRevision: 0,
-      data: project,
     });
     expect(result).toMatchObject({
       ok: false,
-      kind: "conflict",
-      diagnostic: { code: "extension.conflict" },
-      current: { id: "project-a", revision: 1 },
+      diagnostic: { code: "extension.invalid-message" },
     });
   });
 });

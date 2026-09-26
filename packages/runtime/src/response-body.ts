@@ -193,9 +193,9 @@ export async function fetchAndRewriteAuthorizedResponse(
     ? replaceResponseBody(
         action.body,
         contentType,
-        operation.urlRegex === undefined
+        operation.sourceValue === undefined
           ? undefined
-          : { url: operation.target, urlRegex: operation.urlRegex },
+          : { url: operation.target, urlRegex: operation.sourceValue },
       )
     : await rewriteResponseBody(
         {

@@ -14,8 +14,11 @@ function makeRule(
   return {
     id: `rule-${index}`,
     name: `Rule ${index}`,
-    urlRegex: "^https://example\\.com/",
-    origins: [],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/",
+    },
     resourceTypes: ["main_frame"],
     priority: 100 + index,
     ...overrides,
@@ -27,13 +30,12 @@ function makeProject(
   overrides: Record<string, unknown> = {},
 ): RogatioProject & Record<string, unknown> {
   return {
-    version: 1,
+    version: 2,
     name,
     groups: [
       {
         id: "group-a",
         name: "Group A",
-        origins: ["https://example.com"],
         rules: [makeRule(1)],
       },
     ],
@@ -207,7 +209,6 @@ describe("ProjectRepository", () => {
         createdAt: 1000,
         updatedAt: 1000,
         enabledGroupIds: [],
-        grantedOrigins: [],
       });
       expect(result.value.data).toEqual(makeProject());
     }
@@ -332,13 +333,12 @@ describe("ProjectRepository", () => {
     }
   });
 
-  it("resets enablement and prunes grants on data commits", async () => {
+  it("resets enablement on data commits", async () => {
     const storage = new MemoryStorage();
     const { repo, clock } = makeRepository(storage);
 
     await repo.createProject(makeProject());
     await repo.setGroupEnabled("p1", "group-a", true);
-    await repo.grantOrigin("p1", "https://example.com");
 
     clock.advance();
     const saved = await repo.saveProject(
@@ -348,33 +348,16 @@ describe("ProjectRepository", () => {
           {
             id: "group-b",
             name: "Group B",
-            origins: ["https://other.example"],
             rules: [makeRule(2)],
           },
         ],
       }),
-      3,
+      2,
     );
 
     expect(saved.ok).toBe(true);
     if (saved.ok) {
-      expect(saved.value.revision).toBe(4);
-      expect(saved.value.enabledGroupIds).toEqual([]);
-      expect(saved.value.grantedOrigins).toEqual([]);
-    }
-  });
-
-  it("preserves grants that remain declared after a data commit", async () => {
-    const storage = new MemoryStorage();
-    const { repo } = makeRepository(storage);
-
-    await repo.createProject(makeProject());
-    await repo.grantOrigin("p1", "https://example.com");
-    const saved = await repo.saveProject("p1", makeProject("A"), 2);
-
-    expect(saved.ok).toBe(true);
-    if (saved.ok) {
-      expect(saved.value.grantedOrigins).toEqual(["https://example.com"]);
+      expect(saved.value.revision).toBe(3);
       expect(saved.value.enabledGroupIds).toEqual([]);
     }
   });
@@ -421,14 +404,13 @@ describe("ProjectRepository", () => {
     expect(switched.diagnostics[0]?.code).toBe("core.not-found");
   });
 
-  it("switches the active project without touching enablement or grants", async () => {
+  it("switches the active project without touching enablement", async () => {
     const storage = new MemoryStorage();
     const { repo } = makeRepository(storage);
 
     await repo.createProject(makeProject("A"));
     await repo.createProject(makeProject("B"));
     await repo.setGroupEnabled("p2", "group-a", true);
-    await repo.grantOrigin("p2", "https://example.com");
 
     const result = await repo.switchProject("p2");
 
@@ -439,7 +421,6 @@ describe("ProjectRepository", () => {
     expect(switched.ok).toBe(true);
     if (switched.ok) {
       expect(switched.value.enabledGroupIds).toEqual(["group-a"]);
-      expect(switched.value.grantedOrigins).toEqual(["https://example.com"]);
     }
   });
 
@@ -517,50 +498,6 @@ describe("ProjectRepository", () => {
     expect(unknown.diagnostics[0]?.code).toBe("core.not-found");
   });
 
-  it("grants only declared origins and normalizes them", async () => {
-    const storage = new MemoryStorage();
-    const { repo } = makeRepository(storage);
-
-    await repo.createProject(makeProject());
-    const granted = await repo.grantOrigin("p1", "HTTPS://Example.COM:443/");
-    expect(granted.ok).toBe(true);
-    if (granted.ok) {
-      expect(granted.value.grantedOrigins).toEqual(["https://example.com"]);
-    }
-
-    const duplicate = await repo.grantOrigin("p1", "https://example.com");
-    expect(duplicate.ok).toBe(true);
-    if (duplicate.ok) {
-      expect(duplicate.value.grantedOrigins).toEqual(["https://example.com"]);
-    }
-
-    const undeclared = await repo.grantOrigin(
-      "p1",
-      "https://elsewhere.example",
-    );
-    expectFailure(undeclared);
-    expect(undeclared.diagnostics[0]?.code).toBe("core.permission-undeclared");
-
-    const invalid = await repo.grantOrigin("p1", "not an origin");
-    expectFailure(invalid);
-    expect(invalid.diagnostics[0]?.code).toBe("core.invalid-origin");
-  });
-
-  it("revokes grants idempotently", async () => {
-    const storage = new MemoryStorage();
-    const { repo } = makeRepository(storage);
-
-    await repo.createProject(makeProject());
-    await repo.grantOrigin("p1", "https://example.com");
-    const revoked = await repo.revokeOrigin("p1", "https://example.com");
-    expect(revoked.ok).toBe(true);
-    if (revoked.ok) expect(revoked.value.grantedOrigins).toEqual([]);
-
-    const again = await repo.revokeOrigin("p1", "https://example.com");
-    expect(again.ok).toBe(true);
-    if (again.ok) expect(again.value.grantedOrigins).toEqual([]);
-  });
-
   it("exports detached project data", async () => {
     const storage = new MemoryStorage();
     const { repo } = makeRepository(storage);
@@ -570,15 +507,22 @@ describe("ProjectRepository", () => {
     expect(exported.ok).toBe(true);
     if (exported.ok) {
       exported.value.name = "Mutated";
-      (exported.value.groups[0] as unknown as Record<string, unknown>).origins =
-        [];
+      const rule = exported.value.groups[0]?.rules[0];
+      if (rule && "source" in rule) {
+        (rule as { source: { value: string } }).source.value =
+          "^https://evil\\.com/";
+      }
     }
 
     const stored = await repo.exportProject("p1");
     expect(stored.ok).toBe(true);
     if (stored.ok) {
       expect(stored.value.name).toBe("Project A");
-      expect(stored.value.groups[0]?.origins).toEqual(["https://example.com"]);
+      expect(stored.value.groups[0]?.rules[0]?.source).toMatchObject({
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/",
+      });
     }
   });
 
@@ -700,7 +644,7 @@ describe("ProjectRepository", () => {
     await repo.switchProject("p2");
     const raw = storage.valueOf() as StoredEnvelope;
 
-    expect(raw.version).toBe(1);
+    expect(raw.version).toBe(2);
     expect(Object.keys(raw.projects)).toEqual(["p1", "p2"]);
     expect(raw.activeProjectId).toBe("p2");
   });

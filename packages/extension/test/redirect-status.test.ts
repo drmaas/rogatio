@@ -5,19 +5,21 @@ import { createExtensionApplication } from "../src/service-worker.js";
 import { project as matcherProject } from "./fixtures.js";
 
 const redirectProject: RogatioProject = {
-  version: 1,
+  version: 2,
   name: "F9 redirect project",
   groups: [
     {
       id: "group-a",
       name: "Group A",
-      origins: ["https://example.com"],
       rules: [
         {
           id: "rule-redirect",
           name: "Redirect rule",
-          urlRegex: "^https://example\\.com/(.*)$",
-          origins: [],
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://example\\.com/(.*)$",
+          },
           resourceTypes: ["main_frame"],
           priority: 100,
           type: "redirect",
@@ -41,11 +43,6 @@ function redirectHarness() {
         stored = next;
         return true;
       },
-    },
-    permissions: {
-      contains: async () => true,
-      request: vi.fn(async () => true),
-      remove: async () => true,
     },
     installer: {
       current: async () => [installedOp],
@@ -105,11 +102,6 @@ describe("F9 redirect status", () => {
           stored = next;
           return true;
         },
-      },
-      permissions: {
-        contains: async () => true,
-        request: vi.fn(async () => true),
-        remove: async () => true,
       },
       installer: {
         current: async () => [],

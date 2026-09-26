@@ -7,13 +7,12 @@ import { validateProjectDetailed as validateBrowser } from "../src/browser-schem
 
 function project(rule: Record<string, unknown>) {
   return {
-    version: 1,
+    version: 2,
     name: "Response body",
     groups: [
       {
         id: "g1",
         name: "Group",
-        origins: ["https://example.com"],
         rules: [rule],
       },
     ],
@@ -23,8 +22,11 @@ function project(rule: Record<string, unknown>) {
 const baseUntaggedRegex = {
   id: "r1",
   name: "Rewrite",
-  urlRegex: "^https://example\\.com/data$",
-  origins: [],
+  source: {
+    key: "url" as const,
+    operator: "regex" as const,
+    value: "^https://example\\.com/data$",
+  },
   resourceTypes: ["xmlhttprequest"],
   priority: 1,
   type: "response-body",

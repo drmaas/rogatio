@@ -51,10 +51,7 @@ describe("F6 runtime preset", () => {
         makeGrant({ operationId: "operation-z" }),
         makeGrant({ operationId: "operation-a" }),
       ],
-      matchers: [
-        makeMatcher("rule-main"),
-        makeMatcher("rule-second", { origins: ["https://second.example"] }),
-      ],
+      matchers: [makeMatcher("rule-main"), makeMatcher("rule-second")],
     });
     const second: RuntimePresetV1 = {
       grants: [
@@ -75,10 +72,7 @@ describe("F6 runtime preset", () => {
           groupId: "group-main",
         },
       ],
-      matchers: [
-        makeMatcher("rule-main"),
-        makeMatcher("rule-second", { origins: ["https://second.example"] }),
-      ],
+      matchers: [makeMatcher("rule-main"), makeMatcher("rule-second")],
       limits: cloneLimits(),
       version: 1,
     };
@@ -141,7 +135,7 @@ describe("F6 runtime preset", () => {
     }
   });
 
-  it("rejects mismatched matcher identity, method, origin, and operation kind", () => {
+  it("rejects mismatched matcher identity, method, and operation kind", () => {
     expectInvalid(
       makePresetInput({
         grants: [makeGrant({ ruleId: "missing-rule" })],
@@ -151,11 +145,6 @@ describe("F6 runtime preset", () => {
       makePresetInput({
         matchers: [makeMatcher("rule-main", { method: "GET" })],
         grants: [makeGrant({ method: "HEAD" })],
-      }),
-    );
-    expectInvalid(
-      makePresetInput({
-        grants: [makeGrant({ target: "https://other.example/data" })],
       }),
     );
     expectInvalid(
@@ -172,7 +161,6 @@ describe("F6 runtime preset", () => {
 
   it("rejects malformed URLs and logical paths before any I/O", () => {
     for (const target of [
-      "http://example.com/data",
       "https://user:pass@example.com/data",
       "https://example.com/data#fragment",
       "https://example.com\\data",

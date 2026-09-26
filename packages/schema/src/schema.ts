@@ -19,7 +19,7 @@ const id = {
 
 const projectSchemaDefinition = {
   $schema: "https://json-schema.org/draft/2020-12/schema",
-  $id: "https://rogatio.dev/schema/project-v1.json",
+  $id: "https://rogatio.dev/schema/project-v2.json",
   type: "object",
   additionalProperties: false,
   required: ["version", "name", "groups"],
@@ -38,19 +38,28 @@ const projectSchemaDefinition = {
     requestBodyPolicy: { $ref: "#/$defs/requestBodyPolicyConfig" },
   },
   $defs: {
+    sourceCondition: {
+      type: "object",
+      additionalProperties: false,
+      required: ["key", "operator", "value"],
+      properties: {
+        key: { type: "string", enum: ["url", "host"] },
+        operator: { type: "string", const: "regex" },
+        value: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxUrlRegexLength,
+          format: "rogatio-url-regex",
+        },
+      },
+    },
     group: {
       type: "object",
       additionalProperties: false,
-      required: ["id", "name", "origins", "rules"],
+      required: ["id", "name", "rules"],
       properties: {
         id,
         name: label,
-        origins: {
-          type: "array",
-          maxItems: LIMITS.maxOriginsPerScope,
-          uniqueItems: true,
-          items: { type: "string", format: "rogatio-origin" },
-        },
         rules: {
           type: "array",
           maxItems: LIMITS.maxRulesPerGroup,
@@ -61,29 +70,11 @@ const projectSchemaDefinition = {
     rule: {
       type: "object",
       additionalProperties: false,
-      required: [
-        "id",
-        "name",
-        "urlRegex",
-        "origins",
-        "resourceTypes",
-        "priority",
-      ],
+      required: ["id", "name", "source", "resourceTypes", "priority"],
       properties: {
         id,
         name: label,
-        urlRegex: {
-          type: "string",
-          minLength: 1,
-          maxLength: LIMITS.maxUrlRegexLength,
-          format: "rogatio-url-regex",
-        },
-        origins: {
-          type: "array",
-          maxItems: LIMITS.maxOriginsPerScope,
-          uniqueItems: true,
-          items: { type: "string", format: "rogatio-origin" },
-        },
+        source: { $ref: "#/$defs/sourceCondition" },
         resourceTypes: {
           type: "array",
           minItems: 1,

@@ -13,17 +13,15 @@ can retain up to **64 uniquely named projects** and has exactly **one active pro
 whenever any exist.
 
 - Creation, import/update, and browser save leave every group **disabled**.
-- Permission and group activation are separate, visible actions.
-- **Switching** restores the destination project's saved enablement without requesting
-  permission or contacting a runtime.
+- Group activation and **Start runtime** are separate, visible actions.
+- **Switching** restores the destination project's saved enablement without contacting a
+  runtime.
 - Conflicts preserve committed state and provide an explicit refresh path.
 - Removal uses a named, cancelable confirmation.
 
 ## Groups
 
-Groups organize rules and can define shared **site origins** that their rules inherit.
-Origins must be explicit `http`/`https` origins — credentials, paths, query strings,
-fragments, wildcard hosts, and other schemes are rejected.
+Groups organize rules. Matching scope is expressed per rule through a **source condition**.
 
 ## Rules
 
@@ -31,8 +29,8 @@ Every rule can specify:
 
 - A stable **ID**.
 - A **label**.
-- A case-sensitive **URL regular expression**.
-- Optional **origins** (added on top of the group's).
+- A **source condition**: `key` (`url` or `host`), `operator` (`regex` only), and `value`
+  (case-sensitive regular expression).
 - Allowed **resource types**.
 - A **priority**.
 - Where supported, an HTTP **method**.
@@ -40,8 +38,8 @@ Every rule can specify:
   sensitive query, header, and intended body-rewrite values in
   [match logging](/guides/extension/#match-logging).
 
-Rules visibly report one of: `active`, `disabled`, `needs permission`,
-`needs runtime`, `unsupported`, or `error`. Runtime-dependent body rules report
+Rules visibly report one of: `active`, `disabled`, `needs runtime`, `unsupported`, or
+`error`. Runtime-dependent body rules report
 `needs runtime` until the native runtime is started. The toolbar badge reflects the count of successfully installed
 active rules.
 

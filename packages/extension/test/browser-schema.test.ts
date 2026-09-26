@@ -12,14 +12,14 @@ describe("F7 browser schema", () => {
     });
   });
 
-  it("rejects backslash origins and duplicate collection entries", () => {
+  it("rejects v1 urlRegex and origins fields", () => {
     expect(
       validateProjectDetailed({
         ...project,
         groups: [
           {
             ...project.groups[0],
-            origins: ["https://example.com\\evil.com/"],
+            origins: ["https://example.com"],
           },
         ],
       }),
@@ -30,7 +30,35 @@ describe("F7 browser schema", () => {
         groups: [
           {
             ...project.groups[0],
-            origins: ["https://example.com", "https://example.com"],
+            rules: [
+              {
+                ...project.groups[0].rules[0],
+                urlRegex: "^https://example\\.com/",
+              },
+            ],
+          },
+        ],
+      }),
+    ).toMatchObject({ valid: false });
+  });
+
+  it("rejects invalid source operator", () => {
+    expect(
+      validateProjectDetailed({
+        ...project,
+        groups: [
+          {
+            ...project.groups[0],
+            rules: [
+              {
+                ...project.groups[0].rules[0],
+                source: {
+                  key: "url",
+                  operator: "equals",
+                  value: "^https://example\\.com/",
+                },
+              },
+            ],
           },
         ],
       }),

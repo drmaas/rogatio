@@ -12,7 +12,7 @@ function harness(
     protocol: "v1",
     type: "ai.complete",
     metadata: {
-      content: JSON.stringify({ version: 1, name: "Generated", groups: [] }),
+      content: JSON.stringify({ version: 2, name: "Generated", groups: [] }),
     },
   },
 ) {
@@ -51,11 +51,6 @@ function harness(
         stored = next;
         return true;
       },
-    },
-    permissions: {
-      contains: async () => true,
-      request: async () => true,
-      remove: async () => true,
     },
     installer: {
       current: async () => installed,
@@ -122,7 +117,7 @@ describe("extension AI project generation", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      value: { version: 1, name: "Generated", groups: [] },
+      value: { version: 2, name: "Generated", groups: [] },
     });
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -1,20 +1,19 @@
 import { compileProject } from "@rogatio/compiler";
 import {
   LIMITS,
-  normalizeSiteOrigin,
   type RogatioProject,
   validateProjectDetailed,
 } from "@rogatio/schema";
 import type { CoreDiagnostic } from "./diagnostics.js";
 import { coreDiagnostic } from "./diagnostics.js";
 import { migrateEnvelope } from "./migrate.js";
-import { computeDeclaredOrigins } from "./status.js";
 import type {
   CoreResult,
   StorageAdapter,
   StoredEnvelope,
   StoredProject,
 } from "./types.js";
+import { ENVELOPE_VERSION } from "./types.js";
 
 export const MAX_PROJECTS = 64;
 
@@ -45,7 +44,6 @@ type ValidationOutcome =
   | {
       readonly ok: true;
       readonly project: RogatioProject;
-      readonly declared: readonly string[];
     }
   | { readonly ok: false; readonly diagnostics: readonly CoreDiagnostic[] };
 
@@ -186,7 +184,11 @@ export class ProjectRepository {
             activeProjectId = sorted[sorted.length - 1]?.id ?? null;
           }
         }
-        const next: StoredEnvelope = { version: 1, projects, activeProjectId };
+        const next: StoredEnvelope = {
+          version: ENVELOPE_VERSION,
+          projects,
+          activeProjectId,
+        };
         return { kind: "commit", next, value: structuredClone(next) };
       },
       { retry: true },
@@ -224,90 +226,6 @@ export class ProjectRepository {
         const project: StoredProject = {
           ...existing,
           enabledGroupIds: [...enabledSet],
-          revision: existing.revision + 1,
-          updatedAt: this.now(),
-        };
-        return {
-          kind: "commit",
-          next: replaceProject(current, project),
-          value: structuredClone(project),
-        };
-      },
-      { retry: true },
-    );
-  }
-
-  async grantOrigin(
-    projectId: string,
-    origin: string,
-  ): Promise<CoreResult<StoredProject>> {
-    const normalized = normalizeSiteOrigin(origin);
-    if (normalized === null) {
-      return failed([coreDiagnostic("core.invalid-origin")]);
-    }
-    return this.mutate(
-      (current) => {
-        const existing = current.projects[projectId];
-        if (existing === undefined) {
-          return {
-            kind: "failure",
-            diagnostics: [coreDiagnostic("core.not-found", { projectId })],
-          };
-        }
-        const declared = computeDeclaredOrigins(existing.data);
-        if (!declared.ok) {
-          return { kind: "failure", diagnostics: declared.diagnostics };
-        }
-        if (!declared.value.includes(normalized)) {
-          return {
-            kind: "failure",
-            diagnostics: [
-              coreDiagnostic("core.permission-undeclared", { projectId }),
-            ],
-          };
-        }
-        const grantedOrigins = existing.grantedOrigins.includes(normalized)
-          ? existing.grantedOrigins
-          : [...existing.grantedOrigins, normalized];
-        const project: StoredProject = {
-          ...existing,
-          grantedOrigins,
-          revision: existing.revision + 1,
-          updatedAt: this.now(),
-        };
-        return {
-          kind: "commit",
-          next: replaceProject(current, project),
-          value: structuredClone(project),
-        };
-      },
-      { retry: true },
-    );
-  }
-
-  async revokeOrigin(
-    projectId: string,
-    origin: string,
-  ): Promise<CoreResult<StoredProject>> {
-    const normalized = normalizeSiteOrigin(origin);
-    if (normalized === null) {
-      return failed([coreDiagnostic("core.invalid-origin")]);
-    }
-    return this.mutate(
-      (current) => {
-        const existing = current.projects[projectId];
-        if (existing === undefined) {
-          return {
-            kind: "failure",
-            diagnostics: [coreDiagnostic("core.not-found", { projectId })],
-          };
-        }
-        const grantedOrigins = existing.grantedOrigins.filter(
-          (granted) => granted !== normalized,
-        );
-        const project: StoredProject = {
-          ...existing,
-          grantedOrigins,
           revision: existing.revision + 1,
           updatedAt: this.now(),
         };
@@ -401,11 +319,10 @@ export class ProjectRepository {
       createdAt: stamp,
       updatedAt: stamp,
       enabledGroupIds: [],
-      grantedOrigins: [],
     };
     const firstProject = Object.keys(current.projects).length === 0;
     const next: StoredEnvelope = {
-      version: 1,
+      version: ENVELOPE_VERSION,
       projects: { ...current.projects, [id]: project },
       activeProjectId: firstProject ? id : current.activeProjectId,
     };
@@ -461,10 +378,6 @@ export class ProjectRepository {
         }
       }
     }
-    const declaredSet = new Set(validated.declared);
-    const grantedOrigins = existing.grantedOrigins.filter((origin) =>
-      declaredSet.has(origin),
-    );
     const project: StoredProject = {
       ...existing,
       name: validated.project.name,
@@ -472,7 +385,6 @@ export class ProjectRepository {
       revision: existing.revision + 1,
       updatedAt: this.now(),
       enabledGroupIds: [],
-      grantedOrigins,
     };
     return {
       kind: "commit",
@@ -490,14 +402,9 @@ export class ProjectRepository {
       }
       return { ok: false, diagnostics: [coreDiagnostic("core.invariant")] };
     }
-    const declared = computeDeclaredOrigins(validation.data);
-    if (!declared.ok) {
-      return { ok: false, diagnostics: declared.diagnostics };
-    }
     return {
       ok: true,
       project: structuredClone(validation.data),
-      declared: declared.value,
     };
   }
 

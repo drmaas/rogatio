@@ -26,8 +26,11 @@ const requestBodyOp: RequestBodyOperation = {
   name: "body-req-1",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/api$", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/api$",
+    },
     resourceTypes: ["xmlhttprequest"],
     priority: 50,
     method: "POST",
@@ -42,8 +45,11 @@ const responseBodyOp: ResponseBodyOperation = {
   name: "body-res-1",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/page$", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/page$",
+    },
     resourceTypes: ["xmlhttprequest"],
     priority: 40,
     method: "GET",
@@ -84,30 +90,31 @@ describe("buildBodyMarkerRule (set-only inert)", () => {
       },
     ]);
     expect(Object.hasOwn(rule.action, "responseHeaders")).toBe(false);
-    expect(rule.condition.regexFilter).toBe(
-      requestBodyOp.matcher.urlRegex.source,
-    );
+    expect(rule.condition.regexFilter).toBe(requestBodyOp.matcher.source.value);
     expect(rule.condition.resourceTypes).toEqual(["xmlhttprequest"]);
     expect(rule.condition.requestMethods).toEqual(["post"]);
-    expect(rule.condition.requestDomains).toEqual(["example.com"]);
+    expect(rule.condition).not.toHaveProperty("requestDomains");
     expect(rule.condition).not.toHaveProperty("initiatorDomains");
     expect(rule.condition).not.toHaveProperty("excludedRequestDomains");
   });
 
-  it("maps !origins to excludedRequestDomains", () => {
+  it("uses host-pinned regex and requestDomains for literal host source", () => {
     const op: RequestBodyOperation = {
       ...requestBodyOp,
       matcher: {
         ...requestBodyOp.matcher,
-        origins: ["https://example.com", "!https://evil.example"],
+        source: {
+          key: "host",
+          operator: "regex",
+          value: "^example\\.com$",
+        },
       },
     };
     const rule = buildBodyMarkerRule(op, BODY_MARKER_ID_MIN);
     expect(rule.condition.requestDomains).toEqual(["example.com"]);
-    expect(rule.condition.excludedRequestDomains).toEqual([
-      "https://evil.example",
-    ]);
-    expect(rule.condition).not.toHaveProperty("initiatorDomains");
+    expect(rule.condition.regexFilter).toBe(
+      "^https?://example\\.com(?::[0-9]+)?(?:[/?#]|$)",
+    );
   });
 
   it("never pairs set with remove of the same header", () => {

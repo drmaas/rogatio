@@ -1,4 +1,8 @@
-import { compileProject } from "@rogatio/compiler";
+import {
+  compileProject,
+  literalHostname,
+  type RogatioOperation,
+} from "@rogatio/compiler";
 import { formatSha256, validateProjectDetailed } from "@rogatio/schema";
 import {
   type BodyMarkerProbeGates,
@@ -134,7 +138,6 @@ export interface NativeSessionOptions {
     data: unknown;
     enabledGroupIds: readonly string[];
   } | null>;
-  readonly getGrantedOrigins: () => Promise<readonly string[]>;
   /**
    * Session body URL-match markers for match logging. Install only when
    * `runtimeStripPathAvailable` is true (fail-closed). No F17 capability mint.
@@ -150,7 +153,7 @@ export interface NativeRuntimeConfig {
   readonly sessionId: string;
   readonly policyDigest: string;
   readonly extensionId: string;
-  readonly pacOrigins: readonly string[];
+  readonly pacRoutes: readonly string[];
   readonly targetPolicy: {
     publicAllowed: boolean;
     localOrigins: readonly string[];
@@ -160,7 +163,6 @@ export interface NativeRuntimeConfig {
 export async function buildNativePolicy(
   projectData: unknown,
   enabledGroupIds: readonly string[],
-  grantedOrigins: readonly string[],
   localOrigins: readonly string[],
   extensionId: string,
 ): Promise<{ ok: true; value: unknown } | { ok: false; reason: string }> {
@@ -186,7 +188,6 @@ export async function buildNativePolicy(
     extensionId,
     project: schemaResult.data,
     enabledGroupIds,
-    grantedOrigins,
     localTargetOrigins: localOrigins,
     operations,
   };
@@ -240,29 +241,17 @@ async function syncBodyMarkersAfterStart(
   });
 }
 
-/** Derive PAC-routed origins from compiled body-rule matcher origins. */
-function pacOriginsFromBodyOperations(
-  policy: unknown,
-  grantedOrigins: readonly string[],
-): string[] {
-  if (policy === null || typeof policy !== "object") return [];
-  const operations = (policy as { operations?: unknown }).operations;
-  if (!Array.isArray(operations)) return [];
-  const granted = new Set(grantedOrigins);
-  const origins = new Set<string>();
+/** Derive literal-host PAC routes from compiled body-rule sources. */
+function pacRoutesFromBodyOperations(
+  operations: readonly RogatioOperation[],
+): readonly string[] {
+  const hosts = new Set<string>();
   for (const op of operations) {
-    if (op === null || typeof op !== "object") continue;
-    const kind = (op as { kind?: unknown }).kind;
-    if (kind !== "request-body" && kind !== "response-body") continue;
-    const matcher = (op as { matcher?: { origins?: unknown } }).matcher;
-    if (!matcher || !Array.isArray(matcher.origins)) continue;
-    for (const origin of matcher.origins) {
-      if (typeof origin !== "string") continue;
-      if (granted.size > 0 && !granted.has(origin)) continue;
-      origins.add(origin);
-    }
+    if (op.kind !== "request-body" && op.kind !== "response-body") continue;
+    const host = literalHostname(op.matcher.source);
+    if (host !== null) hosts.add(host);
   }
-  return [...origins].sort();
+  return [...hosts].sort();
 }
 
 export async function startNativeSession(
@@ -278,12 +267,10 @@ export async function startNativeSession(
     return { ok: false, reason: "no-project" };
   }
 
-  const granted = await options.getGrantedOrigins();
   console.log("[rogatio] building native policy");
   const policyResult = await buildNativePolicy(
     project.data,
     project.enabledGroupIds,
-    granted,
     [],
     options.extensionId,
   );
@@ -344,13 +331,17 @@ export async function startNativeSession(
 
   const policyDigest = await computeDigest(policyResult.value);
 
-  const pacOrigins = pacOriginsFromBodyOperations(policyResult.value, granted);
+  const policyOps = (policyResult.value as { operations?: unknown }).operations;
+  const operations = Array.isArray(policyOps)
+    ? (policyOps as RogatioOperation[])
+    : [];
+  const pacRoutes = pacRoutesFromBodyOperations(operations);
 
   const config: NativeRuntimeConfig = {
     sessionId,
     policyDigest,
     extensionId: options.extensionId,
-    pacOrigins,
+    pacRoutes,
     targetPolicy: { publicAllowed: true, localOrigins: [] },
   };
 

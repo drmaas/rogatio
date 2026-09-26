@@ -41,7 +41,11 @@ function fileOperation(target: string) {
   );
   expect(normalized.ok).toBe(true);
   if (!normalized.ok) throw new Error("Expected a valid file grant");
-  const authorized = authorizeExact(normalized.value, grant);
+  const authorized = authorizeExact(
+    normalized.value,
+    grant,
+    "https://example.com/page",
+  );
   expect(authorized.ok).toBe(true);
   if (!authorized.ok) throw new Error("Expected an authorized file operation");
   return authorized.value;

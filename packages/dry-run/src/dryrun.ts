@@ -1,6 +1,7 @@
 import type { RogatioOperation } from "@rogatio/compiler";
+import { sourceMatches } from "@rogatio/compiler";
 import type { HttpMethod, ResourceType } from "@rogatio/schema";
-import { compileUrlRegex, HTTP_METHODS, RESOURCE_TYPES } from "@rogatio/schema";
+import { HTTP_METHODS, RESOURCE_TYPES } from "@rogatio/schema";
 import type {
   ActionPreview,
   DryRunError,
@@ -152,6 +153,16 @@ function buildDimension(state: MatchState, detail: string): MatchDimension {
   };
 }
 
+function sourceDetail(
+  source: { key: string; value: string },
+  matched: boolean,
+): string {
+  const subject = source.key === "host" ? "hostname" : "url";
+  return matched
+    ? `${subject} matched /${source.value}/ (${source.key})`
+    : `${subject} did not match /${source.value}/ (${source.key})`;
+}
+
 function emptySummary(): DryRunResult["summary"] {
   return {
     caseCount: 0,
@@ -279,16 +290,6 @@ export function dryRunProject(
     }
   }
 
-  const regexCache = new Map<string, RegExp | null>();
-  const getRegex = (source: string): RegExp | null => {
-    let cached = regexCache.get(source);
-    if (cached === undefined) {
-      cached = compileUrlRegex(source);
-      regexCache.set(source, cached);
-    }
-    return cached;
-  };
-
   const results: UrlDryRunResult[] = [];
   let matchedUrlCount = 0;
   let matchedRuleTotal = 0;
@@ -304,14 +305,9 @@ export function dryRunProject(
     const rules: RuleMatchResult[] = [];
     for (const op of operations) {
       const matcher = op.matcher;
-      const regex = getRegex(matcher.urlRegex.source);
-      const regexState: MatchState = regex
-        ? regex.test(testCase.url)
-          ? "matched"
-          : "unmatched"
-        : "unmatched";
-      const originState: MatchState = matcher.origins.includes(
-        parsed.value.origin,
+      const sourceState: MatchState = sourceMatches(
+        matcher.source,
+        testCase.url,
       )
         ? "matched"
         : "unmatched";
@@ -330,22 +326,13 @@ export function dryRunProject(
             : "unmatched";
 
       const matched =
-        regexState === "matched" &&
-        originState === "matched" &&
+        sourceState === "matched" &&
         methodState !== "unmatched" &&
         resourceState !== "unmatched";
 
-      const urlRegexDim = buildDimension(
-        regexState,
-        regexState === "matched"
-          ? `matches /${matcher.urlRegex.source}/`
-          : `does not match /${matcher.urlRegex.source}/`,
-      );
-      const originDim = buildDimension(
-        originState,
-        originState === "matched"
-          ? `origin ${parsed.value.origin} in [${matcher.origins.join(", ")}]`
-          : `origin ${parsed.value.origin} not in [${matcher.origins.join(", ")}]`,
+      const sourceDim = buildDimension(
+        sourceState,
+        sourceDetail(matcher.source, sourceState === "matched"),
       );
       const methodDim = buildDimension(
         methodState,
@@ -381,8 +368,7 @@ export function dryRunProject(
         groupId: op.groupId,
         ruleId: op.ruleId,
         matched,
-        urlRegex: urlRegexDim,
-        effectiveOrigin: originDim,
+        source: sourceDim,
         method: methodDim,
         resourceType: resourceDim,
         actionPreview,

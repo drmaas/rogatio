@@ -1,4 +1,5 @@
-import { LIMITS } from "@rogatio/schema";
+import type { MigrationNotice } from "@rogatio/schema";
+import { LIMITS, migrateV1Project } from "@rogatio/schema";
 import { coreDiagnostic } from "./diagnostics.js";
 import type {
   EnvelopeMigrationResult,
@@ -118,23 +119,40 @@ function isNonEmptyBoundedString(value: unknown, limit: number): boolean {
   return typeof value === "string" && value.length > 0 && value.length <= limit;
 }
 
+function migrateProjectData(
+  data: unknown,
+):
+  | { ok: true; data: StoredProject["data"]; notices: MigrationNotice[] }
+  | { ok: false } {
+  if (!isRecord(data)) return { ok: false };
+  if (data.version === 2) {
+    return {
+      ok: true,
+      data: data as unknown as StoredProject["data"],
+      notices: [],
+    };
+  }
+  if (data.version !== 1) return { ok: false };
+  const migrated = migrateV1Project(data);
+  if (!migrated.ok) return { ok: false };
+  return {
+    ok: true,
+    data: migrated.project,
+    notices: migrated.notices,
+  };
+}
+
 function validateStoredProject(
   id: string,
   value: unknown,
-): StoredProject | null {
+): { project: StoredProject; notices: MigrationNotice[] } | null {
   if (!isRecord(value)) return null;
   const { name, data, revision, createdAt, updatedAt } = value;
   if (value.id !== id) return null;
   if (!isNonEmptyBoundedString(id, LIMITS.maxIdLength)) return null;
   if (!isNonEmptyBoundedString(name, LIMITS.maxLabelLength)) return null;
-  if (
-    !isRecord(data) ||
-    data.version !== 1 ||
-    typeof data.name !== "string" ||
-    !Array.isArray(data.groups)
-  ) {
-    return null;
-  }
+  const migratedData = migrateProjectData(data);
+  if (!migratedData.ok) return null;
   if (!Number.isSafeInteger(revision) || (revision as number) < 1) return null;
   if (typeof createdAt !== "number" || !Number.isFinite(createdAt)) return null;
   if (typeof updatedAt !== "number" || !Number.isFinite(updatedAt)) return null;
@@ -147,21 +165,17 @@ function validateStoredProject(
   ) {
     return null;
   }
-  if (
-    !isStringArray(value.grantedOrigins) ||
-    !hasUniqueItems(value.grantedOrigins)
-  ) {
-    return null;
-  }
   return {
-    id,
-    name: name as string,
-    data: data as unknown as StoredProject["data"],
-    revision: revision as number,
-    createdAt: createdAt as number,
-    updatedAt: updatedAt as number,
-    enabledGroupIds: [...value.enabledGroupIds],
-    grantedOrigins: [...value.grantedOrigins],
+    project: {
+      id,
+      name: name as string,
+      data: migratedData.data,
+      revision: revision as number,
+      createdAt: createdAt as number,
+      updatedAt: updatedAt as number,
+      enabledGroupIds: [...value.enabledGroupIds],
+    },
+    notices: migratedData.notices,
   };
 }
 
@@ -177,7 +191,7 @@ export function migrateEnvelope(value: unknown): EnvelopeMigrationResult {
     return { ok: false, diagnostic: coreDiagnostic("core.storage-corrupt") };
   }
   const raw = snapshot.value;
-  if (raw.version !== ENVELOPE_VERSION) {
+  if (raw.version !== ENVELOPE_VERSION && raw.version !== 1) {
     return { ok: false, diagnostic: coreDiagnostic("core.storage-corrupt") };
   }
   if (!isRecord(raw.projects)) {
@@ -185,12 +199,16 @@ export function migrateEnvelope(value: unknown): EnvelopeMigrationResult {
   }
 
   const projects: Record<string, StoredProject> = {};
+  const migrationNotices: Record<string, MigrationNotice[]> = {};
   for (const key of Object.keys(raw.projects)) {
     const stored = validateStoredProject(key, raw.projects[key]);
     if (stored === null) {
       return { ok: false, diagnostic: coreDiagnostic("core.storage-corrupt") };
     }
-    projects[key] = stored;
+    projects[key] = stored.project;
+    if (stored.notices.length > 0) {
+      migrationNotices[key] = stored.notices;
+    }
   }
 
   const activeProjectId = raw.activeProjectId;
@@ -201,12 +219,12 @@ export function migrateEnvelope(value: unknown): EnvelopeMigrationResult {
     return { ok: false, diagnostic: coreDiagnostic("core.storage-corrupt") };
   }
 
-  return {
-    ok: true,
-    envelope: {
-      version: ENVELOPE_VERSION,
-      projects,
-      activeProjectId,
-    },
+  const envelope: StoredEnvelope = {
+    version: ENVELOPE_VERSION,
+    projects,
+    activeProjectId,
+    ...(Object.keys(migrationNotices).length > 0 ? { migrationNotices } : {}),
   };
+
+  return { ok: true, envelope };
 }

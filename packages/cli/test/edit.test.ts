@@ -19,7 +19,7 @@ describe("edit command", () => {
   });
 
   const validProject = {
-    version: 1,
+    version: 2,
     name: "Test Project",
     groups: [],
   };
@@ -35,14 +35,14 @@ describe("edit command", () => {
     // File should be created with a random civilization-scale default name
     const project = await readProject(testFile);
     expect(project).toEqual({
-      version: 1,
+      version: 2,
       name: expect.stringMatching(/^[A-Z][a-z]+ [A-Z][a-z]+$/),
       groups: [],
     });
   });
 
   it("backfills a civilization-scale name onto legacy empty-name projects", async () => {
-    await writeProject(testFile, { version: 1, name: "", groups: [] });
+    await writeProject(testFile, { version: 2, name: "", groups: [] });
     const { exitCode, shutdown } = await editCommand([testFile], {
       launchBrowser: vi.fn().mockResolvedValue(false),
     });
@@ -51,7 +51,7 @@ describe("edit command", () => {
 
     const project = await readProject(testFile);
     expect(project).toEqual({
-      version: 1,
+      version: 2,
       name: expect.stringMatching(/^[A-Z][a-z]+ [A-Z][a-z]+$/),
       groups: [],
     });

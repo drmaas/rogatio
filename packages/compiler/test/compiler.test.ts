@@ -22,8 +22,11 @@ function makeRule(
   return {
     id: `rule-${index}`,
     name: `Rule ${index}`,
-    urlRegex: "^https://example\\.com/",
-    origins: [],
+    source: {
+      key: "url" as const,
+      operator: "regex" as const,
+      value: "^https://example\\.com/",
+    },
     resourceTypes: ["image", "main_frame"],
     priority: 100 + index,
     ...overrides,
@@ -37,8 +40,11 @@ function makeHeaderRule(
   return {
     id: `header-${index}`,
     name: `Header Rule ${index}`,
-    urlRegex: "^https://example\\.com/",
-    origins: [],
+    source: {
+      key: "url" as const,
+      operator: "regex" as const,
+      value: "^https://example\\.com/",
+    },
     resourceTypes: ["main_frame"],
     priority: 100 + index,
     type: "header",
@@ -55,13 +61,12 @@ function makeProject(
   ruleOverrides: Record<string, unknown> = {},
 ): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "Example project",
     groups: [
       {
         id: "group-main",
         name: "Main sites",
-        origins: ["https://example.com"],
         rules: [makeRule(1, ruleOverrides)],
         ...groupOverrides,
       },
@@ -94,9 +99,8 @@ function deepFreeze<T>(value: T): T {
 describe("@rogatio/compiler", () => {
   it("compiles a valid project into one data-only matcher operation", () => {
     const project = makeProject(
-      { origins: ["HTTPS://Example.COM:443/"] },
+      {},
       {
-        origins: ["http://localhost:80"],
         resourceTypes: ["image", "main_frame"],
         method: "GET",
         priority: 250,
@@ -115,8 +119,12 @@ describe("@rogatio/compiler", () => {
           name: "Rule 1",
           redactSensitiveInLogs: false,
           matcher: {
-            urlRegex: { source: "^https://example\\.com/", flags: "" },
-            origins: ["http://localhost", "https://example.com"],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/",
+            },
+
             resourceTypes: ["main_frame", "image"],
             priority: 250,
             method: "GET",
@@ -127,51 +135,16 @@ describe("@rogatio/compiler", () => {
     });
   });
 
-  it("normalizes, unions, deduplicates, and sorts effective origins", () => {
-    const project = makeProject(
-      {
-        origins: [
-          "HTTPS://Example.COM:443/",
-          "http://example.com:80",
-          "http://[::1]:80",
-        ],
-      },
-      {
-        origins: ["https://example.com:443", "http://[::1]/"],
-      },
-    );
-
+  it("compiles a source-only rule without an origin set", () => {
+    const project = makeProject();
     const result = compileProject(project);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.operations[0]?.matcher.origins).toEqual([
-        "http://[::1]",
-        "http://example.com",
-        "https://example.com",
-      ]);
-    }
-    expect(project.groups[0].origins).toEqual([
-      "HTTPS://Example.COM:443/",
-      "http://example.com:80",
-      "http://[::1]:80",
-    ]);
-  });
-
-  it("supports rule-only origins and keeps HTTP and HTTPS distinct", () => {
-    const project = makeProject(
-      { origins: [] },
-      { origins: ["https://example.com", "http://example.com"] },
-    );
-
-    const result = compileProject(project);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.operations[0]?.matcher.origins).toEqual([
-        "http://example.com",
-        "https://example.com",
-      ]);
+      expect(result.operations[0]?.matcher.source.key).toBe("url");
+      expect(result.operations[0]?.matcher).not.toHaveProperty("origins");
+      expect(result.operations[0]?.matcher).not.toHaveProperty("urlRegex");
+      expect(result.diagnostics).toEqual([]);
     }
   });
 
@@ -179,7 +152,11 @@ describe("@rogatio/compiler", () => {
     const project = makeProject(
       {},
       {
-        urlRegex: "Example/[A-Z]+$",
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "Example/[A-Z]+$",
+        },
         resourceTypes: ["websocket", "script", "main_frame"],
         method: "POST",
         priority: 999,
@@ -191,8 +168,8 @@ describe("@rogatio/compiler", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.operations[0]?.matcher).toEqual({
-        urlRegex: { source: "Example/[A-Z]+$", flags: "" },
-        origins: ["https://example.com"],
+        source: { key: "url", operator: "regex", value: "Example/[A-Z]+$" },
+
         resourceTypes: ["main_frame", "script", "websocket"],
         priority: 999,
         method: "POST",
@@ -205,11 +182,6 @@ describe("@rogatio/compiler", () => {
     const project = makeProject(
       {},
       {
-        origins: [
-          "https://one.example",
-          "https://two.example",
-          "https://three.example",
-        ],
         resourceTypes: [...RESOURCE_TYPES],
       },
     );
@@ -231,19 +203,17 @@ describe("@rogatio/compiler", () => {
     const second = makeRule(2, { priority: 101 });
     second.id = "rule-second";
     const project = {
-      version: 1,
+      version: 2,
       name: "Ordered project",
       groups: [
         {
           id: "group-first",
           name: "First",
-          origins: ["https://example.com"],
           rules: [first],
         },
         {
           id: "group-second",
           name: "Second",
-          origins: ["https://example.com"],
           rules: [second],
         },
       ],
@@ -269,13 +239,12 @@ describe("@rogatio/compiler", () => {
     const first = makeRule(1, { priority: 1000 });
     const second = makeRule(2, { priority: 1 });
     const project = {
-      version: 1,
+      version: 2,
       name: "Priority order project",
       groups: [
         {
           id: "group-order",
           name: "Order",
-          origins: ["https://example.com"],
           rules: [first, second],
         },
       ],
@@ -300,7 +269,7 @@ describe("@rogatio/compiler", () => {
   it("maps schema failures to stable diagnostics and never returns partial output", () => {
     const result = compileProject({
       ...makeProject(),
-      version: 2,
+      version: 1,
       unexpected: "not echoed",
     });
     const issues = diagnostics(result);
@@ -356,9 +325,14 @@ describe("@rogatio/compiler", () => {
 
   it("reports required, invalid-type, and invalid-format failures", () => {
     const cases: unknown[] = [
-      { version: 1, name: "Missing groups" },
+      { version: 2, name: "Missing groups" },
       null,
-      makeProject({}, { urlRegex: "[" }),
+      makeProject(
+        {},
+        {
+          source: { key: "url", operator: "regex", value: "[" },
+        },
+      ),
     ];
 
     expect(diagnostics(compileProject(cases[0]))[0]).toMatchObject({
@@ -378,7 +352,7 @@ describe("@rogatio/compiler", () => {
     ).toBe(true);
   });
 
-  it("fails closed for duplicate IDs, missing effective origins, invalid actions, and limits", () => {
+  it("fails closed for duplicate IDs, invalid actions, and limits", () => {
     const duplicate = makeProject();
     duplicate.groups[0].rules.push(makeRule(1));
     expect(diagnostics(compileProject(duplicate))).toEqual(
@@ -390,15 +364,9 @@ describe("@rogatio/compiler", () => {
       ]),
     );
 
-    const noOrigin = makeProject({ origins: [] });
-    expect(diagnostics(compileProject(noOrigin))).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: "schema.no-effective-origin",
-          path: "/groups/0/rules/0/origins",
-        }),
-      ]),
-    );
+    const sourceOnly = compileProject(makeProject());
+    expect(sourceOnly.ok).toBe(true);
+    expect(sourceOnly.diagnostics).toEqual([]);
 
     const action = makeProject({}, { action: { type: "redirect" } });
     expect(diagnostics(compileProject(action)).length).toBeGreaterThan(0);
@@ -407,7 +375,6 @@ describe("@rogatio/compiler", () => {
     overLimit.groups = Array.from({ length: 17 }, (_, groupIndex) => ({
       id: `group-${groupIndex}`,
       name: `Group ${groupIndex}`,
-      origins: ["https://example.com"],
       rules: Array.from({ length: LIMITS.maxRulesPerGroup }, (_, ruleIndex) =>
         makeRule(groupIndex * LIMITS.maxRulesPerGroup + ruleIndex, {
           priority: 1,
@@ -484,13 +451,13 @@ describe("@rogatio/compiler", () => {
   });
 
   it("rejects non-JSON collection extensions", () => {
-    const project = makeProject({ origins: [] }, { origins: [] });
+    const project = makeProject();
     Object.defineProperty(project.groups, "entries", {
       value: () => [][Symbol.iterator](),
     });
-    Object.defineProperty(project.groups[0].origins, Symbol.iterator, {
+    Object.defineProperty(project.groups[0].rules, Symbol.iterator, {
       value: function* () {
-        yield "https://example.com";
+        yield makeRule(99);
       },
     });
 
@@ -504,10 +471,7 @@ describe("@rogatio/compiler", () => {
   });
 
   it("is deterministic, does not mutate input, and returns detached serializable data", () => {
-    const project = makeProject(
-      {},
-      { origins: ["HTTPS://Example.COM:443/"], resourceTypes: ["script"] },
-    );
+    const project = makeProject({}, { resourceTypes: ["script"] });
     const before = structuredClone(project);
     const frozen = deepFreeze(project);
 
@@ -519,9 +483,7 @@ describe("@rogatio/compiler", () => {
     expect(JSON.parse(JSON.stringify(first))).toEqual(first);
     if (first.ok) {
       expect(first.operations[0]).not.toBe(frozen.groups[0]);
-      expect(first.operations[0]?.matcher.origins).not.toBe(
-        frozen.groups[0].origins,
-      );
+      expect(first.operations[0]?.matcher).not.toHaveProperty("origins");
       expect(first.operations[0]?.matcher.resourceTypes).not.toBe(
         frozen.groups[0].rules[0].resourceTypes,
       );
@@ -542,8 +504,7 @@ describe("@rogatio/compiler", () => {
         "matcher",
       ]);
       expect(Object.keys(result.operations[0]?.matcher ?? {})).toEqual([
-        "urlRegex",
-        "origins",
+        "source",
         "resourceTypes",
         "priority",
       ]);
@@ -647,10 +608,9 @@ describe("@rogatio/compiler", () => {
 
     it("preserves matcher fields for header rules", () => {
       const project = makeProject(
-        { origins: ["https://example.com"] },
+        {},
         {
           ...makeHeaderRule(1),
-          origins: ["http://localhost:80"],
           method: "POST",
           priority: 500,
         },
@@ -660,10 +620,8 @@ describe("@rogatio/compiler", () => {
       expect(result.ok).toBe(true);
       if (result.ok) {
         const op = result.operations[0] as HeaderOperation;
-        expect(op.matcher.origins).toEqual([
-          "http://localhost",
-          "https://example.com",
-        ]);
+        expect(op.matcher).not.toHaveProperty("origins");
+        expect(op.matcher).not.toHaveProperty("urlRegex");
         expect(op.matcher.method).toBe("POST");
         expect(op.matcher.priority).toBe(500);
       }

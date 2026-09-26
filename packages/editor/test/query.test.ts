@@ -10,8 +10,11 @@ const rulePath = "/groups/0/rules/0";
 const querySetRule: RogatioRule = {
   id: "rule-query",
   name: "Add tracking param",
-  urlRegex: "^https://example\\.com/page\\?",
-  origins: [],
+  source: {
+    key: "url",
+    operator: "regex",
+    value: "^https://example\\.com/page\\?",
+  },
   resourceTypes: ["main_frame"],
   priority: 200,
   type: "query",

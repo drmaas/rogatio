@@ -6,7 +6,7 @@ import { editCommand } from "../../packages/cli/src/commands/edit.js";
 import { readProject } from "../../packages/cli/src/utils/file.js";
 
 const validProject = {
-  version: 1,
+  version: 2,
   name: " edit project",
   groups: [],
 };

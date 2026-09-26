@@ -55,8 +55,6 @@ function statusLabel(status: string): string {
       return "Active";
     case "disabled":
       return "Disabled";
-    case "needs permission":
-      return "Needs permission";
     case "needs runtime":
       return "Needs runtime";
     case "unsupported":

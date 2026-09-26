@@ -4,13 +4,12 @@ import { describe, expect, it } from "vitest";
 
 function projectWith(rule: Record<string, unknown>): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "Example project",
     groups: [
       {
         id: "group-main",
         name: "Main sites",
-        origins: ["https://example.com"],
         rules: [rule as never],
       },
     ],
@@ -22,8 +21,11 @@ describe("@rogatio/compiler redirect operations", () => {
     const project = projectWith({
       id: "rule-redirect",
       name: "Redirect rule",
-      urlRegex: "^https://example\\.com/(.*)$",
-      origins: [],
+      source: {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/(.*)$",
+      },
       resourceTypes: ["main_frame"],
       priority: 100,
       type: "redirect",
@@ -45,8 +47,11 @@ describe("@rogatio/compiler redirect operations", () => {
     const project = projectWith({
       id: "rule-matcher",
       name: "Matcher rule",
-      urlRegex: "^https://example\\.com/",
-      origins: [],
+      source: {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/",
+      },
       resourceTypes: ["main_frame"],
       priority: 100,
     });

@@ -36,7 +36,6 @@ export {
   startNativeSession,
   stopNativeSession,
 } from "./native-session.js";
-export { declaredPermissionOrigins } from "./permissions.js";
 export {
   projectMatchers,
   type RuleProjection,
@@ -52,5 +51,4 @@ export {
   createExtensionApplication,
   type ExtensionApplication,
   type ExtensionApplicationOptions,
-  type PermissionAdapter,
 } from "./service-worker.js";

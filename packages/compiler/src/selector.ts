@@ -1,3 +1,4 @@
+import { sameOrigin, sourceMatches } from "./source-match.js";
 import type { NormalizedMatcher, RogatioOperation } from "./types.js";
 
 export interface RuleMatchContext {
@@ -19,21 +20,6 @@ export type WinnerResult =
       readonly kind: "none";
     };
 
-function urlMatches(matcher: NormalizedMatcher, url: string): boolean {
-  const regex = new RegExp(matcher.urlRegex.source, matcher.urlRegex.flags);
-  return regex.test(url);
-}
-
-function originMatches(origins: readonly string[], target: string): boolean {
-  try {
-    const targetUrl = new URL(target);
-    const targetOrigin = targetUrl.origin;
-    return origins.includes(targetOrigin);
-  } catch {
-    return false;
-  }
-}
-
 function resourceTypeMatches(
   resourceTypes: readonly string[],
   resourceType: string,
@@ -51,19 +37,13 @@ function methodMatches(
 function isCandidate(
   op: RogatioOperation,
   enabledGroupIds: readonly string[],
-  grantedOrigins: readonly string[],
   context: RuleMatchContext,
 ): boolean {
   if (!enabledGroupIds.includes(op.groupId)) return false;
 
   const matcher = op.matcher;
-  const allGranted = matcher.origins.every((origin) =>
-    grantedOrigins.includes(origin),
-  );
-  if (!allGranted) return false;
-
-  if (!urlMatches(matcher, context.url)) return false;
-  if (!originMatches(matcher.origins, context.target)) return false;
+  if (!sourceMatches(matcher.source, context.url)) return false;
+  if (!sameOrigin(context.url, context.target)) return false;
   if (!methodMatches(matcher.method, context.method)) return false;
   if (!resourceTypeMatches(matcher.resourceTypes, context.resourceType))
     return false;
@@ -79,10 +59,8 @@ function isCandidate(
       return true;
     }
     return op.kind === "matcher";
-  } else {
-    if (op.kind === "response-body") return true;
-    return false;
   }
+  return op.kind === "response-body";
 }
 
 function getSourceOrder(
@@ -98,11 +76,10 @@ function getSourceOrder(
 export function selectWinningOperation(
   operations: readonly RogatioOperation[],
   enabledGroupIds: readonly string[],
-  grantedOrigins: readonly string[],
   context: RuleMatchContext,
 ): WinnerResult {
   const candidates = operations.filter((op) =>
-    isCandidate(op, enabledGroupIds, grantedOrigins, context),
+    isCandidate(op, enabledGroupIds, context),
   );
 
   if (candidates.length === 0) {

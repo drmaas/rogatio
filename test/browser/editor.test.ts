@@ -233,7 +233,7 @@ test("converts URLs without executing or mutating on invalid input", async ({
   await expect(
     page
       .locator('[data-rule-card][data-rule-id="rule-one"]')
-      .getByLabel("URL regular expression", { exact: true }),
+      .getByLabel("Regular expression", { exact: true }),
   ).toHaveValue("^https://example\\.com/a\\.b\\?x=1$");
 
   await page.evaluate(() => {
@@ -246,7 +246,7 @@ test("converts URLs without executing or mutating on invalid input", async ({
   await expect(
     page
       .locator('[data-rule-card][data-rule-id="rule-one"]')
-      .getByLabel("URL regular expression", { exact: true }),
+      .getByLabel("Regular expression", { exact: true }),
   ).toHaveValue("^https://example\\.com/a\\.b\\?x=1$");
 });
 

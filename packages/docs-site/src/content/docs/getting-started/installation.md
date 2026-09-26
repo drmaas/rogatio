@@ -45,5 +45,6 @@ browser-store install or automatic update.
 4. Select the unpacked extension directory.
 
 Chrome sideloading may require the organization's extension entitlement. The extension
-does not request broad host permissions up front; you grant only each project's declared
-site access when you import a project (see [Chrome extension](/guides/extension/)).
+declares broad host access (`*://*/*`) at install time so DNR rules can match any HTTP(S)
+URL your projects describe; there is no per-origin grant step (see
+[Chrome extension](/guides/extension/)).

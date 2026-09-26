@@ -1,4 +1,5 @@
 import type { HeaderProjection } from "./projection.js";
+import { projectSourceCondition } from "./source-projection.js";
 
 export interface DnrHeaderRule {
   readonly id: number;
@@ -49,27 +50,6 @@ function toDnrResourceTypes(types: readonly string[]): string[] {
   return types.map((t) => mapping[t] ?? t);
 }
 
-function toDnrDomains(origins: readonly string[]): {
-  allowed: string[];
-  excluded: string[];
-} {
-  const allowed: string[] = [];
-  const excluded: string[] = [];
-  for (const origin of origins) {
-    if (origin.startsWith("!")) {
-      excluded.push(origin.slice(1));
-    } else {
-      try {
-        const url = new URL(origin);
-        allowed.push(url.hostname);
-      } catch {
-        allowed.push(origin);
-      }
-    }
-  }
-  return { allowed, excluded };
-}
-
 function toDnrHeaderAction(
   action: HeaderProjection["action"],
 ): DnrHeaderAction {
@@ -81,8 +61,10 @@ function toDnrHeaderAction(
 }
 
 export function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
-  const { allowed: requestDomains, excluded: excludedRequestDomains } =
-    toDnrDomains(projection.matcher.origins);
+  const sourceProjection = projectSourceCondition(projection.matcher);
+  if (!sourceProjection.projectable) {
+    throw new Error("extension.source-unprojectable");
+  }
   const resourceTypes =
     projection.matcher.resourceTypes.length > 0
       ? toDnrResourceTypes(projection.matcher.resourceTypes)
@@ -105,13 +87,11 @@ export function toDnrRule(projection: HeaderProjection): DnrHeaderRule {
         : {}),
     },
     condition: {
-      // Header rules use the compiler's regular-expression matcher directly.
-      // requestDomains (not initiatorDomains) so main_frame navigations and
-      // cross-initiator XHR still match when the request URL host is in scope.
-      regexFilter: projection.matcher.urlRegex.source,
+      regexFilter: sourceProjection.condition.regexFilter,
       ...(resourceTypes !== undefined ? { resourceTypes } : {}),
-      ...(requestDomains.length > 0 ? { requestDomains } : {}),
-      ...(excludedRequestDomains.length > 0 ? { excludedRequestDomains } : {}),
+      ...(sourceProjection.condition.requestDomains !== undefined
+        ? { requestDomains: [...sourceProjection.condition.requestDomains] }
+        : {}),
       ...(requestMethods !== undefined ? { requestMethods } : {}),
     },
   };

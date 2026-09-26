@@ -21,11 +21,12 @@ function arrayValue(values: readonly string[]): string {
 
 function matcherValue(operation: MatcherOperation): string {
   const matcher = operation.matcher;
+  const source = matcher.source;
   const method =
     matcher.method === undefined
       ? ""
       : `,"method":${stringValue(matcher.method)}`;
-  return `{"kind":"matcher","groupId":${stringValue(operation.groupId)},"ruleId":${stringValue(operation.ruleId)},"matcher":{"urlRegex":{"source":${stringValue(matcher.urlRegex.source)},"flags":""},"origins":${arrayValue(matcher.origins)},"resourceTypes":${arrayValue(matcher.resourceTypes)},"priority":${String(matcher.priority)}${method}}}`;
+  return `{"kind":"matcher","groupId":${stringValue(operation.groupId)},"ruleId":${stringValue(operation.ruleId)},"matcher":{"source":{"key":${stringValue(source.key)},"operator":${stringValue(source.operator)},"value":${stringValue(source.value)}},"resourceTypes":${arrayValue(matcher.resourceTypes)},"priority":${String(matcher.priority)}${method}}}`;
 }
 
 function limitsValue(limits: RuntimeLimits): string {

@@ -235,9 +235,7 @@ test("step 1a — onRuleMatchedDebug for modifyHeaders on smoke origin", async (
 }) => {
   const headerRuleId = 9_100_000;
   const controlRuleId = headerRuleId + 1;
-  const { driver, page, extensionId, close } = await extensionContext({
-    grantOrigins: [SMOKE_HOST_PATTERN],
-  });
+  const { driver, page, extensionId, close } = await extensionContext({});
   registerDriver(driver, close);
 
   let headerEventFired = false;
@@ -313,9 +311,7 @@ test("step 1b — Q4 wake after CDP service-worker stop", async ({
   registerDriver,
 }) => {
   const ruleId = 9_200_000;
-  const { driver, page, extensionId, close } = await extensionContext({
-    grantOrigins: [SMOKE_HOST_PATTERN],
-  });
+  const { driver, page, extensionId, close } = await extensionContext({});
   registerDriver(driver, close);
 
   let q4Outcome: "pass" | "fail" | "inconclusive" = "inconclusive";

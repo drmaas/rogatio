@@ -2,7 +2,6 @@ export const LIMITS = Object.freeze({
   maxGroups: 64,
   maxRulesPerGroup: 256,
   maxRulesPerProject: 4096,
-  maxOriginsPerScope: 32,
   maxIdLength: 64,
   maxLabelLength: 100,
   maxDescriptionLength: 1000,

@@ -4,21 +4,25 @@ import { type RogatioProject, validateProjectDetailed } from "../src/index.js";
 const baseRule = {
   id: "rule",
   name: "Capture rule",
-  urlRegex: "^https://example\\.com/users/([^/]+)$",
-  origins: [],
+  source: {
+    key: "url",
+    operator: "regex",
+    value: "^https://example\\.com/users/([^/]+)$",
+  },
+
   resourceTypes: ["xmlhttprequest" as const],
   priority: 1,
 };
 
 function project(rule: Record<string, unknown>): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "Capture project",
     groups: [
       {
         id: "group",
         name: "Group",
-        origins: ["https://example.com"],
+
         rules: [rule as never],
       },
     ],

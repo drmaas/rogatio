@@ -1,9 +1,7 @@
 import {
   LIMITS,
-  normalizeSiteOrigin,
   RESOURCE_TYPES,
   type ResourceType,
-  type RogatioGroup,
   type RogatioProject,
   type RogatioQueryAction,
   type RogatioRule,
@@ -21,12 +19,6 @@ import type {
   ResponseBodyOperation,
   RogatioOperation,
 } from "./types.js";
-
-function compareCodeUnits(left: string, right: string): number {
-  if (left < right) return -1;
-  if (left > right) return 1;
-  return 0;
-}
 
 type SnapshotResult = { valid: true; value: unknown } | { valid: false };
 
@@ -118,46 +110,6 @@ function snapshotOwnData(
   }
 }
 
-class CompilerInvariantError extends Error {
-  constructor(readonly path: string) {
-    super("invalid normalized origin");
-    this.name = "CompilerInvariantError";
-  }
-}
-
-function normalizeOrigins(
-  group: RogatioGroup,
-  rule: RogatioRule,
-  groupIndex: number,
-  ruleIndex: number,
-): string[] {
-  const origins = new Set<string>();
-  const sourceArrays = [group.origins, rule.origins];
-  for (
-    let sourceIndex = 0;
-    sourceIndex < sourceArrays.length;
-    sourceIndex += 1
-  ) {
-    const source = sourceArrays[sourceIndex];
-    for (let originIndex = 0; originIndex < source.length; originIndex += 1) {
-      const normalized = normalizeSiteOrigin(source[originIndex]);
-      if (normalized === null) {
-        const path =
-          sourceIndex === 0
-            ? `/groups/${groupIndex}/origins/${originIndex}`
-            : `/groups/${groupIndex}/rules/${ruleIndex}/origins/${originIndex}`;
-        throw new CompilerInvariantError(path);
-      }
-      origins.add(normalized);
-    }
-  }
-
-  const normalizedOrigins: string[] = [];
-  for (const origin of origins) normalizedOrigins.push(origin);
-  normalizedOrigins.sort(compareCodeUnits);
-  return normalizedOrigins;
-}
-
 function canonicalResourceTypes(
   resourceTypes: readonly ResourceType[],
 ): ResourceType[] {
@@ -183,21 +135,22 @@ function resolveRedactSensitiveInLogs(rule: RogatioRule): boolean {
   return rule.redactSensitiveInLogs === true;
 }
 
-function compileMatcher(
-  group: RogatioGroup,
-  rule: RogatioRule,
-  groupIndex: number,
-  ruleIndex: number,
-): NormalizedMatcher {
+function compileMatcher(rule: RogatioRule): NormalizedMatcher {
   const matcher: {
-    urlRegex: { source: string; flags: "" };
-    origins: string[];
+    source: {
+      key: "url" | "host";
+      operator: "regex";
+      value: string;
+    };
     resourceTypes: ResourceType[];
     priority: number;
     method?: RogatioRule["method"];
   } = {
-    urlRegex: { source: rule.urlRegex, flags: "" },
-    origins: normalizeOrigins(group, rule, groupIndex, ruleIndex),
+    source: {
+      key: rule.source.key,
+      operator: "regex",
+      value: rule.source.value,
+    },
     resourceTypes: canonicalResourceTypes(rule.resourceTypes),
     priority: rule.priority,
   };
@@ -215,7 +168,7 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
     const group = project.groups[groupIndex];
     for (let ruleIndex = 0; ruleIndex < group.rules.length; ruleIndex += 1) {
       const rule = group.rules[ruleIndex];
-      const matcher = compileMatcher(group, rule, groupIndex, ruleIndex);
+      const matcher = compileMatcher(rule);
       const redactSensitiveInLogs = resolveRedactSensitiveInLogs(rule);
       if (rule.type === "redirect") {
         const operation: RedirectOperation = {
@@ -339,12 +292,11 @@ export function compileProject(value: unknown): CompileResult {
       operations: compileOperations(validation.data),
       diagnostics: [],
     };
-  } catch (error) {
-    const path = error instanceof CompilerInvariantError ? error.path : "";
+  } catch {
     return {
       ok: false,
       operations: [],
-      diagnostics: [invariantDiagnostic(path)],
+      diagnostics: [invariantDiagnostic()],
     };
   }
 }

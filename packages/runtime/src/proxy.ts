@@ -11,7 +11,7 @@ export interface ProxyContext {
   readonly sessionId: string;
   readonly policyDigest: string;
   readonly extensionId: string;
-  readonly pacOrigins: readonly string[];
+  readonly pacRoutes: readonly string[];
   readonly localOrigins: readonly string[];
   readonly allowedOrigins: readonly string[];
 }

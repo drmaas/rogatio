@@ -3,13 +3,13 @@ import { LIMITS, validateProjectDetailed } from "../src/index.js";
 
 function project(rule: Record<string, unknown>) {
   return {
-    version: 1,
+    version: 2,
     name: "Response body",
     groups: [
       {
         id: "g1",
         name: "Group",
-        origins: ["https://example.com"],
+
         rules: [rule],
       },
     ],
@@ -19,8 +19,12 @@ function project(rule: Record<string, unknown>) {
 const baseRegex = {
   id: "r1",
   name: "Rewrite",
-  urlRegex: "^https://example\\.com/data$",
-  origins: [],
+  source: {
+    key: "url",
+    operator: "regex",
+    value: "^https://example\\.com/data$",
+  },
+
   resourceTypes: ["xmlhttprequest"],
   priority: 1,
   type: "response-body",

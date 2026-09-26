@@ -17,8 +17,11 @@ export function makeMatcher(
     name: ruleId,
     redactSensitiveInLogs: false,
     matcher: {
-      urlRegex: { source: "^https://example\\.com/", flags: "" },
-      origins: ["https://example.com"],
+      source: {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/",
+      },
       resourceTypes: ["main_frame"],
       priority: 100,
       ...overrides,
@@ -64,3 +67,5 @@ export function descriptorBody(grant: RuntimeGrant = makeGrant()): string {
     method: grant.method,
   });
 }
+
+export const DEFAULT_REQUEST_URL = "https://example.com/page";

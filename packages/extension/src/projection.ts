@@ -13,6 +13,7 @@ import {
   validateMatcherShape,
 } from "@rogatio/compiler";
 import { extensionDiagnostic } from "./diagnostics.js";
+import { projectSourceCondition } from "./source-projection.js";
 
 export interface DnrRule {
   readonly id: number;
@@ -22,7 +23,6 @@ export interface DnrRule {
     readonly resourceTypes: readonly string[];
     readonly requestMethods?: readonly string[];
     readonly requestDomains?: readonly string[];
-    readonly initiatorDomains?: readonly string[];
   };
   readonly action: {
     readonly type: "redirect";
@@ -62,6 +62,15 @@ export type InstallableProjection = HeaderProjection;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function copyMatcher(matcher: NormalizedMatcher): NormalizedMatcher {
+  return {
+    source: { ...matcher.source },
+    resourceTypes: [...matcher.resourceTypes],
+    priority: matcher.priority,
+    ...(matcher.method !== undefined ? { method: matcher.method } : {}),
+  };
 }
 
 function isMatcherOperation(value: unknown): value is MatcherOperation {
@@ -134,6 +143,49 @@ function isHeaderOperation(value: unknown): value is HeaderOperation {
   return true;
 }
 
+function buildDnrRule(
+  operation: RedirectOperation | QueryOperation,
+  index: number,
+): DnrRule | undefined {
+  const matcher = copyMatcher(operation.matcher);
+  const projection = projectSourceCondition(matcher);
+  if (!projection.projectable) return undefined;
+  const base = {
+    id: 1_000_001 + index,
+    priority: matcher.priority,
+    condition: {
+      regexFilter: projection.condition.regexFilter,
+      resourceTypes: matcher.resourceTypes,
+      ...(matcher.method !== undefined
+        ? { requestMethods: [matcher.method] as readonly string[] }
+        : {}),
+      ...(projection.condition.requestDomains !== undefined
+        ? { requestDomains: projection.condition.requestDomains }
+        : {}),
+    },
+  };
+  if (operation.kind === "redirect") {
+    return {
+      ...base,
+      action: {
+        type: "redirect",
+        redirect: { destination: operation.redirect.destination },
+      },
+    };
+  }
+  return {
+    ...base,
+    action: {
+      type: "redirect",
+      redirect: {
+        transform: {
+          queryTransform: queryActionToDNR(operation.action),
+        },
+      },
+    },
+  };
+}
+
 export function projectMatchers(
   operations: readonly RogatioOperation[],
 ): readonly RuleProjection[] {
@@ -145,95 +197,19 @@ export function projectMatchers(
     let dnrRule: DnrRule | undefined;
 
     if (isMatcherOperation(operation)) {
-      matcher = {
-        urlRegex: { ...operation.matcher.urlRegex },
-        origins: [...operation.matcher.origins],
-        resourceTypes: [...operation.matcher.resourceTypes],
-        priority: operation.matcher.priority,
-        ...(operation.matcher.method !== undefined
-          ? { method: operation.matcher.method }
-          : {}),
-      };
+      matcher = copyMatcher(operation.matcher);
       installable = false;
     } else if (isRedirectOperation(operation)) {
-      matcher = {
-        urlRegex: { ...operation.matcher.urlRegex },
-        origins: [...operation.matcher.origins],
-        resourceTypes: [...operation.matcher.resourceTypes],
-        priority: operation.matcher.priority,
-        ...(operation.matcher.method !== undefined
-          ? { method: operation.matcher.method }
-          : {}),
-      };
-      const hostnames = matcher.origins.map((origin) =>
-        origin.replace(/^https?:\/\//, ""),
-      );
-      installable = true;
-      dnrRule = {
-        id: 1_000_001 + index,
-        priority: matcher.priority,
-        condition: {
-          regexFilter: matcher.urlRegex.source,
-          resourceTypes: matcher.resourceTypes,
-          ...(matcher.method !== undefined
-            ? { requestMethods: [matcher.method] }
-            : {}),
-          requestDomains: hostnames,
-          initiatorDomains: hostnames,
-        },
-        action: {
-          type: "redirect",
-          redirect: {
-            destination: operation.redirect.destination,
-          },
-        },
-      };
+      matcher = copyMatcher(operation.matcher);
+      dnrRule = buildDnrRule(operation, index);
+      installable = dnrRule !== undefined;
     } else if (isResponseBodyOperation(operation)) {
-      matcher = {
-        urlRegex: { ...operation.matcher.urlRegex },
-        origins: [...operation.matcher.origins],
-        resourceTypes: [...operation.matcher.resourceTypes],
-        priority: operation.matcher.priority,
-        ...(operation.matcher.method !== undefined
-          ? { method: operation.matcher.method }
-          : {}),
-      };
-      installable = true;
+      matcher = copyMatcher(operation.matcher);
+      installable = projectSourceCondition(matcher).projectable;
     } else if (isQueryOperation(operation)) {
-      matcher = {
-        urlRegex: { ...operation.matcher.urlRegex },
-        origins: [...operation.matcher.origins],
-        resourceTypes: [...operation.matcher.resourceTypes],
-        priority: operation.matcher.priority,
-        ...(operation.matcher.method !== undefined
-          ? { method: operation.matcher.method }
-          : {}),
-      };
-      const hostnames = matcher.origins.map((origin) =>
-        origin.replace(/^https?:\/\//, ""),
-      );
-      installable = true;
-      dnrRule = {
-        id: 1_000_001 + index,
-        priority: matcher.priority,
-        condition: {
-          regexFilter: matcher.urlRegex.source,
-          resourceTypes: matcher.resourceTypes,
-          ...(matcher.method !== undefined
-            ? { requestMethods: [matcher.method] }
-            : {}),
-          requestDomains: hostnames,
-          initiatorDomains: hostnames,
-        },
-        action: {
-          type: "redirect",
-          redirect: {
-            transform: {
-              queryTransform: queryActionToDNR(operation.action),
-            },
-          },
-        },
-      };
+      matcher = copyMatcher(operation.matcher);
+      dnrRule = buildDnrRule(operation, index);
+      installable = dnrRule !== undefined;
     } else {
       throw new Error(extensionDiagnostic("extension.invalid-operation").code);
     }
@@ -259,19 +235,14 @@ export function projectHeaders(
     if (!isHeaderOperation(operation)) {
       throw new Error(extensionDiagnostic("extension.invalid-operation").code);
     }
+    if (!projectSourceCondition(operation.matcher).projectable) {
+      continue;
+    }
     result.push({
       id: 2_000_001 + index,
       groupId: operation.groupId,
       ruleId: operation.ruleId,
-      matcher: {
-        urlRegex: { ...operation.matcher.urlRegex },
-        origins: [...operation.matcher.origins],
-        resourceTypes: [...operation.matcher.resourceTypes],
-        priority: operation.matcher.priority,
-        ...(operation.matcher.method !== undefined
-          ? { method: operation.matcher.method }
-          : {}),
-      },
+      matcher: copyMatcher(operation.matcher),
       action: {
         direction: operation.header.direction,
         operation: operation.header.operation,

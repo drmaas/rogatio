@@ -10,7 +10,6 @@ export {
 } from "./runtime.js";
 export {
   computeBadge,
-  computeDeclaredOrigins,
   computeDesiredRules,
   computeRuleStatuses,
 } from "./status.js";

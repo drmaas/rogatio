@@ -3,19 +3,21 @@ import { compileProject } from "@rogatio/compiler";
 import { describe, expect, it } from "vitest";
 
 const PROJECT = {
-  version: 1 as const,
+  version: 2 as const,
   name: "request-body dry-run",
   groups: [
     {
       id: "g1",
       name: "group1",
-      origins: ["https://example.com"],
       rules: [
         {
           id: "r1",
           name: "Replace body",
-          urlRegex: "^https://example\\.com/api$",
-          origins: [],
+          source: {
+            key: "url" as const,
+            operator: "regex" as const,
+            value: "^https://example\\.com/api$",
+          },
           resourceTypes: ["xmlhttprequest"] as const,
           priority: 10,
           method: "POST" as const,
@@ -25,8 +27,11 @@ const PROJECT = {
         {
           id: "r2",
           name: "Regex replace",
-          urlRegex: "^https://example\\.com/data$",
-          origins: [],
+          source: {
+            key: "url" as const,
+            operator: "regex" as const,
+            value: "^https://example\\.com/data$",
+          },
           resourceTypes: ["xmlhttprequest"] as const,
           priority: 5,
           method: "PATCH" as const,

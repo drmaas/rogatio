@@ -191,8 +191,7 @@ function buildGrantedPreset(): NormalizedRuntimePreset {
         name: "r",
         redactSensitiveInLogs: false,
         matcher: {
-          urlRegex: { source: ".*", flags: "" },
-          origins: ["https://example.com"],
+          source: { key: "url", operator: "regex", value: ".*" },
           resourceTypes: ["main_frame"],
           priority: 1,
         },
@@ -354,19 +353,21 @@ describe("mock faucet port and serveMock", () => {
 
 describe("runtime.start / runtime.stop envelopes and policy retention", () => {
   const bodyProject = {
-    version: 1,
+    version: 2,
     name: "body",
     groups: [
       {
         id: "g1",
         name: "g",
-        origins: ["http://127.0.0.1:8080"],
         rules: [
           {
             id: "r1",
             name: "resp",
-            urlRegex: "^http://127\\.0\\.0\\.1:8080/data\\.json$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^http://127\\.0\\.0\\.1:8080/data\\.json$",
+            },
             resourceTypes: ["main_frame"],
             priority: 1,
             type: "response-body",
@@ -403,7 +404,7 @@ describe("runtime.start / runtime.stop envelopes and policy retention", () => {
     expect(again.metadata.error).toBe("runtime.already-started");
   });
 
-  it("runtime.start without pacOrigins reports no-pac-origins", async () => {
+  it("runtime.start without pacRoutes reports no-pac-routes", async () => {
     const controller = createNativeRuntimeController({});
     await controller.handleEnvelope({
       type: "runtime.project.set",
@@ -414,14 +415,14 @@ describe("runtime.start / runtime.stop envelopes and policy retention", () => {
       metadata: {
         policyDigest: "sha256:x",
         extensionId: "ext",
-        pacOrigins: [],
+        pacRoutes: [],
         targetPolicy: { publicAllowed: true, localOrigins: [] },
       },
     });
     expect(started.type).toBe("runtime.start");
     expect(started.metadata.interception).toEqual({
       active: false,
-      reasons: ["no-pac-origins"],
+      reasons: ["no-pac-routes"],
     });
   });
 

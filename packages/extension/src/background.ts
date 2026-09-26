@@ -1,7 +1,6 @@
 import type { NativeRuntimePhase } from "@rogatio/browser-core";
 import {
   type ChromePort,
-  createPermissionAdapter,
   createProxyAdapter,
   createStorageAdapter,
   setBadge,
@@ -263,7 +262,7 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
             sessionId: config.sessionId,
             policyDigest: config.policyDigest,
             extensionId: config.extensionId,
-            pacOrigins: [...config.pacOrigins],
+            pacRoutes: [...config.pacRoutes],
             targetPolicy: {
               publicAllowed: config.targetPolicy.publicAllowed,
               localOrigins: [...config.targetPolicy.localOrigins],
@@ -273,7 +272,7 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
         const interception = response.metadata.interception as
           | { active?: boolean; reasons?: string[] }
           | undefined;
-        const needsPac = config.pacOrigins.length > 0;
+        const needsPac = config.pacRoutes.length > 0;
         const active = interception?.active === true;
         if (needsPac && !active) {
           const reasons = Array.isArray(interception?.reasons)
@@ -351,7 +350,6 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
 
 const application = createExtensionApplication({
   storage: createStorageAdapter(api),
-  permissions: createPermissionAdapter(api),
   installer: createDnrInstaller(api),
   badge: (value) => setBadge(value, api),
   extensionId: api.runtime.id,
