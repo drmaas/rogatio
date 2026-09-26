@@ -24,10 +24,10 @@
     "site:preview": "pnpm --filter @rogatio/docs-site preview"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.13",
-    "@puppeteer/browsers": "3.2.2",
+    "@biomejs/biome": "2.5.14",
+    "@puppeteer/browsers": "3.2.3",
     "@semantic-release/changelog": "7.0.0",
-    "@types/node": "26.6.1",
+    "@types/node": "26.6.2",
     "@types/selenium-webdriver": "4.35.7",
     "esbuild": "0.28.2",
     "happy-dom": "^20.14.5",
