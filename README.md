@@ -22,13 +22,14 @@ runtime, no cloud sync, no telemetry, and no retained traffic history.
 - **Browser-native.** Redirects, query params, and headers run entirely in the browser via
   Chrome Manifest V3 Declarative Net Request. Response-body and request-body rules use an
   optional local runtime.
-- **Private by design.** No accounts, no cloud, no telemetry. Site access is granted only
-  for declared origins, and you activate groups explicitly.
+- **Private by design.** No accounts, no cloud, no telemetry. The extension uses broad
+  install-time host access; you activate groups explicitly.
 
 ## Features
 
-Rules belong to named groups. Each rule can target a stable ID, a case-sensitive URL regular
-expression, resource types, priority, and (where supported) an HTTP method.
+Rules belong to named groups. Each rule has a stable ID, a source condition (`key` `url` or
+`host`, `operator` `regex`, case-sensitive `value`), resource types, priority, and (where
+supported) an HTTP method.
 
 - **Redirects** — send matching HTTP(S) requests to an absolute destination, including
   `$1`–`$9` regular-expression capture substitution (`\\1` remains compatible).
@@ -45,8 +46,8 @@ expression, resource types, priority, and (where supported) an HTTP method.
   use `$1`–`$9` URL captures; regex-mode `$1`–`$9` remain body captures.
 
 Every rule can be dry-run against a bounded batch of URLs before saving. The offline check
-reports regex, origin, method, and resource-type results, plus substituted action
-previews, without contacting the target or changing installed rules.
+reports source, method, and resource-type results, plus substituted action previews,
+without contacting the target or changing installed rules.
 
 ## CLI
 
@@ -92,8 +93,8 @@ There is no browser-store install or automatic update.
 4. Select the unpacked extension directory.
 
 Chrome sideloading may require the organization's extension entitlement. The
-extension does not request broad host permissions up front; you grant only each
-project's declared site access when you import a project.
+extension declares broad host access (`*://*/*`) at install time so DNR rules can
+match any HTTP(S) URL your projects describe; there is no per-origin grant step.
 
 The editor, extension management page, and toolbar popup share a dark design
 system (Hanken Grotesk + JetBrains Mono bundled offline, dot-grid page background,
@@ -108,8 +109,8 @@ actions that reuse the management page's create/import lifecycle. The popup reus
 existing group-enablement lifecycle; it contains no editor, search, proxy, permission, or
 rule-authoring controls.
 
-On the management page, each rule reports `active`, `disabled`, `needs permission`,
-`needs runtime`, `unsupported`, or `error`. When a rule fails to install, the status word
+On the management page, each rule reports `active`, `disabled`, `needs runtime`,
+`unsupported`, or `error`. When a rule fails to install, the status word
 `error` is an activatable control that opens that rule in the workspace editor, and a
 distinct error card shows the concrete install failure reason (Chrome's Declarative Net
 Request message when available). The popup continues to show status labels only.
@@ -137,7 +138,7 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio runtime host <path>` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Pairing, authorization, and body transforms flow through this single host. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
-the file into Chrome, grant only declared site access, and activate the groups you need.
+the file into Chrome and activate the groups you need.
 
 ## AI-Assisted Rule Authoring
 
@@ -244,10 +245,10 @@ This is a strict-TypeScript 7, ESM/NodeNext pnpm monorepo.
 
 | Package | Purpose |
 | --- | --- |
-| `@rogatio/schema` | Version-1 JSON schema, validation, origins, bounds, forbidden headers. |
+| `@rogatio/schema` | Version-2 JSON schema, validation, source conditions, bounds, forbidden headers, v1 migration. |
 | `@rogatio/compiler` | Transforms validated source into browser-neutral operations and stable diagnostics. |
-| `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (4-dim matching, preview seam). |
-| `@rogatio/browser-core` | Versioned storage, migrations, permissions, enablement, lifecycle, runtime state. |
+| `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (3-dim matching, preview seam). |
+| `@rogatio/browser-core` | Versioned storage, migrations, enablement, lifecycle, runtime state. |
 | `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
 | `@rogatio/extension` | Chrome MV3 service worker and extension page (WebExtensions/DNR translation). |
 | `@rogatio/runtime` | Reusable response-body and request-body transformation components. |

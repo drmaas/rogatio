@@ -36,8 +36,7 @@ export interface DryRunRuleMatchResult {
   readonly groupId: string;
   readonly ruleId: string;
   readonly matched: boolean;
-  readonly urlRegex: DryRunMatchDimension;
-  readonly effectiveOrigin: DryRunMatchDimension;
+  readonly source: DryRunMatchDimension;
   readonly method: DryRunMatchDimension;
   readonly resourceType: DryRunMatchDimension;
   readonly actionPreview: DryRunActionPreview | null;
@@ -80,12 +79,17 @@ export interface AIAssistRequest {
   };
 }
 
+export interface SourceProposal {
+  key: "url" | "host";
+  operator: "regex";
+  value: string;
+}
+
 export interface RuleProposal {
   kind: "redirect" | "query" | "header" | "response-body" | "request-body";
   groupId: string;
   name: string;
-  urlRegex: string;
-  origins?: string[];
+  source: SourceProposal;
   resourceTypes?: string[];
   priority?: number;
   method?: string;
@@ -130,8 +134,11 @@ export function ruleFromProposal(
   const rule: Record<string, unknown> = {
     id: ruleId,
     name: proposal.name,
-    urlRegex: proposal.urlRegex,
-    origins: proposal.origins ? [...proposal.origins] : [],
+    source: {
+      key: proposal.source.key,
+      operator: "regex",
+      value: proposal.source.value,
+    },
     resourceTypes: proposal.resourceTypes
       ? [...proposal.resourceTypes]
       : ["main_frame"],
@@ -200,7 +207,7 @@ export function mergeProposalIntoProject(
   const groups: Record<string, unknown>[] = Array.isArray(project.groups)
     ? project.groups.map((group) => {
         if (!isRecord(group)) {
-          return { id: "invalid", name: "invalid", origins: [], rules: [] };
+          return { id: "invalid", name: "invalid", rules: [] };
         }
         return {
           ...group,
@@ -218,7 +225,6 @@ export function mergeProposalIntoProject(
       group = {
         id: ruleProposal.groupId,
         name: "AI Group",
-        origins: [],
         rules: [],
       };
       groups.push(group);
@@ -287,15 +293,28 @@ function stringArray(value: unknown): string[] | undefined {
 }
 
 /** Defensive structural parse of one untrusted proposal rule. */
+function parseSourceProposal(value: unknown): SourceProposal | null {
+  if (!isRecord(value)) return null;
+  if (value.key !== "url" && value.key !== "host") return null;
+  if (value.operator !== "regex") return null;
+  if (typeof value.value !== "string" || value.value.length === 0) return null;
+  return {
+    key: value.key,
+    operator: "regex",
+    value: value.value,
+  };
+}
+
 function parseProposalRule(value: unknown): RuleProposal | null {
   if (!isRecord(value)) return null;
   const kind = value.kind;
+  const source = parseSourceProposal(value.source);
   if (
     typeof kind !== "string" ||
     !RULE_KINDS.has(kind as RuleProposal["kind"]) ||
     typeof value.groupId !== "string" ||
     typeof value.name !== "string" ||
-    typeof value.urlRegex !== "string" ||
+    source === null ||
     !Object.hasOwn(value, "action")
   ) {
     return null;
@@ -304,8 +323,7 @@ function parseProposalRule(value: unknown): RuleProposal | null {
     kind: kind as RuleProposal["kind"],
     groupId: value.groupId,
     name: value.name,
-    urlRegex: value.urlRegex,
-    origins: stringArray(value.origins),
+    source,
     resourceTypes: stringArray(value.resourceTypes),
     priority: typeof value.priority === "number" ? value.priority : undefined,
     method: typeof value.method === "string" ? value.method : undefined,
@@ -327,7 +345,7 @@ export function repairProposalIntoProject(
   const groups: Record<string, unknown>[] = Array.isArray(project.groups)
     ? project.groups.map((group) => {
         if (!isRecord(group)) {
-          return { id: "invalid", name: "invalid", origins: [], rules: [] };
+          return { id: "invalid", name: "invalid", rules: [] };
         }
         return {
           ...group,
@@ -371,7 +389,6 @@ export function repairProposalIntoProject(
       group = {
         id: ruleProposal.groupId,
         name: "AI Group",
-        origins: [],
         rules: [],
       };
       groups.push(group);

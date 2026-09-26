@@ -10,19 +10,17 @@ import {
 } from "../src/index.js";
 
 const emptyProject = {
-  version: 1,
+  version: 2,
   name: "Editor project",
   groups: [
     {
       id: "group-one",
       name: "One",
-      origins: ["https://one.example"],
       rules: [
         {
           id: "rule-new",
           name: "New rule",
-          urlRegex: "",
-          origins: [],
+          source: { key: "url", operator: "regex", value: "" },
           resourceTypes: ["main_frame"],
           priority: 100,
         },
@@ -48,19 +46,21 @@ function createTestEditor(initialProject: unknown = emptyProject) {
 
 function headerProject(fields: Record<string, unknown>) {
   return {
-    version: 1,
+    version: 2,
     name: "Editor project",
     groups: [
       {
         id: "group-one",
         name: "One",
-        origins: ["https://one.example"],
         rules: [
           {
             id: "rule-header",
             name: "Header rule",
-            urlRegex: "^https://example\\.com/",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/",
+            },
             resourceTypes: ["main_frame"],
             priority: 100,
             type: "header",
@@ -427,13 +427,84 @@ describe("@rogatio/editor resource type hints", () => {
   });
 });
 
+describe("@rogatio/editor source controls", () => {
+  it("renders source key select and regex value field", () => {
+    const hostProject = {
+      version: 2,
+      name: "Host project",
+      groups: [
+        {
+          id: "group-one",
+          name: "One",
+          rules: [
+            {
+              id: "rule-host",
+              name: "Host rule",
+              source: {
+                key: "host",
+                operator: "regex",
+                value: "^example\\.com$",
+              },
+              resourceTypes: ["main_frame"],
+              priority: 100,
+            },
+          ],
+        },
+      ],
+    };
+    const { root, editor } = createTestEditor(hostProject);
+    const keySelect = root.querySelector(
+      'select[data-path="/groups/0/rules/0/source/key"]',
+    ) as HTMLSelectElement | null;
+    const valueField = root.querySelector(
+      'textarea[data-path="/groups/0/rules/0/source/value"]',
+    ) as HTMLTextAreaElement | null;
+    expect(keySelect?.value).toBe("host");
+    expect(valueField?.value).toBe("^example\\.com$");
+    editor.destroy();
+  });
+
+  it("shows migration notices once until dismissed", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    let dismissed = false;
+    const editor = createEditor({
+      root,
+      initialProject: structuredClone(emptyProject),
+      validate: () => [],
+      save: () => ({ ok: true }),
+      migrationNotices: [
+        {
+          code: "migration.possible-scope-widen",
+          path: "/groups/0/rules/0",
+          message: "Rule scope may have widened during migration.",
+        },
+      ],
+      onDismissMigrationNotices: () => {
+        dismissed = true;
+      },
+    });
+    root
+      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-migration-notices]")).not.toBeNull();
+    root
+      .querySelector('[data-command="dismiss-migration-notices"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    expect(dismissed).toBe(true);
+    expect(root.querySelector("[data-migration-notices]")).toBeNull();
+    editor.destroy();
+  });
+});
+
 describe("@rogatio/editor initial host validation", () => {
   it("mounts a structurally valid draft that fails host validation", () => {
     const root = document.createElement("div");
     document.body.append(root);
     const editor = createEditor({
       root,
-      initialProject: { version: 1, name: "", groups: [] },
+      initialProject: { version: 2, name: "", groups: [] },
       validate: () => [
         {
           code: "schema.minLength",

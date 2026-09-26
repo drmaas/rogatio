@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { authorizeExact, normalizeRuntimePreset } from "../src/index.js";
-import { makeGrant, makeMatcher, makePresetInput } from "./helpers.js";
+import {
+  DEFAULT_REQUEST_URL,
+  makeGrant,
+  makeMatcher,
+  makePresetInput,
+} from "./helpers.js";
 
 function makePolicy() {
   const result = normalizeRuntimePreset(makePresetInput());
@@ -10,9 +15,9 @@ function makePolicy() {
 }
 
 describe("F6 exact authorization", () => {
-  it("authorizes the complete exact grant tuple", () => {
+  it("authorizes the complete exact grant tuple for a same-origin target", () => {
     const policy = makePolicy();
-    const result = authorizeExact(policy, makeGrant());
+    const result = authorizeExact(policy, makeGrant(), DEFAULT_REQUEST_URL);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -34,7 +39,11 @@ describe("F6 exact authorization", () => {
       { target: "https://example.com/other" },
       { method: "HEAD" },
     ]) {
-      const result = authorizeExact(policy, { ...makeGrant(), ...change });
+      const result = authorizeExact(
+        policy,
+        { ...makeGrant(), ...change },
+        DEFAULT_REQUEST_URL,
+      );
       expect(result).toEqual({
         ok: false,
         error: { code: "runtime.authorization-denied" },
@@ -42,11 +51,39 @@ describe("F6 exact authorization", () => {
     }
   });
 
+  it("denies a cross-origin target even when it would match the source regex", () => {
+    const input = makePresetInput({
+      matchers: [
+        makeMatcher("rule-main", {
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://example\\.com/.*",
+          },
+        }),
+      ],
+    });
+    const normalized = normalizeRuntimePreset(input);
+    expect(normalized.ok).toBe(true);
+    if (normalized.ok) {
+      const result = authorizeExact(
+        normalized.value,
+        makeGrant({ target: "https://evil.com/data" }),
+        "https://example.com/page",
+      );
+      expect(result.ok).toBe(false);
+    }
+  });
+
   it("does not execute the F3 regex or invent priority precedence", () => {
     const input = makePresetInput({
       matchers: [
         makeMatcher("rule-main", {
-          urlRegex: { source: "^never-matches$", flags: "" },
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^never-matches$",
+          },
           priority: 1000,
         }),
       ],
@@ -54,7 +91,9 @@ describe("F6 exact authorization", () => {
     const normalized = normalizeRuntimePreset(input);
     expect(normalized.ok).toBe(true);
     if (normalized.ok) {
-      expect(authorizeExact(normalized.value, makeGrant()).ok).toBe(true);
+      expect(
+        authorizeExact(normalized.value, makeGrant(), DEFAULT_REQUEST_URL).ok,
+      ).toBe(true);
     }
   });
 
@@ -64,10 +103,18 @@ describe("F6 exact authorization", () => {
     expect(normalized.ok).toBe(true);
     if (normalized.ok) {
       expect(
-        authorizeExact(normalized.value, makeGrant({ method: "GET" })).ok,
+        authorizeExact(
+          normalized.value,
+          makeGrant({ method: "GET" }),
+          DEFAULT_REQUEST_URL,
+        ).ok,
       ).toBe(true);
       expect(
-        authorizeExact(normalized.value, { ...makeGrant(), method: undefined }),
+        authorizeExact(
+          normalized.value,
+          { ...makeGrant(), method: undefined },
+          DEFAULT_REQUEST_URL,
+        ),
       ).toEqual(
         expect.objectContaining({
           ok: false,

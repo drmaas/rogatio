@@ -87,7 +87,7 @@ async function checkArtifacts(): Promise<void> {
     background?: { service_worker?: string };
     action?: { default_popup?: string };
     permissions?: string[];
-    optional_host_permissions?: string[];
+    host_permissions?: string[];
     content_security_policy?: { extension_pages?: string };
   };
   if (
@@ -95,8 +95,8 @@ async function checkArtifacts(): Promise<void> {
     extensionManifest.background?.service_worker !== "background.js" ||
     extensionManifest.action?.default_popup !== "popup.html" ||
     !extensionManifest.permissions?.includes("storage") ||
-    JSON.stringify(extensionManifest.optional_host_permissions) !==
-      JSON.stringify(["http://*/*", "https://*/*"]) ||
+    JSON.stringify(extensionManifest.host_permissions) !==
+      JSON.stringify(["*://*/*"]) ||
     extensionManifest.content_security_policy?.extension_pages !==
       "script-src 'self'; object-src 'self'"
   )
@@ -177,19 +177,21 @@ async function checkEmittedModules(): Promise<void> {
     validateProject?: (value: unknown) => boolean;
   };
   const project = {
-    version: 1,
+    version: 2,
     name: "Emitted schema check",
     groups: [
       {
         id: "group-check",
         name: "Check",
-        origins: ["https://example.com"],
         rules: [
           {
             id: "rule-check",
             name: "Check",
-            urlRegex: "^https://example\\.com/",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/",
+            },
             resourceTypes: ["main_frame"],
             priority: 100,
           },
@@ -244,7 +246,6 @@ async function checkEmittedModules(): Promise<void> {
     computeRuleStatuses?: (input: {
       operations: readonly unknown[];
       enabledGroupIds: readonly string[];
-      grantedOrigins: readonly string[];
       installedRuleIds: readonly string[];
     }) => readonly { status: string }[];
     computeBadge?: (statuses: readonly { status: string }[]) => {
@@ -287,7 +288,6 @@ async function checkEmittedModules(): Promise<void> {
   const statuses = core.computeRuleStatuses({
     operations: compiled.operations,
     enabledGroupIds: [],
-    grantedOrigins: [],
     installedRuleIds: [],
   });
   if (statuses.length !== 1 || statuses[0]?.status !== "disabled")

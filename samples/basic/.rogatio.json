@@ -1,18 +1,20 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "Sample Rules Project",
   "description": "Exercises redirect, query, header, response-body, and request-body rule types.",
   "groups": [
     {
       "id": "grp-sample",
       "name": "Sample Rules Group",
-      "origins": ["https://example.com"],
       "rules": [
         {
           "id": "rule-redirect",
           "name": "Redirect to docs",
-          "urlRegex": "^https://example\\.com/old/",
-          "origins": [],
+          "source": {
+            "key": "url",
+            "operator": "regex",
+            "value": "^https://example\\.com/old/"
+          },
           "resourceTypes": ["main_frame"],
           "priority": 100,
           "type": "redirect",
@@ -23,8 +25,11 @@
         {
           "id": "rule-query",
           "name": "Add tracking param",
-          "urlRegex": "^https://example\\.com/page",
-          "origins": [],
+          "source": {
+            "key": "url",
+            "operator": "regex",
+            "value": "^https://example\\.com/page"
+          },
           "resourceTypes": ["main_frame"],
           "priority": 200,
           "type": "query",
@@ -36,8 +41,11 @@
         {
           "id": "rule-header-set",
           "name": "Set request header",
-          "urlRegex": "^https://example\\.com/api/",
-          "origins": [],
+          "source": {
+            "key": "url",
+            "operator": "regex",
+            "value": "^https://example\\.com/api/"
+          },
           "resourceTypes": ["xmlhttprequest"],
           "priority": 300,
           "method": "GET",
@@ -50,8 +58,11 @@
         {
           "id": "rule-header-remove",
           "name": "Remove response header",
-          "urlRegex": "^https://example\\.com/api/",
-          "origins": [],
+          "source": {
+            "key": "url",
+            "operator": "regex",
+            "value": "^https://example\\.com/api/"
+          },
           "resourceTypes": ["main_frame"],
           "priority": 310,
           "type": "header",
@@ -59,12 +70,14 @@
           "headerOperation": "remove",
           "headerName": "X-Test-Header"
         },
-
         {
           "id": "rule-response-body",
           "name": "Rewrite response body",
-          "urlRegex": "^https://example\\.com/data\\.json$",
-          "origins": [],
+          "source": {
+            "key": "url",
+            "operator": "regex",
+            "value": "^https://example\\.com/data\\.json$"
+          },
           "resourceTypes": ["main_frame"],
           "priority": 500,
           "type": "response-body",
@@ -78,8 +91,11 @@
         {
           "id": "rule-request-body",
           "name": "Replace request body",
-          "urlRegex": "^https://example\\.com/submit$",
-          "origins": [],
+          "source": {
+            "key": "url",
+            "operator": "regex",
+            "value": "^https://example\\.com/submit$"
+          },
           "resourceTypes": ["xmlhttprequest"],
           "priority": 600,
           "method": "POST",

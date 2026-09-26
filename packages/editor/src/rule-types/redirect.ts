@@ -46,7 +46,14 @@ export function createRedirectRuleType(): RuleTypeFieldExtension {
         typeof (redirect as Record<string, unknown>).destination === "string"
           ? ((redirect as Record<string, unknown>).destination as string)
           : "";
-      const urlRegex = typeof rule.urlRegex === "string" ? rule.urlRegex : "";
+      const source = rule.source;
+      const urlRegex =
+        source !== null &&
+        typeof source === "object" &&
+        (source as Record<string, unknown>).key === "url" &&
+        typeof (source as Record<string, unknown>).value === "string"
+          ? ((source as Record<string, unknown>).value as string)
+          : "";
       const issues = validateRedirectDestination(destination, urlRegex);
       return issues.map((issue) => ({
         code: `schema.${issue.code}`,

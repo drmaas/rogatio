@@ -7,8 +7,11 @@ const ext = createRedirectRuleType();
 const redirectRule: RogatioRule = {
   id: "rule-redirect",
   name: "Redirect rule",
-  urlRegex: "^https://example\\.com/(.*)$",
-  origins: [],
+  source: {
+    key: "url",
+    operator: "regex",
+    value: "^https://example\\.com/(.*)$",
+  },
   resourceTypes: ["main_frame"],
   priority: 100,
   type: "redirect",
@@ -62,7 +65,11 @@ describe("@rogatio/editor redirect rule type", () => {
   it("reports a backreference that exceeds capture groups", () => {
     const rule = {
       ...redirectRule,
-      urlRegex: "^https://example\\.com/(a)$",
+      source: {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/(a)$",
+      },
       redirect: { destination: "https://other.com/\\3" },
     };
     const diagnostics = ext.validate(

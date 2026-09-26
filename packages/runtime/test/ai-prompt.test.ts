@@ -4,25 +4,27 @@ import { buildSystemPrompt } from "../src/ai-prompt.js";
 describe("ai-prompt", () => {
   function createTestProject(): unknown {
     return {
-      version: 1,
+      version: 2,
       name: "Test Project",
       description: "A test project",
       groups: [
         {
           id: "group-1",
           name: "API Rules",
-          origins: ["https://api.example.com"],
           rules: [
             {
               id: "rule-1",
               name: "Redirect API",
-              urlRegex: "^https://api\\.example\\.com/",
-              origins: ["https://api.example.com"],
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://api\\.example\\.com/",
+              },
               resourceTypes: ["main_frame"],
               priority: 100,
               method: "GET",
-              action: {
-                kind: "redirect",
+              type: "redirect",
+              redirect: {
                 destination: "https://mock.example.com/$1",
               },
             },
@@ -57,10 +59,10 @@ describe("ai-prompt", () => {
       expect(prompt.toLowerCase()).toContain("header");
     });
 
-    it("includes origin bounds (http/https only)", () => {
-      expect(prompt).toContain("http");
-      expect(prompt).toContain("https");
-      expect(prompt).toContain("origin");
+    it("includes source condition docs", () => {
+      expect(prompt).toContain("source");
+      expect(prompt).toContain('"url"');
+      expect(prompt).toContain('"host"');
     });
 
     it("includes resource types list", () => {
@@ -128,7 +130,7 @@ describe("ai-prompt", () => {
       expect(prompt).toContain("kind");
       expect(prompt).toContain("groupId");
       expect(prompt).toContain("name");
-      expect(prompt).toContain("urlRegex");
+      expect(prompt).toContain("source");
       expect(prompt).toContain("action");
     });
   });
@@ -152,7 +154,7 @@ describe("ai-prompt", () => {
   describe("Project context", () => {
     it("includes project name and description", () => {
       const project = {
-        version: 1,
+        version: 2,
         name: "My Project",
         description: "Project description",
         groups: [],
@@ -171,7 +173,7 @@ describe("ai-prompt", () => {
     });
 
     it("handles empty project", () => {
-      const project = { version: 1, name: "", groups: [] };
+      const project = { version: 2, name: "", groups: [] };
       const prompt = buildSystemPrompt(project);
       expect(prompt).toContain("name");
     });

@@ -18,6 +18,12 @@ export const SAMPLE_GROUP_ID = "grp-sample";
 
 const EXAMPLE_ORIGIN = "https://example.com";
 
+export type SourceCondition = {
+  key: "url" | "host";
+  operator: "regex";
+  value: string;
+};
+
 export type RogatioProject = {
   version: number;
   name: string;
@@ -25,8 +31,9 @@ export type RogatioProject = {
   groups: Array<{
     id: string;
     name: string;
-    origins: string[];
-    rules: Array<Record<string, unknown> & { id: string; urlRegex: string }>;
+    rules: Array<
+      Record<string, unknown> & { id: string; source: SourceCondition }
+    >;
   }>;
 };
 
@@ -39,17 +46,14 @@ export async function loadShippedSample(): Promise<RogatioProject> {
 const EXAMPLE_REGEX_HOST = "https://example\\.com";
 const VALIDATE_REGEX_HOST = "http://127\\.0\\.0\\.1:8080";
 
-/** Rewrite shipped sample origins/regex from example.com → local validate server. */
+/** Rewrite shipped sample source regex from example.com → local validate server. */
 export function rewriteSampleToValidateOrigin(
   project: RogatioProject,
 ): RogatioProject {
   const clone = structuredClone(project) as RogatioProject;
   for (const group of clone.groups) {
-    group.origins = group.origins.map((origin) =>
-      origin === EXAMPLE_ORIGIN ? VALIDATE_ORIGIN : origin,
-    );
     for (const rule of group.rules) {
-      rule.urlRegex = rule.urlRegex
+      rule.source.value = rule.source.value
         .split(EXAMPLE_REGEX_HOST)
         .join(VALIDATE_REGEX_HOST);
       if (typeof rule.redirect === "object" && rule.redirect !== null) {

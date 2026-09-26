@@ -12,7 +12,7 @@ runtime-owned TLS proxy.
 - **Full body replace**, or
 - **Bounded global ECMAScript regex replace** on the body.
 
-Replace-mode bodies may use `$1` through `$9` from the rule's `urlRegex`, and `$$`
+Replace-mode bodies may use `$1` through `$9` from the rule's **source** regex, and `$$`
 for a literal dollar sign. Regex-mode replacements keep `$1` through `$9` for
 captures from the body regex. The two capture namespaces are not mixed.
 

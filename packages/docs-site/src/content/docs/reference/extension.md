@@ -17,10 +17,10 @@ boundary is designed to accommodate additional browser extensions in the future.
 
 ## Behavior
 
-- The service worker is the authority for `storage.local` persistence, permissions, project
-  lifecycle, group enablement, matcher projection, rule statuses, and the action badge.
-- Permission requests are projected from sorted effective origins and never include
-  undeclared origins or broad host patterns.
+- The service worker is the authority for `storage.local` persistence, project lifecycle,
+  group enablement, matcher projection, rule statuses, and the action badge.
+- The manifest declares broad host access (`host_permissions: ["*://*/*"]`) at install
+  time; there is no per-origin grant UI or `optional_host_permissions` flow.
 - Actionless matcher operations are reported as `unsupported` and are never sent to DNR.
 - Console **match logging** injects a bounded, redacted, live-only lowercase `[rogatio]`
   line into the matched page's DevTools Console when `onRuleMatchedDebug` fires (unpacked

@@ -251,7 +251,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
           const destinationPath = `${rulePath}/redirect/destination`;
           for (const issue of validateRedirectDestination(
             destination,
-            rule.urlRegex,
+            rule.source.value,
           )) {
             issues.push({
               instancePath: destinationPath,
@@ -263,38 +263,11 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
           issues.push(
             ...captureValidationIssues(
               destination,
-              rule.urlRegex,
+              rule.source.value,
               destinationPath,
             ),
           );
         }
-      }
-
-      const effectiveOrigins = new Set<string>();
-      for (
-        let originIndex = 0;
-        originIndex < group.origins.length;
-        originIndex += 1
-      ) {
-        const origin = normalizeSiteOrigin(group.origins[originIndex]);
-        if (origin !== null) effectiveOrigins.add(origin);
-      }
-      for (
-        let originIndex = 0;
-        originIndex < rule.origins.length;
-        originIndex += 1
-      ) {
-        const origin = normalizeSiteOrigin(rule.origins[originIndex]);
-        if (origin !== null) effectiveOrigins.add(origin);
-      }
-      if (effectiveOrigins.size === 0) {
-        issues.push({
-          instancePath: `${rulePath}/origins`,
-          keyword: "effectiveOrigin",
-          message:
-            "must combine with group origins to contain at least one origin",
-          params: {},
-        });
       }
 
       const action = rule.action;
@@ -332,7 +305,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
               issues.push(
                 ...captureValidationIssues(
                   param.value,
-                  rule.urlRegex,
+                  rule.source.value,
                   `${rulePath}/action/params/${p}/value`,
                 ),
               );
@@ -367,7 +340,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
           issues.push(
             ...captureValidationIssues(
               rule.headerValue,
-              rule.urlRegex,
+              rule.source.value,
               `${rulePath}/headerValue`,
             ),
           );
@@ -410,7 +383,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
             issues.push(
               ...captureValidationIssues(
                 action.body,
-                rule.urlRegex,
+                rule.source.value,
                 `${actionPath}/body`,
               ),
             );
@@ -503,7 +476,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
               issues.push(
                 ...captureValidationIssues(
                   action.body,
-                  rule.urlRegex,
+                  rule.source.value,
                   `${actionPath}/body`,
                 ),
               );

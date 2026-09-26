@@ -28,28 +28,33 @@
       import { createEditor } from "/editor/index.js";
 
       const project = {
-        version: 1,
+        version: 2,
         name: "Editor project",
         description: "A project for the editor journey",
         groups: [
           {
             id: "group-one",
             name: "One",
-            origins: ["https://one.example"],
             rules: [
               {
                 id: "rule-one",
                 name: "First rule",
-                urlRegex: "^https://one\\.example/first$",
-                origins: [],
+                source: {
+                  key: "url",
+                  operator: "regex",
+                  value: "^https://one\\.example/first$",
+                },
                 resourceTypes: ["main_frame"],
                 priority: 100,
               },
               {
                 id: "rule-two",
                 name: "Second rule",
-                urlRegex: "^https://one\\.example/second$",
-                origins: [],
+                source: {
+                  key: "url",
+                  operator: "regex",
+                  value: "^https://one\\.example/second$",
+                },
                 resourceTypes: ["script"],
                 priority: 200,
               },
@@ -58,13 +63,15 @@
           {
             id: "group-two",
             name: "Two",
-            origins: ["https://two.example"],
             rules: [
               {
                 id: "rule-three",
                 name: "Third rule",
-                urlRegex: "^https://two\\.example/third$",
-                origins: [],
+                source: {
+                  key: "url",
+                  operator: "regex",
+                  value: "^https://two\\.example/third$",
+                },
                 resourceTypes: ["image"],
                 priority: 300,
               },
@@ -110,24 +117,19 @@
                 ),
               );
             }
-            if (typeof rule.urlRegex !== "string" || rule.urlRegex === "[") {
+            const source = rule.source;
+            const sourceValue =
+              source &&
+              typeof source === "object" &&
+              typeof source.value === "string"
+                ? source.value
+                : "";
+            if (sourceValue === "" || sourceValue === "[") {
               errors.push(
                 diagnostic(
                   "schema.invalid-format",
-                  `${rulePath}/urlRegex`,
-                  "Enter a valid URL regular expression.",
-                ),
-              );
-            }
-            if (
-              (!Array.isArray(group.origins) || group.origins.length === 0) &&
-              (!Array.isArray(rule.origins) || rule.origins.length === 0)
-            ) {
-              errors.push(
-                diagnostic(
-                  "schema.no-effective-origin",
-                  `${rulePath}/origins`,
-                  "Add a group or rule origin.",
+                  `${rulePath}/source/value`,
+                  "Enter a valid regular expression.",
                 ),
               );
             }

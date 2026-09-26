@@ -3,6 +3,7 @@ import type {
   ResponseBodyOperation,
 } from "@rogatio/compiler";
 import type { ChromeApi } from "./chrome.js";
+import { projectSourceCondition } from "./source-projection.js";
 
 /**
  * Body URL-match markers live in the Chrome **session** rule store.
@@ -52,33 +53,14 @@ export function inertMarkerValue(id: number): string {
   return String(id);
 }
 
-/** Align with `toDnrRule` origin → requestDomains (installer.ts). */
-function requestDomainsFromOrigins(origins: readonly string[]): {
-  allowed: string[];
-  excluded: string[];
-} {
-  const allowed: string[] = [];
-  const excluded: string[] = [];
-  for (const origin of origins) {
-    if (origin.startsWith("!")) {
-      excluded.push(origin.slice(1));
-    } else {
-      try {
-        allowed.push(new URL(origin).hostname);
-      } catch {
-        allowed.push(origin);
-      }
-    }
-  }
-  return { allowed, excluded };
-}
-
 export function buildBodyMarkerRule(
   operation: BodyMarkerOperation,
   id: number,
 ): BodyMarkerSessionRule {
-  const { allowed: requestDomains, excluded: excludedRequestDomains } =
-    requestDomainsFromOrigins(operation.matcher.origins);
+  const projection = projectSourceCondition(operation.matcher);
+  if (!projection.projectable) {
+    throw new Error("extension.source-unprojectable");
+  }
   const requestMethods =
     operation.matcher.method !== undefined
       ? [operation.matcher.method.toLowerCase()]
@@ -98,12 +80,11 @@ export function buildBodyMarkerRule(
       ],
     },
     condition: {
-      // requestDomains (not initiatorDomains): same reason as header DNR —
-      // main_frame / cross-initiator XHR still match when URL host is in scope.
-      regexFilter: operation.matcher.urlRegex.source,
+      regexFilter: projection.condition.regexFilter,
       resourceTypes: [...operation.matcher.resourceTypes],
-      ...(requestDomains.length > 0 ? { requestDomains } : {}),
-      ...(excludedRequestDomains.length > 0 ? { excludedRequestDomains } : {}),
+      ...(projection.condition.requestDomains !== undefined
+        ? { requestDomains: [...projection.condition.requestDomains] }
+        : {}),
       ...(requestMethods !== undefined ? { requestMethods } : {}),
     },
   };

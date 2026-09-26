@@ -9,8 +9,8 @@ function makeRule(
   return {
     id: `rule-${index}`,
     name: `Rule ${index}`,
-    urlRegex: "^https://example\\.com/",
-    origins: [],
+    source: { key: "url", operator: "regex", value: "^https://example\\.com/" },
+
     resourceTypes: ["main_frame"],
     priority: 100,
     ...overrides,
@@ -19,13 +19,13 @@ function makeRule(
 
 function projectWith(rule: Record<string, unknown>): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "Example project",
     groups: [
       {
         id: "group-main",
         name: "Main sites",
-        origins: ["https://example.com"],
+
         rules: [rule as never],
       },
     ],

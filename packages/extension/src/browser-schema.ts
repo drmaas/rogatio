@@ -16,6 +16,7 @@ import { hasLoneSurrogate } from "../../schema/src/utf16.js";
 export { safeClone } from "../../schema/src/clone.js";
 export { hasControl } from "../../schema/src/control.js";
 export { formatSha256, isSha256Digest } from "../../schema/src/digest.js";
+export { migrateV1Project } from "../../schema/src/migrate-v1.js";
 export { containsUrlCaptureReference, hasLoneSurrogate };
 
 const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
@@ -80,7 +81,7 @@ export function isForbiddenHeader(
   );
 }
 
-export const PROJECT_VERSION = 1 as const;
+export const PROJECT_VERSION = 2 as const;
 export const RESOURCE_TYPES = Object.freeze([
   "main_frame",
   "sub_frame",
@@ -113,7 +114,6 @@ export const LIMITS = Object.freeze({
   maxGroups: 64,
   maxRulesPerGroup: 256,
   maxRulesPerProject: 4096,
-  maxOriginsPerScope: 32,
   maxIdLength: 64,
   maxLabelLength: 100,
   maxDescriptionLength: 1000,
@@ -419,12 +419,12 @@ const PROJECT_KEYS = [
   "groups",
   "requestBodyPolicy",
 ] as const;
-const GROUP_KEYS = ["id", "name", "origins", "rules"] as const;
+const GROUP_KEYS = ["id", "name", "rules"] as const;
+const SOURCE_KEYS = ["key", "operator", "value"] as const;
 const RULE_KEYS = [
   "id",
   "name",
-  "urlRegex",
-  "origins",
+  "source",
   "resourceTypes",
   "priority",
   "method",
@@ -487,13 +487,40 @@ function validateQueryParam(
   }
 }
 
+function sourcePattern(rule: JsonRecord): string {
+  const source = rule.source;
+  return isRecord(source) && typeof source.value === "string"
+    ? source.value
+    : "";
+}
+
+function validateSource(
+  errors: ValidationIssue[],
+  value: unknown,
+  path: string,
+): void {
+  if (!isRecord(value) || !hasOnlyKeys(value, SOURCE_KEYS)) {
+    errors.push(issue(path, "invalid-structure"));
+    return;
+  }
+  if (value.key !== "url" && value.key !== "host") {
+    errors.push(issue(`${path}/key`, "invalid-value"));
+  }
+  if (value.operator !== "regex") {
+    errors.push(issue(`${path}/operator`, "invalid-value"));
+  }
+  if (!isValidUrlRegex(value.value)) {
+    errors.push(issue(`${path}/value`, "invalid-format"));
+  }
+}
+
 function addCaptureIssues(
   errors: ValidationIssue[],
   value: string,
-  urlRegex: string,
+  sourceValue: string,
   path: string,
 ): void {
-  for (const capture of validateCaptureTemplate(value, urlRegex)) {
+  for (const capture of validateCaptureTemplate(value, sourceValue)) {
     errors.push({
       instancePath: path,
       keyword: `capture-${capture.code}`,
@@ -513,7 +540,7 @@ function validateQueryAction(
   errors: ValidationIssue[],
   value: unknown,
   path: string,
-  urlRegex: string,
+  sourceValue: string,
 ): void {
   if (!isRecord(value) || !hasOnlyKeys(value, QUERY_ACTION_KEYS)) {
     errors.push(issue(path, "invalid-structure"));
@@ -550,7 +577,7 @@ function validateQueryAction(
       addCaptureIssues(
         errors,
         param.value,
-        urlRegex,
+        sourceValue,
         `${path}/params/${index}/value`,
       );
     }
@@ -620,13 +647,6 @@ export function validateProjectDetailed(
     )
       errors.push(issue(`${groupPath}/name`, "invalid-value"));
     if (
-      !Array.isArray(group.origins) ||
-      group.origins.length > LIMITS.maxOriginsPerScope ||
-      !hasUniqueItems(group.origins) ||
-      group.origins.some((item) => origin(item) === null)
-    )
-      errors.push(issue(`${groupPath}/origins`, "invalid-format"));
-    if (
       !Array.isArray(group.rules) ||
       group.rules.length > LIMITS.maxRulesPerGroup
     ) {
@@ -660,15 +680,7 @@ export function validateProjectDetailed(
         !/\S/u.test(rule.name)
       )
         errors.push(issue(`${rulePath}/name`, "invalid-value"));
-      if (!isValidUrlRegex(rule.urlRegex))
-        errors.push(issue(`${rulePath}/urlRegex`, "invalid-format"));
-      if (
-        !Array.isArray(rule.origins) ||
-        rule.origins.length > LIMITS.maxOriginsPerScope ||
-        !hasUniqueItems(rule.origins) ||
-        rule.origins.some((item) => origin(item) === null)
-      )
-        errors.push(issue(`${rulePath}/origins`, "invalid-format"));
+      validateSource(errors, rule.source, `${rulePath}/source`);
       if (
         !Array.isArray(rule.resourceTypes) ||
         rule.resourceTypes.length === 0 ||
@@ -718,11 +730,10 @@ export function validateProjectDetailed(
         if (destination === undefined) {
           errors.push(issue(`${rulePath}/redirect/destination`, "required"));
         } else {
-          const urlRegex =
-            typeof rule.urlRegex === "string" ? rule.urlRegex : "";
+          const pattern = sourcePattern(rule);
           for (const destIssue of validateRedirectDestination(
             destination,
-            urlRegex,
+            pattern,
           )) {
             errors.push({
               instancePath: `${rulePath}/redirect/destination`,
@@ -734,7 +745,7 @@ export function validateProjectDetailed(
           addCaptureIssues(
             errors,
             destination,
-            urlRegex,
+            pattern,
             `${rulePath}/redirect/destination`,
           );
         }
@@ -744,7 +755,7 @@ export function validateProjectDetailed(
           errors,
           rule.action,
           `${rulePath}/action`,
-          typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+          sourcePattern(rule),
         );
       if (rule.type === "header") {
         const direction = (rule as Record<string, unknown>).headerDirection;
@@ -785,7 +796,7 @@ export function validateProjectDetailed(
             addCaptureIssues(
               errors,
               headerValue,
-              typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+              sourcePattern(rule),
               `${rulePath}/headerValue`,
             );
           }
@@ -827,7 +838,7 @@ export function validateProjectDetailed(
             addCaptureIssues(
               errors,
               body,
-              typeof rule.urlRegex === "string" ? rule.urlRegex : "",
+              sourcePattern(rule),
               `${actionPath}/body`,
             );
           }
@@ -993,12 +1004,6 @@ export function validateProjectDetailed(
           );
         }
       }
-      const effective = [
-        ...(Array.isArray(group.origins) ? group.origins : []),
-        ...(Array.isArray(rule.origins) ? rule.origins : []),
-      ].some((item) => origin(item) !== null);
-      if (!effective)
-        errors.push(issue(`${rulePath}/origins`, "no-effective-origin"));
     }
   }
   if (project.requestBodyPolicy != null) {

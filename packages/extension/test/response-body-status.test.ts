@@ -3,19 +3,21 @@ import { describe, expect, it, vi } from "vitest";
 import { createExtensionApplication } from "../src/service-worker.js";
 
 const responseProject: RogatioProject = {
-  version: 1,
+  version: 2,
   name: "Response project",
   groups: [
     {
       id: "group-response",
       name: "Response group",
-      origins: ["https://example.com"],
       rules: [
         {
           id: "rule-response",
           name: "Rewrite response",
-          urlRegex: "^https://example\\.com/data$",
-          origins: [],
+          source: {
+            key: "host",
+            operator: "regex",
+            value: "^example\\.com$",
+          },
           resourceTypes: ["xmlhttprequest"],
           priority: 100,
           method: "GET",
@@ -45,11 +47,6 @@ function harness() {
         stored = next;
         return true;
       },
-    },
-    permissions: {
-      contains: async () => true,
-      request: async () => true,
-      remove: async () => true,
     },
     installer: {
       current: async () => [],
@@ -119,11 +116,6 @@ describe("response-body extension status", () => {
           return true;
         },
       },
-      permissions: {
-        contains: async () => true,
-        request: async () => true,
-        remove: async () => true,
-      },
       installer: {
         current: async () => [],
         install: async () => ({ ok: true as const }),
@@ -160,5 +152,67 @@ describe("response-body extension status", () => {
       ok: false,
       diagnostic: { code: "extension.native-runtime-unavailable" },
     });
+  });
+
+  it("keeps URL-regex body rules needs runtime with runtime.pac-unroutable after start", async () => {
+    const urlRegexProject: RogatioProject = {
+      version: 2,
+      name: "URL regex body",
+      groups: [
+        {
+          id: "group-url",
+          name: "URL group",
+          rules: [
+            {
+              id: "rule-url-body",
+              name: "URL body",
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://example\\.com/api/.*$",
+              },
+              resourceTypes: ["xmlhttprequest"],
+              priority: 100,
+              method: "GET",
+              type: "response-body",
+              responseBody: {
+                replacements: [{ pattern: "old", replacement: "new" }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const { app, nativeRuntime } = harness();
+    await app.handle({
+      version: 1,
+      command: "create-project",
+      data: urlRegexProject,
+    });
+    await app.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "response-project",
+      groupId: "group-url",
+      enabled: true,
+    });
+
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: true,
+      value: {
+        nativeRuntimeState: { phase: "started" },
+        ruleStatuses: [
+          {
+            status: "needs runtime",
+            diagnostics: [{ code: "runtime.pac-unroutable" }],
+          },
+        ],
+      },
+    });
+    expect(nativeRuntime.start).toHaveBeenCalledOnce();
   });
 });

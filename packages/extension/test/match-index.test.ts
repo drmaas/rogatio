@@ -42,11 +42,6 @@ function storageApi(initial: Record<string, unknown> = {}): {
         },
       },
     },
-    permissions: {
-      contains: async () => false,
-      request: async () => true,
-      remove: async () => true,
-    },
     action: {
       setBadgeText: async () => {},
       setBadgeBackgroundColor: async () => {},
@@ -66,11 +61,6 @@ function dnrApi(
 ): ChromeApi {
   return {
     storage,
-    permissions: {
-      contains: async () => false,
-      request: async () => true,
-      remove: async () => true,
-    },
     action: {
       setBadgeText: async () => {},
       setBadgeBackgroundColor: async () => {},
@@ -87,8 +77,7 @@ const redirectOp: RedirectOperation = {
   name: "r1",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/", flags: "" },
-    origins: ["https://example.com"],
+    source: { key: "url", operator: "regex", value: "^https://example\\.com/" },
     resourceTypes: ["main_frame"],
     priority: 5,
   },
@@ -102,8 +91,7 @@ const queryOp: QueryOperation = {
   name: "query-1",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/", flags: "" },
-    origins: ["https://example.com"],
+    source: { key: "url", operator: "regex", value: "^https://example\\.com/" },
     resourceTypes: ["main_frame"],
     priority: 10,
   },
@@ -581,8 +569,11 @@ describe("match index", () => {
       name: "rule-header-set",
       redactSensitiveInLogs: true,
       matcher: {
-        urlRegex: { source: "^https://example\\.com/", flags: "" },
-        origins: ["https://example.com"],
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/",
+        },
         resourceTypes: ["main_frame"],
         priority: 100,
       },
@@ -746,8 +737,11 @@ describe("match index", () => {
       name: "rule-header-race",
       redactSensitiveInLogs: false,
       matcher: {
-        urlRegex: { source: "^https://example\\.com/", flags: "" },
-        origins: ["https://example.com"],
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/",
+        },
         resourceTypes: ["main_frame"],
         priority: 100,
       },
@@ -799,8 +793,11 @@ describe("match index", () => {
       name: "rule-header-restart",
       redactSensitiveInLogs: false,
       matcher: {
-        urlRegex: { source: "^https://example\\.com/", flags: "" },
-        origins: ["https://example.com"],
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/",
+        },
         resourceTypes: ["main_frame"],
         priority: 100,
       },
@@ -844,8 +841,11 @@ describe("match index", () => {
       name: "body-req",
       redactSensitiveInLogs: false,
       matcher: {
-        urlRegex: { source: "^https://example\\.com/api$", flags: "" },
-        origins: ["https://example.com"],
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/api$",
+        },
         resourceTypes: ["xmlhttprequest"],
         priority: 50,
         method: "POST",
@@ -859,8 +859,11 @@ describe("match index", () => {
       name: "body-res",
       redactSensitiveInLogs: true,
       matcher: {
-        urlRegex: { source: "^https://example\\.com/page$", flags: "" },
-        origins: ["https://example.com"],
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/page$",
+        },
         resourceTypes: ["xmlhttprequest"],
         priority: 40,
       },
@@ -993,8 +996,11 @@ describe("match index", () => {
       name: "rule-header-set",
       redactSensitiveInLogs: false,
       matcher: {
-        urlRegex: { source: "^https://example\\.com/", flags: "" },
-        origins: ["https://example.com"],
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/",
+        },
         resourceTypes: ["main_frame"],
         priority: 100,
       },

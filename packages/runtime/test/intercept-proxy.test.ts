@@ -41,18 +41,27 @@ function closeServer(server: Server): Promise<void> {
 }
 
 function buildProject(
-  origin: string,
-  rules: RogatioProject["groups"][0]["rules"],
+  _origin: string,
+  rules: Array<Record<string, unknown>>,
 ): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "proxy-test",
     groups: [
       {
         id: "g1",
         name: "group",
-        origins: [origin],
-        rules,
+        rules: rules.map((rule) => {
+          const { urlRegex, origins: _origins, ...rest } = rule;
+          return {
+            ...rest,
+            source: {
+              key: "url",
+              operator: "regex",
+              value: urlRegex as string,
+            },
+          };
+        }) as RogatioProject["groups"][0]["rules"],
       },
     ],
   };

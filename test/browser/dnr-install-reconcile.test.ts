@@ -120,9 +120,7 @@ async function assertChromeDnrIdentity(
 test("samples/basic DNR rules stay active after proven CDP service-worker restart", async ({
   registerDriver,
 }) => {
-  const { driver, page, extensionId, close } = await extensionContext({
-    grantOrigins: [VALIDATE_HOST_PATTERN],
-  });
+  const { driver, page, extensionId, close } = await extensionContext({});
   registerDriver(driver, close);
 
   const shipped = await loadShippedSample();

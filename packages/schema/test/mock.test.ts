@@ -6,8 +6,8 @@ function mockRule(overrides: Record<string, unknown> = {}) {
   return {
     id: "rule-mock",
     name: "Mock rule",
-    urlRegex: "^https://example\\.com/",
-    origins: [],
+    source: { key: "url", operator: "regex", value: "^https://example\\.com/" },
+
     resourceTypes: ["main_frame" as const],
     priority: 100,
     type: "mock" as const,
@@ -18,13 +18,13 @@ function mockRule(overrides: Record<string, unknown> = {}) {
 
 function projectWith(rule: Record<string, unknown>): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "Example project",
     groups: [
       {
         id: "group-main",
         name: "Main sites",
-        origins: ["https://example.com"],
+
         rules: [rule as never],
       },
     ],
@@ -50,8 +50,12 @@ describe("@rogatio/schema mock rules removed", () => {
     const rule = {
       id: "rule-mock",
       name: "Mock rule",
-      urlRegex: "^https://example\\.com/",
-      origins: [],
+      source: {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/",
+      },
+
       resourceTypes: ["main_frame" as const],
       priority: 100,
       mock: { status: 200, body: "hello" },

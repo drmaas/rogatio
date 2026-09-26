@@ -3,13 +3,12 @@ import { validateProjectDetailed } from "../src/browser-schema.js";
 
 function project(rule: Record<string, unknown>) {
   return {
-    version: 1,
+    version: 2,
     name: "Query",
     groups: [
       {
         id: "g1",
         name: "Group",
-        origins: ["https://example.com"],
         rules: [rule],
       },
     ],
@@ -19,8 +18,11 @@ function project(rule: Record<string, unknown>) {
 const baseSet = {
   id: "r1",
   name: "Set param",
-  urlRegex: "^https://example\\.com/",
-  origins: [],
+  source: {
+    key: "url" as const,
+    operator: "regex" as const,
+    value: "^https://example\\.com/",
+  },
   resourceTypes: ["main_frame"],
   priority: 1,
   type: "query",

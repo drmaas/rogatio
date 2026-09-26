@@ -52,7 +52,11 @@ describe(" response-body transformation", () => {
     expect(normalized.ok).toBe(true);
     if (!normalized.ok) return;
 
-    const authorized = authorizeExact(normalized.value, makeGrant());
+    const authorized = authorizeExact(
+      normalized.value,
+      makeGrant(),
+      "https://example.com/page",
+    );
     expect(authorized.ok).toBe(true);
     if (!authorized.ok) return;
 
@@ -96,7 +100,11 @@ describe(" response-body transformation", () => {
     expect(normalized.ok).toBe(true);
     if (!normalized.ok) return;
 
-    const authorized = authorizeExact(normalized.value, makeGrant());
+    const authorized = authorizeExact(
+      normalized.value,
+      makeGrant(),
+      "https://example.com/page",
+    );
     expect(authorized.ok).toBe(true);
     if (!authorized.ok) return;
 
@@ -142,7 +150,11 @@ describe(" response-body transformation", () => {
     expect(normalized.ok).toBe(true);
     if (!normalized.ok) return;
 
-    const authorized = authorizeExact(normalized.value, makeGrant());
+    const authorized = authorizeExact(
+      normalized.value,
+      makeGrant(),
+      "https://example.com/page",
+    );
     expect(authorized.ok).toBe(true);
     if (!authorized.ok) return;
 
@@ -193,7 +205,11 @@ describe(" response-body transformation", () => {
     expect(normalized.ok).toBe(true);
     if (!normalized.ok) return;
 
-    const authorized = authorizeExact(normalized.value, makeGrant());
+    const authorized = authorizeExact(
+      normalized.value,
+      makeGrant(),
+      "https://example.com/page",
+    );
     expect(authorized.ok).toBe(true);
     if (!authorized.ok) return;
 

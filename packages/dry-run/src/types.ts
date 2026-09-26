@@ -18,8 +18,7 @@ export interface RuleMatchResult {
   groupId: string;
   ruleId: string;
   matched: boolean;
-  urlRegex: MatchDimension;
-  effectiveOrigin: MatchDimension;
+  source: MatchDimension;
   method: MatchDimension;
   resourceType: MatchDimension;
   actionPreview: ActionPreview | null;

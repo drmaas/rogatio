@@ -68,26 +68,17 @@ require the organization's extension entitlement.
 2. On the **Dashboard**, choose the **Import Project** tile.
 3. Select `samples/basic/.rogatio.json` from this repository.
 
-The project is imported as **disabled** with every group off and **no site access granted**.
-Importing never activates anything or requests permissions.
+The project is imported as **disabled** with every group off. Importing never activates
+groups. The extension already has broad host access at install time (`*://*/*`); there is no
+per-origin grant step.
 
-## 4. Grant declared site access
-
-Rogatio requests only the origins the project declares — here `https://example.com`.
-
-1. On the imported project, find the **Grant / needs permission** control for the sample
-   group's origin.
-2. Approve the permission prompt. Only `https://example.com/*` is requested; no broad host
-   permission is granted.
-
-## 5. Activate the group
-
-Group activation is separate from permission grant.
+## 4. Activate the group
 
 1. Toggle the **Sample Rules Group** enablement switch on.
 2. After activation, each rule shows a status in the management page and the toolbar popup:
-   `active`, `disabled`, `needs permission`, `needs runtime`, `unsupported`, or `error`.
-   Redirect, query, and header rules should read `active` once permission is granted; response-body and request-body rules read `needs runtime` until the native runtime is started.
+   `active`, `disabled`, `needs runtime`, `unsupported`, or `error`. Redirect, query, and
+   header rules should read `active` once installed; response-body and request-body rules
+   read `needs runtime` until the native runtime is started.
 
 ## 5. Start the runtime (response-body, request-body)
 
@@ -167,7 +158,7 @@ From the monorepo root, after `pnpm install` and a successful `pnpm build` (or l
 
 ```sh
 # DNR rules live: redirect, query, header-set, header-remove
-# (rewrites sample origins to http://127.0.0.1:8080, seeds host grants,
+# (rewrites sample source hosts to http://127.0.0.1:8080,
 # asserts network effects + match-debug events)
 pnpm test:browser -- test/browser/sample-basic-live.test.ts
 
@@ -252,17 +243,15 @@ server.listen(PORT, () => console.log(`validation server on http://localhost:${P
 
 #### Point the sample at the local server
 
-Edit `samples/basic/.rogatio.json` (or use `rogatio edit`) so the group `origins` is
-`["http://localhost:8080"]` and each rule's `urlRegex` targets `localhost:8080` instead of
-`example.com`. For example:
+Edit `samples/basic/.rogatio.json` (or use `rogatio edit`) so each rule's
+`source.value` targets `localhost:8080` instead of `example.com`. For example:
 
-- `"origins": ["https://example.com"]` → `"origins": ["http://localhost:8080"]`
 - `"^https://example\\.com/old/"` → `"^http://localhost:8080/old/"`
 - `"^https://example\\.com/page"` → `"^http://localhost:8080/page"`
 - and so on for `/api/`, `/data\.json`, `/submit`.
 
-Re-import the modified file (or **Update** the project in the extension), re-grant
-`http://localhost:8080/*`, and re-activate the group. Then:
+Re-import the modified file (or **Update** the project in the extension) and re-activate
+the group. Then:
 
 **Header — set request** (`rule-header-set`):
 

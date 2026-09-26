@@ -18,7 +18,11 @@ Example:
 
 ```json
 {
-  "urlRegex": "^https://example\\.com/old/(.*)$",
+  "source": {
+    "key": "url",
+    "operator": "regex",
+    "value": "^https://example\\.com/old/(.*)$"
+  },
   "redirect": { "destination": "https://example.com/new/$1" }
 }
 ```

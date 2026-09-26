@@ -68,19 +68,21 @@ function allDraftIds(draft: {
 
 function projectWithNestedRule() {
   return {
-    version: 1,
+    version: 2,
     name: "Editor project",
     groups: [
       {
         id: "group-one",
         name: "One",
-        origins: ["https://group.example"],
         rules: [
           {
             id: "rule-source",
             name: "Source rule",
-            urlRegex: "^https://example\\.com/",
-            origins: ["https://source.example"],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://source\\.example/",
+            },
             resourceTypes: ["main_frame"],
             priority: 100,
             type: "redirect",
@@ -89,8 +91,11 @@ function projectWithNestedRule() {
           {
             id: "rule-other",
             name: "Other rule",
-            urlRegex: "^https://other\\.example/",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://other\\.example/",
+            },
             resourceTypes: ["script"],
             priority: 200,
           },
@@ -99,13 +104,15 @@ function projectWithNestedRule() {
       {
         id: "group-two",
         name: "Two",
-        origins: [],
         rules: [
           {
             id: "rule-three",
             name: "Third",
-            urlRegex: "^https://three\\.example/",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://three\\.example/",
+            },
             resourceTypes: ["image"],
             priority: 300,
           },
@@ -113,6 +120,11 @@ function projectWithNestedRule() {
       },
     ],
   };
+}
+
+function sourceValue(rule: unknown): string {
+  const source = (rule as { source?: { value?: string } }).source;
+  return source?.value ?? "";
 }
 
 describe("@rogatio/editor copy rule / copy group", () => {
@@ -135,26 +147,26 @@ describe("@rogatio/editor copy rule / copy group", () => {
       | Record<string, unknown>
       | undefined;
     expect(copy?.name).toBe("Source rule (copy)");
-    expect(copy?.origins).toEqual(["https://source.example"]);
+    expect(sourceValue(copy)).toBe("^https://source\\.example/");
     expect(copy?.redirect).toEqual({ destination: "https://dest.example/" });
     expect(editor.isDirty()).toBe(true);
 
-    const originInput = root.querySelector(
-      '[data-rule-card][data-rule-id="rule-new"] input[data-path$="/origins/0"]',
+    const sourceInput = root.querySelector(
+      '[data-rule-card][data-rule-id="rule-new"] textarea[data-path$="/source/value"]',
     );
-    if (!(originInput instanceof HTMLInputElement)) {
-      throw new Error("copy origin input not found");
+    if (!(sourceInput instanceof HTMLTextAreaElement)) {
+      throw new Error("copy source input not found");
     }
-    originInput.value = "https://copy-only.example";
-    originInput.dispatchEvent(new Event("change", { bubbles: true }));
+    sourceInput.value = "^https://copy-only\\.example/";
+    sourceInput.dispatchEvent(new Event("input", { bubbles: true }));
 
     const after = editor.getDraft();
-    expect(after.groups[0]?.rules[0]?.origins).toEqual([
-      "https://source.example",
-    ]);
-    expect(after.groups[0]?.rules[1]?.origins).toEqual([
-      "https://copy-only.example",
-    ]);
+    expect(sourceValue(after.groups[0]?.rules[0])).toBe(
+      "^https://source\\.example/",
+    );
+    expect(sourceValue(after.groups[0]?.rules[1])).toBe(
+      "^https://copy-only\\.example/",
+    );
     expect(
       (after.groups[0]?.rules[0] as unknown as Record<string, unknown>)
         ?.redirect,
@@ -185,22 +197,22 @@ describe("@rogatio/editor copy rule / copy group", () => {
     expect(new Set(allDraftIds(draft)).size).toBe(allDraftIds(draft).length);
     expect(editor.isDirty()).toBe(true);
 
-    const originInput = root.querySelector(
-      'input[data-path="/groups/1/rules/0/origins/0"]',
+    const sourceInput = root.querySelector(
+      'textarea[data-path="/groups/1/rules/0/source/value"]',
     );
-    if (!(originInput instanceof HTMLInputElement)) {
-      throw new Error("copied group rule origin input not found");
+    if (!(sourceInput instanceof HTMLTextAreaElement)) {
+      throw new Error("copied group rule source input not found");
     }
-    originInput.value = "https://group-copy-only.example";
-    originInput.dispatchEvent(new Event("change", { bubbles: true }));
+    sourceInput.value = "^https://group-copy-only\\.example/";
+    sourceInput.dispatchEvent(new Event("input", { bubbles: true }));
 
     const after = editor.getDraft();
-    expect(after.groups[0]?.rules[0]?.origins).toEqual([
-      "https://source.example",
-    ]);
-    expect(after.groups[1]?.rules[0]?.origins).toEqual([
-      "https://group-copy-only.example",
-    ]);
+    expect(sourceValue(after.groups[0]?.rules[0])).toBe(
+      "^https://source\\.example/",
+    );
+    expect(sourceValue(after.groups[1]?.rules[0])).toBe(
+      "^https://group-copy-only\\.example/",
+    );
   });
 
   it("keeps the original name when a (copy) suffix would exceed maxLabelLength", () => {

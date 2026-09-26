@@ -10,8 +10,11 @@ const queryOperation: QueryOperation = {
   name: "Rule A",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/",
+    },
     resourceTypes: ["main_frame", "script"],
     priority: 100,
     method: "GET",
@@ -26,8 +29,11 @@ const redirectOperation: RogatioOperation = {
   name: "Rule B",
   redactSensitiveInLogs: false,
   matcher: {
-    urlRegex: { source: "^https://example\\.com/", flags: "" },
-    origins: ["https://example.com"],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/",
+    },
     resourceTypes: ["main_frame", "script"],
     priority: 200,
     method: "POST",
@@ -72,7 +78,7 @@ describe("F7 matcher projection", () => {
           ...operation,
           matcher: {
             ...operation.matcher,
-            urlRegex: { source: "[", flags: "" },
+            source: { key: "url", operator: "regex", value: "[" },
           },
         },
       ]),
@@ -81,10 +87,13 @@ describe("F7 matcher projection", () => {
       projectMatchers([
         {
           ...operation,
-          matcher: { ...operation.matcher, origins: ["<all_urls>"] },
+          matcher: {
+            ...operation.matcher,
+            source: { key: "host", operator: "regex", value: "^.*$" },
+          },
         },
       ]),
-    ).toThrowError("extension.invalid-operation");
+    ).not.toThrow();
   });
 
   it("builds an installable DNR rule for a query action ()", () => {
@@ -100,8 +109,6 @@ describe("F7 matcher projection", () => {
         regexFilter: "^https://example\\.com/",
         resourceTypes: ["main_frame", "script"],
         requestMethods: ["GET"],
-        requestDomains: ["example.com"],
-        initiatorDomains: ["example.com"],
       },
       action: {
         type: "redirect",
@@ -151,8 +158,6 @@ describe("F7 matcher projection", () => {
         regexFilter: "^https://example\\.com/",
         resourceTypes: ["main_frame", "script"],
         requestMethods: ["POST"],
-        requestDomains: ["example.com"],
-        initiatorDomains: ["example.com"],
       },
       action: {
         type: "redirect",

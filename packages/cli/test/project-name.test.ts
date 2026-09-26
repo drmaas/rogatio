@@ -25,7 +25,7 @@ describe("emptyProjectDocument", () => {
   it("bootstraps a schema-shaped project with a civilization-scale name", () => {
     const project = emptyProjectDocument();
     expect(project).toEqual({
-      version: 1,
+      version: 2,
       name: expect.stringMatching(NAME_PATTERN),
       groups: [],
     });

@@ -5,7 +5,6 @@ import {
   type HttpMethod,
   hasControl,
   LIMITS,
-  normalizeSiteOrigin,
   RESOURCE_TYPES,
   type ResourceType,
 } from "@rogatio/schema";
@@ -22,7 +21,7 @@ import type {
   RuntimePresetV1,
   RuntimeResult,
 } from "./types.js";
-import { canonicalizeOutboundTarget, isOriginAllowed } from "./url.js";
+import { canonicalizeOutboundTarget } from "./url.js";
 
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
@@ -156,12 +155,13 @@ function validResourceType(value: unknown): value is ResourceType {
 }
 
 function freezeMatcher(operation: MatcherOperation): MatcherOperation {
+  const source = Object.freeze({
+    key: operation.matcher.source.key,
+    operator: operation.matcher.source.operator,
+    value: operation.matcher.source.value,
+  });
   const matcher = Object.freeze({
-    urlRegex: Object.freeze({
-      source: operation.matcher.urlRegex.source,
-      flags: "" as const,
-    }),
-    origins: Object.freeze([...operation.matcher.origins]),
+    source,
     resourceTypes: Object.freeze([...operation.matcher.resourceTypes]),
     priority: operation.matcher.priority,
     ...(operation.matcher.method === undefined
@@ -213,15 +213,9 @@ function normalizeMatcher(value: unknown): MatcherOperation | null {
     matcherValue === null ||
     typeof matcherValue !== "object" ||
     Array.isArray(matcherValue) ||
-    (!exactKeys(matcherValue, [
-      "urlRegex",
-      "origins",
-      "resourceTypes",
-      "priority",
-    ]) &&
+    (!exactKeys(matcherValue, ["source", "resourceTypes", "priority"]) &&
       !exactKeys(matcherValue, [
-        "urlRegex",
-        "origins",
+        "source",
         "resourceTypes",
         "priority",
         "method",
@@ -230,35 +224,25 @@ function normalizeMatcher(value: unknown): MatcherOperation | null {
     return null;
   }
   const matcher = matcherValue as Record<string, unknown>;
-  const regexValue = matcher.urlRegex;
+  const sourceValue = matcher.source;
   if (
-    regexValue === null ||
-    typeof regexValue !== "object" ||
-    Array.isArray(regexValue) ||
-    !exactKeys(regexValue, ["source", "flags"])
+    sourceValue === null ||
+    typeof sourceValue !== "object" ||
+    Array.isArray(sourceValue) ||
+    !exactKeys(sourceValue, ["key", "operator", "value"])
   ) {
     return null;
   }
-  const regex = regexValue as Record<string, unknown>;
+  const source = sourceValue as Record<string, unknown>;
   if (
-    typeof regex.source !== "string" ||
-    regex.source.length > LIMITS.maxUrlRegexLength ||
-    regex.flags !== "" ||
-    compileUrlRegex(regex.source) === null
+    (source.key !== "url" && source.key !== "host") ||
+    source.operator !== "regex" ||
+    typeof source.value !== "string" ||
+    source.value.length === 0 ||
+    source.value.length > LIMITS.maxUrlRegexLength ||
+    compileUrlRegex(source.value) === null
   ) {
     return null;
-  }
-  if (
-    !Array.isArray(matcher.origins) ||
-    matcher.origins.length === 0 ||
-    matcher.origins.length > LIMITS.maxOriginsPerScope
-  )
-    return null;
-  const origins: string[] = [];
-  for (const value of matcher.origins) {
-    const normalized = normalizeSiteOrigin(value as string);
-    if (normalized === null || origins.includes(normalized)) return null;
-    origins.push(normalized);
   }
   if (
     !Array.isArray(matcher.resourceTypes) ||
@@ -300,8 +284,11 @@ function normalizeMatcher(value: unknown): MatcherOperation | null {
     name: resolveMatcherName(record.ruleId, record.name),
     redactSensitiveInLogs,
     matcher: {
-      urlRegex: { source: regex.source, flags: "" },
-      origins,
+      source: {
+        key: source.key as "url" | "host",
+        operator: "regex",
+        value: source.value as string,
+      },
       resourceTypes,
       priority: matcher.priority,
       ...(method === undefined ? {} : { method }),
@@ -368,8 +355,7 @@ function makeGrant(
   if (record.kind === "outbound-http") {
     if (record.method !== "GET" && record.method !== "HEAD") return null;
     target = canonicalizeOutboundTarget(record.target);
-    if (target === null || !isOriginAllowed(target, matcher.matcher.origins))
-      return null;
+    if (target === null) return null;
   } else {
     target = normalizeLogicalPath(record.target);
   }

@@ -10,8 +10,11 @@ export interface RequestBodyPolicyOperation {
   readonly ruleId: string;
   readonly sourceOrder: number;
   readonly matcher: {
-    readonly urlRegex: { readonly source: string; readonly flags: string };
-    readonly origins: readonly string[];
+    readonly source: {
+      readonly key: "url" | "host";
+      readonly operator: "regex";
+      readonly value: string;
+    };
     readonly resourceTypes: readonly string[];
     readonly priority: number;
     readonly method: string;
@@ -31,7 +34,6 @@ export interface RequestBodyPolicyV1 {
   readonly projectId: string;
   readonly projectRevision: number;
   readonly enabledGroupIds: readonly string[];
-  readonly grantedOrigins: readonly string[];
   readonly localTargetOrigins: readonly string[];
   readonly operations: readonly RequestBodyPolicyOperation[];
   readonly limits: {
@@ -60,8 +62,13 @@ function validateOperation(
   if (op.matcher.priority < 1 || op.matcher.priority > 1000) {
     return failure("runtime.request-body-invalid-priority");
   }
-  if (!op.matcher.origins.length) {
-    return failure("runtime.request-body-empty-origins");
+  if (
+    (op.matcher.source.key !== "url" && op.matcher.source.key !== "host") ||
+    op.matcher.source.operator !== "regex" ||
+    typeof op.matcher.source.value !== "string" ||
+    op.matcher.source.value.length === 0
+  ) {
+    return failure("runtime.request-body-policy-invalid");
   }
   if (!op.matcher.resourceTypes.includes("xmlhttprequest")) {
     return failure("runtime.request-body-invalid-resource-type");
@@ -140,10 +147,7 @@ export function validateRequestBodyPolicy(
   ) {
     return failure("runtime.request-body-policy-invalid");
   }
-  if (
-    !Array.isArray(p.grantedOrigins) ||
-    !p.grantedOrigins.every((x) => typeof x === "string")
-  ) {
+  if ("grantedOrigins" in p) {
     return failure("runtime.request-body-policy-invalid");
   }
   if (
@@ -199,7 +203,6 @@ export function canonicalizePolicy(policy: RequestBodyPolicyV1): string {
     projectId: policy.projectId,
     projectRevision: policy.projectRevision,
     enabledGroupIds: [...policy.enabledGroupIds].sort(),
-    grantedOrigins: [...policy.grantedOrigins].sort(),
     localTargetOrigins: [...policy.localTargetOrigins].sort(),
     operations: sortedOps.map((op) => ({
       kind: op.kind,
@@ -207,8 +210,11 @@ export function canonicalizePolicy(policy: RequestBodyPolicyV1): string {
       ruleId: op.ruleId,
       sourceOrder: op.sourceOrder,
       matcher: {
-        urlRegex: op.matcher.urlRegex,
-        origins: [...op.matcher.origins].sort(),
+        source: {
+          key: op.matcher.source.key,
+          operator: op.matcher.source.operator,
+          value: op.matcher.source.value,
+        },
         resourceTypes: [...op.matcher.resourceTypes].sort(),
         priority: op.matcher.priority,
         method: op.matcher.method,

@@ -21,8 +21,11 @@ function makeRule(index: number) {
   return {
     id: `rule-${index}`,
     name: `Rule ${index}`,
-    urlRegex: "^https://example\\.com/",
-    origins: [],
+    source: {
+      key: "url" as const,
+      operator: "regex" as const,
+      value: "^https://example\\.com/",
+    },
     resourceTypes: ["main_frame" as const],
     priority: 100,
   };
@@ -30,13 +33,12 @@ function makeRule(index: number) {
 
 function makeProject(): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "Example project",
     groups: [
       {
         id: "group-main",
         name: "Main sites",
-        origins: ["https://example.com"],
         rules: [makeRule(1)],
       },
     ],
@@ -44,7 +46,7 @@ function makeProject(): RogatioProject {
 }
 
 describe("@rogatio/schema", () => {
-  it("accepts the common version-1 project and returns typed data", () => {
+  it("accepts the common version-2 project and returns typed data", () => {
     const project = makeProject();
 
     expect(validateProject(project)).toBe(true);
@@ -56,7 +58,7 @@ describe("@rogatio/schema", () => {
   it("rejects unknown properties and unsupported version values", () => {
     const project = {
       ...makeProject(),
-      version: 2,
+      version: 1,
       unexpected: true,
     };
 
@@ -100,10 +102,13 @@ describe("@rogatio/schema", () => {
     }
   });
 
-  it("accepts rule-owned origins and preserves regex case sensitivity", () => {
+  it("preserves regex case sensitivity and accepts host source keys", () => {
     const project = makeProject();
-    project.groups[0].origins = [];
-    project.groups[0].rules[0].origins = ["http://localhost:8080"];
+    project.groups[0].rules[0].source = {
+      key: "host",
+      operator: "regex",
+      value: "^example\\.com$",
+    };
     expect(validateProject(project)).toBe(true);
 
     const pattern = compileUrlRegex("Example");
@@ -113,30 +118,59 @@ describe("@rogatio/schema", () => {
     expect(isValidUrlRegex("[")).toBe(false);
   });
 
+  it("rejects a missing source, an empty value, rule origins, and still accepts localOrigins", () => {
+    const missingSource = makeProject();
+    delete (missingSource.groups[0].rules[0] as { source?: unknown }).source;
+    expect(validateProject(missingSource)).toBe(false);
+
+    const emptyValue = makeProject();
+    emptyValue.groups[0].rules[0].source.value = "";
+    expect(validateProject(emptyValue)).toBe(false);
+
+    const ruleOrigins = makeProject();
+    (ruleOrigins.groups[0].rules[0] as { origins?: string[] }).origins = [
+      "https://example.com",
+    ];
+    expect(validateProject(ruleOrigins)).toBe(false);
+
+    const local = makeProject();
+    local.requestBodyPolicy = { localOrigins: ["https://example.com"] };
+    expect(validateProject(local)).toBe(true);
+  });
+
   it("rejects invalid regular expressions and patterns over the bound", () => {
     const invalidRegex = makeProject();
-    invalidRegex.groups[0].rules[0].urlRegex = "[";
+    invalidRegex.groups[0].rules[0].source.value = "[";
     expect(validateProject(invalidRegex)).toBe(false);
 
     const longRegex = makeProject();
-    longRegex.groups[0].rules[0].urlRegex = "a".repeat(
+    longRegex.groups[0].rules[0].source.value = "a".repeat(
       LIMITS.maxUrlRegexLength + 1,
     );
     expect(validateProject(longRegex)).toBe(false);
   });
 
-  it("requires effective origins and unique stable IDs", () => {
-    const noEffectiveOrigin = makeProject();
-    noEffectiveOrigin.groups[0].origins = [];
-    const originResult = validateProjectDetailed(noEffectiveOrigin);
-    expect(originResult.valid).toBe(false);
-    if (!originResult.valid) {
-      expect(
-        originResult.errors.some(
-          (error) => error.keyword === "effectiveOrigin",
-        ),
-      ).toBe(true);
-    }
+  it("rejects origins fields and requires unique stable IDs", () => {
+    const withOrigins = {
+      ...makeProject(),
+      groups: [
+        {
+          id: "group-main",
+          name: "Main sites",
+          origins: ["https://example.com"],
+          rules: [makeRule(1)],
+        },
+      ],
+    };
+    expect(validateProject(withOrigins)).toBe(false);
+
+    const unknownOperator = makeProject();
+    unknownOperator.groups[0].rules[0].source = {
+      key: "url",
+      operator: "equals" as "regex",
+      value: "^https://example\\.com/",
+    };
+    expect(validateProject(unknownOperator)).toBe(false);
 
     const duplicateId = makeProject();
     duplicateId.groups[0].rules.push(makeRule(1));
@@ -171,7 +205,7 @@ describe("@rogatio/schema", () => {
     project.groups = Array.from({ length: 17 }, (_, groupIndex) => ({
       id: `group-${groupIndex}`,
       name: `Group ${groupIndex}`,
-      origins: ["https://example.com"],
+
       rules: Array.from({ length: LIMITS.maxRulesPerGroup }, (_, ruleIndex) =>
         makeRule(groupIndex * LIMITS.maxRulesPerGroup + ruleIndex),
       ),
@@ -193,7 +227,7 @@ describe("@rogatio/schema", () => {
     expect(validateProject(project)).toBe(true);
     expect(project).toEqual(before);
 
-    for (const value of [null, 1, "project", [], {}, { version: 1 }]) {
+    for (const value of [null, 1, "project", [], {}, { version: 2 }]) {
       expect(() => validateProject(value)).not.toThrow();
       expect(validateProject(value)).toBe(false);
     }
@@ -232,14 +266,12 @@ describe("@rogatio/schema", () => {
 
   it("does not trust overridden collection iteration", () => {
     const project = makeProject();
-    project.groups[0].origins = [];
-    project.groups[0].rules[0].origins = [];
     Object.defineProperty(project.groups, "entries", {
       value: () => [][Symbol.iterator](),
     });
-    Object.defineProperty(project.groups[0].origins, Symbol.iterator, {
+    Object.defineProperty(project.groups[0].rules, Symbol.iterator, {
       value: function* () {
-        yield "https://example.com";
+        yield makeRule(99);
       },
     });
 

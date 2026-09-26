@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { RogatioOperation } from "@rogatio/compiler";
+import type { NormalizedMatcher, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject, parseTestUrl } from "@rogatio/dry-run";
@@ -35,11 +35,25 @@ function usageError(message: string): string {
   return `Error: ${message}\n`;
 }
 
+function captureSubject(
+  matcher: NormalizedMatcher,
+  url: string,
+): string | null {
+  if (matcher.source.key === "url") return url;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
 function previewAction(
   operation: RogatioOperation,
   url: string,
 ): { kind: string; summary: string } | null {
-  const captures = matchUrlCaptures(operation.matcher.urlRegex.source, url);
+  const subject = captureSubject(operation.matcher, url);
+  if (subject === null) return null;
+  const captures = matchUrlCaptures(operation.matcher.source.value, subject);
   if (captures === null) return null;
   const expand = (value: string): string =>
     substituteUrlCaptures(value, captures);
@@ -430,8 +444,7 @@ async function testCommandImpl(
       output += `  Matched rules: ${urlResult.matchedRuleCount}\n`;
       for (const rule of urlResult.rules) {
         output += `  ${rule.groupId}/${rule.ruleId}: ${rule.matched ? "MATCHED" : "NOT MATCHED"}\n`;
-        output += `    urlRegex: ${rule.urlRegex.state} - ${rule.urlRegex.detail}\n`;
-        output += `    effectiveOrigin: ${rule.effectiveOrigin.state} - ${rule.effectiveOrigin.detail}\n`;
+        output += `    source: ${rule.source.state} - ${rule.source.detail}\n`;
         output += `    method: ${rule.method.state} - ${rule.method.detail}\n`;
         output += `    resourceType: ${rule.resourceType.state} - ${rule.resourceType.detail}\n`;
         if (rule.actionPreview) {

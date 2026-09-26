@@ -239,18 +239,18 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
 
   const platformProvider = createPlatformInterceptionProvider(platformAdapter);
 
-  // Session-scoped InterceptionProvider closes over pacOrigins from the
+  // Session-scoped InterceptionProvider closes over pacRoutes from the
   // activation/session start path via PlatformInterceptionProvider.start.
-  // startInterception calls provider.start(activation); we wrap so origins
+  // startInterception calls provider.start(activation); we wrap so routes
   // come from the SessionProvider registration arguments stored on activation.
-  let pendingOrigins: readonly string[] = [];
+  let pendingRoutes: readonly string[] = [];
   registerInterceptionProvider({
     platform: platformProvider.platform,
     detect: () => platformProvider.detect(),
     async start(activation) {
-      const origins =
-        pendingOrigins.length > 0 ? pendingOrigins : activation.pacOrigins;
-      const endpoint = await platformProvider.start(activation, origins);
+      const routes =
+        pendingRoutes.length > 0 ? pendingRoutes : activation.pacRoutes;
+      const endpoint = await platformProvider.start(activation, routes);
       const policy = controller.getActivePolicy();
       interceptProxy?.setPolicy(
         policy
@@ -264,16 +264,12 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
     },
   });
 
-  // Hook startInterception pacOrigins: lifecycle passes them into
+  // Hook startInterception pacRoutes: lifecycle passes them into
   // startInterception which does not forward to provider.start. Capture via
-  // a thin monkey-patch on register... Actually lifecycle calls
-  // startInterception(..., pacOrigins, ...) and provider.start(activation)
-  // only. Plan prefers host wrapper closing over pacOrigins — set pending
-  // origins before start by wrapping getCurrentSession path.
+  // pendingRoutes before start by wrapping getCurrentSession path.
   //
-  // The lifecycle stores pacOrigins on activation when provided in
-  // sessionConfig (activation.pacOrigins). Use that.
-  // Override: patch pendingOrigins from activation.pacOrigins in wrapper above.
+  // The lifecycle stores pacRoutes on activation when provided in
+  // sessionConfig (activation.pacRoutes). Use that.
 
   const handle: NativeHostHandle = {
     controller,
@@ -321,11 +317,11 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
         }
       }
 
-      // Capture pacOrigins before controller binds interception.
+      // Capture pacRoutes before controller binds interception.
       if (envelope.type === "runtime.start") {
-        const origins = envelope.metadata.pacOrigins;
-        pendingOrigins = Array.isArray(origins)
-          ? origins.filter((o): o is string => typeof o === "string")
+        const routes = envelope.metadata.pacRoutes;
+        pendingRoutes = Array.isArray(routes)
+          ? routes.filter((o): o is string => typeof o === "string")
           : [];
       }
 

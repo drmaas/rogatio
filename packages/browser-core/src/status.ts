@@ -1,45 +1,19 @@
-import { compileProject, type RogatioOperation } from "@rogatio/compiler";
+import type { RogatioOperation } from "@rogatio/compiler";
 import { coreDiagnostic } from "./diagnostics.js";
-import type {
-  BadgeState,
-  CoreResult,
-  RuleStatus,
-  RuleStatusInput,
-} from "./types.js";
-
-function originSets(
-  enabledGroupIds: readonly string[],
-  grantedOrigins: readonly string[],
-): { enabled: Set<string>; granted: Set<string> } {
-  return {
-    enabled: new Set(enabledGroupIds),
-    granted: new Set(grantedOrigins),
-  };
-}
+import type { BadgeState, RuleStatus, RuleStatusInput } from "./types.js";
 
 export function computeDesiredRules(input: {
   readonly operations: readonly RogatioOperation[];
   readonly enabledGroupIds: readonly string[];
-  readonly grantedOrigins: readonly string[];
 }): readonly RogatioOperation[] {
-  const { enabled, granted } = originSets(
-    input.enabledGroupIds,
-    input.grantedOrigins,
-  );
-  return input.operations.filter(
-    (operation) =>
-      enabled.has(operation.groupId) &&
-      operation.matcher.origins.every((origin) => granted.has(origin)),
-  );
+  const enabled = new Set(input.enabledGroupIds);
+  return input.operations.filter((operation) => enabled.has(operation.groupId));
 }
 
 export function computeRuleStatuses(
   input: RuleStatusInput,
 ): readonly RuleStatus[] {
-  const { enabled, granted } = originSets(
-    input.enabledGroupIds,
-    input.grantedOrigins,
-  );
+  const enabled = new Set(input.enabledGroupIds);
   const installed = new Set(input.installedRuleIds);
   const statuses: RuleStatus[] = [];
   for (const operation of input.operations) {
@@ -48,14 +22,6 @@ export function computeRuleStatuses(
         groupId: operation.groupId,
         ruleId: operation.ruleId,
         status: "disabled",
-      });
-      continue;
-    }
-    if (!operation.matcher.origins.every((origin) => granted.has(origin))) {
-      statuses.push({
-        groupId: operation.groupId,
-        ruleId: operation.ruleId,
-        status: "needs permission",
       });
       continue;
     }
@@ -93,21 +59,4 @@ export function computeBadge(statuses: readonly RuleStatus[]): BadgeState {
     }
   }
   return { text: String(active), attention };
-}
-
-export function computeDeclaredOrigins(
-  value: unknown,
-): CoreResult<readonly string[]> {
-  const compiled = compileProject(value);
-  if (!compiled.ok) {
-    return { ok: false, kind: "failure", diagnostics: compiled.diagnostics };
-  }
-  const origins = new Set<string>();
-  for (const operation of compiled.operations) {
-    for (const origin of operation.matcher.origins) {
-      origins.add(origin);
-    }
-  }
-  const sorted: string[] = [...origins].sort();
-  return { ok: true, value: sorted };
 }

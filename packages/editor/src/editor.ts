@@ -94,8 +94,7 @@ const HTTP_METHODS = [
 const COMMON_RULE_FIELDS = new Set([
   "id",
   "name",
-  "urlRegex",
-  "origins",
+  "source",
   "resourceTypes",
   "priority",
   "method",
@@ -111,11 +110,15 @@ const F2_MAX_URL_REGEX_LENGTH = 2048;
 let editorInstanceCount = 0;
 
 type JsonRecord = Record<string, unknown>;
+type DraftSource = JsonRecord & {
+  key: unknown;
+  operator: unknown;
+  value: unknown;
+};
 type DraftRule = JsonRecord & {
   id: unknown;
   name: unknown;
-  urlRegex: unknown;
-  origins: unknown[];
+  source: DraftSource;
   resourceTypes: unknown[];
   priority: unknown;
   method?: unknown;
@@ -123,7 +126,6 @@ type DraftRule = JsonRecord & {
 type DraftGroup = JsonRecord & {
   id: unknown;
   name: unknown;
-  origins: unknown[];
   rules: DraftRule[];
 };
 type DraftProject = JsonRecord & {
@@ -698,6 +700,7 @@ class EditorControllerImpl implements EditorController {
   private aiAssistPanel: ReturnType<typeof createAIAssistPanel> | null = null;
   private aiAssistInFlight = false;
   private aiRepairTargets: readonly RuleRepairTarget[] = [];
+  private migrationNoticesDismissed = false;
 
   constructor(
     options: EditorOptions,
@@ -1083,31 +1086,8 @@ class EditorControllerImpl implements EditorController {
       if (groupId && ruleId) this.copyRule(groupId, ruleId);
       return;
     }
-    if (command === "add-group-origin") {
-      const groupId = element.dataset.groupId;
-      if (groupId) this.addGroupOrigin(groupId);
-      return;
-    }
-    if (command === "remove-group-origin") {
-      const groupId = element.dataset.groupId;
-      const index = Number(element.dataset.index);
-      if (groupId && Number.isSafeInteger(index))
-        this.removeGroupOrigin(groupId, index);
-      return;
-    }
-    if (command === "add-rule-origin") {
-      const groupId = element.dataset.groupId;
-      const ruleId = element.dataset.ruleId;
-      if (groupId && ruleId) this.addRuleOrigin(groupId, ruleId);
-      return;
-    }
-    if (command === "remove-rule-origin") {
-      const groupId = element.dataset.groupId;
-      const ruleId = element.dataset.ruleId;
-      const index = Number(element.dataset.index);
-      if (groupId && ruleId && Number.isSafeInteger(index)) {
-        this.removeRuleOrigin(groupId, ruleId, index);
-      }
+    if (command === "dismiss-migration-notices") {
+      void this.dismissMigrationNotices();
       return;
     }
     if (command === "convert-url") {
@@ -1396,7 +1376,6 @@ class EditorControllerImpl implements EditorController {
     this.draft.groups.push({
       id: groupId,
       name: "New group",
-      origins: [],
       rules: [],
     });
     this.markChanged();
@@ -1414,8 +1393,7 @@ class EditorControllerImpl implements EditorController {
     group.rules.push({
       id: ruleId,
       name: "New rule",
-      urlRegex: "",
-      origins: [],
+      source: { key: "url", operator: "regex", value: "" },
       resourceTypes: ["main_frame"],
       priority: 100,
     });
@@ -1692,7 +1670,6 @@ class EditorControllerImpl implements EditorController {
         this.draft.groups.push({
           id: groupId,
           name: "AI Group",
-          origins: [],
           rules: [],
         });
         group = this.groupById(groupId);
@@ -1721,8 +1698,11 @@ class EditorControllerImpl implements EditorController {
       const rule: DraftRule = {
         id: ruleId,
         name: ruleProposal.name,
-        urlRegex: ruleProposal.urlRegex,
-        origins: ruleProposal.origins ? [...ruleProposal.origins] : [],
+        source: {
+          key: ruleProposal.source.key,
+          operator: "regex",
+          value: ruleProposal.source.value,
+        },
         resourceTypes: ruleProposal.resourceTypes
           ? [...ruleProposal.resourceTypes]
           : ["main_frame"],
@@ -1872,55 +1852,17 @@ class EditorControllerImpl implements EditorController {
     return { proposal: chunk.proposal };
   }
 
-  private addGroupOrigin(groupId: string): void {
-    const group = this.groupById(groupId);
-    if (!group || this.saving) return;
-    group.origins.push("");
-    this.markChanged();
-    this.focusRequest = pointer(
-      "groups",
-      this.groupIndex(groupId),
-      "origins",
-      group.origins.length - 1,
-    );
-    this.render();
-  }
-
-  private removeGroupOrigin(groupId: string, index: number): void {
-    const group = this.groupById(groupId);
-    if (!group || this.saving || index < 0 || index >= group.origins.length)
+  private async dismissMigrationNotices(): Promise<void> {
+    if (this.saving || this.migrationNoticesDismissed) return;
+    try {
+      await this.options.onDismissMigrationNotices?.();
+    } catch {
+      this.statusMessage = "Could not dismiss migration notices.";
+      this.render();
       return;
-    group.origins.splice(index, 1);
-    this.markChanged();
-    this.render();
-  }
-
-  private addRuleOrigin(groupId: string, ruleId: string): void {
-    const rule = this.ruleById(groupId, ruleId);
-    if (!rule || this.saving) return;
-    rule.origins.push("");
-    this.markChanged();
-    this.focusRequest = pointer(
-      "groups",
-      this.groupIndex(groupId),
-      "rules",
-      this.ruleIndex(this.groupById(groupId) as DraftGroup, ruleId),
-      "origins",
-      rule.origins.length - 1,
-    );
-    this.render();
-  }
-
-  private removeRuleOrigin(
-    groupId: string,
-    ruleId: string,
-    index: number,
-  ): void {
-    const rule = this.ruleById(groupId, ruleId);
-    if (!rule || this.saving || index < 0 || index >= rule.origins.length)
-      return;
-    rule.origins.splice(index, 1);
-    this.markChanged();
+    }
+    this.migrationNoticesDismissed = true;
+    this.statusMessage = "Migration notices dismissed.";
     this.render();
   }
 
@@ -1939,7 +1881,7 @@ class EditorControllerImpl implements EditorController {
       "rules",
       this.ruleIndex(this.groupById(groupId) as DraftGroup, ruleId),
     );
-    const path = `${rulePath}/urlRegex`;
+    const path = `${rulePath}/source/value`;
     if (!result.ok) {
       this.conversionDiagnostics.set(
         ruleId,
@@ -1956,6 +1898,12 @@ class EditorControllerImpl implements EditorController {
       this.focusRequest = path;
       this.render();
       return;
+    }
+    if (setValueAtPath(this.draft, `${rulePath}/source/key`, "url")) {
+      this.markChanged();
+    }
+    if (setValueAtPath(this.draft, `${rulePath}/source/operator`, "regex")) {
+      this.markChanged();
     }
     if (setValueAtPath(this.draft, path, result.source)) this.markChanged();
     this.statusMessage = "Exact URL regular expression created.";
@@ -2082,9 +2030,8 @@ class EditorControllerImpl implements EditorController {
         ruleHeader.append(ruleName, ruleBadge);
         ruleDiv.append(ruleHeader);
 
-        const dims: Array<{ label: string; dim: typeof rule.urlRegex }> = [
-          { label: "urlRegex", dim: rule.urlRegex },
-          { label: "effectiveOrigin", dim: rule.effectiveOrigin },
+        const dims: Array<{ label: string; dim: typeof rule.source }> = [
+          { label: "source", dim: rule.source },
           { label: "method", dim: rule.method },
           { label: "resourceType", dim: rule.resourceType },
         ];
@@ -2251,6 +2198,7 @@ class EditorControllerImpl implements EditorController {
     }
     this.decorateExtensionControls();
     this.renderSummary();
+    this.renderMigrationNotices();
     this.renderSearchResults();
     this.renderConfirmation();
     this.restoreFocus();
@@ -2531,15 +2479,6 @@ class EditorControllerImpl implements EditorController {
     );
     settings.append(fields);
     this.form.append(settings);
-    this.renderOrigins(
-      this.form,
-      "Group origins",
-      group.origins,
-      "group",
-      groupId,
-      undefined,
-      groupIndex,
-    );
 
     const rulesSection = this.document.createElement("section");
     rulesSection.dataset.rulesSection = "true";
@@ -2766,36 +2705,9 @@ class EditorControllerImpl implements EditorController {
     name.maxLength = 100;
     name.value = safeText(rule.name);
     this.renderField(grid, "Rule name", `${rulePath}/name`, name);
-    const regex = this.document.createElement("textarea");
-    regex.maxLength = F2_MAX_URL_REGEX_LENGTH;
-    regex.value = safeText(rule.urlRegex);
-    this.renderField(
-      grid,
-      "URL regular expression",
-      `${rulePath}/urlRegex`,
-      regex,
-    );
-    const convert = this.createCommandButton(
-      "Convert to regex",
-      "convert-url",
-      this.saving,
-      { groupId, ruleId },
-      "secondary",
-    );
-    grid.append(convert);
     fields.append(grid);
+    this.renderSource(fields, rule, rulePath, groupId, ruleId);
     card.append(fields);
-
-    this.renderOrigins(
-      card,
-      "Rule origins",
-      rule.origins,
-      "rule",
-      groupId,
-      ruleId,
-      groupIndex,
-      ruleIndex,
-    );
     this.renderResourceTypes(card, rule, rulePath);
     const matcherFields = this.document.createElement("fieldset");
     const matcherLegend = this.document.createElement("legend");
@@ -2893,60 +2805,105 @@ class EditorControllerImpl implements EditorController {
     return card;
   }
 
-  private renderOrigins(
+  private renderSource(
     parent: HTMLElement,
-    label: string,
-    values: unknown[],
-    owner: "group" | "rule",
+    rule: DraftRule,
+    rulePath: string,
     groupId: string,
-    ruleId: string | undefined,
-    groupIndex: number,
-    ruleIndex?: number,
+    ruleId: string,
   ): void {
-    const fieldset = this.document.createElement("fieldset");
-    const legend = this.document.createElement("legend");
-    legend.textContent = label;
-    fieldset.append(legend);
-    for (let index = 0; index < values.length; index += 1) {
-      const row = this.document.createElement("div");
-      row.dataset.editorOriginRow = "true";
-      const path =
-        owner === "group"
-          ? pointer("groups", groupIndex, "origins", index)
-          : pointer(
-              "groups",
-              groupIndex,
-              "rules",
-              ruleIndex ?? 0,
-              "origins",
-              index,
-            );
-      const input = this.document.createElement("input");
-      input.type = "text";
-      input.maxLength = 2048;
-      input.value = safeText(values[index]);
-      input.disabled = this.saving;
-      this.renderField(row, `Origin ${index + 1}`, path, input);
-      const remove = this.createCommandButton(
-        `Remove ${owner} origin ${index + 1}`,
-        owner === "group" ? "remove-group-origin" : "remove-rule-origin",
-        this.saving,
-        { groupId, ruleId, index: String(index) },
-        "danger",
-      );
-      row.append(remove);
-      fieldset.append(row);
+    const sourceFieldset = this.document.createElement("fieldset");
+    const sourceLegend = this.document.createElement("legend");
+    sourceLegend.textContent = "Source condition";
+    sourceFieldset.append(sourceLegend);
+    const sourceGrid = this.document.createElement("div");
+    sourceGrid.dataset.editorFields = "true";
+
+    const sourceKey = rule.source?.key === "host" ? "host" : "url";
+    const keySelect = this.document.createElement("select");
+    for (const value of ["url", "host"] as const) {
+      const option = this.document.createElement("option");
+      option.value = value;
+      option.textContent =
+        value === "url" ? "URL (full request URL)" : "Host (hostname only)";
+      keySelect.append(option);
     }
-    fieldset.append(
+    keySelect.value = sourceKey;
+    this.renderField(
+      sourceGrid,
+      "Match key",
+      `${rulePath}/source/key`,
+      keySelect,
+    );
+
+    const operator = this.document.createElement("input");
+    operator.type = "text";
+    operator.value = "regex";
+    operator.readOnly = true;
+    operator.disabled = true;
+    this.renderField(
+      sourceGrid,
+      "Operator",
+      `${rulePath}/source/operator`,
+      operator,
+    );
+
+    const regex = this.document.createElement("textarea");
+    regex.maxLength = F2_MAX_URL_REGEX_LENGTH;
+    regex.value = safeText(rule.source?.value);
+    this.renderField(
+      sourceGrid,
+      "Regular expression",
+      `${rulePath}/source/value`,
+      regex,
+    );
+
+    sourceFieldset.append(sourceGrid);
+    sourceFieldset.append(
       this.createCommandButton(
-        "Add origin",
-        owner === "group" ? "add-group-origin" : "add-rule-origin",
+        "Convert URL to regex",
+        "convert-url",
         this.saving,
         { groupId, ruleId },
         "secondary",
       ),
     );
-    parent.append(fieldset);
+    parent.append(sourceFieldset);
+  }
+
+  private renderMigrationNotices(): void {
+    const existing = this.host.querySelector("[data-migration-notices]");
+    existing?.remove();
+    if (
+      this.migrationNoticesDismissed ||
+      !this.options.migrationNotices ||
+      this.options.migrationNotices.length === 0
+    ) {
+      return;
+    }
+    const banner = this.document.createElement("section");
+    banner.dataset.migrationNotices = "true";
+    banner.setAttribute("role", "status");
+    const heading = this.document.createElement("h2");
+    heading.textContent = "Migration notices";
+    const list = this.document.createElement("ul");
+    for (const notice of this.options.migrationNotices) {
+      const item = this.document.createElement("li");
+      item.textContent = notice.message;
+      list.append(item);
+    }
+    banner.append(
+      heading,
+      list,
+      this.createCommandButton(
+        "Dismiss notices",
+        "dismiss-migration-notices",
+        this.saving,
+        {},
+        "secondary",
+      ),
+    );
+    this.main.prepend(banner);
   }
 
   private renderResourceTypes(

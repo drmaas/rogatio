@@ -1,4 +1,13 @@
-export const PROJECT_VERSION = 1 as const;
+export const PROJECT_VERSION = 2 as const;
+
+export type SourceKey = "url" | "host";
+export type SourceOperator = "regex";
+
+export interface SourceCondition {
+  key: SourceKey;
+  operator: SourceOperator;
+  value: string;
+}
 
 export const RESOURCE_TYPES = Object.freeze([
   "main_frame",
@@ -125,8 +134,7 @@ export interface RequestBodyPolicyConfig {
 export interface RogatioRule {
   id: string;
   name: string;
-  urlRegex: string;
-  origins: string[];
+  source: SourceCondition;
   resourceTypes: ResourceType[];
   priority: number;
   method?: HttpMethod;
@@ -157,7 +165,6 @@ export interface RogatioRule {
 export interface RogatioGroup {
   id: string;
   name: string;
-  origins: string[];
   rules: RogatioRule[];
 }
 

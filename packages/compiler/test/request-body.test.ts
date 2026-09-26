@@ -2,19 +2,23 @@ import { describe, expect, it } from "vitest";
 import { compileProject } from "../src/index.js";
 
 const project = {
-  version: 1,
+  version: 2,
   name: "Request body",
   groups: [
     {
       id: "g1",
       name: "Group",
-      origins: ["https://example.com"],
+
       rules: [
         {
           id: "r1",
           name: "Replace",
-          urlRegex: "^https://example\\.com/api$",
-          origins: [],
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://example\\.com/api$",
+          },
+
           resourceTypes: ["xmlhttprequest"] as const,
           priority: 10,
           method: "POST" as const,
@@ -24,8 +28,12 @@ const project = {
         {
           id: "r2",
           name: "Regex",
-          urlRegex: "^https://example\\.com/data$",
-          origins: [],
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://example\\.com/data$",
+          },
+
           resourceTypes: ["xmlhttprequest"] as const,
           priority: 5,
           method: "PATCH" as const,
@@ -55,7 +63,11 @@ describe(" request-body compiler", () => {
       groupId: "g1",
       ruleId: "r1",
       matcher: expect.objectContaining({
-        urlRegex: { source: "^https://example\\.com/api$", flags: "" },
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/api$",
+        },
         resourceTypes: ["xmlhttprequest"],
         priority: 10,
         method: "POST",
@@ -69,7 +81,11 @@ describe(" request-body compiler", () => {
       groupId: "g1",
       ruleId: "r2",
       matcher: expect.objectContaining({
-        urlRegex: { source: "^https://example\\.com/data$", flags: "" },
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/data$",
+        },
         resourceTypes: ["xmlhttprequest"],
         priority: 5,
         method: "PATCH",

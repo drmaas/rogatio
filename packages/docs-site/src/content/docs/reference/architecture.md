@@ -12,7 +12,7 @@ file `docs/architecture.md`. This page is the short user-facing summary.
 
 | Package | Responsibility |
 |---------|----------------|
-| `@rogatio/schema` | Version-1 JSON Schema, AJV validation, origins, bounds, forbidden headers. |
+| `@rogatio/schema` | Version-2 JSON Schema, AJV validation, source conditions, bounds, forbidden headers. |
 | `@rogatio/compiler` | Validated source → browser-neutral operations + stable diagnostics. |
 | `@rogatio/browser-core` | Versioned storage, migrations, permissions, enablement, CAS lifecycle, atomic install/recovery, runtime state, diagnostics, badge state. |
 | `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |

@@ -86,7 +86,7 @@ export interface AuthorizedOperation {
   readonly kind: RuntimeOperationKind;
   readonly target: string;
   readonly method: HttpMethod;
-  readonly urlRegex?: string;
+  readonly sourceValue?: string;
   readonly presetDigest: PresetDigest;
 }
 
@@ -182,7 +182,6 @@ export type RuntimeErrorCode =
   | "runtime.request-body-duplicate-rule-id"
   | "runtime.request-body-invalid-source-order"
   | "runtime.request-body-invalid-priority"
-  | "runtime.request-body-empty-origins"
   | "runtime.request-body-invalid-resource-type"
   | "runtime.request-body-replace-missing-body"
   | "runtime.request-body-replace-too-large"
@@ -242,8 +241,8 @@ export const PROTOCOL = "v1" as const;
 /** Maximum serialized envelope size in bytes (spec REQ-009). */
 export const ENVELOPE_MAX_BYTES = 64 * 1024;
 
-/** Maximum distinct PAC origins per generated script (spec REQ-027). */
-export const MAX_PAC_ORIGINS = 256;
+/** Maximum distinct PAC routes per generated script (spec REQ-027). */
+export const MAX_PAC_ROUTES = 256;
 
 /** Maximum concurrent body transforms (spec REQ-013). */
 export const MAX_CONCURRENT_TRANSFORMS = 32;
@@ -333,6 +332,7 @@ export interface AuthorizeRequest {
   readonly sessionCapability: string;
   readonly presetDigest: string;
   readonly descriptor: unknown;
+  readonly requestUrl?: string;
 }
 
 export interface AuthorizeResponse {

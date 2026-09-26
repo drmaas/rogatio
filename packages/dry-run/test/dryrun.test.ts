@@ -5,19 +5,21 @@ import type { DryRunTestCase } from "../src/index.js";
 import { dryRunProject, parseTestUrl } from "../src/index.js";
 
 const PROJECT = {
-  version: 1 as const,
+  version: 2 as const,
   name: "test-project",
   groups: [
     {
       id: "g1",
       name: "group1",
-      origins: ["https://example.com", "https://www.example.com"],
       rules: [
         {
           id: "r1",
           name: "rule1",
-          urlRegex: "^https://example\\.com/",
-          origins: ["https://example.com"],
+          source: {
+            key: "url" as const,
+            operator: "regex" as const,
+            value: "^https://example\\.com/",
+          },
           resourceTypes: ["main_frame"],
           priority: 1,
           method: "GET",
@@ -25,8 +27,11 @@ const PROJECT = {
         {
           id: "r2",
           name: "rule2",
-          urlRegex: "^https://example\\.com/",
-          origins: ["https://example.com"],
+          source: {
+            key: "url" as const,
+            operator: "regex" as const,
+            value: "^https://example\\.com/",
+          },
           resourceTypes: ["main_frame"],
           priority: 2,
         },
@@ -102,7 +107,7 @@ describe("dryRunProject", () => {
     expect(rule?.matched).toBe(true);
   });
 
-  it("reports all four dimensions with states (AC-002)", () => {
+  it("reports source, method, and resourceType dimensions (AC-002)", () => {
     const result = run([
       {
         url: "https://example.com/page",
@@ -112,16 +117,10 @@ describe("dryRunProject", () => {
     ]);
     const rule = result.results[0].rules.find((r) => r.ruleId === "r1");
     if (!rule) throw new Error("rule r1 not found");
-    expect(rule.urlRegex.state).toBe("matched");
-    expect(rule.effectiveOrigin.state).toBe("matched");
+    expect(rule.source.state).toBe("matched");
     expect(rule.method.state).toBe("matched");
     expect(rule.resourceType.state).toBe("matched");
-    for (const dim of [
-      rule.urlRegex,
-      rule.effectiveOrigin,
-      rule.method,
-      rule.resourceType,
-    ]) {
+    for (const dim of [rule.source, rule.method, rule.resourceType]) {
       expect(typeof dim.detail).toBe("string");
       expect(dim.detail.length).toBeGreaterThan(0);
     }

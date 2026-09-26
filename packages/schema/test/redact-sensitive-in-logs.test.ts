@@ -10,8 +10,12 @@ function makeRule(index: number, overrides: Record<string, unknown> = {}) {
   return {
     id: `rule-${index}`,
     name: `Rule ${index}`,
-    urlRegex: "^https://example\\.com/",
-    origins: [],
+    source: {
+      key: "url" as const,
+      operator: "regex" as const,
+      value: "^https://example\\.com/",
+    },
+
     resourceTypes: ["main_frame" as const],
     priority: 100,
     ...overrides,
@@ -22,13 +26,13 @@ function makeProject(
   ruleOverrides: Record<string, unknown> = {},
 ): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "Example project",
     groups: [
       {
         id: "group-main",
         name: "Main sites",
-        origins: ["https://example.com"],
+
         rules: [makeRule(1, ruleOverrides)],
       },
     ],

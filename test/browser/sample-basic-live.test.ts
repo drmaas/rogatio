@@ -97,9 +97,7 @@ testStandalone(
   "samples/basic DNR rules: match, execute, and console-log live",
   async ({ registerDriver }) => {
     const server = await startValidateServer();
-    const { driver, page, extensionId, close } = await extensionContext({
-      grantOrigins: [VALIDATE_HOST_PATTERN],
-    });
+    const { driver, page, extensionId, close } = await extensionContext({});
     registerDriver(driver, close);
 
     try {
@@ -231,9 +229,7 @@ if (LIVE_E2E && SUDO_OK) {
     async ({ registerDriver }) => {
       const server = await startValidateServer();
       const { driver, page, extensionId, profile, close } =
-        await extensionContext({
-          grantOrigins: [VALIDATE_HOST_PATTERN],
-        });
+        await extensionContext({});
       registerDriver(driver, close);
 
       try {

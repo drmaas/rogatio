@@ -316,8 +316,12 @@ export function createAIAssistPanel(
         ruleDetails.appendChild(detail);
       };
 
-      addDetail("Regex", rule.urlRegex);
-      if (rule.origins?.length) addDetail("Origins", rule.origins.join(", "));
+      if (rule.source) {
+        addDetail(
+          "Source",
+          `${rule.source.key} / ${rule.source.operator}: ${rule.source.value}`,
+        );
+      }
       if (rule.resourceTypes?.length)
         addDetail("Types", rule.resourceTypes.join(", "));
       if (rule.priority !== undefined)

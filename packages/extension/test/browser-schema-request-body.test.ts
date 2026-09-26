@@ -3,13 +3,12 @@ import { validateProjectDetailed } from "../src/browser-schema.js";
 
 function project(rule: Record<string, unknown>) {
   return {
-    version: 1,
+    version: 2,
     name: "Request body",
     groups: [
       {
         id: "g1",
         name: "Group",
-        origins: ["https://example.com"],
         rules: [rule],
       },
     ],
@@ -19,8 +18,11 @@ function project(rule: Record<string, unknown>) {
 const baseReplace = {
   id: "r1",
   name: "Replace body",
-  urlRegex: "^https://example\\.com/api$",
-  origins: [],
+  source: {
+    key: "url" as const,
+    operator: "regex" as const,
+    value: "^https://example\\.com/api$",
+  },
   resourceTypes: ["xmlhttprequest"],
   priority: 1,
   method: "POST",
@@ -31,8 +33,11 @@ const baseReplace = {
 const baseRegex = {
   id: "r1",
   name: "Regex replace",
-  urlRegex: "^https://example\\.com/api$",
-  origins: [],
+  source: {
+    key: "url" as const,
+    operator: "regex" as const,
+    value: "^https://example\\.com/api$",
+  },
   resourceTypes: ["xmlhttprequest"],
   priority: 1,
   method: "POST",
@@ -123,7 +128,7 @@ describe(" request-body browser schema", () => {
 
   it("accepts valid local origins in project config", () => {
     const p = {
-      version: 1,
+      version: 2,
       name: "Test",
       requestBodyPolicy: {
         localOrigins: ["http://127.0.0.1:3000", "https://localhost:8443"],
@@ -132,7 +137,6 @@ describe(" request-body browser schema", () => {
         {
           id: "g1",
           name: "G",
-          origins: ["https://example.com"],
           rules: [baseReplace],
         },
       ],
@@ -148,14 +152,13 @@ describe(" request-body browser schema", () => {
     ],
   ])("rejects %s", (_name, config) => {
     const p = {
-      version: 1,
+      version: 2,
       name: "Test",
       requestBodyPolicy: config,
       groups: [
         {
           id: "g1",
           name: "G",
-          origins: ["https://example.com"],
           rules: [baseReplace],
         },
       ],

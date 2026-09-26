@@ -19,7 +19,7 @@
     "nativeMessaging",
     "proxy"
   ],
-  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "host_permissions": ["*://*/*"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   }

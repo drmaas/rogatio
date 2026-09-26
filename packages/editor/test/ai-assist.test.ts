@@ -11,17 +11,20 @@ import type {
 } from "../src/types.js";
 
 const baseProject = {
-  version: 1,
+  version: 2,
   name: "AI Assist project",
   groups: [
     {
       id: "group-one",
       name: "One",
-      origins: ["https://one.example"],
       rules: [] as unknown[],
     },
   ],
 } as const;
+
+function sourceRegex(value: string) {
+  return { key: "url" as const, operator: "regex" as const, value };
+}
 
 const live: { root?: HTMLElement; editor?: EditorController } = {};
 
@@ -115,7 +118,7 @@ describe("@rogatio/editor AI Assist wire", () => {
           kind: "redirect",
           groupId: "group-one",
           name: "Redirect",
-          urlRegex: "^https://api\\.example/",
+          source: sourceRegex("^https://api\\.example/"),
           action: { destination: "https://mock.example/$1" },
         }),
       };
@@ -144,7 +147,7 @@ describe("@rogatio/editor AI Assist wire", () => {
             kind: "redirect",
             groupId: "group-one",
             name: "Fixed",
-            urlRegex: "^https://ok\\.example/",
+            source: sourceRegex("^https://ok\\.example/"),
             action: { destination: "https://mock.example/" },
           }),
         };
@@ -153,7 +156,7 @@ describe("@rogatio/editor AI Assist wire", () => {
         {
           code: "schema.invalid-regex",
           severity: "error",
-          path: "/groups/0/rules/0/urlRegex",
+          path: "/groups/0/rules/0/source/value",
           message: "bad regex",
         },
       ],
@@ -226,7 +229,7 @@ describe("@rogatio/editor AI Assist wire", () => {
               kind,
               groupId: "group-one",
               name: `Rule ${kind}`,
-              urlRegex: "^https://example\\.com/",
+              source: sourceRegex("^https://example\\.com/"),
               action: actions[kind],
             }),
           };
@@ -274,19 +277,17 @@ describe("@rogatio/editor AI Assist wire", () => {
 
   it("Apply repairs the offending rule in place for fix requests (AC-003)", async () => {
     const brokenProject = {
-      version: 1,
+      version: 2,
       name: "Fix project",
       groups: [
         {
           id: "group-one",
           name: "One",
-          origins: ["https://one.example"],
           rules: [
             {
               id: "rule-broken",
               name: "Broken",
-              urlRegex: "[",
-              origins: [],
+              source: { key: "url", operator: "regex", value: "[" },
               resourceTypes: ["main_frame"],
               priority: 100,
               type: "redirect",
@@ -305,7 +306,7 @@ describe("@rogatio/editor AI Assist wire", () => {
             kind: "redirect",
             groupId: "group-one",
             name: "Fixed",
-            urlRegex: "^https://one\\.example/ok$",
+            source: sourceRegex("^https://one\\.example/ok$"),
             action: { destination: "https://mock.example/new" },
           }),
         };
@@ -314,7 +315,7 @@ describe("@rogatio/editor AI Assist wire", () => {
         {
           code: "schema.invalid-regex",
           severity: "error",
-          path: "/groups/0/rules/0/urlRegex",
+          path: "/groups/0/rules/0/source/value",
           message: "bad regex",
         },
       ],
@@ -336,26 +337,26 @@ describe("@rogatio/editor AI Assist wire", () => {
     const rule = group?.rules[0] as unknown as Record<string, unknown>;
     expect(rule.id).toBe("rule-broken");
     expect(rule.name).toBe("Fixed");
-    expect(rule.urlRegex).toBe("^https://one\\.example/ok$");
+    expect((rule.source as { value: string }).value).toBe(
+      "^https://one\\.example/ok$",
+    );
     expect(rule.type).toBe("redirect");
     expect(rule.redirect).toEqual({ destination: "https://mock.example/new" });
   });
 
   it("Apply appends surplus fix-proposal rules beyond the repair targets (AC-003)", async () => {
     const brokenProject = {
-      version: 1,
+      version: 2,
       name: "Fix project",
       groups: [
         {
           id: "group-one",
           name: "One",
-          origins: ["https://one.example"],
           rules: [
             {
               id: "rule-broken",
               name: "Broken",
-              urlRegex: "[",
-              origins: [],
+              source: { key: "url", operator: "regex", value: "[" },
               resourceTypes: ["main_frame"],
               priority: 100,
               type: "redirect",
@@ -374,14 +375,14 @@ describe("@rogatio/editor AI Assist wire", () => {
               kind: "redirect",
               groupId: "group-one",
               name: "Fixed",
-              urlRegex: "^https://one\\.example/ok$",
+              source: sourceRegex("^https://one\\.example/ok$"),
               action: { destination: "https://mock.example/new" },
             },
             {
               kind: "redirect",
               groupId: "group-one",
               name: "Surplus",
-              urlRegex: "^https://one\\.example/extra$",
+              source: sourceRegex("^https://one\\.example/extra$"),
               action: { destination: "https://mock.example/extra" },
             },
           ] as RuleProposal[],
@@ -391,7 +392,7 @@ describe("@rogatio/editor AI Assist wire", () => {
         {
           code: "schema.invalid-regex",
           severity: "error",
-          path: "/groups/0/rules/0/urlRegex",
+          path: "/groups/0/rules/0/source/value",
           message: "bad regex",
         },
       ],
@@ -424,7 +425,7 @@ describe("@rogatio/editor AI Assist wire", () => {
         kind: "header",
         groupId: "group-one",
         name: "Schema header",
-        urlRegex: "^https://example\\.com/",
+        source: sourceRegex("^https://example\\.com/"),
         action: {
           headerDirection: "response",
           headerOperation: "append",
@@ -463,7 +464,7 @@ describe("@rogatio/editor AI Assist wire", () => {
         kind: "header",
         groupId: "group-one",
         name: "Safe header",
-        urlRegex: "^https://example\\.com/",
+        source: sourceRegex("^https://example\\.com/"),
         action: polluted,
       }),
     }));
@@ -501,7 +502,7 @@ describe("@rogatio/editor AI Assist wire", () => {
           kind: "redirect",
           groupId: "group-one",
           name: "Once",
-          urlRegex: "^https://example\\.com/",
+          source: sourceRegex("^https://example\\.com/"),
           action: { destination: "https://mock.example/" },
         }),
       };

@@ -1,3 +1,4 @@
+import { sameOrigin } from "@rogatio/compiler";
 import { HTTP_METHODS, type HttpMethod } from "@rogatio/schema";
 import { failure } from "./errors.js";
 import { normalizeLogicalPath } from "./path.js";
@@ -9,7 +10,7 @@ import type {
   RuntimeOperationKind,
   RuntimeResult,
 } from "./types.js";
-import { canonicalizeOutboundTarget, isOriginAllowed } from "./url.js";
+import { canonicalizeOutboundTarget } from "./url.js";
 
 function validMethod(value: unknown): value is HttpMethod {
   return (
@@ -81,9 +82,13 @@ function matchesGrant(descriptor: RuntimeGrant, grant: RuntimeGrant): boolean {
 export function authorizeExact(
   preset: NormalizedRuntimePreset,
   value: unknown,
+  requestUrl: string,
 ): RuntimeResult<AuthorizedOperation> {
   const descriptor = exactDescriptor(value);
   if (descriptor === null) return failure("runtime.authorization-denied");
+  if (typeof requestUrl !== "string" || requestUrl.length === 0) {
+    return failure("runtime.authorization-denied");
+  }
   const target = canonicalTarget(descriptor.kind, descriptor.target);
   if (target === null) return failure("runtime.authorization-denied");
 
@@ -94,10 +99,12 @@ export function authorizeExact(
         candidate.groupId === grant.groupId &&
         candidate.ruleId === grant.ruleId,
     );
+    if (matcher === undefined) {
+      return failure("runtime.authorization-denied");
+    }
     if (
-      matcher === undefined ||
-      (grant.kind === "outbound-http" &&
-        !isOriginAllowed(grant.target, matcher.matcher.origins))
+      grant.kind === "outbound-http" &&
+      !sameOrigin(grant.target, requestUrl)
     ) {
       return failure("runtime.authorization-denied");
     }
@@ -110,7 +117,7 @@ export function authorizeExact(
         kind: grant.kind,
         target: grant.target,
         method: grant.method,
-        urlRegex: matcher.matcher.urlRegex.source,
+        sourceValue: matcher.matcher.source.value,
         presetDigest: preset.digest,
       }),
     };

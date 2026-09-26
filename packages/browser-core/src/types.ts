@@ -1,8 +1,8 @@
 import type { RogatioOperation } from "@rogatio/compiler";
-import type { RogatioProject } from "@rogatio/schema";
+import type { MigrationNotice, RogatioProject } from "@rogatio/schema";
 import type { CoreDiagnostic } from "./diagnostics.js";
 
-export const ENVELOPE_VERSION = 1 as const;
+export const ENVELOPE_VERSION = 2 as const;
 
 export interface StoredProject {
   readonly id: string;
@@ -12,13 +12,15 @@ export interface StoredProject {
   readonly createdAt: number;
   readonly updatedAt: number;
   readonly enabledGroupIds: readonly string[];
-  readonly grantedOrigins: readonly string[];
 }
 
 export interface StoredEnvelope {
   readonly version: typeof ENVELOPE_VERSION;
   readonly projects: Readonly<Record<string, StoredProject>>;
   readonly activeProjectId: string | null;
+  readonly migrationNotices?: Readonly<
+    Record<string, readonly MigrationNotice[]>
+  >;
 }
 
 /**
@@ -62,7 +64,6 @@ export type InstallOutcome =
 export type RuleStatusKind =
   | "active"
   | "disabled"
-  | "needs permission"
   | "needs runtime"
   | "unsupported"
   | "error";
@@ -82,7 +83,6 @@ export interface BadgeState {
 export interface RuleStatusInput {
   readonly operations: readonly RogatioOperation[];
   readonly enabledGroupIds: readonly string[];
-  readonly grantedOrigins: readonly string[];
   readonly installedRuleIds: readonly string[];
 }
 

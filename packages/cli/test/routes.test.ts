@@ -17,23 +17,27 @@ describe("API routes", () => {
   let storage: ProjectStorage;
 
   const validProject = {
-    version: 1,
+    version: 2,
     name: "Test Project",
     description: "A test project",
     groups: [
       {
         id: "group1",
         name: "Group 1",
-        origins: ["https://example.com"],
         rules: [
           {
             id: "rule1",
             name: "Redirect Rule",
-            urlRegex: "^https://example\\.com/old/(.*)$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/old/(.*)$",
+            },
             resourceTypes: ["main_frame"],
             priority: 1,
             method: "GET",
+            type: "redirect",
+            redirect: { destination: "https://example.com/new/" },
           },
         ],
       },
@@ -122,7 +126,7 @@ describe("API routes", () => {
     });
 
     it("returns schema errors for invalid project", async () => {
-      const invalidProject = { ...validProject, version: 2 };
+      const invalidProject = { ...validProject, version: 3 };
       const req = createMockReq(
         "POST",
         "/api/validate",
@@ -264,13 +268,12 @@ describe("API routes", () => {
       prompt: "Add a redirect",
       context: {
         project: {
-          version: 1,
+          version: 2,
           name: "Test Project",
           groups: [
             {
               id: "group1",
               name: "Group 1",
-              origins: ["https://example.com"],
               rules: [],
             },
           ],
@@ -284,8 +287,11 @@ describe("API routes", () => {
           kind: "redirect",
           groupId: "group1",
           name: "Redirect",
-          urlRegex: "^https://example\\.com/old$",
-          origins: [],
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://example\\.com/old$",
+          },
           resourceTypes: ["main_frame"],
           priority: 100,
           action: { destination: "https://example.com/new" },

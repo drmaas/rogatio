@@ -23,22 +23,26 @@ describe("verify command", () => {
   });
 
   const validProject = {
-    version: 1,
+    version: 2,
     name: "Test Project",
     groups: [
       {
         id: "group1",
         name: "Group 1",
-        origins: ["https://example.com"],
         rules: [
           {
             id: "rule1",
             name: "Redirect Rule",
-            urlRegex: "^https://example\\.com/old/(.*)$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/old/(.*)$",
+            },
             resourceTypes: ["main_frame"],
             priority: 1,
             method: "GET",
+            type: "redirect",
+            redirect: { destination: "https://example.com/new/" },
           },
         ],
       },
@@ -52,7 +56,7 @@ describe("verify command", () => {
   });
 
   it("exits 1 for invalid schema", async () => {
-    const invalidProject = { ...validProject, version: 2 };
+    const invalidProject = { ...validProject, version: 3 };
     await writeProject(testFile, invalidProject);
     const exitCode = await verifyCommand([testFile]);
     expect(exitCode).toBe(1);

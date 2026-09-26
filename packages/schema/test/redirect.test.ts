@@ -10,8 +10,12 @@ function redirectRule(overrides: Record<string, unknown> = {}) {
   return {
     id: "rule-redirect",
     name: "Redirect rule",
-    urlRegex: "^https://example\\.com/(.*)$",
-    origins: [],
+    source: {
+      key: "url",
+      operator: "regex",
+      value: "^https://example\\.com/(.*)$",
+    },
+
     resourceTypes: ["main_frame" as const],
     priority: 100,
     type: "redirect" as const,
@@ -22,13 +26,13 @@ function redirectRule(overrides: Record<string, unknown> = {}) {
 
 function projectWith(rule: Record<string, unknown>): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "Example project",
     groups: [
       {
         id: "group-main",
         name: "Main sites",
-        origins: ["https://example.com"],
+
         rules: [rule as never],
       },
     ],
@@ -59,7 +63,11 @@ describe("@rogatio/schema redirect rules", () => {
 
   it("rejects a redirect rule whose backreference exceeds capture groups", () => {
     const rule = redirectRule({
-      urlRegex: "^https://example\\.com/(a)$",
+      source: {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/(a)$",
+      },
       redirect: { destination: "https://other.com/\\3" },
     });
     const result = validateProjectDetailed(projectWith(rule));

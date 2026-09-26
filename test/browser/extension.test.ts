@@ -377,15 +377,14 @@ test("derives the attention reason from the actual rule statuses", async ({
 }) => {
   await page.addInitScript(() => {
     const state = {
-      version: 1,
+      version: 2,
       projects: {
         "project-a": {
           id: "project-a",
           name: "Project A",
-          data: { version: 1, name: "Project A", groups: [] },
+          data: { version: 2, name: "Project A", groups: [] },
           revision: 1,
           enabledGroupIds: [],
-          grantedOrigins: [],
         },
       },
       activeProjectId: "project-a",
@@ -393,8 +392,8 @@ test("derives the attention reason from the actual rule statuses", async ({
       ruleStatuses: [
         {
           groupId: "group-a",
-          ruleId: "rule-redirect",
-          status: "needs permission",
+          ruleId: "rule-body",
+          status: "needs runtime",
         },
       ],
     };
@@ -408,12 +407,10 @@ test("derives the attention reason from the actual rule statuses", async ({
         if (message.command === "refresh") {
           refreshes += 1;
           if (refreshes > 1) {
-            // After granting access with the runtime stopped, the real blocker
-            // is the proxy runtime, not permissions.
             state.ruleStatuses = [
               {
                 groupId: "group-a",
-                ruleId: "rule-redirect",
+                ruleId: "rule-body",
                 status: "unsupported",
               },
             ];
@@ -429,11 +426,6 @@ test("derives the attention reason from the actual rule statuses", async ({
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
         },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
-        },
         action: {
           setBadgeText: async () => {},
           setBadgeBackgroundColor: async () => {},
@@ -445,14 +437,14 @@ test("derives the attention reason from the actual rule statuses", async ({
   await page.goto("/extension/index.html");
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
   const badge = page.locator("[data-badge-state]");
-  await expect(badge).toContainText("needs permission: grant declared access");
+  await expect(badge).toContainText("needs runtime: start the native runtime");
   await expect(page.locator(".rogatio-attention-note")).toContainText(
-    "Grant declared access",
+    "Start runtime",
   );
 
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(badge).toContainText("attention needed");
-  await expect(badge).not.toContainText("needs permission");
+  await expect(badge).not.toContainText("needs runtime");
   await expect(page.locator(".rogatio-attention-note")).toContainText(
     "unsupported in this browser",
   );

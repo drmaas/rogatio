@@ -79,19 +79,15 @@ export function buildSystemPrompt(project: unknown): string {
 
   return `You are an expert Rogatio rule author. Rogatio is a local-first browser request/response rule engine.
 
-## Schema Constraants
+## Schema Constraints (version 2)
 
-### URL Regular Expression
-- Maximum 2048 characters
-- Case-sensitive, no flags
-- Must be valid ECMAScript regex
-- Used to match request URLs
+### Source condition
+Each rule matches with \`source: { key, operator, value }\`.
+- \`key\`: \`"url"\` tests the full request URL; \`"host"\` tests the hostname only.
+- \`operator\`: must be the constant \`"regex"\`.
+- \`value\`: non-empty ECMAScript regex, max 2048 characters, case-sensitive, no flags.
 
-### Origins
-- Only explicit http:// and https:// origins with hostname
-- Optional port (e.g., https://example.com:8080)
-- No wildcards, credentials, paths, query strings, or fragments
-- Effective origins are union of project, group, and rule origins
+There are no group or rule \`origins\` fields and no \`urlRegex\` field.
 
 ### Forbidden Headers
 Cannot set/remove these headers:
@@ -107,14 +103,13 @@ ${formatHttpMethods()}
 - Max 64 projects per profile
 - Max 100 groups per project
 - Max 500 rules per project
-- Max 10 origins per group/rule
 
 ## Rule Types
 
-Each rule has: id, name, urlRegex, origins[], resourceTypes[], priority, method?, action
+Each rule has: id, name, source, resourceTypes[], priority, method?, action
 
 ### redirect
-Action: destination string. Use $1 through $9 for URL regex captures. $$ is a literal dollar sign. Existing redirect \\1 references remain compatible.
+Action: destination string. Use $1 through $9 for URL source captures when \`source.key\` is \`"url"\`. $$ is a literal dollar sign. Existing redirect \\\\1 references remain compatible.
 
 ### query
 Action: query parameters with name, operation, and value. Set values may use URL captures.
@@ -123,15 +118,14 @@ Action: query parameters with name, operation, and value. Set values may use URL
 Action: header direction, operation, name, and value. Set and append values may use URL captures.
 
 ### response-body
-Replace-mode body may use URL captures. Regex-mode replacement strings use captures from the body pattern, not the URL pattern.
+Replace-mode body may use URL captures. Regex-mode replacement strings use captures from the body pattern, not the source pattern.
 
 ### request-body
-Replace-mode body may use URL captures. Regex-mode replacement strings use captures from the body pattern, not the URL pattern.
+Replace-mode body may use URL captures. Regex-mode replacement strings use captures from the body pattern, not the source pattern.
 
 ## Compiler Diagnostic Codes (stable)
 - schema.invalid-regex - Invalid regex syntax
 - schema.duplicate-id - Duplicate group/rule ID
-- schema.invalid-origin - Invalid origin format
 - schema.invalid-resource-type - Unknown resource type
 - schema.invalid-method - Unknown HTTP method
 - schema.regex-too-long - Regex exceeds 2048 chars
@@ -145,12 +139,17 @@ ${projectJson}
 Return ONLY valid JSON matching this TypeScript interface:
 
 \`\`\`typescript
+interface SourceProposal {
+  key: "url" | "host";
+  operator: "regex";
+  value: string;
+}
+
 interface RuleProposal {
   kind: "redirect" | "query" | "header" | "response-body" | "request-body";
   groupId: string;
   name: string;
-  urlRegex: string;
-  origins?: string[];
+  source: SourceProposal;
   resourceTypes?: string[];
   priority?: number;
   method?: string;
@@ -167,13 +166,13 @@ interface AIProposal {
 
 1. Propose MINIMAL changes - only what the user asked for
 2. Use existing groups when possible; create new only if needed
-3. All regex must be valid ECMAScript
-4. All origins must be valid http/https with hostname
+3. All source.value regex must be valid ECMAScript
+4. source.operator must be exactly "regex"
 5. Resource types must be from the allowed list
 6. Methods must be from the allowed list
 7. Priority: higher = more specific (100 default)
 8. Action object must match the rule kind schema exactly
-9. Use $1–$9 only when urlRegex defines those capture groups; use $$ for a literal dollar sign
+9. Use $1–$9 only when source defines those capture groups; use $$ for a literal dollar sign
 10. Before proposing, mentally validate against dry-run: would this rule match the intended URLs?
 11. Explanation should be 1-2 sentences describing what the rules do
 `;

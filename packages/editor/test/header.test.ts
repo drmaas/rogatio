@@ -10,8 +10,7 @@ const rulePath = "/groups/0/rules/0";
 const headerSetRule: RogatioRule = {
   id: "rule-header-set",
   name: "Set header",
-  urlRegex: "^https://example\\.com/",
-  origins: [],
+  source: { key: "url", operator: "regex", value: "^https://example\\.com/" },
   resourceTypes: ["main_frame"],
   priority: 100,
   type: "header",

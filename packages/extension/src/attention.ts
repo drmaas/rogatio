@@ -11,7 +11,6 @@ export interface AttentionExplanation {
 
 const ATTENTION_PRECEDENCE: readonly string[] = [
   "error",
-  "needs permission",
   "needs runtime",
   "unsupported",
 ];
@@ -33,13 +32,6 @@ export function attentionFromRuleStatuses(input: {
         blocking: "rules failed to install: see the rule error",
         explanation: "some rules failed to install.",
         fix: "Click the error status for the failed rule.",
-      };
-    }
-    if (blocking === "needs permission") {
-      return {
-        blocking: "needs permission: grant declared access",
-        explanation: "some rules need permission.",
-        fix: "Click 'Grant declared access' after reviewing origins.",
       };
     }
     if (blocking === "needs runtime") {

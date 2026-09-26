@@ -42,13 +42,13 @@ describe("F21 popup group status aggregation", () => {
     expect(aggregateGroupStatus(true, [])).toBe("active");
   });
 
-  it("applies precedence error > needs permission > needs runtime > unsupported > active", () => {
+  it("applies precedence error > needs runtime > unsupported > active", () => {
     const statuses: PopupRuleStatus[] = [
       { groupId: "g", ruleId: "r1", status: "active" },
-      { groupId: "g", ruleId: "r2", status: "needs permission" },
+      { groupId: "g", ruleId: "r2", status: "needs runtime" },
       { groupId: "g", ruleId: "r3", status: "unsupported" },
     ];
-    expect(aggregateGroupStatus(true, statuses)).toBe("needs permission");
+    expect(aggregateGroupStatus(true, statuses)).toBe("needs runtime");
     expect(
       aggregateGroupStatus(true, [
         { groupId: "g", ruleId: "r", status: "needs runtime" },
@@ -81,7 +81,7 @@ describe("F21 popup model", () => {
       envelope: envelope({
         ruleStatuses: [
           { groupId: "g1", ruleId: "r1", status: "active" },
-          { groupId: "g3", ruleId: "r3", status: "needs permission" },
+          { groupId: "g3", ruleId: "r3", status: "needs runtime" },
         ],
       }),
       send: vi.fn(async () => ({ ok: true })),
@@ -105,7 +105,7 @@ describe("F21 popup model", () => {
       id: "r3",
       groupId: "g3",
       enabled: true,
-      status: "needs permission",
+      status: "needs runtime",
     });
     expect(model.activeProjectName).toBe("Alpha");
   });
@@ -232,7 +232,7 @@ describe("F21 popup groups accessor", () => {
         ruleStatuses: [
           { groupId: "g1", ruleId: "r1", status: "active" },
           { groupId: "g1", ruleId: "r2", status: "active" },
-          { groupId: "g3", ruleId: "r3", status: "needs permission" },
+          { groupId: "g3", ruleId: "r3", status: "needs runtime" },
         ],
       }),
       send: vi.fn(async () => ({ ok: true })),
@@ -257,7 +257,7 @@ describe("F21 popup groups accessor", () => {
       id: "g3",
       name: "Third",
       enabled: true,
-      status: "needs permission",
+      status: "needs runtime",
       ruleCount: 1,
     });
   });

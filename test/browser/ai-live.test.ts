@@ -57,7 +57,6 @@ const AI_WAIT_MS = 120_000;
  * provider's output guardrail unmasked and still reaches the local server.
  */
 const AI_ORIGIN = "http://localhost:8080";
-const AI_HOST_PATTERN = `${AI_ORIGIN}/*`;
 /** Live model variance: retry a failed request before failing the journey. */
 const AI_ATTEMPTS = 3;
 
@@ -82,11 +81,8 @@ function totalRules(project: RogatioProject): number {
 function withLocalhostOrigin(project: RogatioProject): RogatioProject {
   const clone = structuredClone(project);
   for (const group of clone.groups) {
-    group.origins = group.origins.map((origin) =>
-      origin === "https://example.com" ? AI_ORIGIN : origin,
-    );
     for (const rule of group.rules) {
-      rule.urlRegex = rule.urlRegex
+      rule.source.value = rule.source.value
         .split("https://example\\.com")
         .join(AI_ORIGIN);
       if (typeof rule.redirect === "object" && rule.redirect !== null) {
@@ -360,9 +356,7 @@ if (AI_LIVE) {
       await startAI();
       const server = await startValidateServer();
       const { driver, page, extensionId, profile, close } =
-        await extensionContext({
-          grantOrigins: [AI_HOST_PATTERN],
-        });
+        await extensionContext({});
       registerDriver(driver, close);
       try {
         await page.goto(`chrome-extension://${extensionId}/index.html`);
@@ -435,9 +429,7 @@ if (AI_LIVE) {
       await startAI();
       const server = await startValidateServer();
       const { driver, page, extensionId, profile, close } =
-        await extensionContext({
-          grantOrigins: [AI_HOST_PATTERN],
-        });
+        await extensionContext({});
       registerDriver(driver, close);
       try {
         await page.goto(`chrome-extension://${extensionId}/index.html`);

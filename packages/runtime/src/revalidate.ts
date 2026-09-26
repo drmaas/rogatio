@@ -1,9 +1,6 @@
 import type { RogatioOperation } from "@rogatio/compiler";
-import {
-  compileUrlRegex,
-  normalizeSiteOrigin,
-  type ResourceType,
-} from "@rogatio/schema";
+import { sameOrigin, sourceMatches } from "@rogatio/compiler";
+import { normalizeSiteOrigin, type ResourceType } from "@rogatio/schema";
 import { snapshotOwnData } from "./snapshot.js";
 import type {
   AuthorityDecision,
@@ -21,6 +18,10 @@ function originOf(value: string): string | null {
   }
 }
 
+function isHttpOrigin(origin: string): boolean {
+  return origin.startsWith("http://") || origin.startsWith("https://");
+}
+
 function projectHasRule(
   project: RogatioProject,
   groupId: string,
@@ -30,6 +31,12 @@ function projectHasRule(
   const group = project.groups.find((candidate) => candidate.id === groupId);
   if (group === undefined || !Array.isArray(group.rules)) return false;
   return group.rules.some((rule) => rule.id === ruleId);
+}
+
+function isBodyOperation(operation: RogatioOperation): boolean {
+  return (
+    operation.kind === "request-body" || operation.kind === "response-body"
+  );
 }
 
 /**
@@ -69,24 +76,27 @@ export function revalidateAuthority(
   }
 
   const matcher = operation.matcher;
-  const regex = compileUrlRegex(matcher.urlRegex.source);
-  if (regex === null || !regex.test(request.url)) {
+  if (!sourceMatches(matcher.source, request.url)) {
     return { allowed: false, reason: "url-mismatch" };
   }
 
-  const targetOrigin = request.target
-    ? originOf(request.target)
-    : originOf(request.url);
-  if (targetOrigin === null || !matcher.origins.includes(targetOrigin)) {
+  const requestOrigin = originOf(request.url);
+  const targetUrl = request.target ?? request.url;
+  const targetOrigin = originOf(targetUrl);
+  if (
+    requestOrigin === null ||
+    targetOrigin === null ||
+    !sameOrigin(request.url, targetUrl)
+  ) {
     return { allowed: false, reason: "target-unauthorized" };
   }
 
-  if (request.initiator !== undefined) {
+  if (isBodyOperation(operation)) {
+    if (request.initiator === undefined) {
+      return { allowed: false, reason: "initiator-unauthorized" };
+    }
     const initiatorOrigin = originOf(request.initiator);
-    if (
-      initiatorOrigin === null ||
-      !matcher.origins.includes(initiatorOrigin)
-    ) {
+    if (initiatorOrigin === null || !isHttpOrigin(initiatorOrigin)) {
       return { allowed: false, reason: "initiator-unauthorized" };
     }
   }

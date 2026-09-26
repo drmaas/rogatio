@@ -1,6 +1,6 @@
 ---
 title: Chrome extension
-description: Import, export, switch, grant, and activate Rogatio projects in Chrome.
+description: Import, export, switch, and activate Rogatio projects in Chrome.
 ---
 
 The Chrome MV3 extension is the browser boundary for Rogatio. It translates neutral rules
@@ -24,18 +24,16 @@ The management page uses a **Dashboard** overview and a **Workspace** editor she
 rule fails to install, the status word `error` is an activatable control that opens that
 rule in the workspace, and a distinct error card shows the concrete install failure reason.
 
-## Permissions and activation
+## Host access and activation
 
-- Importing a project lets you **review** the complete project and **grant** only its
-  declared site access. Permission requests never include undeclared origins or broad host
-  patterns.
-- **Group activation** is kept separate from permission. Activating a group does not grant
-  permission; granting permission does not activate a group.
+- The extension declares broad host access (`*://*/*`) at install time so DNR rules can
+  match any HTTP(S) URL your projects describe. There is no per-origin grant UI.
+- **Group activation** is separate from **Start runtime**. Activating a group installs DNR
+  rules; starting the native runtime is required for body rules.
 
 ## Rule status and badge
 
-Rules report `active`, `disabled`, `needs permission`, `needs runtime`,
-`unsupported`, or `error`. Body rules report `needs runtime` until the native runtime
+Rules report `active`, `disabled`, `needs runtime`, `unsupported`, or `error`. Body rules report `needs runtime` until the native runtime
 is started. The toolbar badge reflects the successfully installed active rules. Actionless
 matcher operations are reported as `unsupported` and are not installed until a later
 action slice defines their DNR action.
@@ -72,8 +70,7 @@ bodies are **not** logged; neither are wire-applied header values.
 off) applies a deny-list to sensitive query, header, and intended body-rewrite values when
 enabled. URLs are always stripped of userinfo and fragments and truncated per field.
 
-**Limitations:** logging is skipped when Chrome supplies `tabId === -1`, when the top-level tab
-URL is outside granted origins (even if a granted-origin subresource matched), when
+**Limitations:** logging is skipped when Chrome supplies `tabId === -1`, when
 injection into that tab fails, or when body markers were not installed (no strip path /
 fail-closed gate). Iframe/subframe matches depend on Chrome supplying a real tab
 id and successful top-frame injection. Matches that arrive while Chrome has the extension's

@@ -11,6 +11,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { migrateV1Project } from "@rogatio/schema";
 
 export type ProjectStorageErrorCode =
   | "not-found"
@@ -86,7 +87,7 @@ export function emptyProjectDocument(): {
   name: string;
   groups: [];
 } {
-  return { version: 1, name: randomCivilizationProjectName(), groups: [] };
+  return { version: 2, name: randomCivilizationProjectName(), groups: [] };
 }
 
 /** Adjective / epithet half of a default project name. */
@@ -195,6 +196,19 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+function migrateLoadedProject(parsed: Record<string, unknown>): unknown {
+  if (parsed.version === 2) return parsed;
+  if (parsed.version !== 1) return parsed;
+  const migrated = migrateV1Project(parsed);
+  if (!migrated.ok) return parsed;
+  for (const notice of migrated.notices) {
+    console.error(
+      `[rogatio] ${notice.code}: ${notice.message} (${notice.path})`,
+    );
+  }
+  return migrated.project;
+}
+
 async function readDocument(id: string): Promise<unknown> {
   try {
     const content = await readFile(id, "utf-8");
@@ -210,7 +224,7 @@ async function readDocument(id: string): Promise<unknown> {
         "Project file must contain a JSON object",
       );
     }
-    return parsed;
+    return migrateLoadedProject(parsed);
   } catch (e) {
     if (e instanceof ProjectFileError) throw e;
     if ((e as NodeJS.ErrnoException).code === "ENOENT") {

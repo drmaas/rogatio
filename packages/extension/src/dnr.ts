@@ -22,6 +22,7 @@ import {
   writeMatchIndex,
 } from "./match-index.js";
 import { projectHeaders } from "./projection.js";
+import { projectSourceCondition } from "./source-projection.js";
 
 /** Per-rule Chrome/DNR failure from the last `install` attempt (ADR 0010). */
 export type DnrInstallError = {
@@ -83,27 +84,6 @@ function normalizeDnrRegexSubstitution(value: string): string {
   return normalized;
 }
 
-function hostnamesFromOrigins(origins: readonly string[]): string[] {
-  const hosts: string[] = [];
-  for (const origin of origins) {
-    let value = typeof origin === "string" ? origin : "";
-    const schemeMatch = /^[a-z][a-z0-9+.-]*:\/\//i.exec(value);
-    if (schemeMatch) value = value.slice(schemeMatch[0].length);
-    const slash = value.indexOf("/");
-    if (slash !== -1) value = value.slice(0, slash);
-    const colon = value.indexOf(":");
-    if (colon !== -1) value = value.slice(0, colon);
-    if (value.startsWith("*.")) value = value.slice(2);
-    // Chrome DNR requestDomains rejects bare IPv4/IPv6 literals in practice for
-    // dynamic rules; origin scoping stays in regexFilter (which includes host:port).
-    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value) || value.includes(":")) {
-      continue;
-    }
-    if (value.length > 0) hosts.push(value);
-  }
-  return hosts;
-}
-
 function redirectQueryCondition(
   operation: RedirectOperation | QueryOperation,
 ): {
@@ -111,11 +91,16 @@ function redirectQueryCondition(
   resourceTypes: readonly string[];
   requestDomains?: string[];
 } {
-  const requestDomains = hostnamesFromOrigins(operation.matcher.origins);
+  const projection = projectSourceCondition(operation.matcher);
+  if (!projection.projectable) {
+    throw new Error("extension.source-unprojectable");
+  }
   return {
-    regexFilter: operation.matcher.urlRegex.source,
+    regexFilter: projection.condition.regexFilter,
     resourceTypes: operation.matcher.resourceTypes,
-    ...(requestDomains.length > 0 ? { requestDomains } : {}),
+    ...(projection.condition.requestDomains !== undefined
+      ? { requestDomains: [...projection.condition.requestDomains] }
+      : {}),
   };
 }
 

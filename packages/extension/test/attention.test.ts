@@ -59,15 +59,15 @@ describe("P3b attentionFromRuleStatuses", () => {
     );
   });
 
-  it("still explains needs permission with grant guidance", () => {
+  it("still explains needs runtime with start guidance", () => {
     const attention = attentionFromRuleStatuses({
       attention: true,
-      statuses: [{ status: "needs permission" }],
+      statuses: [{ status: "needs runtime" }],
     });
     expect(attention).toEqual({
-      blocking: "needs permission: grant declared access",
-      explanation: "some rules need permission.",
-      fix: "Click 'Grant declared access' after reviewing origins.",
+      blocking: "needs runtime: start the native runtime",
+      explanation: "some rules need the native runtime.",
+      fix: "Click 'Start runtime'.",
     });
   });
 

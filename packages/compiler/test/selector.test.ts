@@ -3,19 +3,23 @@ import { compileProject, type RogatioOperation } from "../src/index.js";
 
 function makeProject(): RogatioOperation[] {
   const project = {
-    version: 1,
+    version: 2,
     name: "Selector test",
     groups: [
       {
         id: "g1",
         name: "Group 1",
-        origins: ["https://example.com"],
+
         rules: [
           {
             id: "r1",
             name: "Redirect high",
-            urlRegex: "^https://example\\.com/redirect$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/redirect$",
+            },
+
             resourceTypes: ["xmlhttprequest"] as const,
             priority: 100,
             method: "POST" as const,
@@ -25,8 +29,12 @@ function makeProject(): RogatioOperation[] {
           {
             id: "r2",
             name: "Request body medium",
-            urlRegex: "^https://example\\.com/api$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/api$",
+            },
+
             resourceTypes: ["xmlhttprequest"] as const,
             priority: 50,
             method: "POST" as const,
@@ -38,13 +46,17 @@ function makeProject(): RogatioOperation[] {
       {
         id: "g2",
         name: "Group 2",
-        origins: ["https://example.com"],
+
         rules: [
           {
             id: "r3",
             name: "Query low",
-            urlRegex: "^https://example\\.com/query$",
-            origins: [],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/query$",
+            },
+
             resourceTypes: ["xmlhttprequest"] as const,
             priority: 10,
             method: "POST" as const,

@@ -20,7 +20,6 @@ interface StoredProject {
   readonly data: unknown;
   readonly revision: number;
   readonly enabledGroupIds: readonly string[];
-  readonly grantedOrigins: readonly string[];
 }
 
 interface Envelope {
@@ -71,8 +70,6 @@ let editor: EditorController | undefined;
 let statusMessage = "";
 /** Ready-to-run native host install command shown with a copy button. */
 let installCommand: string | null = null;
-let permissionOrigins: readonly string[] = [];
-let permissionGranted = false;
 /** AI support status from native host */
 let aiSupported = false;
 let aiStatusChecked = false;
@@ -99,10 +96,10 @@ let diagnosticsData: {
 
 function safeProjectData(): unknown {
   if (!state.activeProjectId)
-    return { version: 1, name: "Rogatio project", groups: [] };
+    return { version: 2, name: "Rogatio project", groups: [] };
   return (
     state.projects[state.activeProjectId]?.data ?? {
-      version: 1,
+      version: 2,
       name: "Rogatio project",
       groups: [],
     }
@@ -287,7 +284,7 @@ function runtimeRecoveryText(): string {
 /**
  * The blocking status behind the badge's attention flag, derived from the
  * actual rule statuses (REQ-GAV-004) with the shared f21 precedence
- * (error > unsupported > needs permission). The badge and the
+ * (error > needs runtime > unsupported > active). The badge and the
  * sidebar note must describe what is actually blocking — never a canned
  * "grant access" hint when permissions are already granted.
  */
@@ -424,15 +421,7 @@ function createSidebar(): HTMLElement {
   startRuntime.disabled = controlsDisabled.start;
   const stopRuntime = button("Stop runtime", "stop-native-runtime");
   stopRuntime.disabled = controlsDisabled.stop;
-  actions.append(
-    button("Review permissions", "review-permissions"),
-    button(
-      permissionGranted ? "Access granted" : "Grant declared access",
-      "grant-permissions",
-    ),
-    startRuntime,
-    stopRuntime,
-  );
+  actions.append(startRuntime, stopRuntime);
   sidebar.append(actions);
 
   sidebar.append(
@@ -508,15 +497,6 @@ function createSidebar(): HTMLElement {
 
   // Project switching and import are dashboard actions. Workspace controls
   // operate only on the committed active project.
-
-  if (permissionOrigins.length > 0) {
-    const permissionSummary = document.createElement("p");
-    permissionSummary.dataset.permissionSummary = "true";
-    permissionSummary.textContent = permissionGranted
-      ? `Declared access granted: ${permissionOrigins.join(", ")}`
-      : `Declared access needed: ${permissionOrigins.join(", ")}`;
-    sidebar.append(permissionSummary);
-  }
 
   const attention = attentionFromStatuses();
   if (attention !== null) {
@@ -966,8 +946,6 @@ function renderShell(): void {
     if (command === "ai-create") void createGeneratedProject();
     if (command === "copy-install-command") void copyInstallCommand();
     if (command === "copy-extension-id") void copyExtensionId();
-    if (command === "review-permissions") void reviewPermissions();
-    if (command === "grant-permissions") void grantPermissions();
     if (command === "start-native-runtime")
       void nativeRuntimeCommand("start-native-runtime");
     if (command === "stop-native-runtime")
@@ -1201,7 +1179,7 @@ async function createProject(): Promise<void> {
   const response = await client.send({
     version: 1,
     command: "create-project",
-    data: { version: 1, name, groups: [] },
+    data: { version: 2, name, groups: [] },
   });
   statusMessage =
     response.ok === true
@@ -1227,61 +1205,6 @@ async function importProject(input: HTMLInputElement): Promise<void> {
         : "The project could not be imported.";
   } catch {
     statusMessage = "The selected file is not valid JSON.";
-  }
-  await refresh();
-}
-
-async function reviewPermissions(): Promise<void> {
-  const projectId = state.activeProjectId;
-  if (!projectId) return;
-  const response = await client.send({
-    version: 1,
-    command: "review-permissions",
-    projectId,
-  });
-  if (response.ok !== true || !isProjectRecord(response.value)) {
-    statusMessage = "Declared permissions could not be reviewed.";
-    renderShell();
-    return;
-  }
-  if (isProjectRecord(response.value.state)) {
-    state = response.value.state as unknown as Envelope;
-  }
-  permissionOrigins = Array.isArray(response.value.origins)
-    ? response.value.origins.filter(
-        (origin): origin is string => typeof origin === "string",
-      )
-    : [];
-  permissionGranted = response.value.granted === true;
-  statusMessage = "Permissions reviewed.";
-  renderShell();
-}
-
-async function grantPermissions(): Promise<void> {
-  const projectId = state.activeProjectId;
-  if (!projectId) return;
-  if (permissionOrigins.length === 0) await reviewPermissions();
-  if (permissionOrigins.length === 0) return;
-  // chrome.permissions.request must run inside a user gesture, which is lost
-  // across the runtime message round trip to the service worker. The page
-  // therefore owns the exact-origin request and asks the worker to re-sync
-  // stored grants from the actual permission state afterwards.
-  const origins = permissionOrigins.map((origin) =>
-    origin.endsWith("/") ? origin : `${origin}/*`,
-  );
-  const granted = await chrome.permissions.request({ origins });
-  permissionGranted = granted;
-  statusMessage = granted
-    ? "Declared access granted."
-    : "Declared access was not granted.";
-  if (granted && projectId) {
-    await client.send({
-      version: 1,
-      command: "grant-permissions",
-      projectId,
-      origins: permissionOrigins,
-      granted: true,
-    });
   }
   await refresh();
 }
@@ -1583,8 +1506,6 @@ async function refresh(
   const activeProjectChanged =
     previousActiveProjectId !== state.activeProjectId;
   if (activeProjectChanged) {
-    permissionOrigins = [];
-    permissionGranted = false;
   }
   if (pendingProjectId && !Object.hasOwn(state.projects, pendingProjectId))
     pendingProjectId = state.activeProjectId;

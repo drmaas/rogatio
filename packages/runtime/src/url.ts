@@ -1,5 +1,5 @@
 import { isIP } from "node:net";
-import { hasControl, normalizeSiteOrigin } from "@rogatio/schema";
+import { hasControl } from "@rogatio/schema";
 
 const ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
@@ -81,17 +81,4 @@ export function canonicalizeOutboundTarget(value: unknown): string | null {
   const canonical = url.href;
   if (canonical.includes("#") || canonical.includes("@")) return null;
   return canonical;
-}
-
-export function targetOrigin(value: string): string | null {
-  const origin = normalizeSiteOrigin(new URL(value).origin);
-  return origin;
-}
-
-export function isOriginAllowed(
-  target: string,
-  origins: readonly string[],
-): boolean {
-  const origin = targetOrigin(target);
-  return origin !== null && origins.includes(origin);
 }

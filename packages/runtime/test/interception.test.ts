@@ -30,7 +30,7 @@ const activation = {
   state: "running" as const,
   startedAt: 1,
   presetDigest: "sha256:example" as const,
-  pacOrigins: ["https://example.com"],
+  pacRoutes: ["example.com"],
   proxy: { host: "127.0.0.1", port: 8443 },
 };
 
@@ -41,7 +41,7 @@ describe(" interception provider", () => {
 
     expect(provider.status()).toBe("stopped");
     expect(provider.detect()).toEqual({ supported: true, reasons: [] });
-    const endpoint = await provider.start(activation, ["https://example.com"]);
+    const endpoint = await provider.start(activation, ["example.com"]);
     expect(endpoint).toEqual({ host: "127.0.0.1", port: 9999 });
     expect(provider.status()).toBe("running");
     expect(platform.startTlsProxy).toHaveBeenCalledWith(activation);
@@ -49,7 +49,7 @@ describe(" interception provider", () => {
     const pacScript = vi.mocked(platform.installPac).mock
       .calls[0]?.[0] as string;
     expect(pacScript).toContain("127.0.0.1:9999");
-    expect(pacScript).toContain("https://example.com");
+    expect(pacScript).toContain('"example.com"');
     // Proxy must be listening before PAC routes traffic to it.
     const proxyOrder = vi.mocked(platform.startTlsProxy).mock
       .invocationCallOrder[0];

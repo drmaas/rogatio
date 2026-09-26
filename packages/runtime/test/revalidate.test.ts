@@ -5,19 +5,21 @@ import { revalidateAuthority } from "../src/revalidate.js";
 
 function buildProject(overrides: Partial<RogatioProject> = {}): RogatioProject {
   return {
-    version: 1,
+    version: 2,
     name: "test-project",
     groups: [
       {
         id: "g1",
         name: "group-one",
-        origins: ["https://example.com"],
         rules: [
           {
             id: "r1",
             name: "rule-one",
-            urlRegex: "^https://example\\.com/.*",
-            origins: ["https://example.com"],
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/.*",
+            },
             resourceTypes: ["main_frame"],
             priority: 1,
             method: "GET",
@@ -26,6 +28,35 @@ function buildProject(overrides: Partial<RogatioProject> = {}): RogatioProject {
       },
     ],
     ...overrides,
+  } as RogatioProject;
+}
+
+function buildBodyProject(): RogatioProject {
+  return {
+    version: 2,
+    name: "body-project",
+    groups: [
+      {
+        id: "g1",
+        name: "group-one",
+        rules: [
+          {
+            id: "r1",
+            name: "body-rule",
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/.*",
+            },
+            resourceTypes: ["xmlhttprequest"],
+            priority: 1,
+            method: "POST",
+            type: "request-body",
+            requestBody: { mode: "replace", body: "ok" },
+          },
+        ],
+      },
+    ],
   } as RogatioProject;
 }
 
@@ -68,7 +99,7 @@ describe("revalidateAuthority", () => {
     expect(decision).toEqual({ allowed: false, reason: "url-mismatch" });
   });
 
-  it("denies when the target origin is not authorized", () => {
+  it("denies when the target origin is not same-origin", () => {
     const decision = revalidateAuthority(
       buildProject(),
       compile(buildProject()),
@@ -77,16 +108,63 @@ describe("revalidateAuthority", () => {
     expect(decision).toEqual({ allowed: false, reason: "target-unauthorized" });
   });
 
-  it("denies when the initiator origin is not authorized", () => {
+  it("allows absent target when the URL matches source", () => {
     const decision = revalidateAuthority(
       buildProject(),
       compile(buildProject()),
-      { ...baseRequest, initiator: "https://evil.com" },
+      { ...baseRequest, target: undefined },
+    );
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("denies missing initiator for a body operation", () => {
+    const decision = revalidateAuthority(
+      buildBodyProject(),
+      compile(buildBodyProject()),
+      {
+        groupId: "g1",
+        ruleId: "r1",
+        url: "https://example.com/page",
+        method: "POST",
+        resourceType: "xmlhttprequest",
+      },
     );
     expect(decision).toEqual({
       allowed: false,
       reason: "initiator-unauthorized",
     });
+  });
+
+  it("denies body transforms when the URL no longer matches source", () => {
+    const decision = revalidateAuthority(
+      buildBodyProject(),
+      compile(buildBodyProject()),
+      {
+        groupId: "g1",
+        ruleId: "r1",
+        url: "https://other.example/stale",
+        method: "POST",
+        resourceType: "xmlhttprequest",
+        initiator: "https://example.com",
+      },
+    );
+    expect(decision).toEqual({ allowed: false, reason: "url-mismatch" });
+  });
+
+  it("allows http(s) initiator for body ops without an origins list", () => {
+    const decision = revalidateAuthority(
+      buildBodyProject(),
+      compile(buildBodyProject()),
+      {
+        groupId: "g1",
+        ruleId: "r1",
+        url: "https://example.com/page",
+        method: "POST",
+        resourceType: "xmlhttprequest",
+        initiator: "https://other.example",
+      },
+    );
+    expect(decision.allowed).toBe(true);
   });
 
   it("denies when the method does not match", () => {
@@ -125,7 +203,7 @@ describe("revalidateAuthority", () => {
   it("denies when the project is inconsistent with the operations", () => {
     const operations = compile(buildProject());
     const stripped = buildProject({
-      groups: [{ id: "g1", name: "g", origins: [], rules: [] }],
+      groups: [{ id: "g1", name: "g", rules: [] }],
     });
     const decision = revalidateAuthority(stripped, operations, baseRequest);
     expect(decision).toEqual({

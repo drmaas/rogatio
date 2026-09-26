@@ -12,7 +12,7 @@ rewriting via native messaging to the explicitly started local runtime.
 - Authorized **public GET** only, without browser credentials.
 - **Replace mode** substitutes the entire fetched response body with the configured UTF-8 text while preserving upstream status and headers.
 - **Regex rewrite mode** applies one or more bounded pattern/replacement pairs to the fetched body.
-- Replace-mode bodies may use `$1` through `$9` from the rule's `urlRegex`, and `$$`
+- Replace-mode bodies may use `$1` through `$9` from the rule's **source** regex, and `$$`
   for a literal dollar sign.
 - Regex-mode replacements keep `$1` through `$9` for captures from the body regex.
   The two capture namespaces are not mixed.

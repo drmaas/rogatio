@@ -4,8 +4,11 @@ import { validateProjectDetailed } from "../src/browser-schema.js";
 const redirectRule = {
   id: "rule-redirect",
   name: "Redirect rule",
-  urlRegex: "^https://example\\.com/(.*)$",
-  origins: [],
+  source: {
+    key: "url" as const,
+    operator: "regex" as const,
+    value: "^https://example\\.com/(.*)$",
+  },
   resourceTypes: ["main_frame"],
   priority: 100,
   type: "redirect" as const,
@@ -13,13 +16,12 @@ const redirectRule = {
 };
 
 const baseProject = {
-  version: 1,
+  version: 2,
   name: "Example project",
   groups: [
     {
       id: "group-main",
       name: "Main sites",
-      origins: ["https://example.com"],
       rules: [redirectRule],
     },
   ],
@@ -56,7 +58,11 @@ describe("F9 browser schema redirect rules", () => {
           rules: [
             {
               ...redirectRule,
-              urlRegex: "^https://example\\.com/(a)$",
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://example\\.com/(a)$",
+              },
               redirect: { destination: "https://other.com/\\3" },
             },
           ],

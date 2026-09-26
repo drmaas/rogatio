@@ -45,7 +45,7 @@ export interface RuntimeActivation {
   readonly state: "running";
   readonly startedAt: number;
   readonly presetDigest: PresetDigest;
-  readonly pacOrigins: readonly string[];
+  readonly pacRoutes: readonly string[];
   readonly proxy?: { readonly host: string; readonly port: number };
 }
 
@@ -57,7 +57,7 @@ export interface CapabilityProfile {
 export interface SessionConfig {
   readonly policyDigest: string;
   readonly extensionId: string;
-  readonly pacOrigins: readonly string[];
+  readonly pacRoutes: readonly string[];
   readonly targetPolicy: {
     readonly public: boolean;
     readonly localOrigins: readonly string[];
@@ -165,11 +165,11 @@ export function createNativeRuntimeController(
     session: SessionProvider | null;
     interception: { active: boolean; reasons: string[] };
   }> {
-    if (sessionConfig.pacOrigins.length === 0) {
+    if (sessionConfig.pacRoutes.length === 0) {
       return {
-        activation: { ...current, pacOrigins: [] },
+        activation: { ...current, pacRoutes: [] },
         session: null,
-        interception: { active: false, reasons: ["no-pac-origins"] },
+        interception: { active: false, reasons: ["no-pac-routes"] },
       };
     }
     if (hasActiveSession()) {
@@ -187,7 +187,7 @@ export function createNativeRuntimeController(
       current,
       sessionConfig.policyDigest,
       sessionConfig.extensionId,
-      sessionConfig.pacOrigins,
+      sessionConfig.pacRoutes,
       {
         public: sessionConfig.targetPolicy.public,
         localOrigins: sessionConfig.targetPolicy.localOrigins,
@@ -203,7 +203,7 @@ export function createNativeRuntimeController(
     const session = getCurrentSession();
     const next: RuntimeActivation = {
       ...current,
-      pacOrigins: sessionConfig.pacOrigins,
+      pacRoutes: sessionConfig.pacRoutes,
       proxy: result.proxy,
     };
     return {
@@ -244,7 +244,7 @@ export function createNativeRuntimeController(
         state: "running",
         startedAt,
         presetDigest: preset.digest,
-        pacOrigins: sessionConfig?.pacOrigins ?? [],
+        pacRoutes: sessionConfig?.pacRoutes ?? [],
       };
 
       let session: SessionProvider | null = null;
@@ -450,7 +450,8 @@ export function createNativeRuntimeController(
         const meta = input.metadata as {
           policyDigest?: string;
           extensionId?: string;
-          pacOrigins?: readonly string[];
+          pacRoutes?: readonly string[];
+          requestUrl?: string;
           targetPolicy?: {
             public?: boolean;
             publicAllowed?: boolean;
@@ -462,7 +463,7 @@ export function createNativeRuntimeController(
             typeof meta.policyDigest === "string" ? meta.policyDigest : "",
           extensionId:
             typeof meta.extensionId === "string" ? meta.extensionId : "",
-          pacOrigins: Array.isArray(meta.pacOrigins) ? meta.pacOrigins : [],
+          pacRoutes: Array.isArray(meta.pacRoutes) ? meta.pacRoutes : [],
           targetPolicy: {
             public:
               meta.targetPolicy?.public === true ||
@@ -485,7 +486,7 @@ export function createNativeRuntimeController(
             ...(activation.proxy !== undefined
               ? { proxy: activation.proxy }
               : {}),
-            pacOrigins: activation.pacOrigins,
+            pacRoutes: activation.pacRoutes,
           },
         };
       }
@@ -564,7 +565,17 @@ export function createNativeRuntimeController(
             };
           }
           if (!preset) throw new Error("runtime not started");
-          const result = authorizeExact(preset, meta.descriptor);
+          const descriptorRecord =
+            typeof meta.descriptor === "object" && meta.descriptor !== null
+              ? (meta.descriptor as { target?: string })
+              : {};
+          const requestUrl =
+            typeof meta.requestUrl === "string" && meta.requestUrl.length > 0
+              ? meta.requestUrl
+              : typeof descriptorRecord.target === "string"
+                ? descriptorRecord.target
+                : "";
+          const result = authorizeExact(preset, meta.descriptor, requestUrl);
           op.value();
           if (!result.ok) {
             return {

@@ -2,7 +2,6 @@ import {
   compileUrlRegex,
   HTTP_METHODS,
   LIMITS,
-  normalizeSiteOrigin,
   RESOURCE_TYPES,
 } from "@rogatio/schema";
 import type { NormalizedMatcher } from "./types.js";
@@ -20,16 +19,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function validateMatcherShape(
   value: unknown,
 ): value is NormalizedMatcher {
-  if (!isRecord(value) || !isRecord(value.urlRegex)) return false;
+  if (!isRecord(value) || !isRecord(value.source)) return false;
+  const source = value.source;
   if (
-    typeof value.urlRegex.source !== "string" ||
-    value.urlRegex.flags !== "" ||
-    compileUrlRegex(value.urlRegex.source) === null ||
-    !Array.isArray(value.origins) ||
-    !value.origins.every(
-      (origin) =>
-        typeof origin === "string" && normalizeSiteOrigin(origin) !== null,
-    ) ||
+    (source.key !== "url" && source.key !== "host") ||
+    source.operator !== "regex" ||
+    typeof source.value !== "string" ||
+    compileUrlRegex(source.value) === null ||
     !Array.isArray(value.resourceTypes) ||
     !value.resourceTypes.every((type) =>
       RESOURCE_TYPES.includes(type as (typeof RESOURCE_TYPES)[number]),

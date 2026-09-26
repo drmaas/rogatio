@@ -39,11 +39,11 @@ interception; the native host itself runs everywhere the browser can start it.
 
 ## Authority revalidation
 
-The browser grant is **not** a security boundary. Every transformation request is
-re-checked against the canonical `.rogatio.json`: the rule must exist, its URL regular
-expression must match, the request and target origins must be within the rule's effective
-origins, the method must match when specified, the resource type must be allowed, and the
-initiator origin must be within granted scope. A denied request triggers no interception.
+Install-time host access is **not** a security boundary. Every transformation request is
+re-checked against the canonical `.rogatio.json`: the rule must exist, its source
+condition must match, the method must match when specified, the resource type must be
+allowed, and initiator/target same-origin policy must hold. A denied request triggers no
+interception.
 
 ## Body confidentiality
 

@@ -2,19 +2,21 @@ import { describe, expect, it, vi } from "vitest";
 import { startNativeSession } from "../src/native-session.js";
 
 const bodyProject = {
-  version: 1,
+  version: 2,
   name: "Body project",
   groups: [
     {
       id: "group-body",
       name: "Body group",
-      origins: ["http://127.0.0.1:8080"],
       rules: [
         {
           id: "rule-response-body",
           name: "Rewrite",
-          urlRegex: "^http://127\\.0\\.0\\.1:8080/data\\.json$",
-          origins: [],
+          source: {
+            key: "host",
+            operator: "regex",
+            value: "^127\\.0\\.0\\.1$",
+          },
           resourceTypes: ["main_frame"],
           priority: 50,
           type: "response-body",
@@ -25,8 +27,11 @@ const bodyProject = {
         {
           id: "rule-request-body",
           name: "Replace",
-          urlRegex: "^http://127\\.0\\.0\\.1:8080/submit$",
-          origins: [],
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^http://127\\.0\\.0\\.1:8080/submit$",
+          },
           resourceTypes: ["xmlhttprequest"],
           priority: 60,
           method: "POST",
@@ -38,10 +43,10 @@ const bodyProject = {
   ],
 };
 
-describe("startNativeSession pacOrigins", () => {
-  it("derives pacOrigins from compiled body-rule matcher origins", async () => {
-    const start = vi.fn(async (config: { pacOrigins: readonly string[] }) => {
-      expect(config.pacOrigins).toEqual(["http://127.0.0.1:8080"]);
+describe("startNativeSession pacRoutes", () => {
+  it("derives pacRoutes from literal-host body-rule sources only", async () => {
+    const start = vi.fn(async (config: { pacRoutes: readonly string[] }) => {
+      expect(config.pacRoutes).toEqual(["127.0.0.1"]);
       return { state: "started" as const };
     });
     const result = await startNativeSession({
@@ -72,7 +77,6 @@ describe("startNativeSession pacOrigins", () => {
         data: bodyProject,
         enabledGroupIds: ["group-body"],
       }),
-      getGrantedOrigins: async () => ["http://127.0.0.1:8080"],
     });
     expect(result.ok).toBe(true);
     expect(start).toHaveBeenCalledOnce();

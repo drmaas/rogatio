@@ -7,7 +7,6 @@ import {
   type StorageAdapter,
 } from "@rogatio/browser-core";
 import { compileProject, type RogatioOperation } from "@rogatio/compiler";
-import { normalizeSiteOrigin } from "@rogatio/schema";
 import {
   buildAssistSystemPrompt,
   MAX_AI_ASSIST_ENVELOPE_BYTES,
@@ -31,14 +30,11 @@ import {
   startNativeSession,
   stopNativeSession,
 } from "./native-session.js";
-import { declaredPermissionOrigins } from "./permissions.js";
 import { type ExtensionRequest, parseRequest } from "./protocol.js";
-
-type PermissionAdapter = {
-  contains(origins: readonly string[]): Promise<boolean>;
-  request(origins: readonly string[]): Promise<boolean>;
-  remove(origins: readonly string[]): Promise<boolean>;
-};
+import {
+  isPacRoutableBodySource,
+  projectSourceCondition,
+} from "./source-projection.js";
 
 function installerWithMatchIndex(
   installer: RuleInstallerAdapter,
@@ -60,7 +56,6 @@ function takeDnrInstallErrors(
 
 export interface ExtensionApplicationOptions {
   readonly storage: StorageAdapter;
-  readonly permissions: PermissionAdapter;
   readonly installer: RuleInstallerAdapter;
   readonly badge?: (value: {
     readonly text: string;
@@ -132,25 +127,18 @@ function stringValue(value: unknown): string | undefined {
 
 const MAX_AI_PROMPT_LENGTH = 4000;
 const AI_GENERATION_SYSTEM_PROMPT =
-  "Return only one complete Rogatio version-1 JSON project. Use valid groups and rules; do not include markdown, commentary, credentials, or unknown properties.";
-
-function arrayOfStrings(value: unknown): readonly string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value.every((item) => typeof item === "string") ? value : undefined;
-}
+  'Return only one complete Rogatio version-2 JSON project. Each rule requires source: { key: "url"|"host", operator: "regex", value: string }. Do not include group or rule origins, urlRegex, markdown, commentary, credentials, or unknown properties.';
 
 function operationStatuses(
   operations: readonly RogatioOperation[],
   installedRuleIds: readonly string[],
   enabledGroupIds: readonly string[],
-  grantedOrigins: readonly string[],
   nativePhase: NativeRuntimePhase | "unsupported",
   dnrInstallErrors: readonly DnrInstallError[] = [],
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
     enabledGroupIds,
-    grantedOrigins,
     installedRuleIds,
   });
   return statuses.map((status): Record<string, unknown> => {
@@ -159,6 +147,25 @@ function operationStatuses(
         candidate.ruleId === status.ruleId &&
         candidate.groupId === status.groupId,
     );
+    if (!operation) return { ...status };
+
+    if (
+      operation.kind === "redirect" ||
+      operation.kind === "query" ||
+      operation.kind === "header" ||
+      operation.kind === "request-body" ||
+      operation.kind === "response-body"
+    ) {
+      if (!projectSourceCondition(operation.matcher).projectable) {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "error",
+          diagnostics: [extensionDiagnostic("extension.source-unprojectable")],
+        };
+      }
+    }
+
     const dnrInstallError = dnrInstallErrors.find(
       (error) => error.ruleId === status.ruleId,
     );
@@ -173,7 +180,7 @@ function operationStatuses(
         ],
       };
     }
-    if (operation?.kind === "matcher") {
+    if (operation.kind === "matcher") {
       if (status.status === "active" || status.status === "error") {
         return {
           groupId: status.groupId,
@@ -185,18 +192,24 @@ function operationStatuses(
       return { ...status };
     }
     if (
-      operation?.kind === "request-body" ||
-      operation?.kind === "response-body"
+      operation.kind === "request-body" ||
+      operation.kind === "response-body"
     ) {
-      if (status.status !== "active" && status.status !== "error") {
-        return { ...status };
-      }
+      if (status.status === "disabled") return { ...status };
       if (nativePhase === "unsupported") {
         return {
           groupId: status.groupId,
           ruleId: status.ruleId,
           status: "unsupported",
           diagnostics: [extensionDiagnostic("extension.unsupported")],
+        };
+      }
+      if (!isPacRoutableBodySource(operation.matcher)) {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "needs runtime",
+          diagnostics: [extensionDiagnostic("runtime.pac-unroutable")],
         };
       }
       if (nativePhase !== "started") {
@@ -212,19 +225,13 @@ function operationStatuses(
         status: "active",
       };
     }
-    // redirect, query, and header operations are browser-native and remain
-    // active once their permissions and installation are satisfied.
-    if (operation?.kind === "header") {
-      if (status.status === "active") {
-        return {
-          groupId: status.groupId,
-          ruleId: status.ruleId,
-          status: "active",
-        };
-      }
-      return { ...status };
+    if (operation.kind === "header" && status.status === "active") {
+      return {
+        groupId: status.groupId,
+        ruleId: status.ruleId,
+        status: "active",
+      };
     }
-    // redirect and query: trust computeRuleStatuses (active only when installed).
     return { ...status };
   });
 }
@@ -247,16 +254,6 @@ export function createExtensionApplication(
   let nativeRuntimeError: string | null = null;
   let pendingProjectId: string | null = null;
 
-  async function grantedOriginsFor(
-    origins: readonly string[],
-  ): Promise<readonly string[]> {
-    const result: string[] = [];
-    for (const origin of origins) {
-      if (await options.permissions.contains([origin])) result.push(origin);
-    }
-    return result;
-  }
-
   /**
    * The DNR-managed operation set for the active project. Browser-side
    * redirect/query/header rules stay installed across start and stop.
@@ -264,10 +261,8 @@ export function createExtensionApplication(
   function dnrManagedOps(
     operations: readonly RogatioOperation[],
     enabledGroupIds: readonly string[],
-    granted: readonly string[],
   ): readonly RogatioOperation[] {
     const enabled = new Set(enabledGroupIds);
-    const grantedSet = new Set(granted);
     return operations.filter((operation) => {
       if (
         operation.kind === "redirect" ||
@@ -276,11 +271,9 @@ export function createExtensionApplication(
       ) {
         return (
           enabled.has(operation.groupId) &&
-          operation.matcher.origins.length > 0 &&
-          operation.matcher.origins.every((origin) => grantedSet.has(origin))
+          projectSourceCondition(operation.matcher).projectable
         );
       }
-      // Body rules stay on the native-runtime overlay (never DNR).
       return false;
     });
   }
@@ -314,10 +307,6 @@ export function createExtensionApplication(
       await options.badge?.(badge);
       return { statuses: [], badge };
     }
-    const declared = declaredPermissionOrigins({
-      operations: compiled.operations,
-    });
-    const granted = await grantedOriginsFor(declared);
     const matchIndexInstaller = installerWithMatchIndex(options.installer);
     if (matchIndexInstaller !== undefined) {
       // ADR 0008: warm cold tracked before reporting installed ids.
@@ -338,7 +327,6 @@ export function createExtensionApplication(
       const desiredDnrOps = dnrManagedOps(
         compiled.operations,
         project.enabledGroupIds,
-        granted,
       );
       const currentlyInstalled = await options.installer.current();
       const currentDnr = currentlyInstalled.filter(
@@ -375,7 +363,6 @@ export function createExtensionApplication(
       compiled.operations,
       installedRuleIds,
       project.enabledGroupIds,
-      granted,
       nativePhase,
       dnrInstallErrors,
     );
@@ -385,7 +372,6 @@ export function createExtensionApplication(
       status: status.status as
         | "active"
         | "disabled"
-        | "needs permission"
         | "needs runtime"
         | "unsupported"
         | "error",
@@ -393,24 +379,6 @@ export function createExtensionApplication(
     const badge = computeBadge(badgeStatuses);
     await options.badge?.(badge);
     return { statuses, badge };
-  }
-
-  async function syncStoredGrants(
-    projectId: string,
-    declared: readonly string[],
-    granted: readonly string[],
-  ): Promise<void> {
-    const current = await repository.getProject(projectId);
-    if (!current.ok) return;
-    const grantedSet = new Set(granted);
-    const storedSet = new Set(current.value.grantedOrigins);
-    for (const origin of declared) {
-      if (grantedSet.has(origin) && !storedSet.has(origin)) {
-        await repository.grantOrigin(projectId, origin);
-      } else if (!grantedSet.has(origin) && storedSet.has(origin)) {
-        await repository.revokeOrigin(projectId, origin);
-      }
-    }
   }
 
   async function state(): Promise<ApplicationResponse> {
@@ -449,7 +417,6 @@ export function createExtensionApplication(
         extensionId: options.extensionId,
         nativeRuntime: options.nativeRuntime,
         getProject: async () => null,
-        getGrantedOrigins: async () => [],
       });
       return { ok: true, value: { supported } };
     }
@@ -471,7 +438,6 @@ export function createExtensionApplication(
           extensionId: options.extensionId,
           nativeRuntime: options.nativeRuntime,
           getProject: async () => null,
-          getGrantedOrigins: async () => [],
         },
         [
           { role: "system", content: AI_GENERATION_SYSTEM_PROMPT },
@@ -556,7 +522,6 @@ export function createExtensionApplication(
           extensionId: options.extensionId,
           nativeRuntime: options.nativeRuntime,
           getProject: async () => null,
-          getGrantedOrigins: async () => [],
         },
         messages,
         "",
@@ -727,7 +692,7 @@ export function createExtensionApplication(
         // (Dashboard "Create using AI") need the native runtime and its AI
         // channel before any project exists. Start against an empty project.
         const projectData = project?.data ?? {
-          version: 1,
+          version: 2,
           name: "Untitled project",
           groups: [],
         };
@@ -752,11 +717,6 @@ export function createExtensionApplication(
             extensionId: options.extensionId,
             nativeRuntime: options.nativeRuntime,
             getProject: async () => ({ data: projectData, enabledGroupIds }),
-            getGrantedOrigins: async () => {
-              return declaredPermissionOrigins({
-                operations: compileResult.operations,
-              });
-            },
             bodyMarkers:
               options.chromeApi === undefined
                 ? undefined
@@ -819,7 +779,6 @@ export function createExtensionApplication(
               enabledGroupIds: project.enabledGroupIds,
             };
           },
-          getGrantedOrigins: async () => [],
           bodyMarkers:
             options.chromeApi === undefined
               ? undefined
@@ -860,71 +819,6 @@ export function createExtensionApplication(
         },
       };
     }
-    if (
-      request.command === "review-permissions" ||
-      request.command === "grant-permissions" ||
-      request.command === "revoke-permission"
-    ) {
-      const projectId = stringValue(data.projectId);
-      if (!projectId) return failure("extension.invalid-message");
-      const exported = await repository.exportProject(projectId);
-      if (!exported.ok) return failure("extension.not-found");
-      const compiled = compileProject(exported.value);
-      if (!compiled.ok) return failure("extension.storage-failed");
-      let declared: readonly string[];
-      try {
-        declared = declaredPermissionOrigins({
-          operations: compiled.operations,
-        });
-      } catch {
-        return failure("extension.invalid-origin");
-      }
-      const grantedOrigins = await grantedOriginsFor(declared);
-      if (request.command === "review-permissions") {
-        await syncStoredGrants(projectId, declared, grantedOrigins);
-        const current = await repository.state();
-        if (!current.ok) return failure("extension.storage-failed");
-        const projection = await projectState(current.value);
-        return {
-          ok: true,
-          value: {
-            origins: declared,
-            granted: grantedOrigins.length === declared.length,
-            state: {
-              ...current.value,
-              ruleStatuses: projection.statuses,
-              badge: projection.badge,
-              nativeRuntimeState: { phase: nativePhase },
-            },
-          },
-        };
-      }
-      const requested = arrayOfStrings(data.origins);
-      if (!requested) return failure("extension.invalid-message");
-      const normalized = requested.map((origin) => normalizeSiteOrigin(origin));
-      if (normalized.some((origin) => origin === null))
-        return failure("extension.invalid-origin");
-      const exact = normalized as string[];
-      if (exact.some((origin) => !declared.includes(origin)))
-        return failure("extension.invalid-origin");
-      const changed =
-        request.command === "grant-permissions"
-          ? data.granted === true || (await options.permissions.request(exact))
-          : await options.permissions.remove(exact);
-      if (!changed) return failure("extension.permission-failed");
-      const currentGranted = await grantedOriginsFor(declared);
-      await syncStoredGrants(projectId, declared, currentGranted);
-      // Permission changes move installed rules via state() → projectState
-      // (full desired set). That covers activate-then-grant and revoke.
-      await state();
-      return {
-        ok: true,
-        value: {
-          origins: declared,
-          granted: currentGranted.length === declared.length,
-        },
-      };
-    }
     return failure("extension.invalid-message");
   }
 
@@ -940,5 +834,3 @@ export function createExtensionApplication(
     },
   };
 }
-
-export type { PermissionAdapter };
