@@ -94,7 +94,7 @@
           "source": {
             "key": "url",
             "operator": "regex",
-            "value": "^https://example\\.com/submit$"
+            "value": "^https://example\\.com/(submit)$"
           },
           "resourceTypes": ["xmlhttprequest"],
           "priority": 600,
@@ -102,7 +102,7 @@
           "type": "request-body",
           "requestBody": {
             "mode": "replace",
-            "body": "{\"replaced\":true}"
+            "body": "{\"user\":\"$1\"}"
           }
         }
       ]

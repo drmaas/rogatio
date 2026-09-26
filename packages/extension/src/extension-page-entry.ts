@@ -1040,7 +1040,7 @@ function renderShell(): void {
             code: `schema.${error.keyword}`,
             severity: "error" as const,
             path: error.instancePath,
-            message: "The project contains invalid data.",
+            message: error.message ?? "The project contains invalid data.",
           }));
         },
         save: async (draft) => {
