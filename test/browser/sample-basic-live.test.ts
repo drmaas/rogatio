@@ -93,6 +93,9 @@ async function dnrIdForRule(
   return undefined;
 }
 
+// Explicit timeouts: these journeys (sample import, group enablement, several
+// navigations, console/match assertions, native install) outrun the 120s
+// `testStandalone` default on loaded CI runners.
 testStandalone(
   "samples/basic DNR rules: match, execute, and console-log live",
   async ({ registerDriver }) => {
@@ -221,6 +224,7 @@ testStandalone(
       await server.close();
     }
   },
+  300_000,
 );
 
 if (LIVE_E2E && SUDO_OK) {
@@ -308,6 +312,7 @@ if (LIVE_E2E && SUDO_OK) {
         await server.close();
       }
     },
+    300_000,
   );
 } else {
   it.skip(
