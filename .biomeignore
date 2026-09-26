@@ -1,8 +1,0 @@
-node_modules
-**/dist
-graphify-out/**
-coverage
-playwright-report
-**/test-results
-test/fixtures
-packages/docs-site/**

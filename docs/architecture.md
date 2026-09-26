@@ -1207,8 +1207,12 @@ The root `typecheck` (`tsc --noEmit` over `packages/**/*.ts`) and root `lint`/`f
 
 - Is added to the root `tsconfig.json` `exclude` list so Astro/Starlight type surface and
   config are not checked by the product typecheck.
-- Is added to `.biomeignore` so Biome does not format/lint Astro component and Markdown
-  content files (these are owned by Astro/Starlight tooling).
+- Has its generated output (`packages/docs-site/.astro`, `dist`) ignored via
+  `biome.json` `files.includes` (`!!**/.astro`, `!!**/dist`), so Biome never reads Astro's
+  generated `content.d.ts`, collection schema, and content modules. Hand-written docs-site
+  sources (`*.css`, `*.mjs`, `*.ts`) stay under root lint/format coverage; Biome does not
+  parse `.astro` or `.md`, so those files are left to Astro/Starlight tooling. Biome 2.x
+  ignores `.biomeignore`, so all ignore rules live in `biome.json`.
 
 The root esbuild `build` script (`scripts/build.ts`) targets only product packages and
 does not include docs-site, so the canonical `pnpm build` is unaffected. `pnpm test`
