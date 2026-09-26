@@ -1,3 +1,5 @@
+> Status: frozen 2026-09-25
+
 # AI fix-kind repair — workflow log
 
 Worktree `~/Projects/github/drmaas/rogatio-ai-fix-repair`, branch `feature/ai-fix-repair`, base `main` @ `50ca273`.

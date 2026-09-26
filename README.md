@@ -178,15 +178,14 @@ The config file has `600` permissions (owner read/write only). The API key never
    - "Add a response-body replace rule that returns {'status': 'ok'}"
    - "Fix the invalid regex on rule xyz"
 4. AI returns a validated proposal (CLI Assist uses the configured model; token streaming is optional and may be absent)
-5. Click **Apply** to add the rule to your project, or **Reject** to discard
+5. Click **Apply** to add the rule to your project, or **Reject** to discard (for a fix request, Apply replaces the offending rule in place, keeping its id)
 
 ### AI Capabilities
 
 | Feature | Description |
 |---------|-------------|
 | **Generate** | Create new rules from natural language |
-| **Fix** | Automatically fix schema validation errors (max 3 iterations on CLI; extension validates once) |
-| **Fix dry-run** | Modify rules to match failing test cases |
+| **Fix** | Repair schema validation errors in place: the rules that carry diagnostics are replaced (keeping their rule ids), and the host validates the repaired project before accepting the proposal (up to 3 fix iterations on CLI; the extension validates once and rejects proposals that do not repair the project) |
 | **Explain** | Describe what a rule or project does |
 
 ### In the Chrome Extension

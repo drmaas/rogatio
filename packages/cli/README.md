@@ -85,8 +85,7 @@ Configuration is stored at `~/.config/rogatio/provider.json` (Linux), `~/Library
 
 When AI is configured, `rogatio edit` shows an **AI Assist** button in the command bar. Click it to:
 - Generate rules from natural language
-- Fix validation errors (max 3 auto-fix iterations)
-- Fix dry-run mismatches
+- Fix validation errors by repairing the offending rules in place (keeping their rule ids; max 3 auto-fix iterations)
 
 ## Related
 
