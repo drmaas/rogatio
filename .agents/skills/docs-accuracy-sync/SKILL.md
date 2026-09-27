@@ -5,8 +5,9 @@ description: >-
   Use when updating README, AGENTS.md, docs/architecture.md, rogatio-overview.md,
   packages/docs-site content, package READMEs, or when docs drift from CLI/runtime/
   extension behavior (pnpm pin, package DAG, install commands, host vs CA).
-  Runs graphify (update or full) then queries the graph before editing.
-  Lives at .agents/skills/ for multi-agent discovery (Cursor, Claude Code, etc.).
+  Queries the main checkout's graphify graph (packages/ only, built once in the
+  main checkout) before editing. Lives at .agents/skills/ for multi-agent discovery
+  (Cursor, Claude Code, etc.).
 ---
 
 # Rogatio docs accuracy sync
@@ -23,8 +24,10 @@ Bring **current-behavior** docs in line with code. Decision records stay frozen.
 
 - Do **not** rewrite `docs/specs/`, `docs/plans/`, `docs/workflows/`, `docs/research/`, or `docs/adrs/` to match current behavior (append-only; `Superseded by:` only when reviewing a record)
 - Do **not** invent product behavior; code and tests win
-- Do **not** edit in the main checkout
+- Do **not** edit in the main checkout (the one exception is a graphify rebuild, which runs there and writes nothing tracked)
 - Do **not** commit `graphify-out/` (gitignored local artifact)
+- Do **not** build a graph in a worktree; read the main checkout's graph with `--graph`
+- Do **not** graph anything but `packages/`
 
 ## Source-of-truth priority
 
@@ -34,7 +37,7 @@ Bring **current-behavior** docs in line with code. Decision records stay frozen.
 4. `README.md`, `packages/*/README.md`
 5. Decision records (why / rejected — not what the system does now)
 
-Graphify answers are **orientation aids**. If graphify and code disagree, **code wins**.
+Graphify answers are **orientation aids**. If graphify and code disagree, **code wins**. The graph is built from `main` and only covers `packages/`, so it is always one branch behind the current worktree — treat every answer as a lead to verify, never as evidence.
 
 Live current-behavior surfaces that **must** stay synced with code:
 
@@ -61,44 +64,63 @@ All edits and validation run only in that worktree.
 
 ## Graphify (required)
 
-After entering the worktree, **before** drafting doc edits, refresh and query the knowledge graph. Follow the `graphify` skill for install/detect details when the CLI is missing.
+After entering the worktree, **before** drafting doc edits, query the knowledge graph. Follow the `graphify` skill for install/detect details when the CLI is missing.
 
-### Refresh
+Two fixed rules keep the graph cheap and consistent across worktrees:
+
+1. **Graph `packages/` only.** The corpus is the product source, never the repo root. `docs/`, `test/`, `samples/`, and decision records are prose, not product code; graphing them buries the package graph in document nodes.
+2. **The graph lives in the main checkout, not in worktrees.** One graph per repository, built from `main`'s `packages/`. Worktrees read it; they never build one.
 
 ```bash
-# Prefer incremental when a graph already exists in this worktree
+MAIN=~/Projects/github/drmaas/rogatio
+GRAPH="$MAIN/graphify-out/graph.json"
+```
+
+### Query (every worktree, every run)
+
+Point the read commands at the main checkout's graph. `--graph` overrides the default `graphify-out/graph.json` lookup, so these work from any worktree:
+
+```bash
+graphify query "What are the Rogatio packages and their dependency direction?" --graph "$GRAPH"
+graphify query "What is the public CLI surface and runtime install vs Start/Stop model?" --graph "$GRAPH"
+graphify query "Where do README, AGENTS, architecture, and docs-site disagree with packages/cli and packages/runtime?" --graph "$GRAPH"
+graphify path "@rogatio/schema" "@rogatio/extension" --graph "$GRAPH"
+graphify explain "createRequestBodyTrustController" --graph "$GRAPH"
+```
+
+Use further `graphify query` / `explain` / `path` / `affected` when a specific doc claim is ambiguous (match logging, AI, CA trust, rule statuses). `query` / `path` / `explain` / `affected` all accept `--graph`.
+
+### Refresh (main checkout only, or an explicit user request)
+
+Never run this from a worktree. Refresh in the main checkout after code lands on `main`, or when the user explicitly asks for a rebuild:
+
+```bash
+cd ~/Projects/github/drmaas/rogatio
 if [ -f graphify-out/graph.json ]; then
-  graphify . --update --no-viz
+  graphify packages --update --no-viz
 else
-  graphify . --no-viz
+  graphify packages --no-viz
 fi
 ```
 
-If `graphify` is not on `PATH`, install/resolve via the graphify skill (`uv tool install graphifyy` or equivalent), then re-run. Use worktree root as `INPUT_PATH`. Skip viz (`--no-viz`) unless the user wants HTML.
+Notes:
 
-Optional deeper pass when architecture/DAG claims look badly wrong: `graphify . --mode deep --no-viz` (slower).
-
-### Query before edit
-
-Run these (or close equivalents) and keep answers for the audit:
-
-```bash
-graphify query "What are the Rogatio packages and their dependency direction?"
-graphify query "What is the public CLI surface and runtime install vs Start/Stop model?"
-graphify query "Where do README, AGENTS, architecture, and docs-site disagree with packages/cli and packages/runtime?"
-graphify path "@rogatio/schema" "@rogatio/extension"
-```
-
-Use further `graphify query` / `explain` / `path` when a specific doc claim is ambiguous (match logging, AI, CA trust, rule statuses).
+- `INPUT_PATH` is `packages`, not `.`; graph output still lands in `<cwd>/graphify-out/`.
+- Skip viz (`--no-viz`) unless the user wants HTML.
+- Optional deeper pass when DAG claims look badly wrong: `graphify packages --mode deep --no-viz` (slower).
+- If `graphify` is not on `PATH`, install/resolve via the graphify skill (`uv tool install graphifyy` or equivalent), then re-run.
+- `graphify-out/.graphify_root` records the scanned root; it should read `…/rogatio/packages`. If it reads anything else, the last build used the wrong `INPUT_PATH`.
+- A worktree that needs a fresher graph than `main` has is a signal to ask the user, not to build locally.
 
 ### After edits (optional but preferred)
 
+Re-run the relevant read commands against the same main-checkout graph. Do not rebuild:
+
 ```bash
-graphify . --update --no-viz
-graphify query "Do orientation docs and docs-site still contradict the package DAG or CLI?"
+graphify query "Do orientation docs and docs-site still contradict the package DAG or CLI?" --graph "$GRAPH"
 ```
 
-Do not treat a clean graphify answer as a substitute for `pnpm validate` or for reading `package.json` / CLI router.
+Do not treat a clean graphify answer as a substitute for `pnpm validate` or for reading `package.json` / CLI router. A worktree graph is always one branch behind, so code reading wins on every claim it touches.
 
 ## Audit before edit
 
@@ -122,7 +144,7 @@ Default product decisions unless user overrides:
 1. `README.md` + `AGENTS.md` + `rogatio-overview.md` (+ CONTRIBUTING / samples pins)
 2. `docs/architecture.md` — targeted hygiene (DAG, security wording, CLI components, remove false “remain accurate” on removed features, fix known factual errors). Not a full rewrite of every feature slice
 3. Docs-site **P0** (wrong install/start copy, registry, trust/status, security denials, architecture DAG)
-4. Docs-site **P1** (popup/Dashboard/Workspace, `--extension-id`, `trust unsupported` exits 0)
+4. Docs-site **P1** (popup/Dashboard/Workspace, `--extension-id`, `runtime verify`, `trust unsupported` exits 1 with the manifest rolled back)
 5. `packages/cli/README.md` if CLI flags/commands changed
 
 ### Docs-site P0 checklist
@@ -136,13 +158,16 @@ Default product decisions unless user overrides:
 - [ ] Platforms: host start unconditional after manifest; request-body CA/PAC gated
 - [ ] Security: no false “does not use native messaging / proxy / TLS”
 - [ ] Architecture page DAG matches `package.json`; stubs labeled stubs
+- [ ] Dry-run is described as **3-dimension** (source, method, resourceType), never 4-dim
+- [ ] `runtime install` trust failure → **exit 1 with the manifest rolled back**, never “exit 0, manifest installed, CA skipped”
+- [ ] Every routed subcommand is listed: `runtime install | uninstall | verify | host`, and top-level `edit | test | verify | runtime | ai`
 
 ## Stale-claim greps (live docs only)
 
 After edits, grep **current-behavior** files (not frozen decision trees):
 
 ```bash
-rg -n '10\.32\.1|@drmaas/rogatio|GitHub Packages|exactly of `edit`|start and connect|macOS runtime lifecycle|Requires the device-local CA trust' \
+rg -n '10\.32\.1|@drmaas/rogatio|GitHub Packages|exactly of `edit`|start and connect|macOS runtime lifecycle|Requires the device-local CA trust|4-dim|exits? `?0`? \(manifest' \
   README.md AGENTS.md CONTRIBUTING.md rogatio-overview.md docs/architecture.md \
   packages/cli/README.md packages/docs-site samples
 ```
@@ -178,6 +203,6 @@ Do not declare done on a green unit suite alone when `pnpm validate` includes br
 ## Additional resources
 
 - Repo agent rules: `AGENTS.md`
-- Graphify skill: follow `graphify` for install, detect, and query semantics
+- Graphify skill: follow `graphify` for install, detect, and query semantics. Corpus is `packages/`; graph output is `~/Projects/github/drmaas/rogatio/graphify-out/` and worktrees read it with `--graph`
 - Durable-docs policy: decision trees under `docs/decisions/` → freeze to `docs/{research,specs,plans,workflows}/`
 - Site sidebar: `packages/docs-site/astro.config.mjs`

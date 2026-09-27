@@ -393,17 +393,12 @@ export async function runtimeCommand(
   }
 
   const first = args[0];
-  if (
-    first === "install" ||
-    first === "trust" ||
-    first === "uninstall" ||
-    first === "verify"
-  )
+  if (first === "install" || first === "uninstall" || first === "verify")
     return trustRuntimeCommand(args);
   if (first === "host") return runtimeHostCommand(args.slice(1), options);
 
   console.error(
-    `Error: 'rogatio runtime' no longer starts or stops the runtime. Use 'rogatio runtime install|uninstall' to manage the host manifest and request-body trust, or 'rogatio runtime host [path]' to run the native-messaging host. Start/stop is driven from the extension's controls.`,
+    `Error: 'rogatio runtime' no longer starts or stops the runtime. Use 'rogatio runtime install|uninstall|verify' to manage the host manifest and request-body trust, or 'rogatio runtime host [path]' to run the native-messaging host. Start/stop is driven from the extension's controls.`,
   );
   showRuntimeHelp();
   return 2;

@@ -131,8 +131,9 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
-  runtime <install|uninstall|host>  Native messaging runtime control
+  runtime <install|uninstall|verify|host>  Native messaging runtime control
   runtime host [path]  Run the native-messaging runtime host
+  ai <setup|ls|show|delete|test>  AI provider configuration
 
 Global Options:
   --help, -h      Show help

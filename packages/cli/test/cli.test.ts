@@ -39,6 +39,17 @@ describe("CLI entry point", () => {
     consoleSpy.mockRestore();
   });
 
+  it("global help lists every routed command", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await cli(["--help"]);
+    const output = consoleSpy.mock.calls.join("\n");
+    for (const command of ["edit", "test", "verify", "runtime", "ai"]) {
+      expect(output).toMatch(new RegExp(`^ {2}${command}\\b`, "m"));
+    }
+    expect(output).toContain("install|uninstall|verify|host");
+    consoleSpy.mockRestore();
+  });
+
   it("shows version", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await cli(["--version"]);

@@ -44,9 +44,12 @@ Commands:
   install   Install the native-messaging host manifest and (on capable
             platforms) provision the device-local CA (requires --extension-id).
             CA trust requires root/admin privileges (Linux: sudo, macOS: keychain
-            password, Windows: Administrator).
+            password, Windows: Administrator). Transactional: when CA trust is
+            unavailable the manifest is rolled back and the command exits 1.
   uninstall Remove the native-messaging host manifest and device-local CA trust
             (idempotent).
+  verify    Check that the manifest, runtime-host wrapper, allowed origins, and
+            device-local CA trust are all present and valid.
   host [path]  Run the native-messaging runtime host. The browser launches this
                process via the native-messaging manifest to handle rule matching.
 
@@ -56,12 +59,14 @@ Start/Stop controls, not the CLI. Run 'rogatio runtime install --extension-id
 
 Options:
   --extension-id  Extension ID for native messaging manifest (required for install)
-  --root <dir>    Root for confined runtime file access (default: project directory)
+  --root <dir>    Root for confined runtime file access (host only; default: project directory)
+  --mock-port <n> Bind the loopback mock-response faucet to this port (host only, 1-65535)
   --help, -h      Show this help
 
 Exit codes:
   0  Stopped cleanly / success
-  1  Invalid project (diagnostics present) or file outside the root
+  1  Invalid project (diagnostics present), file outside the root, or a failed
+     trust / verification check
   2  Error (IO or usage)`);
 }
 

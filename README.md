@@ -78,7 +78,7 @@ rogatio --help
 ```
 
 The public CLI consists of `edit`, `verify`, `test`, `runtime` (with
-`install`, `uninstall`, and `host` subcommands), and `ai`.
+`install`, `uninstall`, `verify`, and `host` subcommands), and `ai`.
 
 ## Chrome extension
 
@@ -134,8 +134,8 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
 | `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
-| `rogatio runtime <install\|uninstall>` | Request-body trust lifecycle. `install` registers the native-messaging host manifest and (on capable platforms) provisions and trusts the device-local CA in a single, transactional call. `uninstall` removes the host manifest, the device-local CA files, and the trust installation (idempotent). The CA/trust provisioning remains capability-gated at the OS level and reports `unsupported` without error on incapable platforms. |
-| `rogatio runtime host <path>` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Pairing, authorization, and body transforms flow through this single host. |
+| `rogatio runtime <install\|uninstall\|verify>` | Request-body trust lifecycle. `install` registers the native-messaging host manifest **and** provisions and trusts the device-local CA in a single, transactional call: it needs elevated privileges (Linux `sudo`, macOS keychain authorization, Windows Administrator) and capability-gates the OS trust step, rolling the manifest back and exiting `1` with `trust unsupported: <reasons>` when a capability or elevation is missing. `uninstall` removes the host manifest, the device-local CA files, and the trust installation (idempotent). `verify` reports whether the manifest, the `runtime-host` wrapper, the allowed origins, and the CA trust are all present and valid (exit `0` only when all pass). |
+| `rogatio runtime host [path]` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Pairing, authorization, and body transforms flow through this single host. `--root <dir>` overrides the confined file root; `--mock-port <n>` binds the loopback mock-response faucet. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome and activate the groups you need.
@@ -213,7 +213,14 @@ host. Register it once, then start the runtime from the extension.
 ```sh
 # Register the native-messaging host once (required before Start runtime works)
 # <extension ID> is shown in the extension sidebar ("Extension ID: …")
+# This also trusts the device-local CA, so run it with elevated privileges:
+#   Linux: sudo rogatio runtime install --extension-id <id>
+#   macOS: authorize the login-keychain prompt
+#   Windows: run from an Administrator shell
 rogatio runtime install --extension-id <extension ID>
+
+# Confirm manifest, runtime-host wrapper, allowed origins, and CA trust
+rogatio runtime verify
 
 # Start the runtime from the extension's Start runtime control
 # (Stop runtime stops it)
@@ -234,7 +241,9 @@ manifest is not installed, starting shows the exact ready-to-run
 one-click copy button. If the project has request-body rules and the
 device-local CA is not yet trusted, the message points to
 `rogatio runtime install --extension-id <your extension ID>` instead (the same
-install command also provisions the device-local CA on capable platforms).
+install command also provisions the device-local CA, transactionally — if the CA
+cannot be trusted it rolls the manifest back and exits `1`, so nothing is
+half-installed).
 To remove the host and the device-local CA trust, run
 `rogatio runtime uninstall` (idempotent).
 

@@ -16,9 +16,9 @@ file `docs/architecture.md`. This page is the short user-facing summary.
 | `@rogatio/compiler` | Validated source → browser-neutral operations + stable diagnostics. |
 | `@rogatio/browser-core` | Versioned storage, migrations, permissions, enablement, CAS lifecycle, atomic install/recovery, runtime state, diagnostics, badge state. |
 | `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
-| `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (4-dim matching, preview seam). |
+| `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (3-dim matching: source, method, resource type; preview seam). |
 | `@rogatio/runtime` | Bounded response-body and request-body transformation/runtime components (native host). |
-| `@rogatio/cli` | Editor host, file verification, dry-run (`test`), AI config (`ai`), runtime dispatch (`install` / `uninstall` / `host`). |
+| `@rogatio/cli` | Editor host, file verification, dry-run (`test`), AI config (`ai`), runtime dispatch (`install` / `uninstall` / `verify` / `host`). |
 | `@rogatio/extension` | Chrome MV3 service worker, popup, management page, DNR projection, native-session bridge. |
 | `@rogatio/docs-site` | Astro + Starlight static documentation site (this site); off the product package DAG. |
 | `@rogatio/smoke` / `@rogatio/sanity` | Tiny workspace stubs for package wiring checks (not browser e2e fixtures). |
@@ -30,6 +30,11 @@ schema → compiler → { editor, dry-run, browser-core } → { cli, extension }
  ↑
  runtime (depends on schema + compiler only; cli depends on runtime)
 ```
+
+`@rogatio/cli` declares its `@rogatio/*` siblings as **devDependencies**: esbuild bundles
+them into its single `dist/node/index.js`, so the published npm package ships no workspace
+dependencies. `@rogatio/smoke` and `@rogatio/sanity` are wiring-check stubs, not product
+packages.
 
 ## Build and quality
 

@@ -338,11 +338,13 @@ The **request-body trust lifecycle** that request-body interception (the request
 
 ### Ownership and data flow
 
-`@rogatio/runtime` gains a `trust` module with a `createRequestBodyTrustController` controller and pure helper functions. `@rogatio/cli` extends `rogatio runtime` with `install | uninstall`. Three owned operations:
+`@rogatio/runtime` gains a `trust` module with a `createRequestBodyTrustController` controller and pure helper functions. `@rogatio/cli` extends `rogatio runtime` with `install | uninstall | verify`. Three owned controller operations:
 
-- **install:** register the native-messaging host and (on capable platforms) provision the device-local CA in a single, transactional call. Writes the native-messaging host manifest (`com.rogatio.runtime.json`) into the platform's Chrome native-messaging manifest directory, pointing at the installed runtime host; then, capability-gated, generates the device-local CA key + certificate, writes them under the install root, and invokes the platform-native `caTrustInstaller` to record the CA in the OS trust store. On incapable platforms, the install completes without CA trust and the caller is informed. Returns `runtime install complete: manifest + device-local CA trusted` on success and `trust unsupported: <reasons>` when any capability is missing. Idempotent across repeated calls with the same extension ID.
-- **uninstall:** remove the native-messaging host manifest, the three device-local CA files (`caKeyFile`, `caPubFile`, `caCertFile`) under the install root, and the OS trust-store trust installation via the capability-provided `caTrustRemover` when present. Unconditional on capabilities and idempotent across repeated calls (no-op exit-0 once the manifest and CA are gone). Returns `runtime uninstall complete: manifest + device-local CA removed` on success.
-- **status:** report `{ installed, trusted, platform, capabilityReasons }` without side effects; reads the manifest (present + well-formed) and the CA trust standing.
+- **install:** register the native-messaging host and provision the device-local CA in a single, **fully transactional** call. Writes the native-messaging host manifest (`com.rogatio.runtime.json`) into the platform's Chrome native-messaging manifest directory, pointing at the installed runtime host; then, capability-gated, generates the device-local CA key + certificate, writes them under the install root, and invokes the platform-native `caTrustInstaller` to record the CA in the OS trust store. There is no partial-success state: when the manifest capability or the CA-trust capability is missing, or when the OS trust installer fails, the manifest and the CA files are rolled back and the call returns `unsupported`. The CLI prints `trust unsupported: <reasons>` with a per-reason remediation hint and **exits 1**; the user re-runs with elevated privileges. On success it returns `installed` and the CLI prints `runtime install complete: manifest + device-local CA trusted + runtime-host wrapper created` and exits 0. Idempotent across repeated calls with the same extension ID. CA trust needs root/admin privileges per platform: Linux `sudo`, macOS login-keychain authorization, Windows Administrator.
+- **uninstall:** remove the native-messaging host manifest, the three device-local CA files (`caKeyFile`, `caPubFile`, `caCertFile`) under the install root, and the OS trust-store trust installation via the capability-provided `caTrustRemover` when present. Unconditional on capabilities and idempotent across repeated calls (no-op exit-0 once the manifest and CA are gone). Returns `runtime uninstall complete: manifest + device-local CA removed` on success. The store removal is skipped when the CA key file was already absent.
+- **status:** report `{ installed, trusted, platform, capabilityReasons }` without side effects; reads the manifest (present + well-formed) and the CA trust standing. It never leaks paths, key material, or platform tooling text.
+
+`verify` is a CLI-side administrative check over the same controller state, not a fourth controller operation: it reports manifest existence/validity, `runtime-host` wrapper presence and execute bit, `allowed_origins` count, and CA trust, each with a remediation hint, and exits 0 only when all pass.
 
 Three owned layers:
 
@@ -380,8 +382,8 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 - Global options: `--help`, `--version`
 
 **2. Edit Command (`src/commands/edit.ts`)**
-- HTTP server (Node `http` module) bound to `127.0.0.1:0` (random port, or a fixed port via `--port`)
-- Static file serving for the editor page (`GET /editor.html`) and the `@rogatio/editor` browser bundle (`GET /vendor/editor.js`)
+- HTTP server (Node `http` module) bound to `127.0.0.1:0` (OS-assigned ephemeral port, or a fixed port via `--port`)
+- Static file serving for the editor page (`GET /editor.html`) and the `@rogatio/editor` browser bundle (`GET /vendor/editor.js`, `GET /vendor/editor.css`, `GET /vendor/fonts/*`)
 - API endpoints:
   - `GET /api/project` → returns current project JSON
   - `POST /api/validate` → runs schema + compiler validation
@@ -409,9 +411,10 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 - Never contacts tested URLs, requests permission, or starts a runtime
 
 **5. Runtime Command (`src/commands/runtime.ts`)**
-- `install --extension-id <id>`: register native-messaging host manifest; on capable platforms also provision/trust device-local CA
+- `install --extension-id <id>`: register native-messaging host manifest and provision/trust the device-local CA in one transactional call (rolls back and exits 1 when a required capability is missing)
 - `uninstall`: remove host manifest, CA files, and trust (idempotent)
-- `host <path>`: stdio native-messaging host entry (browser-launched; manual use for debugging)
+- `verify`: report whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all present and valid
+- `host [path] [--root <dir>] [--mock-port <n>]`: stdio native-messaging host entry (browser-launched; manual use for debugging)
 
 **6. AI Command (`src/commands/ai.ts`)**
 - Provider configuration: `setup | ls | show | delete | test`
@@ -492,8 +495,8 @@ rogatio edit [path]
 - Schema validation errors → structured diagnostics
 - Compiler diagnostics → included in verify output
 - IO errors → exit code 2 with stderr message
-- Browser launch failure → fallback instructions printed, server still runs
-- Port conflict → retry with new random port (max 3 attempts)
+- Browser launch failure → prints the editor URL and the server keeps running; an unsupported platform raises `BrowserLaunchError`
+- Port conflict → no retry. A fixed `--port` that cannot be bound fails with exit 2; the default path asks the OS for an ephemeral port (port 0) because random high ports can land on WHATWG/undici blocked ports that `fetch()` rejects
 
 ### Testing Seams
 - HTTP server: unit test with `fetch` against running server
@@ -599,7 +602,7 @@ CLI / Editor
 │ dryRunProject (dry-run)  │
 │ - parse/validate cases
 │ - cache regex
-│ - 4-dim match per rule
+│ - 3-dim match per rule
 │ - summary
 └─────────┬────────────┘
           │
