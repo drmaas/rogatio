@@ -48,6 +48,16 @@ describe("rogatio runtime command", () => {
     expect(log.mock.calls.join("\n")).toContain("rogatio runtime");
   });
 
+  it("help text documents the implemented verify subcommand and host flags", async () => {
+    silence();
+    const log = vi.spyOn(console, "log");
+    await runtimeCommand(["--help"]);
+    const output = log.mock.calls.join("\n");
+    expect(output).toMatch(/^ {2}verify\b/m);
+    expect(output).toContain("--mock-port");
+    expect(output).toContain("rolled back");
+  });
+
   it("help text does not advertise the removed activate/deactivate/status/trust/untrust subcommands", async () => {
     silence();
     const log = vi.spyOn(console, "log");
@@ -84,9 +94,7 @@ describe("rogatio runtime command", () => {
     const err = vi.spyOn(console, "error");
     const code = await runtimeCommand(["trust"]);
     expect(code).toBe(2);
-    expect(err.mock.calls.join("\n")).toContain(
-      "unknown runtime subcommand: trust",
-    );
+    expect(err.mock.calls.join("\n")).toContain("no longer starts or stops");
     expect(log.mock.calls.join("\n")).toContain("rogatio runtime");
   });
 

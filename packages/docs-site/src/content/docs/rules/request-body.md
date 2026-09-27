@@ -33,10 +33,12 @@ captures from the body regex. The two capture namespaces are not mixed.
 - Where those capabilities are absent, request-body activation reports `unsupported`;
   Linux and Windows may still verify, edit, import, export, and dry-run request-body rules.
   The host can still start for response-body rules.
-- CA trust is installed by the same `rogatio runtime install --extension-id <id>` command
-  on capable platforms. Elevation: Linux (`sudo`), macOS (keychain authorization), Windows
-  (Administrator). When elevation is unavailable the command prints
-  `trust unsupported: <reasons>` and exits `0` (manifest installed; CA skipped).
+- CA trust is installed by the same `rogatio runtime install --extension-id <id>` command.
+  Elevation: Linux (`sudo`), macOS (keychain authorization), Windows (Administrator). When
+  elevation or any required capability is unavailable, that command is transactional and
+  prints `trust unsupported: <reasons>` then exits `1` after rolling the manifest back —
+  nothing is half-installed. Use `rogatio runtime verify` to check the manifest,
+  `runtime-host` wrapper, allowed origins, and CA trust independently.
   See [Local runtime](/guides/runtime/).
 - Observed bodies are processed in-process only and never persisted, logged, exported, or
   transferred through native messaging.

@@ -15,19 +15,24 @@ native-messaging envelope (spec REQ-001..REQ-005).
   registered it.
 - `rogatio runtime install --extension-id <id>` registers the device-local
   native-messaging host for your loaded extension ID. The same invocation also
-  provisions and trusts the device-local CA on capable platforms (required for
-  request-body interception). When elevation is unavailable the command prints
-  `trust unsupported: <reasons>` and exits `0` — the host manifest is still installed;
-  only the CA trust step is skipped. CA trust requires elevated privileges: Linux
-  (`sudo`), macOS (keychain authorization), Windows (Administrator).
+  provisions and trusts the device-local CA (required for request-body interception).
+  The call is **transactional**: CA trust requires elevated privileges — Linux
+  (`sudo`), macOS (keychain authorization), Windows (Administrator) — and when elevation
+  or any required capability is unavailable the command prints
+  `trust unsupported: <reasons>` with a remediation hint and exits `1` after rolling the
+  manifest back. Nothing is half-installed; re-run it with elevated privileges.
   `rogatio runtime uninstall` removes the host manifest, the device-local CA files, and
   the trust installation (idempotent).
+- `rogatio runtime verify` reports whether the manifest, the `runtime-host` wrapper, the
+  allowed origins, and the device-local CA trust are all present and valid. It exits `0`
+  only when every check passes, and prints a remediation hint per failed check.
 - If the host manifest is missing, the extension's Start control shows the ready-to-run
   `rogatio runtime install --extension-id <your extension ID>` command with a copy
   affordance (the browser-assigned extension ID is shown in the UI).
 - `rogatio runtime host <path>` launches the consolidated native-messaging host for a
   project on stdio. The browser extension connects to it for pairing, authorization, and
-  body transforms.
+  body transforms. `--root <dir>` overrides the confined file root; `--mock-port <n>`
+  binds the loopback mock-response faucet.
 
 ## Activation is unconditional for the host
 

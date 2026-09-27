@@ -21,11 +21,19 @@ supported browser.
 
 - Register the native-messaging host with
   `rogatio runtime install --extension-id <id>` (and remove it with `uninstall`).
-  On capable platforms the same `install` also provisions and trusts the device-local CA.
+  The same transactional `install` also provisions and trusts the device-local CA, or
+  rolls back and exits `1` when elevation or a required capability is missing.
+- `rogatio runtime verify` checks the manifest, the `runtime-host` wrapper, the allowed
+  origins, and the CA trust on any platform.
 - After install, the extension starts and stops the host via **Start runtime** /
   **Stop runtime**. Host start is unconditional once the manifest is registered.
 - Response-body and request-body rules share one runtime session. The host itself runs as
   `rogatio runtime host <path>` (normally browser-launched).
+
+CA trust adapters exist for all three supported operating systems; each needs different
+privilege. Linux shells out to `sudo update-ca-certificates`, macOS uses
+`security add-trusted-cert` against the login keychain, and Windows uses
+`certutil -addstore` into `Cert:\CurrentUser\Root`.
 
 ## Request-body capability gate
 

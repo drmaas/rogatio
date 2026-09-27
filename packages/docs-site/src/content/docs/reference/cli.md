@@ -33,14 +33,21 @@ Runs the offline dry-run test engine against a `.rogatio.json` file (see
 Trust lifecycle and native-host entry (see [Local runtime](/guides/runtime/)):
 
 - `rogatio runtime install --extension-id <id>` — register the native-messaging host
-  manifest for your loaded extension ID and, on capable platforms, provision and trust the
-  device-local CA for request-body rules in one call. When elevation is unavailable the
-  command prints `trust unsupported: <reasons>` and exits `0` (manifest still installed;
-  only the CA trust step is skipped).
+  manifest for your loaded extension ID and provision and trust the device-local CA for
+  request-body rules in one **transactional** call. CA trust needs elevated privileges
+  (Linux `sudo`, macOS keychain authorization, Windows Administrator). When elevation or
+  any required capability is unavailable the command prints `trust unsupported: <reasons>`
+  with a remediation hint and exits `1` after rolling the manifest back — nothing is
+  half-installed, so re-run it with elevated privileges.
 - `rogatio runtime uninstall` — remove the host manifest, the device-local CA files, and
   the trust installation (idempotent).
-- `rogatio runtime host <path>` — run the consolidated native-messaging host for a project
+- `rogatio runtime verify` — report whether the manifest, the `runtime-host` wrapper, the
+  allowed origins, and the device-local CA trust are all present and valid. Exits `0` only
+  when every check passes.
+- `rogatio runtime host [path]` — run the consolidated native-messaging host for a project
   on stdio (normally launched by the browser extension; run manually only for debugging).
+  Accepts `--root <dir>` to override the confined file root and `--mock-port <n>` to bind
+  the loopback mock-response faucet.
 
 Start/stop of the runtime session itself is driven from the extension's **Start runtime** /
 **Stop runtime** controls; the CLI does not have a session lifecycle subcommand.
