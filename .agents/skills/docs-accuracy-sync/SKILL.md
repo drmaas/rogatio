@@ -54,11 +54,13 @@ Live current-behavior surfaces that **must** stay synced with code:
 ## Worktree first
 
 ```bash
-git worktree add -b docs/<short-slug> ~/Projects/github/drmaas/temp/rogatio-<slug> main
-cd ~/Projects/github/drmaas/temp/rogatio-<slug>
+git worktree add -b docs/<short-slug> <worktree-parent>/rogatio-<slug> main
+cd <worktree-parent>/rogatio-<slug>
 pnpm install
 # confirm: git rev-parse --show-toplevel is the worktree
 ```
+
+`<worktree-parent>` is any stable directory outside the clone (see `AGENTS.md`, Worktree Convention). Never hardcode one contributor's home path.
 
 All edits and validation run only in that worktree.
 
@@ -71,10 +73,14 @@ Two fixed rules keep the graph cheap and consistent across worktrees:
 1. **Graph `packages/` only.** The corpus is the product source, never the repo root. `docs/`, `test/`, `samples/`, and decision records are prose, not product code; graphing them buries the package graph in document nodes.
 2. **The graph lives in the main checkout, not in worktrees.** One graph per repository, built from `main`'s `packages/`. Worktrees read it; they never build one.
 
+Resolve the main checkout from git, not from a hardcoded path. `git worktree list` lists every checkout; the one whose branch is `main` is the graph owner:
+
 ```bash
-MAIN=~/Projects/github/drmaas/rogatio
+MAIN=${ROGATIO_MAIN:-$(git worktree list --porcelain | awk '$1=="worktree"{p=$2} $1=="branch" && $2=="refs/heads/main"{print p; exit}')}
 GRAPH="$MAIN/graphify-out/graph.json"
 ```
+
+`ROGATIO_MAIN` is the escape hatch for clones that are not registered as worktrees.
 
 ### Query (every worktree, every run)
 
@@ -95,21 +101,24 @@ Use further `graphify query` / `explain` / `path` / `affected` when a specific d
 Never run this from a worktree. Refresh in the main checkout after code lands on `main`, or when the user explicitly asks for a rebuild:
 
 ```bash
-cd ~/Projects/github/drmaas/rogatio
+cd "$MAIN"
 if [ -f graphify-out/graph.json ]; then
-  graphify packages --update --no-viz
+  graphify packages --update --no-viz --code-only --out .
 else
-  graphify packages --no-viz
+  graphify packages --no-viz --code-only --out .
 fi
 ```
 
 Notes:
 
-- `INPUT_PATH` is `packages`, not `.`; graph output still lands in `<cwd>/graphify-out/`.
+- `INPUT_PATH` is `packages`, not `.`.
+- `--code-only` is required. Without it graphify indexes the 23 docs and 4 images under `packages/` and dies on `error: no LLM API key found (27 doc/paper/image file(s) need semantic extraction)`.
+- `--out .` is required. Output otherwise lands in `packages/graphify-out/`, where the default `--graph` lookup and the Biome exclude (`!!graphify-out`) do not reach it.
 - Skip viz (`--no-viz`) unless the user wants HTML.
-- Optional deeper pass when DAG claims look badly wrong: `graphify packages --mode deep --no-viz` (slower).
+- An `--update` run does not regenerate `GRAPH_REPORT.md`; follow it with `graphify cluster-only packages --graph graphify-out/graph.json --no-viz`. Skip that step when community names are not needed.
+- Optional deeper pass when DAG claims look badly wrong: `graphify packages --mode deep --no-viz --code-only --out .` (slower).
 - If `graphify` is not on `PATH`, install/resolve via the graphify skill (`uv tool install graphifyy` or equivalent), then re-run.
-- `graphify-out/.graphify_root` records the scanned root; it should read `…/rogatio/packages`. If it reads anything else, the last build used the wrong `INPUT_PATH`.
+- `graphify-out/.graphify_root` records the scanned root; it should end in `/packages`. If it reads anything else, the last build used the wrong `INPUT_PATH`.
 - A worktree that needs a fresher graph than `main` has is a signal to ask the user, not to build locally.
 
 ### After edits (optional but preferred)
@@ -203,6 +212,6 @@ Do not declare done on a green unit suite alone when `pnpm validate` includes br
 ## Additional resources
 
 - Repo agent rules: `AGENTS.md`
-- Graphify skill: follow `graphify` for install, detect, and query semantics. Corpus is `packages/`; graph output is `~/Projects/github/drmaas/rogatio/graphify-out/` and worktrees read it with `--graph`
+- Graphify skill: follow `graphify` for install, detect, and query semantics. Corpus is `packages/`; the graph lives in the main checkout (`$MAIN/graphify-out/`, resolved via `git worktree list`) and worktrees read it with `--graph`
 - Durable-docs policy: decision trees under `docs/decisions/` → freeze to `docs/{research,specs,plans,workflows}/`
 - Site sidebar: `packages/docs-site/astro.config.mjs`
