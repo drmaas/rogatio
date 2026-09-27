@@ -185,6 +185,18 @@ export interface RuleTypeFieldMount {
   destroy(): void;
 }
 
+/**
+ * Host-owned group on/off control. The editor draws the button and reports
+ * the next state. It does not store enablement in the project draft.
+ */
+export interface EditorGroupEnablement {
+  readonly isEnabled: (groupId: string) => boolean;
+  readonly setEnabled: (
+    groupId: string,
+    enabled: boolean,
+  ) => void | Promise<void>;
+}
+
 export interface EditorOptions {
   readonly root: HTMLElement;
   readonly initialProject: unknown;
@@ -196,6 +208,8 @@ export interface EditorOptions {
   readonly aiAssist?: EditorAIAssistHandler;
   readonly migrationNotices?: readonly MigrationNotice[];
   readonly onDismissMigrationNotices?: () => void | Promise<void>;
+  /** Omit on hosts that have no browser group enablement, such as the CLI. */
+  readonly groupEnablement?: EditorGroupEnablement;
 }
 
 export interface EditorController {
@@ -205,6 +219,11 @@ export interface EditorController {
   destroy(): void;
   /** Deep-link the editor to a group's destination, falling back to Overview. */
   navigateToGroup(groupId: string | null | undefined): void;
+  /**
+   * Refresh heading Enable/Disable labels without re-rendering the draft.
+   * Used when a dirty Workspace must keep unsaved edits mounted.
+   */
+  syncGroupEnablement(enabledGroupIds: readonly string[]): void;
 }
 
 export type UrlConversionResult =

@@ -44,8 +44,13 @@ test("drives the real extension page lifecycle and mounts the editor", async ({
   await expect(page.getByText("Project imported.")).toBeVisible();
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
 
-  await page.locator('[data-group-toggle="true"]').check();
-  await expect(page.locator('[data-group-toggle="true"]')).toBeChecked();
+  await page
+    .locator('[data-desktop-route-rail] [data-group-id="group-real"]')
+    .click();
+  const enable = page.locator("[data-group-heading] [data-group-enable]");
+  await expect(enable).toHaveText("Enable");
+  await enable.click();
+  await expect(enable).toHaveText("Disable");
   await expect(page.locator("[data-rule-statuses] li")).toContainText("active");
   await expect(
     page.locator("[data-editor-root] [data-rogatio-editor]"),

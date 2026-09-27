@@ -23,7 +23,7 @@ runtime, no cloud sync, no telemetry, and no retained traffic history.
   Chrome Manifest V3 Declarative Net Request. Response-body and request-body rules use an
   optional local runtime.
 - **Private by design.** No accounts, no cloud, no telemetry. The extension uses broad
-  install-time host access; you activate groups explicitly.
+  install-time host access; you enable groups explicitly.
 
 ## Features
 
@@ -138,7 +138,7 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio runtime host [path]` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Pairing, authorization, and body transforms flow through this single host. `--root <dir>` overrides the confined file root; `--mock-port <n>` binds the loopback mock-response faucet. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
-the file into Chrome and activate the groups you need.
+the file into Chrome and enable the groups you need.
 
 ## AI-Assisted Rule Authoring
 

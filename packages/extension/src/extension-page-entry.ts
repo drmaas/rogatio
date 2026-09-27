@@ -381,38 +381,6 @@ function createSidebar(): HTMLElement {
     sidebar.append(projectCard);
   }
 
-  // Group activation sits directly under the active project so enable/disable
-  // is as discoverable here as in the toolbar popup.
-  if (activeProject && isProjectRecord(activeProject.data)) {
-    const groups = document.createElement("fieldset");
-    groups.dataset.groupActivation = "true";
-    const legend = document.createElement("legend");
-    legend.textContent = "Group activation";
-    groups.append(legend);
-    const enabled = new Set(activeProject.enabledGroupIds);
-    const sourceGroups = Array.isArray(activeProject.data.groups)
-      ? activeProject.data.groups
-      : [];
-    for (const group of sourceGroups) {
-      if (!isProjectRecord(group) || typeof group.id !== "string") continue;
-      const label = document.createElement("label");
-      label.className = enabled.has(group.id)
-        ? "rogatio-group-label rogatio-group-active"
-        : "rogatio-group-label rogatio-group-inactive";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = enabled.has(group.id);
-      checkbox.dataset.groupId = group.id;
-      checkbox.dataset.groupToggle = "true";
-      label.append(
-        checkbox,
-        document.createTextNode(text(group.name, group.id)),
-      );
-      groups.append(label);
-    }
-    sidebar.append(groups);
-  }
-
   const actions = document.createElement("div");
   actions.className = "rogatio-sidebar-actions";
   const runtimePhaseForControls = state.nativeRuntimeState?.phase ?? "stopped";
@@ -571,6 +539,16 @@ function patchWorkspaceEnablementChrome(): void {
   if (status) status.textContent = statusMessage;
   const badge = root.querySelector("[data-badge-state]");
   if (badge) badge.textContent = badgeLabelText();
+  editor?.syncGroupEnablement(activeEnabledGroupIds());
+}
+
+function activeEnabledGroupIds(): readonly string[] {
+  const project = state.activeProjectId
+    ? state.projects[state.activeProjectId]
+    : undefined;
+  const ids = project?.enabledGroupIds;
+  if (!Array.isArray(ids)) return [];
+  return ids.filter((id): id is string => typeof id === "string");
 }
 
 function renderOverview(shell: HTMLElement): void {
@@ -1017,16 +995,6 @@ function renderShell(): void {
     "change",
     () => void importProject(importControl),
   );
-  shell.addEventListener("change", (event) => {
-    const target = event.target;
-    if (
-      !(target instanceof HTMLInputElement) ||
-      target.dataset.groupToggle !== "true"
-    )
-      return;
-    void setGroupEnabled(target.dataset.groupId ?? "", target.checked);
-  });
-
   if (activeTab === "workspace" && ids().length > 0) {
     const editorRoot = shell.querySelector<HTMLElement>("[data-editor-root]");
     if (editorRoot) {
@@ -1091,6 +1059,14 @@ function renderShell(): void {
               },
             }
           : {}),
+        groupEnablement: {
+          isEnabled(groupId) {
+            return activeEnabledGroupIds().includes(groupId);
+          },
+          setEnabled(groupId, enabled) {
+            return setGroupEnabled(groupId, enabled);
+          },
+        },
       });
       if (deepLinkGroup) editor.navigateToGroup(deepLinkGroup);
     }
@@ -1224,13 +1200,13 @@ async function setGroupEnabled(
   statusMessage =
     response.ok === true
       ? enabled
-        ? "Group activated."
-        : "Group deactivated."
-      : "The group activation could not be changed.";
+        ? "Group enabled."
+        : "Group disabled."
+      : enabled
+        ? "The group could not be enabled."
+        : "The group could not be disabled.";
   await refresh({
-    remountEditor: shouldRemountEditorAfterGroupEnablement(
-      editor?.isDirty() === true,
-    ),
+    remountEditor: shouldRemountEditorAfterGroupEnablement(),
   });
 }
 

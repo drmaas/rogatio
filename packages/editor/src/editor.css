@@ -388,6 +388,10 @@
   justify-content: space-between;
   gap: 0.65rem;
 }
+.rogatio-editor [data-group-heading] button[data-group-enable] {
+  padding: 0.55rem 1.05rem;
+  font-size: 0.95rem;
+}
 .rogatio-editor [data-group-heading] h2,
 .rogatio-editor [data-section-heading] h2,
 .rogatio-editor [data-rule-heading] h3 {

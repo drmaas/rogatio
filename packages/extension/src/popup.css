@@ -227,9 +227,37 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
 }
-.rogatio-popup [data-group-status] {
+.rogatio-popup details[data-group] summary [data-group-status] {
+  flex: 0 0 auto;
+  color: var(--rogatio-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--rogatio-border);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  background: var(--rogatio-neutral);
+}
+.rogatio-popup details[data-group] > ul [data-group-status] {
   color: var(--rogatio-muted);
   font-size: 0.8rem;
+  font-weight: 400;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.rogatio-popup button[data-group-toggle] {
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-primary-strong);
+  color: var(--rogatio-text);
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+.rogatio-popup button[data-group-toggle]:hover {
+  box-shadow: 0 0 0 3px var(--rogatio-primary);
 }
 .rogatio-popup a {
   color: var(--rogatio-primary);
@@ -357,7 +385,8 @@ body {
   .rogatio-popup details[data-group] summary::before {
     border-color: ButtonText;
   }
-  .rogatio-popup [data-create-actions] button[data-create-submit] {
+  .rogatio-popup [data-create-actions] button[data-create-submit],
+  .rogatio-popup button[data-group-toggle] {
     background: Highlight;
     color: HighlightText;
   }

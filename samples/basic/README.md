@@ -68,14 +68,14 @@ require the organization's extension entitlement.
 2. On the **Dashboard**, choose the **Import Project** tile.
 3. Select `samples/basic/.rogatio.json` from this repository.
 
-The project is imported as **disabled** with every group off. Importing never activates
+The project is imported as **disabled** with every group off. Importing never enables
 groups. The extension already has broad host access at install time (`*://*/*`); there is no
 per-origin grant step.
 
-## 4. Activate the group
+## 4. Enable the group
 
-1. Toggle the **Sample Rules Group** enablement switch on.
-2. After activation, each rule shows a status in the management page and the toolbar popup:
+1. Open **Workspace**, open **Sample Rules Group**, and click **Enable** on the group heading.
+2. After the group is enabled, each rule shows a status in the management page and the toolbar popup:
    `active`, `disabled`, `needs runtime`, `unsupported`, or `error`. Redirect, query, and
    header rules should read `active` once installed; response-body and request-body rules
    read `needs runtime` until the native runtime is started.
@@ -197,7 +197,7 @@ action, not proof of success). Body-rule matches are not logged.
 (`rule-header-remove`), **Response-body** (`rule-response-body`), and **Request-body**
 (`rule-request-body`) are simplest to verify against a target you control. Use the local
 server recipe below, then re-point the sample at `http://localhost:8080` (instructions
-follow) and repeat the import/grant/activate steps.
+follow) and repeat the import and enable steps.
 
 #### Local validation server
 
@@ -250,8 +250,8 @@ Edit `samples/basic/.rogatio.json` (or use `rogatio edit`) so each rule's
 - `"^https://example\\.com/page"` → `"^http://localhost:8080/page"`
 - and so on for `/api/`, `/data\.json`, `/submit`.
 
-Re-import the modified file (or **Update** the project in the extension) and re-activate
-the group. Then:
+Re-import the modified file (or **Update** the project in the extension) and enable
+the group again. Then:
 
 **Header — set request** (`rule-header-set`):
 
