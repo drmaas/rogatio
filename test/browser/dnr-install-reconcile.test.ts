@@ -70,7 +70,9 @@ function numericIdForRule(
 }
 
 function statusLine(ruleId: string, status: string): string {
-  return `${SAMPLE_GROUP_ID}/${ruleId}: ${status}`;
+  // A rule row is a link carrying the identity plus a sibling status token, so
+  // the row's text is the two concatenated with no separator.
+  return `${SAMPLE_GROUP_ID}/${ruleId}${status}`;
 }
 
 function assertNamedStatuses(

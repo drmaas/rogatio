@@ -21,9 +21,13 @@ pencil that opens the management page on that group. The popup also has **Match 
 and **Import project** (file picker). The popup has no editor, search, proxy, permission,
 or rule-authoring controls.
 
-The management page uses a **Dashboard** overview and a **Workspace** editor shell. When a
-rule fails to install, the status word `error` is an activatable control that opens that
-rule in the workspace, and a distinct error card shows the concrete install failure reason.
+The management page uses a **Dashboard** overview and a **Workspace** editor shell. The
+Workspace sidebar is a set of cards. **Runtime** holds Start/Stop, the runtime status, the
+extension ID, and a **Show diagnostics** control when the runtime has failed. **AI** reports
+whether AI is available. **Rules** lists every rule with its install status; each rule is a
+link that opens that rule in the editor, and a rule that failed to install also selects a
+card showing the concrete install failure reason. **Match logging** sits in the **Rules**
+card.
 
 ## Host access and enablement
 
@@ -45,7 +49,8 @@ action slice defines their DNR action.
 When Chrome authoritatively reports a Rogatio-installed DNR rule match, the extension can
 inject one bounded, redacted, live-only lowercase `[rogatio]` line into the matched page's
 DevTools Console. Turn logging on or off with the **Match logging** checkbox in the toolbar
-popup and the management sidebar (default **on** when the setting has never been changed).
+popup and in the management page's **Rules** card (default **on** when the setting has never
+been changed).
 
 Match logging requires an **unpacked** extension load. Chrome fires the underlying
 `onRuleMatchedDebug` event (granted by the `declarativeNetRequestFeedback` permission) only

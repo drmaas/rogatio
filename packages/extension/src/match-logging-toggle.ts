@@ -19,6 +19,10 @@ export function createMatchLoggingToggle(options: {
   const input = document.createElement("input");
   input.type = "checkbox";
   input.checked = options.enabled;
+  // The focusable node is the input, not the label, so the hook that focus
+  // restoration looks for has to be on the input. The label keeps its own hook
+  // because the popup and the sidebar both locate the control by it.
+  input.dataset.matchLoggingToggle = "true";
   input.addEventListener("change", () => {
     void (async () => {
       const next = input.checked;

@@ -563,6 +563,8 @@ function roleSelector(role: string): string {
       return 'input[type="checkbox"], [role="checkbox"]';
     case "radio":
       return 'input[type="radio"], [role="radio"]';
+    case "link":
+      return 'a[href], [role="link"]';
     default:
       return `[role="${role}"]`;
   }
@@ -803,6 +805,16 @@ export class Page {
   async reload(): Promise<void> {
     await this.driver.navigate().refresh();
     await this.drainPageErrors();
+  }
+
+  /** Browser Back, for in-page history entries such as deep-link pushState. */
+  async goBack(): Promise<void> {
+    await this.driver.navigate().back();
+    await this.drainPageErrors();
+  }
+
+  async url(): Promise<string> {
+    return this.driver.getCurrentUrl();
   }
 
   locator(selector: string): Locator {

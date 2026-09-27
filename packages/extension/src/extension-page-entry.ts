@@ -67,6 +67,8 @@ let state: Envelope = { projects: {}, activeProjectId: null };
 let pendingProjectId: string | null = null;
 let activeTab: "dashboard" | "workspace" = "dashboard";
 let editor: EditorController | undefined;
+/** True once an editor has been mounted, to tell navigation from a rebuild. */
+let editorHasMounted = false;
 let statusMessage = "";
 /** Ready-to-run native host install command shown with a copy button. */
 let installCommand: string | null = null;
@@ -81,6 +83,19 @@ let aiMessage = "";
 let selectedErrorRule: { groupId: string; ruleId: string } | null = null;
 /** Console match logging toggle; missing storage key defaults on. */
 let matchLoggingEnabled = true;
+
+/**
+ * A `?group=&rule=` link is the source of truth for where the workspace opens.
+ * The same URL shape backs the popup deep links and the sidebar rule links, so
+ * one resolver handles initial load, browser Back, and in-page activation.
+ */
+function readRuleDeepLink(): { groupId: string; ruleId: string } | null {
+  const params = new URLSearchParams(window.location.search);
+  const groupId = params.get("group");
+  if (groupId === null || groupId.length === 0) return null;
+  const ruleId = params.get("rule");
+  return { groupId, ruleId: ruleId === null ? "" : ruleId };
+}
 
 /** Diagnostics modal state */
 let diagnosticsOpen = false;
@@ -111,6 +126,14 @@ function text(value: unknown, fallback: string): string {
 }
 
 const RULE_ERROR_REASON_FALLBACK = "The rule failed to install.";
+
+/**
+ * Display fallbacks for a malformed status entry. Shared so the sidebar row, the
+ * error lookup, and the error card all agree on one identity per entry; three
+ * different fallbacks would render a row that nothing can select.
+ */
+const UNKNOWN_GROUP_ID = "unknown group";
+const UNKNOWN_RULE_ID = "unknown rule";
 
 interface ErrorRuleRef {
   readonly groupId: string;
@@ -174,8 +197,8 @@ function collectErrorRuleRefs(): ErrorRuleRef[] {
   for (const ruleStatus of state.ruleStatuses ?? []) {
     if (text(ruleStatus.status, "error") !== "error") continue;
     refs.push({
-      groupId: text(ruleStatus.groupId, "unknown group"),
-      ruleId: text(ruleStatus.ruleId, "unknown rule"),
+      groupId: text(ruleStatus.groupId, UNKNOWN_GROUP_ID),
+      ruleId: text(ruleStatus.ruleId, UNKNOWN_RULE_ID),
     });
   }
   return refs;
@@ -205,8 +228,8 @@ function ruleErrorReasonFor(groupId: string, ruleId: string): string {
   for (const ruleStatus of state.ruleStatuses ?? []) {
     if (text(ruleStatus.status, "error") !== "error") continue;
     if (
-      text(ruleStatus.groupId, "unknown group") !== groupId ||
-      text(ruleStatus.ruleId, "unknown rule") !== ruleId
+      text(ruleStatus.groupId, UNKNOWN_GROUP_ID) !== groupId ||
+      text(ruleStatus.ruleId, UNKNOWN_RULE_ID) !== ruleId
     ) {
       continue;
     }
@@ -239,6 +262,145 @@ function runtimeStatusTone(): string {
   if (phase === "failed" || phase === "error") return "rogatio-runtime-failed";
   if (phase === "starting") return "rogatio-runtime-starting";
   return "rogatio-runtime-idle";
+}
+
+type SidebarCardName = "runtime" | "ai" | "rules";
+
+/**
+ * A labelled status module for the sidebar. The heading carries the tone so an
+ * operator reads state before controls: the dot in the header is the summary,
+ * the body is the detail.
+ */
+function createSidebarCard(
+  name: SidebarCardName,
+  headingText: string,
+  tone: string,
+): { readonly card: HTMLElement; readonly body: HTMLElement } {
+  const card = document.createElement("section");
+  card.className = "rogatio-sidebar-card";
+  card.dataset.card = name;
+  const heading = document.createElement("h2");
+  heading.className = "rogatio-sidebar-card-heading";
+  heading.dataset.tone = tone;
+  heading.textContent = headingText;
+  const body = document.createElement("div");
+  body.className = "rogatio-sidebar-card-body";
+  card.append(heading, body);
+  return { card, body };
+}
+
+/** Deep link for one rule, using the same `?group=&rule=` shape as `groupUrl`. */
+function ruleDeepLink(groupId: string, ruleId: string): string {
+  return `?group=${encodeURIComponent(groupId)}&rule=${encodeURIComponent(ruleId)}`;
+}
+
+/**
+ * Install status for one rule, or undefined when it is not in the projection.
+ * Compares with the same fallbacks the sidebar row uses, so a malformed status
+ * entry that renders as "unknown group" is still found by its own link. Using
+ * different fallbacks here would make a rendered row impossible to select.
+ */
+function statusForRule(groupId: string, ruleId: string): string | undefined {
+  for (const ruleStatus of state.ruleStatuses ?? []) {
+    if (
+      text(ruleStatus.groupId, UNKNOWN_GROUP_ID) === groupId &&
+      text(ruleStatus.ruleId, UNKNOWN_RULE_ID) === ruleId
+    ) {
+      return text(ruleStatus.status, "error");
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The single place a `?group=&rule=` deep link becomes editor state. Initial
+ * load, browser Back, and in-page link activation all funnel through here so
+ * there is one navigation mechanism rather than three.
+ *
+ * On the workspace path it never calls `renderShell()`. The mounted editor is
+ * the user's unsaved work, and rule navigation is a sidebar state change, so
+ * the sidebar is replaced on its own. The dashboard path has no mounted editor
+ * to preserve, so it remounts and lets the mount path apply the link.
+ */
+function navigateToRuleDeepLink(
+  groupId: string,
+  ruleId: string,
+  options: { readonly push: boolean },
+): void {
+  if (options.push) {
+    window.history.pushState(
+      { rogatioRule: { groupId, ruleId } },
+      "",
+      ruleDeepLink(groupId, ruleId),
+    );
+  }
+  if (activeTab !== "workspace") {
+    // Coming from the dashboard means there is no mounted editor to preserve.
+    // `renderShell` applies the deep link on mount, so do not navigate twice.
+    activeTab = "workspace";
+    renderShell();
+    return;
+  }
+  // Refresh the sidebar so the error card reflects the newly selected rule,
+  // then let the editor move and reveal it.
+  patchWorkspaceEnablementChrome();
+  editor?.navigateToRule(groupId, ruleId);
+}
+
+let ruleStatusSerial = 0;
+
+/**
+ * One rule row: a real link to the rule's section, with its status as a
+ * separate right-aligned token.
+ *
+ * The link is always a real deep link even when the rule is no longer in the
+ * draft, because an unsaved rename is not something the sidebar should refuse to
+ * navigate. `navigateToRule` resolves against the draft and lands on the owning
+ * group when the rule itself is gone, which is a real destination rather than a
+ * dead click. A non-navigable element would also be the wrong shape: an errored
+ * rule can be absent from the project while its install reason is still the most
+ * useful thing on screen.
+ */
+function createRuleEntry(
+  groupId: string,
+  ruleId: string,
+  statusValue: string,
+): HTMLLIElement {
+  ruleStatusSerial += 1;
+  const item = document.createElement("li");
+  item.className = "rogatio-rule-row";
+  const link = document.createElement("a");
+  link.className = "rogatio-rule-link";
+  link.dataset.ruleLink = "true";
+  link.dataset.groupId = groupId;
+  link.dataset.ruleId = ruleId;
+  link.href = ruleDeepLink(groupId, ruleId);
+  link.textContent = `${groupId}/${ruleId}`;
+  const status = document.createElement("span");
+  status.className = "rogatio-rule-status";
+  status.dataset.ruleStatus = "true";
+  status.dataset.tone = ruleStatusTone(statusValue);
+  status.id = `rogatio-rule-status-${ruleStatusSerial}`;
+  status.textContent = statusValue;
+  // The status is a sibling of the link, so name it explicitly or a screen
+  // reader announces the identity with no state attached.
+  link.setAttribute("aria-describedby", status.id);
+  item.append(link, status);
+  return item;
+}
+
+/** Map an install status to a tone token for the status dot and column. */
+function ruleStatusTone(statusValue: string): string {
+  switch (statusValue) {
+    case "active":
+      return "ok";
+    case "error":
+      return "error";
+    case "disabled":
+      return "muted";
+    default:
+      return "warn";
+  }
 }
 
 /** Human-readable runtime phase for the sidebar status line. */
@@ -369,10 +531,14 @@ function createSidebar(): HTMLElement {
     : undefined;
   if (activeProject && isProjectRecord(activeProject.data)) {
     const projectCard = document.createElement("div");
-    projectCard.className = "rogatio-project-card";
+    // Not `.rogatio-project-card`: that class is the interactive dashboard card
+    // and carries `cursor: pointer` plus a hover border. Naming the active
+    // project is not an action, so the sidebar gets an inert card instead of a
+    // dead affordance.
+    projectCard.className = "rogatio-sidebar-project-card";
     projectCard.dataset.activeProjectCard = "true";
     const title = document.createElement("p");
-    title.className = "rogatio-project-card-title";
+    title.className = "rogatio-sidebar-project-card-title";
     title.textContent = text(activeProject.data.name, activeProject.id);
     const status = document.createElement("p");
     status.className = "rogatio-project-status";
@@ -381,26 +547,28 @@ function createSidebar(): HTMLElement {
     sidebar.append(projectCard);
   }
 
+  const runtimePhase = state.nativeRuntimeState?.phase ?? "stopped";
+  const runtimeTone =
+    runtimePhase === "started"
+      ? "ok"
+      : runtimePhase === "failed" || runtimePhase === "error"
+        ? "error"
+        : runtimePhase === "starting"
+          ? "warn"
+          : "muted";
+
+  // Runtime card: the session controls, the phase they change, and the
+  // extension ID that `rogatio runtime install` needs.
+  const runtime = createSidebarCard("runtime", "Runtime", runtimeTone);
   const actions = document.createElement("div");
   actions.className = "rogatio-sidebar-actions";
-  const runtimePhaseForControls = state.nativeRuntimeState?.phase ?? "stopped";
-  const controlsDisabled = runtimeControlDisabled(runtimePhaseForControls);
+  const controlsDisabled = runtimeControlDisabled(runtimePhase);
   const startRuntime = button("Start runtime", "start-native-runtime");
   startRuntime.disabled = controlsDisabled.start;
   const stopRuntime = button("Stop runtime", "stop-native-runtime");
   stopRuntime.disabled = controlsDisabled.stop;
   actions.append(startRuntime, stopRuntime);
-  sidebar.append(actions);
-
-  sidebar.append(
-    createMatchLoggingToggle({
-      api: chrome,
-      enabled: matchLoggingEnabled,
-      onPersisted: (enabled) => {
-        matchLoggingEnabled = enabled;
-      },
-    }),
-  );
+  runtime.body.append(actions);
 
   // Runtime status sits directly under the Start/Stop controls so the current
   // phase is always visible next to the actions that change it.
@@ -408,15 +576,42 @@ function createSidebar(): HTMLElement {
   nativeRuntime.dataset.nativeRuntimeState = "true";
   nativeRuntime.className = `rogatio-runtime-status ${runtimeStatusTone()}`;
   nativeRuntime.textContent = `Runtime status: ${runtimeStatusText()}`;
-  sidebar.append(nativeRuntime);
+  runtime.body.append(nativeRuntime);
 
-  // Show diagnostics button when runtime failed or is unsupported
-  const runtimePhase = state.nativeRuntimeState?.phase ?? "stopped";
+  // The browser-assigned extension ID is what `rogatio runtime install` pins
+  // in the native-messaging manifest; always show it so the install step
+  // never requires hunting through chrome://extensions.
+  const extensionIdRow = document.createElement("div");
+  extensionIdRow.className = "rogatio-extension-id-row";
+  const extensionIdLine = document.createElement("p");
+  extensionIdLine.dataset.extensionId = "true";
+  extensionIdLine.className = "rogatio-extension-id";
+  extensionIdLine.textContent = `Extension ID: ${extensionId() || "unknown"}`;
+  const copyId = button("⧉", "copy-extension-id");
+  copyId.className = "rogatio-copy-icon";
+  copyId.setAttribute("aria-label", "Copy extension ID");
+  copyId.title = "Copy extension ID";
+  extensionIdRow.append(extensionIdLine, copyId);
+  runtime.body.append(extensionIdRow);
+
+  // Show diagnostics when the runtime failed or is unsupported, and keep the
+  // concrete error next to it.
   if (runtimePhase === "failed" || runtimePhase === "unsupported") {
-    sidebar.append(button("Show diagnostics", "show-diagnostics"));
+    runtime.body.append(button("Show diagnostics", "show-diagnostics"));
+    const runtimeError = state.nativeRuntimeError;
+    if (runtimeError) {
+      const runtimeErrorLine = document.createElement("p");
+      runtimeErrorLine.dataset.runtimeError = "true";
+      runtimeErrorLine.className = "rogatio-runtime-error";
+      runtimeErrorLine.textContent = `Runtime error: ${runtimeError}`;
+      runtime.body.append(runtimeErrorLine);
+    }
   }
+  sidebar.append(runtime.card);
 
-  // AI status - check if native host supports AI
+  // AI card: status only. Provider and model reporting is issue #241.
+  const aiTone = aiSupported ? "ok" : aiStatusChecked ? "warn" : "muted";
+  const ai = createSidebarCard("ai", "AI", aiTone);
   const aiStatus = document.createElement("p");
   aiStatus.dataset.aiStatus = "true";
   aiStatus.className = "rogatio-ai-status";
@@ -433,35 +628,8 @@ function createSidebar(): HTMLElement {
     aiStatus.textContent = "AI: Not configured";
     aiStatus.className += " rogatio-ai-not-configured";
   }
-  sidebar.append(aiStatus);
-
-  // The browser-assigned extension ID is what `rogatio runtime install` pins
-  // in the native-messaging manifest; always show it so the install step
-  // never requires hunting through chrome://extensions.
-  const extensionIdRow = document.createElement("div");
-  extensionIdRow.className = "rogatio-extension-id-row";
-  const extensionIdLine = document.createElement("p");
-  extensionIdLine.dataset.extensionId = "true";
-  extensionIdLine.className = "rogatio-extension-id";
-  extensionIdLine.textContent = `Extension ID: ${extensionId() || "unknown"}`;
-  const copyId = button("⧉", "copy-extension-id");
-  copyId.className = "rogatio-copy-icon";
-  copyId.setAttribute("aria-label", "Copy extension ID");
-  copyId.title = "Copy extension ID";
-  extensionIdRow.append(extensionIdLine, copyId);
-  sidebar.append(extensionIdRow);
-
-  const runtimeError = state.nativeRuntimeError;
-  if (
-    (runtimePhase === "failed" || runtimePhase === "unsupported") &&
-    runtimeError
-  ) {
-    const runtimeErrorLine = document.createElement("p");
-    runtimeErrorLine.dataset.runtimeError = "true";
-    runtimeErrorLine.className = "rogatio-runtime-error";
-    runtimeErrorLine.textContent = `Runtime error: ${runtimeError}`;
-    sidebar.append(runtimeErrorLine);
-  }
+  ai.body.append(aiStatus);
+  sidebar.append(ai.card);
 
   // Project switching and import are dashboard actions. Workspace controls
   // operate only on the committed active project.
@@ -477,32 +645,50 @@ function createSidebar(): HTMLElement {
     sidebar.append(attentionNote);
   }
 
+  // Rules card: one link per rule, then the observation switch. Match logging
+  // belongs with the rules because it reports on rule matching, not on the
+  // session.
+  const statuses = state.ruleStatuses ?? [];
+  // The card dot summarises the rules, so it has to reflect the worst status.
+  // "There are rows" is not the same claim as "the rules are fine", and a green
+  // dot above ten disabled rules is a false summary.
+  const allActive =
+    statuses.length > 0 &&
+    statuses.every((ruleStatus) => text(ruleStatus.status, "") === "active");
+  const rules = createSidebarCard(
+    "rules",
+    "Rules",
+    attention !== null
+      ? "warn"
+      : allActive
+        ? "ok"
+        : statuses.length > 0
+          ? "warn"
+          : "muted",
+  );
   const ruleStatuses = document.createElement("ul");
+  ruleStatuses.className = "rogatio-rule-list";
   ruleStatuses.dataset.ruleStatuses = "true";
-  for (const ruleStatus of state.ruleStatuses ?? []) {
-    const item = document.createElement("li");
-    const groupId = text(ruleStatus.groupId, "unknown group");
-    const ruleId = text(ruleStatus.ruleId, "unknown rule");
-    const statusValue = text(ruleStatus.status, "error");
-    if (statusValue === "error") {
-      item.append(document.createTextNode(`${groupId}/${ruleId}: `));
-      const link = document.createElement("button");
-      link.type = "button";
-      link.dataset.ruleErrorLink = "true";
-      link.dataset.groupId = groupId;
-      link.dataset.ruleId = ruleId;
-      link.textContent = statusValue;
-      link.setAttribute(
-        "aria-label",
-        `Show error details for ${groupId}/${ruleId}`,
-      );
-      item.append(link);
-    } else {
-      item.textContent = `${groupId}/${ruleId}: ${statusValue}`;
-    }
-    ruleStatuses.append(item);
+  for (const ruleStatus of statuses) {
+    ruleStatuses.append(
+      createRuleEntry(
+        text(ruleStatus.groupId, UNKNOWN_GROUP_ID),
+        text(ruleStatus.ruleId, UNKNOWN_RULE_ID),
+        text(ruleStatus.status, "error"),
+      ),
+    );
   }
-  sidebar.append(ruleStatuses);
+  rules.body.append(ruleStatuses);
+  rules.body.append(
+    createMatchLoggingToggle({
+      api: chrome,
+      enabled: matchLoggingEnabled,
+      onPersisted: (enabled) => {
+        matchLoggingEnabled = enabled;
+      },
+    }),
+  );
+  sidebar.append(rules.card);
 
   const selectedError = reconcileSelectedErrorRule();
   if (selectedError !== null) {
@@ -527,14 +713,71 @@ function createSidebar(): HTMLElement {
   return sidebar;
 }
 
-function renderSidebar(shell: HTMLElement): void {
-  shell.append(createSidebar());
+/**
+ * Identifiers that survive a sidebar re-render, so focus can be put back on
+ * the control the user was actually using. The sidebar is rebuilt wholesale, so
+ * without this the focused node is destroyed and focus falls to `<body>`.
+ */
+const FOCUSABLE_HOOKS = ["ruleLink", "command", "matchLoggingToggle"] as const;
+
+function captureSidebarFocus(): {
+  readonly hook: string;
+  readonly key: string;
+  readonly position: number;
+} | null {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) return null;
+  const data = active.dataset;
+  for (const hook of FOCUSABLE_HOOKS) {
+    const value = data[hook];
+    if (typeof value !== "string") continue;
+    if (hook === "command" || hook === "matchLoggingToggle") {
+      return { hook, key: value, position: -1 };
+    }
+    const position = [...document.querySelectorAll("[data-rule-link]")].indexOf(
+      active,
+    );
+    if (value === "true" || position >= 0) {
+      return { hook, key: value, position };
+    }
+  }
+  return null;
 }
 
-/** Update enablement chrome without remounting a dirty editor draft. */
+function restoreSidebarFocus(
+  captured: ReturnType<typeof captureSidebarFocus>,
+): void {
+  if (captured === null) return;
+  const selector =
+    captured.hook === "command"
+      ? `[data-command="${CSS.escape(captured.key)}"]`
+      : captured.hook === "matchLoggingToggle"
+        ? "[data-match-logging-toggle] input"
+        : "[data-rule-link]";
+  const target =
+    captured.position >= 0
+      ? ([...document.querySelectorAll(selector)][captured.position] as
+          | HTMLElement
+          | undefined)
+      : (document.querySelector(selector) as HTMLElement | null);
+  // `preventScroll` matters: putting focus back must not move the viewport,
+  // and the control being restored is often in a different part of the page
+  // than where the user is looking.
+  if (target && typeof target.focus === "function") {
+    target.focus({ preventScroll: true });
+  }
+}
+
+/**
+ * Update sidebar chrome without remounting a dirty editor draft. This is the
+ * only path a sidebar state change may take: `renderShell()` destroys the
+ * mounted editor and would discard unsaved work.
+ */
 function patchWorkspaceEnablementChrome(): void {
+  const captured = captureSidebarFocus();
   const existing = root.querySelector(".rogatio-sidebar");
   if (existing) existing.replaceWith(createSidebar());
+  restoreSidebarFocus(captured);
   const status = root.querySelector(".rogatio-status");
   if (status) status.textContent = statusMessage;
   const badge = root.querySelector("[data-badge-state]");
@@ -805,6 +1048,10 @@ function renderOverview(shell: HTMLElement): void {
 }
 
 function renderShell(): void {
+  // Both rebuild paths restore focus: `renderShell` for a clean editor and
+  // `patchWorkspaceEnablementChrome` for a dirty one. Without this the focused
+  // node is destroyed and focus falls to `<body>`.
+  const capturedFocus = captureSidebarFocus();
   editor?.destroy();
   editor = undefined;
   root.replaceChildren();
@@ -817,7 +1064,7 @@ function renderShell(): void {
   const layout = document.createElement("div");
   layout.className = "rogatio-layout";
   layout.dataset.view = activeTab;
-  if (activeTab === "workspace") renderSidebar(layout);
+  if (activeTab === "workspace") layout.append(createSidebar());
 
   const main = document.createElement("main");
   main.className = "rogatio-main";
@@ -888,23 +1135,33 @@ function renderShell(): void {
   shell.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
-    const errorLink = target.closest<HTMLElement>("[data-rule-error-link]");
-    if (errorLink) {
-      const groupId = errorLink.dataset.groupId ?? "";
-      const ruleId = errorLink.dataset.ruleId ?? "";
-      if (groupId.length > 0 && ruleId.length > 0) {
-        selectedErrorRule = { groupId, ruleId };
-        activeTab = "workspace";
-        renderShell();
-        editor?.navigateToGroup(groupId);
-        const ruleCard = document.getElementById(
-          `rogatio-rule-${groupId}-${ruleId}`,
-        );
-        if (ruleCard) {
-          ruleCard.scrollIntoView({ block: "start", behavior: "smooth" });
-          ruleCard.focus({ preventScroll: true });
-        }
+    const ruleLink = target.closest<HTMLAnchorElement>("[data-rule-link]");
+    if (ruleLink) {
+      // Only take over a plain primary click. A modifier or non-primary click
+      // must keep its native meaning, otherwise ctrl/cmd+click and shift+click
+      // stop opening a new tab and the entry is not actually a link.
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
       }
+      event.preventDefault();
+      const groupId = ruleLink.dataset.groupId ?? "";
+      const ruleId = ruleLink.dataset.ruleId ?? "";
+      if (groupId.length === 0 || ruleId.length === 0) return;
+      // Selecting a rule is the one control that both navigates and, when the
+      // rule failed, shows its install reason. Clear the previous selection so
+      // the card never describes a different rule than the one on screen.
+      selectedErrorRule =
+        text(statusForRule(groupId, ruleId), "") === "error"
+          ? { groupId, ruleId }
+          : null;
+      navigateToRuleDeepLink(groupId, ruleId, { push: true });
       return;
     }
     const tab = target.dataset.tab;
@@ -1068,9 +1325,28 @@ function renderShell(): void {
           },
         },
       });
-      if (deepLinkGroup) editor.navigateToGroup(deepLinkGroup);
+      // The URL is the source of truth for the destination, so a remount must
+      // not silently drop it. But only the *first* mount reveals and focuses the
+      // rule: a later remount is a rebuild (a group toggle, a refresh, a tab
+      // switch), not navigation, and re-running the reveal would yank the
+      // viewport back to a rule the user had already scrolled away from. The
+      // route still comes from the URL, so the user stays where they were.
+      const deepLink = readRuleDeepLink();
+      if (deepLink) {
+        const firstMount = !editorHasMounted;
+        editorHasMounted = true;
+        if (deepLink.ruleId.length > 0 && firstMount) {
+          editor.navigateToRule(deepLink.groupId, deepLink.ruleId);
+        } else {
+          editor.navigateToGroup(deepLink.groupId);
+        }
+      } else {
+        editorHasMounted = true;
+      }
     }
   }
+
+  restoreSidebarFocus(capturedFocus);
 }
 
 function openAIComposer(): void {
@@ -1576,7 +1852,24 @@ async function removeProject(): Promise<void> {
   await refresh();
 }
 
-// Deep links from the popup open the workspace editor at the group.
-const deepLinkGroup = new URLSearchParams(window.location.search).get("group");
-if (deepLinkGroup) activeTab = "workspace";
+// Deep links from the popup and from a copied rule URL open the workspace
+// editor at a group or a rule.
+if (readRuleDeepLink()) activeTab = "workspace";
+
+// Browser Back and Forward after an in-page rule navigation. Resolving without
+// pushing keeps history from growing. Both directions reconcile the active tab
+// from the URL so Back and Forward behave symmetrically: a rule link means
+// Workspace, and no rule link means the view is left alone rather than silently
+// changing underneath the user.
+window.addEventListener("popstate", () => {
+  const link = readRuleDeepLink();
+  if (link === null) {
+    if (activeTab !== "workspace") return;
+    editor?.navigateToGroup(null);
+    patchWorkspaceEnablementChrome();
+    return;
+  }
+  navigateToRuleDeepLink(link.groupId, link.ruleId, { push: false });
+});
+
 void refresh();
