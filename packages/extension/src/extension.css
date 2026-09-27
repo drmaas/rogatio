@@ -243,6 +243,135 @@ body {
   display: grid;
   gap: 0.5rem;
 }
+
+/*
+ * Sidebar status cards. The sidebar reads as a small rack of modules: the
+ * heading carries the tone so state is legible before controls, and the body is
+ * detail. Reuses the F22 radius, border, and mono uppercase micro-header.
+ */
+.rogatio-sidebar-card {
+  min-width: 0;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  background: var(--rogatio-surface-raised);
+}
+.rogatio-sidebar-card-heading {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  margin: 0;
+  border-bottom: 1px solid var(--rogatio-border);
+  padding: 0.55rem 0.75rem;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rogatio-muted);
+}
+.rogatio-sidebar-card-heading::before {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--rogatio-muted);
+}
+.rogatio-sidebar-card-heading[data-tone="ok"]::before {
+  background: var(--rogatio-success);
+}
+.rogatio-sidebar-card-heading[data-tone="warn"]::before {
+  background: var(--rogatio-warning, var(--rogatio-faint));
+}
+.rogatio-sidebar-card-heading[data-tone="error"]::before {
+  background: var(--rogatio-danger, #d73a4a);
+}
+.rogatio-sidebar-card-body {
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 0.7rem 0.75rem;
+}
+
+/* Rule rows: identity on the left, status as a right-aligned mono token.
+   Scoped under `.rogatio-sidebar` so it outranks the generic sidebar list
+   rule above instead of losing to it on specificity. */
+.rogatio-sidebar .rogatio-rule-list {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+.rogatio-rule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: baseline;
+  min-width: 0;
+}
+.rogatio-rule-link {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--rogatio-text);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.rogatio-rule-link:hover,
+.rogatio-rule-link:focus-visible {
+  color: var(--rogatio-primary);
+  border-bottom-color: currentColor;
+}
+.rogatio-rule-link[aria-disabled="true"] {
+  color: var(--rogatio-faint);
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.rogatio-rule-status {
+  flex: none;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--rogatio-muted);
+  white-space: nowrap;
+}
+.rogatio-rule-status[data-tone="ok"] {
+  color: var(--rogatio-success);
+}
+.rogatio-rule-status[data-tone="error"] {
+  color: var(--rogatio-danger, #d73a4a);
+}
+.rogatio-rule-status[data-tone="warn"] {
+  color: var(--rogatio-warning, var(--rogatio-faint));
+}
+
+/* AI status tone classes drive a real dot instead of being dead names. */
+.rogatio-ai-status {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.8rem;
+}
+.rogatio-ai-status::before {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--rogatio-muted);
+}
+.rogatio-ai-ready::before {
+  background: var(--rogatio-success);
+}
+.rogatio-ai-needs-runtime::before {
+  background: var(--rogatio-faint);
+}
+.rogatio-ai-not-configured::before {
+  background: var(--rogatio-warning, var(--rogatio-faint));
+}
+
 .rogatio-runtime-status {
   display: flex;
   gap: 0.45rem;
@@ -323,19 +452,6 @@ body {
   overflow-wrap: anywhere;
   font-family: var(--rogatio-font-mono);
   font-size: 0.8rem;
-}
-.rogatio-shell button[data-rule-error-link] {
-  border: 0;
-  border-radius: 0;
-  background: none;
-  padding: 0;
-  color: var(--rogatio-danger);
-  font-weight: 600;
-  text-decoration: underline;
-}
-.rogatio-shell button[data-rule-error-link]:hover:not(:disabled) {
-  background: none;
-  border-color: transparent;
 }
 .rogatio-rule-error-card {
   display: grid;
@@ -478,17 +594,31 @@ body {
   text-align: left;
   cursor: pointer;
 }
-.rogatio-sidebar .rogatio-project-card {
+/* The sidebar project card names the active project; it is not an action, so it
+   must not inherit the interactive dashboard card's pointer cursor or hover
+   border. */
+.rogatio-sidebar-project-card {
+  display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0.45rem;
-  padding: 0.8rem;
-}
-.rogatio-sidebar :where(.rogatio-project-card-title, .rogatio-project-status) {
   min-width: 0;
-  overflow-wrap: anywhere;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-raised);
+  padding: 0.8rem;
+  text-align: left;
+  cursor: default;
 }
-.rogatio-sidebar :where(.rogatio-project-status) {
-  white-space: normal;
+.rogatio-sidebar-project-card:hover {
+  border-color: var(--rogatio-border);
+  background: var(--rogatio-surface-raised);
+}
+.rogatio-sidebar-project-card-title {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 1.05rem;
+  font-weight: 700;
 }
 
 .rogatio-project-card:hover:not(:disabled) {
@@ -505,8 +635,13 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--rogatio-muted);
   font-size: 0.85rem;
+  /* The sidebar column is narrow, so let the label wrap rather than force the
+     card wider. Declared on the base rule to keep selector specificity flat. */
+  white-space: normal;
 }
 .rogatio-project-status::before {
   content: "";
@@ -704,6 +839,14 @@ body {
   }
 }
 
+@media (max-width: 64rem) {
+  /* Between 64rem and 48rem the sidebar column is at its narrowest, so the
+     identity gets an explicit wrap budget before the row stacks. */
+  .rogatio-sidebar .rogatio-rule-link {
+    overflow-wrap: anywhere;
+  }
+}
+
 @media (max-width: 48rem) {
   .rogatio-layout {
     display: block;
@@ -715,6 +858,20 @@ body {
   .rogatio-topbar-actions {
     margin-left: 0;
     width: 100%;
+  }
+  .rogatio-sidebar-card-heading {
+    min-width: 0;
+  }
+}
+@media (max-width: 26rem) {
+  /* Below ~416px a right-aligned status column squeezes the identity too far to
+     stay readable, so the row becomes a two-line stack. */
+  .rogatio-sidebar .rogatio-rule-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.1rem;
+  }
+  .rogatio-sidebar .rogatio-rule-status {
+    justify-self: start;
   }
 }
 @media (forced-colors: active) {
@@ -761,9 +918,14 @@ body {
     border-color: ButtonText;
     background: Canvas;
   }
-  .rogatio-sidebar fieldset {
+  .rogatio-sidebar fieldset,
+  .rogatio-sidebar-card,
+  .rogatio-sidebar-project-card {
     border-color: ButtonText;
     background: Canvas;
+  }
+  .rogatio-sidebar-card-heading {
+    border-bottom-color: ButtonText;
   }
   .rogatio-runtime-guidance,
   .rogatio-runtime-error {

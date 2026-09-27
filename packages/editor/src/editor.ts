@@ -2127,6 +2127,44 @@ class EditorControllerImpl implements EditorController {
     }
   }
 
+  /**
+   * Scroll a rendered rule card into view and focus it. Explicit `behavior`
+   * overrides the stylesheet's `scroll-behavior`, so the reduced-motion
+   * preference has to be read here too.
+   */
+  private revealRuleCard(groupId: string, ruleId: string): void {
+    const card = this.document.getElementById(ruleAnchorId(groupId, ruleId));
+    if (!card) return;
+    const view = this.document.defaultView;
+    const reduceMotion =
+      typeof view?.matchMedia === "function" &&
+      view.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    card.scrollIntoView({
+      block: "start",
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+    card.focus({ preventScroll: true });
+  }
+
+  /**
+   * Deep-link to a rule: route to the group that owns it, render, then reveal
+   * the rule card. Resolves against the draft, because the editor renders the
+   * draft and a rule id from committed storage may have been renamed there. An
+   * unknown rule still lands on its group; an unknown group falls back to
+   * Overview. Never throws, so a stale link lands somewhere real rather than
+   * failing.
+   */
+  navigateToRule(
+    groupId: string | null | undefined,
+    ruleId: string | null | undefined,
+  ): void {
+    this.navigateToGroup(groupId);
+    const resolvedGroup = safeText(this.currentGroupId());
+    const resolvedRule = safeText(ruleId);
+    if (resolvedGroup.length === 0 || resolvedRule.length === 0) return;
+    this.revealRuleCard(resolvedGroup, resolvedRule);
+  }
+
   private navigateToSearchResult(path: string): void {
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
@@ -2146,12 +2184,7 @@ class EditorControllerImpl implements EditorController {
     this.statusMessage = "Jumped to rule.";
     this.render();
     if (rule && typeof rule.id === "string") {
-      const anchor = `rogatio-rule-${safeText(group.id)}-${safeText(rule.id)}`;
-      const card = this.document.getElementById(anchor);
-      if (card) {
-        card.scrollIntoView({ block: "start", behavior: "smooth" });
-        card.focus({ preventScroll: true });
-      }
+      this.revealRuleCard(group.id, rule.id);
     }
   }
 
@@ -2706,7 +2739,7 @@ class EditorControllerImpl implements EditorController {
     const card = this.document.createElement("article");
     card.dataset.ruleCard = "true";
     card.dataset.ruleId = ruleId;
-    card.id = `rogatio-rule-${groupId}-${ruleId}`;
+    card.id = ruleAnchorId(groupId, ruleId);
     card.tabIndex = -1;
     const headingRow = this.document.createElement("div");
     headingRow.dataset.ruleHeading = "true";
@@ -3502,6 +3535,38 @@ function saveFailureDiagnostic(value: unknown): EditorDiagnostic {
 export type ResolvedRoute =
   | { readonly kind: "project" }
   | { readonly kind: "group"; readonly groupId: string };
+
+/**
+ * Percent-encode one anchor segment. `encodeURIComponent` leaves `!'()*`
+ * unescaped and those are CSS-significant, so they are escaped too: the anchor
+ * id is a public contract that a host may feed to a selector, and ids coming
+ * from committed storage are not guaranteed to be schema-legal.
+ */
+function encodeAnchorSegment(value: string): string {
+  return encodeURIComponent(value).replace(
+    /[!'()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+/**
+ * Element id for a rule card, owned by the editor because the editor owns the
+ * element. Hosts that link to a rule must build the same string rather than
+ * re-deriving the format.
+ *
+ * The join uses an encoded segment around a `:` separator. The schema id
+ * pattern `^[A-Za-z0-9][A-Za-z0-9._-]*$` cannot contain `:`, and the encoding
+ * never emits a raw `:`, so the separator is unambiguous and the mapping is
+ * injective. That matters because the group id and the rule id are joined into
+ * a single DOM identity: a plain `-` join maps group `a-b` with rule `c` and
+ * group `a` with rule `b-c` onto the same element, and `getElementById` would
+ * resolve to whichever came first.
+ */
+export function ruleAnchorId(groupId: unknown, ruleId: unknown): string {
+  return `rogatio-rule-${encodeAnchorSegment(safeText(groupId))}:${encodeAnchorSegment(
+    safeText(ruleId),
+  )}`;
+}
 
 /** Resolve a deep-link group id to a concrete editor route, falling back to Overview. */
 export function resolveGroupRoute(

@@ -281,3 +281,8 @@ Covered by F22-REQ-009. Operational: the canonical validation remains
   the editor remains the Workspace view (user chose "Restyle + Shell rework").
 - Assumption: "History" and other mock-design nav destinations are non-goals because
   no backing feature exists (confirmed in review packet).
+> Superseded by: the Workspace sidebar card structure in `docs/architecture.md`
+> (issue #242) extends F22-REQ-005a and F22-REQ-005d rather than contradicting them. The
+> sidebar is now labelled status cards — Runtime, AI, Rules — instead of the flat list
+> described above, and the "permissions summary" this record lists was already gone before
+> that change. Every `data-*` attribute, role, label, and command name is still preserved.

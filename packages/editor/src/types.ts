@@ -224,6 +224,15 @@ export interface EditorController {
    * Used when a dirty Workspace must keep unsaved edits mounted.
    */
   syncGroupEnablement(enabledGroupIds: readonly string[]): void;
+  /**
+   * Deep-link to one rule, falling back to its group and then to Overview.
+   * Resolves against the draft, so a link built from committed storage lands on
+   * the owning group rather than doing nothing after an unsaved rename.
+   */
+  navigateToRule(
+    groupId: string | null | undefined,
+    ruleId: string | null | undefined,
+  ): void;
 }
 
 export type UrlConversionResult =

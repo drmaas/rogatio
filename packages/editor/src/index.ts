@@ -1,4 +1,4 @@
-export { createEditor } from "./editor.js";
+export { createEditor, ruleAnchorId } from "./editor.js";
 export { createHeaderRuleType } from "./rule-types/header.js";
 export {
   builtInRuleTypes,

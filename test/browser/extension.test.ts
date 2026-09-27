@@ -634,13 +634,15 @@ test("renders the DNR error reason in the rule error card", async ({
     "Rule with id 2000001 cannot have an empty list",
   );
   await expect(
-    page.getByRole("button", {
-      name: "Show error details for group-a/rule-one",
-    }),
+    page.getByRole("link", { name: "group-a/rule-one" }),
   ).toBeVisible();
-  await expect(page.locator("[data-rule-statuses] li")).toHaveText(
-    "group-a/rule-one: error",
-  );
+  // A rule row is a link carrying the identity plus a sibling status token.
+  await expect(
+    page.locator("[data-rule-statuses] [data-rule-link]"),
+  ).toHaveText("group-a/rule-one");
+  await expect(
+    page.locator("[data-rule-statuses] [data-rule-status]"),
+  ).toHaveText("error");
 });
 
 test("falls back to the stable diagnostic message when params.reason is absent", async ({
@@ -929,10 +931,12 @@ test("keys the error card by group and rule id instead of merging equal reasons"
   await expect(page.locator("[data-rule-error-card]")).not.toContainText(
     "group-b/rule-one",
   );
-  await expect(page.locator("[data-rule-statuses] li")).toHaveText([
-    "group-a/rule-one: error",
-    "group-b/rule-one: error",
-  ]);
+  await expect(
+    page.locator("[data-rule-statuses] [data-rule-link]"),
+  ).toHaveText(["group-a/rule-one", "group-b/rule-one"]);
+  await expect(
+    page.locator("[data-rule-statuses] [data-rule-status]"),
+  ).toHaveText(["error", "error"]);
 });
 
 test("reconciles stale error selection after refresh and removes the card when errors clear", async ({
@@ -1113,16 +1117,14 @@ test("activates the error link by keyboard and focuses the failing rule card", a
   await expect(
     page.locator("[data-editor-root] [data-rogatio-editor]"),
   ).toBeVisible();
-  const errorLink = page.getByRole("button", {
-    name: "Show error details for group-b/rule-two",
-  });
+  const errorLink = page.getByRole("link", { name: "group-b/rule-two" });
   await errorLink.focus();
   await expect(errorLink).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(
     page.locator('[data-editor-key="route:group:group-b"]'),
   ).toHaveAttribute("aria-current", "page");
-  await expect(page.locator("#rogatio-rule-group-b-rule-two")).toBeFocused();
+  await expect(page.locator("#rogatio-rule-group-b\\:rule-two")).toBeFocused();
   await expect(page.locator("[data-rule-error-card]")).toContainText(
     "group-b/rule-two",
   );
@@ -1167,11 +1169,7 @@ test("updates the error card without throwing when the rule card is missing", as
     ],
   });
   await openWorkspace(page);
-  await page
-    .getByRole("button", {
-      name: "Show error details for group-a/rule-missing",
-    })
-    .click();
+  await page.getByRole("link", { name: "group-a/rule-missing" }).click();
   await expect(page.locator("[data-rule-error-card]")).toContainText(
     "group-a/rule-missing",
   );
@@ -1179,11 +1177,7 @@ test("updates the error card without throwing when the rule card is missing", as
     missingRuleReason,
   );
   expect(pageErrors).toEqual([]);
-  await page
-    .getByRole("button", {
-      name: "Show error details for group-z/rule-one",
-    })
-    .click();
+  await page.getByRole("link", { name: "group-z/rule-one" }).click();
   await expect(page.locator("[data-rule-error-card]")).toContainText(
     "group-z/rule-one",
   );
