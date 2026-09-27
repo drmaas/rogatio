@@ -1,6 +1,6 @@
 ---
 title: Chrome extension
-description: Import, export, switch, and activate Rogatio projects in Chrome.
+description: Import, export, switch, and enable groups in Chrome.
 ---
 
 The Chrome MV3 extension is the browser boundary for Rogatio. It translates neutral rules
@@ -14,22 +14,24 @@ to WebExtensions Declarative Net Request (DNR) rules and manages project lifecyc
   project**.
 - Creation, import/update, and browser save leave every group disabled.
 
-The toolbar **popup** lists the active project's saved groups with one enable/disable
-switch each, truthful runtime status, **Match logging**, **Open app** (management page
-Overview / Dashboard), and a pencil that opens the management page on that group. It also
-offers **New project** (inline name form) and **Import project** (file picker). The popup
-has no editor, search, proxy, permission, or rule-authoring controls.
+The toolbar **popup** lists the active project's saved groups. Each row has the group
+name, a separate status indicator, a prominent **Enable** or **Disable** button, and a
+pencil that opens the management page on that group. The popup also has **Match logging**,
+**Open app** (management page Overview / Dashboard), **New project** (inline name form),
+and **Import project** (file picker). The popup has no editor, search, proxy, permission,
+or rule-authoring controls.
 
 The management page uses a **Dashboard** overview and a **Workspace** editor shell. When a
 rule fails to install, the status word `error` is an activatable control that opens that
 rule in the workspace, and a distinct error card shows the concrete install failure reason.
 
-## Host access and activation
+## Host access and enablement
 
 - The extension declares broad host access (`*://*/*`) at install time so DNR rules can
   match any HTTP(S) URL your projects describe. There is no per-origin grant UI.
-- **Group activation** is separate from **Start runtime**. Activating a group installs DNR
-  rules; starting the native runtime is required for body rules.
+- **Enable** / **Disable** on the Workspace group heading is separate from **Start
+  runtime**. Enabling a group installs DNR rules; starting the native runtime is required
+  for body rules. The left sidebar does not list group on/off controls.
 
 ## Rule status and badge
 

@@ -37,7 +37,7 @@ Validate and save. This writes `.rogatio.json` in the current directory.
 ## 5. Run it in Chrome
 
 1. Import the `.rogatio.json` file into the extension.
-2. **Switch** to the project, then explicitly **activate** the group.
+2. **Switch** to the project, open the group, and click **Enable**. The toolbar popup has the same **Enable** / **Disable** button.
 3. Browse normally and inspect the visible rule status and toolbar badge.
 
 For response-body or request-body rules, also [start the local runtime](/guides/runtime/).

@@ -228,14 +228,6 @@ body {
   font-weight: 500;
   color: var(--rogatio-muted);
 }
-.rogatio-group-active {
-  color: var(--rogatio-success);
-  font-weight: 600;
-}
-.rogatio-group-inactive {
-  color: var(--rogatio-muted);
-  opacity: 0.75;
-}
 .rogatio-sidebar ul {
   margin: 0;
   padding-left: 1.1rem;

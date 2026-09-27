@@ -525,3 +525,137 @@ describe("@rogatio/editor initial host validation", () => {
     editor.destroy();
   });
 });
+
+describe("group enablement heading button", () => {
+  it("omits the button when the host supplies no enablement port", () => {
+    const { root, editor } = createTestEditor();
+    expect(
+      root.querySelector("[data-group-heading] [data-group-enable]"),
+    ).toBeNull();
+    editor.destroy();
+  });
+
+  it("shows Enable or Disable, calls the host, and leaves the draft clean", () => {
+    const calls: Array<{ groupId: string; enabled: boolean }> = [];
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: emptyProject,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      groupEnablement: {
+        isEnabled: () => false,
+        setEnabled(groupId, enabled) {
+          calls.push({ groupId, enabled });
+        },
+      },
+    });
+    root
+      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const button = root.querySelector<HTMLButtonElement>(
+      "[data-group-heading] [data-group-enable]",
+    );
+    expect(button?.textContent).toBe("Enable");
+    expect(button?.getAttribute("aria-label")).toBe("Enable group One");
+    expect(button?.dataset.btn).toBe("primary");
+    button?.click();
+    expect(calls).toEqual([{ groupId: "group-one", enabled: true }]);
+    expect(editor.isDirty()).toBe(false);
+    editor.syncGroupEnablement(["group-one"]);
+    expect(button?.textContent).toBe("Disable");
+    expect(button?.getAttribute("aria-label")).toBe("Disable group One");
+    editor.syncGroupEnablement([]);
+    expect(button?.textContent).toBe("Enable");
+    editor.destroy();
+  });
+
+  it("enables the saved group id when the draft id is unsaved", () => {
+    const calls: Array<{ groupId: string; enabled: boolean }> = [];
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: emptyProject,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      groupEnablement: {
+        isEnabled: () => false,
+        setEnabled(groupId, enabled) {
+          calls.push({ groupId, enabled });
+        },
+      },
+    });
+    root
+      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const idInput = root.querySelector<HTMLInputElement>(
+      '[data-path="/groups/0/id"]',
+    );
+    if (!idInput) throw new Error("group id field missing");
+    idInput.value = "renamed-group";
+    idInput.dispatchEvent(new Event("input", { bubbles: true }));
+    root
+      .querySelector(
+        '[data-desktop-route-rail] button[data-group-id="renamed-group"]',
+      )
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const button = root.querySelector<HTMLButtonElement>(
+      "[data-group-heading] [data-group-enable]",
+    );
+    expect(button?.dataset.groupId).toBe("group-one");
+    button?.click();
+    expect(calls).toEqual([{ groupId: "group-one", enabled: true }]);
+    expect(editor.isDirty()).toBe(true);
+    editor.destroy();
+  });
+
+  it("omits Enable on a copied group that has not been saved", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: {
+        version: 2,
+        name: "Editor project",
+        groups: [
+          emptyProject.groups[0],
+          {
+            id: "group-two",
+            name: "Two",
+            rules: emptyProject.groups[0].rules,
+          },
+        ],
+      },
+      validate: () => [],
+      save: () => ({ ok: true }),
+      groupEnablement: {
+        isEnabled: () => false,
+        setEnabled() {},
+      },
+    });
+    root
+      .querySelector(
+        '[data-desktop-route-rail] button[data-group-id="group-one"]',
+      )
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root
+      .querySelector('[data-group-heading] button[data-command="copy-group"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(
+      root.querySelector("[data-group-heading] [data-group-enable]"),
+    ).toBeNull();
+    root
+      .querySelector(
+        '[data-desktop-route-rail] button[data-group-id="group-two"]',
+      )
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(
+      root.querySelector<HTMLButtonElement>(
+        "[data-group-heading] [data-group-enable]",
+      )?.dataset.groupId,
+    ).toBe("group-two");
+    editor.destroy();
+  });
+});

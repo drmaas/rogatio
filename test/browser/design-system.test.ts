@@ -481,10 +481,14 @@ test("popup group card chrome", async ({ page }) => {
         .evaluate((summary) => getComputedStyle(summary, "::before").transform),
     )
     .not.toBe(chevronTransformClosed);
-  // Checkbox stopPropagation: sync click must not toggle details open/closed.
+  await expect(
+    page.getByRole("button", { name: "Disable group One" }),
+  ).toBeVisible();
+  await expect(groupCard.locator("[data-group-status]")).toHaveText("Active");
+  // Button stopPropagation: sync click must not toggle details open/closed.
   const openAfterToggleClick = await groupCard.evaluate((el) => {
     const details = el as HTMLDetailsElement;
-    const toggle = details.querySelector<HTMLInputElement>(
+    const toggle = details.querySelector<HTMLButtonElement>(
       "[data-group-toggle]",
     );
     if (!toggle) return null;
@@ -615,40 +619,25 @@ test("popup Open app href stays management page after project switch", async ({
   await expect(openApp).toHaveAttribute("href", "index.html");
 });
 
-test("workspace group activation sits under the active project card", async ({
-  page,
-}) => {
+test("workspace enable button sits on the group heading", async ({ page }) => {
   await page.addInitScript(installChromeMock, defaultEnvelope());
   await page.goto("/extension/index.html");
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
 
   const projectCard = page.locator("[data-active-project-card]");
-  const activation = page.locator("[data-group-activation]");
   const startRuntime = page.getByRole("button", { name: "Start runtime" });
   await expect(projectCard).toBeVisible();
-  await expect(activation).toBeVisible();
-  await expect(page.locator("[data-group-toggle]")).toHaveCount(1);
-
-  const order = await page.evaluate(() => {
-    const card = document.querySelector("[data-active-project-card]");
-    const groups = document.querySelector("[data-group-activation]");
-    const start = document.querySelector(
-      '[data-command="start-native-runtime"]',
-    );
-    if (!card || !groups || !start) return null;
-    const position = card.compareDocumentPosition(groups);
-    const groupsBeforeStart = groups.compareDocumentPosition(start);
-    return {
-      groupsFollowCard: (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-      startFollowsGroups:
-        (groupsBeforeStart & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-    };
-  });
-  expect(order).toEqual({
-    groupsFollowCard: true,
-    startFollowsGroups: true,
-  });
   await expect(startRuntime).toBeVisible();
+  await expect(page.locator("[data-group-activation]")).toHaveCount(0);
+
+  await page
+    .locator('[data-desktop-route-rail] [data-group-id="group-one"]')
+    .click();
+  const enable = page.locator("[data-group-heading] [data-group-enable]");
+  await expect(enable).toBeVisible();
+  await expect(enable).toHaveText("Disable");
+  await expect(enable).toHaveAttribute("aria-label", "Disable group One");
+  await expect(page.locator("[data-group-toggle]")).toHaveCount(0);
 });
 
 test("workspace group toggle keeps dirty editor draft mounted", async ({
@@ -673,14 +662,20 @@ test("workspace group toggle keeps dirty editor draft mounted", async ({
     "Unsaved changes",
   );
 
-  const toggle = page.locator("[data-group-toggle]");
-  await expect(toggle).toBeChecked();
-  await toggle.uncheck();
-  await expect(toggle).not.toBeChecked();
-  await expect(page.getByText("Group deactivated.")).toBeVisible();
+  await page
+    .locator('[data-desktop-route-rail] [data-group-id="group-one"]')
+    .click();
+  const toggle = page.locator("[data-group-heading] [data-group-enable]");
+  await expect(toggle).toHaveText("Disable");
+  await toggle.click();
+  await expect(toggle).toHaveText("Enable");
+  await expect(page.getByText("Group disabled.")).toBeVisible();
   await expect(page.locator("[data-dirty-state]")).toHaveText(
     "Unsaved changes",
   );
+  await page
+    .locator('[data-desktop-route-rail] [data-route="project"]')
+    .click();
   await expect(nameInput).toHaveValue("Draft rename");
   await expect(page.locator("[data-badge-state]")).toContainText(
     "Active rules: 0",

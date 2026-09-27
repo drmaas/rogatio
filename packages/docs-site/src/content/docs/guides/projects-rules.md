@@ -13,7 +13,7 @@ can retain up to **64 uniquely named projects** and has exactly **one active pro
 whenever any exist.
 
 - Creation, import/update, and browser save leave every group **disabled**.
-- Group activation and **Start runtime** are separate, visible actions.
+- Enabling a group and **Start runtime** are separate, visible actions. The Workspace group heading has an **Enable** / **Disable** button. The toolbar popup uses the same words, with group status as its own indicator.
 - **Switching** restores the destination project's saved enablement without contacting a
   runtime.
 - Conflicts preserve committed state and provide an explicit refresh path.

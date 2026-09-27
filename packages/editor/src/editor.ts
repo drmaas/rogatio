@@ -680,6 +680,8 @@ class EditorControllerImpl implements EditorController {
   private readonly conversionDiagnostics = new Map<string, EditorDiagnostic>();
   private readonly extensionErrors = new Map<string, EditorDiagnostic>();
   private readonly controls = new Map<string, HTMLElement>();
+  /** Live draft group object to the id last saved for that group. */
+  private readonly savedGroupIds = new WeakMap<DraftGroup, string>();
   private readonly extensionControls = new Map<string, HTMLElement>();
   private extensionCleanups: Array<() => void> = [];
   private confirmation: Confirmation | undefined;
@@ -714,6 +716,7 @@ class EditorControllerImpl implements EditorController {
     this.instanceId = `rogatio-editor-${++editorInstanceCount}`;
     this.draft = initial;
     this.committed = cloneSnapshot(initial) as DraftProject;
+    this.bindSavedGroupIds();
 
     // Structurally valid drafts may still fail host validation (e.g. CLI bootstrap
     // with an empty name). Mount and surface those diagnostics instead of failing closed.
@@ -1590,6 +1593,7 @@ class EditorControllerImpl implements EditorController {
       return;
     }
     this.draft = cloneSnapshot(this.committed) as DraftProject;
+    this.bindSavedGroupIds();
     this.revision += 1;
     this.errors = [];
     this.conversionDiagnostics.clear();
@@ -1645,6 +1649,7 @@ class EditorControllerImpl implements EditorController {
     }
     if (isSaveSuccess(result)) {
       this.committed = cloneSnapshot(snapshot) as DraftProject;
+      this.bindSavedGroupIds();
       this.errors = [];
       this.statusMessage = "Saved";
       this.render();
@@ -2100,6 +2105,28 @@ class EditorControllerImpl implements EditorController {
     this.render();
   }
 
+  syncGroupEnablement(enabledGroupIds: readonly string[]): void {
+    if (this.destroyed) return;
+    const enabled = new Set<string>();
+    for (const id of enabledGroupIds) {
+      if (typeof id === "string") enabled.add(id);
+    }
+    const buttons = this.host.querySelectorAll<HTMLButtonElement>(
+      "button[data-group-enable]",
+    );
+    for (const button of buttons) {
+      const groupId = button.dataset.groupId ?? "";
+      const headingName = button.parentElement
+        ?.querySelector("h2")
+        ?.textContent?.trim();
+      const groupName =
+        headingName && headingName.length > 0
+          ? headingName
+          : displayName(this.groupById(groupId)?.name, "Unnamed group");
+      this.applyGroupEnablementLabel(button, enabled.has(groupId), groupName);
+    }
+  }
+
   private navigateToSearchResult(path: string): void {
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
@@ -2447,7 +2474,35 @@ class EditorControllerImpl implements EditorController {
       { groupId },
       "danger",
     );
-    headingRow.append(heading, copyGroup, removeGroup);
+    const savedGroupId = this.savedGroupId(group);
+    const enablement = this.options.groupEnablement;
+    if (enablement && savedGroupId) {
+      const enableButton = this.document.createElement("button");
+      enableButton.type = "button";
+      enableButton.dataset.groupEnable = "true";
+      enableButton.dataset.groupId = savedGroupId;
+      enableButton.dataset.btn = "primary";
+      this.applyGroupEnablementLabel(
+        enableButton,
+        enablement.isEnabled(savedGroupId) === true,
+        groupName,
+      );
+      enableButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (enableButton.disabled) return;
+        const next = enablement.isEnabled(savedGroupId) !== true;
+        enableButton.disabled = true;
+        void Promise.resolve(enablement.setEnabled(savedGroupId, next)).finally(
+          () => {
+            if (enableButton.isConnected) enableButton.disabled = false;
+          },
+        );
+      });
+      headingRow.append(heading, enableButton, copyGroup, removeGroup);
+    } else {
+      headingRow.append(heading, copyGroup, removeGroup);
+    }
     this.form.append(headingRow);
 
     const settings = this.document.createElement("fieldset");
@@ -3300,6 +3355,35 @@ class EditorControllerImpl implements EditorController {
     button.textContent = label;
     button.dataset.editorKey = `button:${key}`;
     return button;
+  }
+
+  private applyGroupEnablementLabel(
+    button: HTMLButtonElement,
+    enabled: boolean,
+    groupName: string,
+  ): void {
+    const action = enabled ? "Disable" : "Enable";
+    button.textContent = action;
+    button.setAttribute("aria-label", `${action} group ${groupName}`);
+  }
+
+  private bindSavedGroupIds(): void {
+    for (let index = 0; index < this.draft.groups.length; index += 1) {
+      const draftGroup = this.draft.groups[index];
+      const savedGroup = this.committed.groups[index];
+      const savedId = savedGroup?.id;
+      if (!draftGroup || typeof savedId !== "string" || savedId.length === 0) {
+        continue;
+      }
+      this.savedGroupIds.set(draftGroup, savedId);
+    }
+  }
+
+  private savedGroupId(group: DraftGroup): string | undefined {
+    const savedId = this.savedGroupIds.get(group);
+    return typeof savedId === "string" && savedId.length > 0
+      ? savedId
+      : undefined;
   }
 
   private createCommandButton(

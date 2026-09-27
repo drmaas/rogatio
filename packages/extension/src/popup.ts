@@ -306,17 +306,16 @@ function render(): void {
     status.dataset.groupStatus = "true";
     status.textContent = statusLabel(group.status);
 
-    const toggle = document.createElement("input");
-    toggle.type = "checkbox";
-    toggle.checked = group.enabled;
+    const toggle = document.createElement("button");
+    toggle.type = "button";
     toggle.dataset.groupToggle = "true";
-    toggle.setAttribute(
-      "aria-label",
-      `${group.enabled ? "Deactivate" : "Activate"} group ${group.name}`,
-    );
-    toggle.addEventListener("change", async (event) => {
+    const action = group.enabled ? "Disable" : "Enable";
+    toggle.textContent = action;
+    toggle.setAttribute("aria-label", `${action} group ${group.name}`);
+    toggle.addEventListener("click", async (event) => {
+      event.preventDefault();
       event.stopPropagation();
-      await current.toggle(group.id, toggle.checked);
+      await current.toggle(group.id, !group.enabled);
       await refresh();
     });
 

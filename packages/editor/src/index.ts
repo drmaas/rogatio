@@ -15,6 +15,7 @@ export type {
   EditorAIAssistHandler,
   EditorController,
   EditorDiagnostic,
+  EditorGroupEnablement,
   EditorOptions,
   EditorProjectSnapshot,
   EditorSaveHandler,
