@@ -26,6 +26,20 @@ type MockEnvelope = {
   }>;
   nativeRuntimeState?: { phase: string };
   nativeRuntimeError?: string;
+  aiCheck?: AiCheck;
+};
+
+/** The service worker's check-ai-support answer (issue #241 response shape). */
+type AiCheck = {
+  supported: boolean;
+  reported: boolean;
+  providerUrl?: string;
+  model?: string;
+  /**
+   * Simulates a leaky transport. The real host never sends the key; the page
+   * must never render it even if it arrives (AC-008).
+   */
+  apiKey?: string;
 };
 
 const sidebarProject: MockProject = {
@@ -137,6 +151,13 @@ function installChromeMock(seed: MockEnvelope): void {
           ) {
             const next = message.projectId;
             if (next && state.projects[next]) state.activeProjectId = next;
+          }
+          if (message.command === "check-ai-support") {
+            callback({
+              ok: true,
+              value: state.aiCheck ?? { supported: false, reported: false },
+            });
+            return;
           }
           callback({ ok: true, value: state });
         },
@@ -253,16 +274,93 @@ test("runtime card surfaces diagnostics and the error when the host failed", asy
   );
 });
 
-test("AI card carries the AI status and nothing else", async ({ page }) => {
+test("AI card shows the reported provider and model (AC-007)", async ({
+  page,
+}) => {
   await page.addInitScript(
     installChromeMock,
-    sidebarEnvelope({ nativeRuntimeState: { phase: "started" } }),
+    sidebarEnvelope({
+      nativeRuntimeState: { phase: "started" },
+      aiCheck: {
+        supported: true,
+        reported: true,
+        providerUrl: "https://api.example.com/v1",
+        model: "example-model-1",
+        apiKey: "sk-mock-secret-123",
+      },
+    }),
   );
   await openWorkspace(page);
 
   const ai = sidebarCard(page, "ai");
-  await expect(ai.locator("[data-ai-status]")).toHaveCount(1);
-  // Provider and model are issue #241, not this change.
+  await expect(ai.locator("[data-ai-status]")).toHaveText("AI: Configured");
+  await expect(ai.locator("[data-ai-provider]")).toHaveText(
+    "Provider: https://api.example.com/v1",
+  );
+  await expect(ai.locator("[data-ai-model]")).toHaveText(
+    "Model: example-model-1",
+  );
+  // AC-008: even a leaky transport cannot put the key in the DOM.
+  await expect(page.locator("body")).not.toContainText("sk-mock-secret-123");
+});
+
+test("AI card shows Not configured without provider lines (AC-007)", async ({
+  page,
+}) => {
+  await page.addInitScript(
+    installChromeMock,
+    sidebarEnvelope({
+      nativeRuntimeState: { phase: "started" },
+      aiCheck: { supported: false, reported: true },
+    }),
+  );
+  await openWorkspace(page);
+
+  const ai = sidebarCard(page, "ai");
+  await expect(ai.locator("[data-ai-status]")).toHaveText("AI: Not configured");
+  await expect(ai.locator("[data-ai-provider]")).toHaveCount(0);
+  await expect(ai.locator("[data-ai-model]")).toHaveCount(0);
+});
+
+test("AI card degrades to not reported, not an error state (AC-005)", async ({
+  page,
+}) => {
+  await page.addInitScript(
+    installChromeMock,
+    sidebarEnvelope({
+      nativeRuntimeState: { phase: "started" },
+      aiCheck: { supported: false, reported: false },
+    }),
+  );
+  await openWorkspace(page);
+
+  const ai = sidebarCard(page, "ai");
+  await expect(ai.locator("[data-ai-status]")).toHaveText("AI: not reported");
+  await expect(ai.locator("[data-ai-provider]")).toHaveCount(0);
+  await expect(ai.locator("[data-ai-model]")).toHaveCount(0);
+  // Not an error state: the sidebar keeps its other cards and shows no error.
+  await expect(sidebarCard(page, "rules")).toBeVisible();
+  await expect(page.locator("[data-runtime-error]")).toHaveCount(0);
+});
+
+test("AI card keeps needs runtime precedence over reported metadata (AC-010)", async ({
+  page,
+}) => {
+  await page.addInitScript(
+    installChromeMock,
+    sidebarEnvelope({
+      aiCheck: {
+        supported: true,
+        reported: true,
+        providerUrl: "https://api.example.com/v1",
+        model: "example-model-1",
+      },
+    }),
+  );
+  await openWorkspace(page);
+
+  const ai = sidebarCard(page, "ai");
+  await expect(ai.locator("[data-ai-status]")).toHaveText("AI: needs runtime");
   await expect(ai.locator("[data-ai-provider]")).toHaveCount(0);
 });
 

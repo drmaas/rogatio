@@ -75,6 +75,10 @@ let installCommand: string | null = null;
 /** AI support status from native host */
 let aiSupported = false;
 let aiStatusChecked = false;
+/** Whether the host reported provider metadata at the last check. */
+let aiReported = false;
+/** Host-reported provider metadata for display; never contains the API key. */
+let aiProvider: { url: string; model: string } | null = null;
 let aiPromptOpen = false;
 let aiBusy = false;
 let aiPreview: unknown | null = null;
@@ -609,26 +613,43 @@ function createSidebar(): HTMLElement {
   }
   sidebar.append(runtime.card);
 
-  // AI card: status only. Provider and model reporting is issue #241.
-  const aiTone = aiSupported ? "ok" : aiStatusChecked ? "warn" : "muted";
+  // AI card: status plus host-reported provider metadata (issue #241). The
+  // host never sends the API key, so the card never renders it (spec REQ-010).
+  const aiTone = aiSupported
+    ? "ok"
+    : aiStatusChecked && aiReported
+      ? "warn"
+      : "muted";
   const ai = createSidebarCard("ai", "AI", aiTone);
   const aiStatus = document.createElement("p");
   aiStatus.dataset.aiStatus = "true";
   aiStatus.className = "rogatio-ai-status";
-  if (aiSupported) {
-    aiStatus.textContent = "AI: Ready";
-    aiStatus.className += " rogatio-ai-ready";
-  } else if (state.nativeRuntimeState?.phase !== "started") {
+  const aiProviderInfo = aiSupported ? aiProvider : null;
+  if (state.nativeRuntimeState?.phase !== "started") {
     aiStatus.textContent = "AI: needs runtime";
     aiStatus.className += " rogatio-ai-needs-runtime";
-  } else if (state.nativeRuntimeState?.phase === "started" && aiStatusChecked) {
-    aiStatus.textContent = "AI: Not configured";
-    aiStatus.className += " rogatio-ai-not-configured";
+  } else if (aiProviderInfo !== null) {
+    aiStatus.textContent = "AI: Configured";
+    aiStatus.className += " rogatio-ai-ready";
+  } else if (aiStatusChecked && !aiReported) {
+    aiStatus.textContent = "AI: not reported";
+    aiStatus.className += " rogatio-ai-not-reported";
   } else {
     aiStatus.textContent = "AI: Not configured";
     aiStatus.className += " rogatio-ai-not-configured";
   }
   ai.body.append(aiStatus);
+  if (aiProviderInfo !== null) {
+    const aiProviderLine = document.createElement("p");
+    aiProviderLine.dataset.aiProvider = "true";
+    aiProviderLine.className = "rogatio-ai-provider";
+    aiProviderLine.textContent = `Provider: ${aiProviderInfo.url}`;
+    const aiModelLine = document.createElement("p");
+    aiModelLine.dataset.aiModel = "true";
+    aiModelLine.className = "rogatio-ai-model";
+    aiModelLine.textContent = `Model: ${aiProviderInfo.model}`;
+    ai.body.append(aiProviderLine, aiModelLine);
+  }
   sidebar.append(ai.card);
 
   // Project switching and import are dashboard actions. Workspace controls
@@ -1594,14 +1615,49 @@ async function checkNativeAISupport(): Promise<void> {
       version: 1,
       command: "check-ai-support",
     });
-    aiSupported =
+    const value =
       response?.ok === true &&
       typeof response.value === "object" &&
-      response.value !== null &&
-      (response.value as { supported?: unknown }).supported === true;
+      response.value !== null
+        ? (response.value as {
+            supported?: unknown;
+            reported?: unknown;
+            providerUrl?: unknown;
+            model?: unknown;
+          })
+        : null;
+    const reported = value?.reported === true;
+    const providerUrl = value?.providerUrl;
+    const model = value?.model;
+    if (
+      reported &&
+      value?.supported === true &&
+      typeof providerUrl === "string" &&
+      providerUrl.length > 0 &&
+      typeof model === "string" &&
+      model.length > 0
+    ) {
+      aiSupported = true;
+      aiReported = true;
+      // Copy the two display strings only; nothing else from the response
+      // reaches the DOM.
+      aiProvider = { url: providerUrl, model };
+    } else if (reported && value?.supported === true) {
+      // Partial metadata is non-conforming: "not reported", never a
+      // half-populated card (spec REQ-007).
+      aiSupported = false;
+      aiReported = false;
+      aiProvider = null;
+    } else {
+      aiSupported = false;
+      aiReported = reported;
+      aiProvider = null;
+    }
     aiStatusChecked = true;
   } catch {
     aiSupported = false;
+    aiReported = false;
+    aiProvider = null;
     aiStatusChecked = true;
   }
 }
@@ -1769,6 +1825,8 @@ async function refresh(
   } else {
     aiSupported = false;
     aiStatusChecked = false;
+    aiReported = false;
+    aiProvider = null;
   }
   const aiSupportChanged = previousAiSupported !== aiSupported;
 

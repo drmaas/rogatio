@@ -27,6 +27,7 @@ import { RUNTIME_LIMITS } from "./limits.js";
 import { mintToken, type RenderedMock, renderMockResponse } from "./mock.js";
 import { normalizeRuntimePreset } from "./preset.js";
 import type {
+  AIStatusMetadata,
   AuthorizeRequest,
   Envelope,
   EnvelopeInput,
@@ -77,6 +78,14 @@ export interface NativeRuntimeControllerOptions {
   readonly clock?: () => number;
   /** Optional AI provider config for AI completions via native messaging. */
   readonly aiProviderConfig?: AIProviderConfig;
+  /**
+   * Optional reader for re-reading the AI provider config while the host runs.
+   * When present, every AI envelope refreshes the config and rebuilds the client
+   * when it changed, so `rogatio ai setup` takes effect without a host restart
+   * (spec REQ-003). When absent, the launch-time `aiProviderConfig` stays in
+   * force unchanged.
+   */
+  readonly aiConfigReader?: () => Promise<AIProviderConfig | null>;
 }
 
 export interface RuntimeStartResult {
@@ -151,10 +160,55 @@ export function createNativeRuntimeController(
   let activePolicy: ActiveRuntimePolicy | null = null;
   const mockTokens = new Map<string, RuntimeMockConfig>();
 
-  // Initialize AI client if config provided
+  // AI provider config in force and its client. When `aiConfigReader` is wired,
+  // both are refreshed on every AI envelope so config changes take effect
+  // without a host restart and the reported metadata can never disagree with
+  // the client (spec REQ-003).
+  let aiConfigInForce: AIProviderConfig | null =
+    options.aiProviderConfig ?? null;
   let aiClient: AIClient | undefined;
-  if (options.aiProviderConfig) {
-    aiClient = createAIClient(options.aiProviderConfig);
+  if (aiConfigInForce) {
+    aiClient = createAIClient(aiConfigInForce);
+  }
+
+  function isUsableAIProviderConfig(value: unknown): value is AIProviderConfig {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+    const record = value as Record<string, unknown>;
+    return (
+      typeof record.providerUrl === "string" &&
+      record.providerUrl.length > 0 &&
+      typeof record.model === "string" &&
+      record.model.length > 0 &&
+      typeof record.apiKey === "string" &&
+      record.apiKey.length > 0
+    );
+  }
+
+  function canonicalAIConfig(config: AIProviderConfig | null): string {
+    return config === null
+      ? "null"
+      : JSON.stringify([config.providerUrl, config.model, config.apiKey]);
+  }
+
+  async function refreshAIProviderConfig(): Promise<AIProviderConfig | null> {
+    const reader = options.aiConfigReader;
+    if (!reader) return aiConfigInForce;
+    let next: AIProviderConfig | null = null;
+    try {
+      const read = await reader();
+      next = isUsableAIProviderConfig(read) ? read : null;
+    } catch {
+      // A malformed or unreadable config file reports unconfigured: never a
+      // throw, never partial metadata (spec REQ-001, REQ-010).
+      next = null;
+    }
+    if (canonicalAIConfig(next) !== canonicalAIConfig(aiConfigInForce)) {
+      aiConfigInForce = next;
+      aiClient = next ? createAIClient(next) : undefined;
+    }
+    return aiConfigInForce;
   }
 
   async function bindInterception(
@@ -659,7 +713,26 @@ export function createNativeRuntimeController(
             metadata: { state, presetDigest: preset.digest },
           };
         }
+        case "ai.status": {
+          const config = await refreshAIProviderConfig();
+          const metadata: AIStatusMetadata =
+            config !== null
+              ? {
+                  configured: true,
+                  providerUrl: config.providerUrl,
+                  model: config.model,
+                }
+              : { configured: false };
+          return {
+            protocol: "v1",
+            type: "ai.status",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata,
+          };
+        }
         case "ai.complete": {
+          await refreshAIProviderConfig();
           if (!aiClient) {
             return {
               protocol: "v1",
@@ -685,7 +758,7 @@ export function createNativeRuntimeController(
           try {
             const result = await aiClient.complete({
               messages: [...meta.messages] as ChatMessage[],
-              model: meta.model || options.aiProviderConfig?.model || "",
+              model: meta.model || aiConfigInForce?.model || "",
               temperature: meta.temperature,
               responseFormat: meta.responseFormat,
             });
@@ -715,6 +788,7 @@ export function createNativeRuntimeController(
           }
         }
         case "ai.stream.chunk": {
+          await refreshAIProviderConfig();
           if (!aiClient) {
             return {
               protocol: "v1",
@@ -739,7 +813,7 @@ export function createNativeRuntimeController(
           try {
             for await (const chunk of aiClient.stream({
               messages: [...meta.messages] as ChatMessage[],
-              model: meta.model || options.aiProviderConfig?.model || "",
+              model: meta.model || aiConfigInForce?.model || "",
               temperature: meta.temperature,
             })) {
               // For streaming, we return each chunk as a separate envelope

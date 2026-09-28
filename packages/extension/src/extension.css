@@ -371,6 +371,17 @@ body {
 .rogatio-ai-not-configured::before {
   background: var(--rogatio-warning, var(--rogatio-faint));
 }
+.rogatio-ai-not-reported::before {
+  background: var(--rogatio-faint);
+}
+.rogatio-ai-provider,
+.rogatio-ai-model {
+  margin: 0;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.75rem;
+  color: var(--rogatio-faint);
+  overflow-wrap: anywhere;
+}
 
 .rogatio-runtime-status {
   display: flex;

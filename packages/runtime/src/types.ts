@@ -314,7 +314,22 @@ export type EnvelopeMessageType =
   | "mock.response"
   | "ai.complete"
   | "ai.stream.chunk"
-  | "ai.error";
+  | "ai.error"
+  | "ai.status";
+
+/**
+ * Provider metadata reported by `ai.status` (spec REQ-001). This is a pick-type:
+ * the API key must never cross the host boundary, so `AIProviderConfig` is never
+ * serialized into an envelope. Optional fields are omitted (not `undefined`-valued)
+ * when unconfigured.
+ */
+export type AIStatusMetadata =
+  | { readonly configured: false }
+  | {
+      readonly configured: true;
+      readonly providerUrl: string;
+      readonly model: string;
+    };
 
 export interface PairRequest {
   readonly capability: string;

@@ -350,3 +350,9 @@ rogatio ai test        # Test connection
 ---
 
 **Approval**: This specification requires explicit human approval before implementation plan (Stage 5).
+
+> Superseded by: docs/specs/ai-provider-metadata.md — the AI wire registry gains the additive
+> `ai.status` envelope (the three-type registry claimed here is extended, not replaced), and
+> the extension's AI capability check is metadata-only instead of a completion probe. Provider
+> config is re-read while the host runs, so "read once at launch" no longer describes the
+> runtime. `ai.complete` / `ai.stream.chunk` / `ai.error` semantics stand.

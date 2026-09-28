@@ -461,32 +461,82 @@ export async function* requestAIStream(
   }
 }
 
+/** Provider metadata reported by the native host via `ai.status` (spec REQ-001). */
+export type AIStatusReport =
+  | { readonly configured: false }
+  | {
+      readonly configured: true;
+      readonly providerUrl: string;
+      readonly model: string;
+    };
+
 /**
- * Check if the native host supports AI (has send method and AI configured).
+ * Upper bound for the `ai.status` reply. An older host does not know the
+ * envelope type and never answers, so the bridge would wait out its full
+ * timeout; bounding the wait keeps a stale host from slowing the page down
+ * (spec REQ-007).
  */
-export async function checkAISupport(
+const AI_STATUS_TIMEOUT_MS = 2000;
+
+function isAIStatusResponse(response: NativeEnvelopeResponse): boolean {
+  return (
+    response.type === "ai.status" &&
+    typeof response.metadata === "object" &&
+    response.metadata !== null &&
+    typeof (response.metadata as Record<string, unknown>).configured ===
+      "boolean"
+  );
+}
+
+/**
+ * Ask the native host for its AI provider metadata. Metadata only: this issues
+ * no completion request and no provider network traffic (spec REQ-004).
+ *
+ * Returns null whenever the host does not report: an older host that rejects the
+ * unknown envelope type, a dropped frame, a bridge timeout, or non-conforming
+ * metadata (spec REQ-007). The API key is never part of this exchange.
+ */
+export async function requestAIStatus(
   options: NativeSessionOptions,
-): Promise<boolean> {
+): Promise<AIStatusReport | null> {
   const send = options.nativeRuntime.send;
-  if (!send) return false;
+  if (!send) return null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const response = await send({
+    const sent = send({
       protocol: "v1",
-      type: "ai.complete",
+      type: "ai.status",
       requestId: crypto.randomUUID(),
       timestamp: Date.now(),
-      metadata: {
-        messages: [{ role: "user", content: "ping" }],
-        model: "test",
-      },
-    });
-    return (
-      response.type !== "ai.error" ||
-      (response.metadata as AIErrorResponse["metadata"]).code !==
-        "ai.not-configured"
+      metadata: {},
+    }).then(
+      (response: NativeEnvelope) => response,
+      // The bridge rejects when the host never answers (older host).
+      () => null,
     );
+    const bounded = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), AI_STATUS_TIMEOUT_MS);
+    });
+    const response = await Promise.race([sent, bounded]);
+    if (response === null || !isAIStatusResponse(response)) return null;
+    const metadata = response.metadata as Record<string, unknown>;
+    if (metadata.configured !== true) return { configured: false };
+    const providerUrl = metadata.providerUrl;
+    const model = metadata.model;
+    if (
+      typeof providerUrl !== "string" ||
+      providerUrl.length === 0 ||
+      typeof model !== "string" ||
+      model.length === 0
+    ) {
+      // Partial metadata is non-conforming: never a half-rendered card.
+      return null;
+    }
+    return { configured: true, providerUrl, model };
   } catch {
-    return false;
+    return null;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
