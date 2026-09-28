@@ -653,3 +653,94 @@ describe("group enablement heading button", () => {
     editor.destroy();
   });
 });
+
+describe("workspace action layout", () => {
+  function openGroup(root: HTMLElement): void {
+    root
+      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  }
+
+  it("clusters group actions beside the name and repeats them under the rules", () => {
+    const { root, editor } = createTestEditor();
+    openGroup(root);
+    const headingActions = root.querySelector(
+      "[data-group-heading] [data-group-actions]",
+    );
+    expect(
+      headingActions?.querySelector('[data-command="copy-group"]'),
+    ).not.toBeNull();
+    expect(
+      headingActions?.querySelector('[data-command="remove-group"]'),
+    ).not.toBeNull();
+    expect(headingActions?.querySelector("[data-group-enable]")).toBeNull();
+    expect(
+      root.querySelector(
+        "[data-editor-command-bar] [data-action-cluster='commit'] [data-command='save']",
+      ),
+    ).not.toBeNull();
+
+    const dock = root.querySelector("[data-action-dock]");
+    expect(dock?.textContent).toContain("Rules");
+    expect(dock?.textContent).toContain("Group");
+    expect(dock?.textContent).toContain("Project");
+    expect(dock?.querySelector('[data-command="add-rule"]')).not.toBeNull();
+    expect(dock?.querySelector('[data-command="copy-group"]')).not.toBeNull();
+    expect(dock?.querySelector('[data-command="remove-group"]')).not.toBeNull();
+    expect(dock?.querySelector('[data-command="validate"]')).not.toBeNull();
+    expect(dock?.querySelector('[data-command="save"]')).not.toBeNull();
+    expect(dock?.querySelector('[data-command="cancel"]')).not.toBeNull();
+
+    const before = root.querySelectorAll("[data-rule-card]").length;
+    dock
+      ?.querySelector<HTMLButtonElement>('[data-command="add-rule"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelectorAll("[data-rule-card]").length).toBe(before + 1);
+    expect(
+      root.querySelector("[data-action-dock] [data-command='add-rule']"),
+    ).not.toBeNull();
+    editor.destroy();
+  });
+
+  it("repeats Add group and project actions under the group list", () => {
+    const { root, editor } = createTestEditor();
+    root
+      .querySelector('[data-desktop-route-rail] button[data-route="project"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const dock = root.querySelector("[data-action-dock]");
+    expect(dock?.querySelector('[data-command="add-group"]')).not.toBeNull();
+    expect(dock?.querySelector('[data-command="save"]')).not.toBeNull();
+    expect(dock?.querySelector('[data-command="copy-group"]')).toBeNull();
+    expect(dock?.querySelector('[data-command="add-rule"]')).toBeNull();
+    editor.destroy();
+  });
+
+  it("keeps the dock enable control on the saved group id", () => {
+    const calls: Array<{ groupId: string; enabled: boolean }> = [];
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: emptyProject,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      groupEnablement: {
+        isEnabled: () => true,
+        setEnabled(groupId, enabled) {
+          calls.push({ groupId, enabled });
+        },
+      },
+    });
+    root
+      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const button = root.querySelector<HTMLButtonElement>(
+      "[data-action-dock] [data-group-enable]",
+    );
+    expect(button?.textContent).toBe("Disable");
+    expect(button?.getAttribute("aria-label")).toBe("Disable group One");
+    button?.click();
+    expect(calls).toEqual([{ groupId: "group-one", enabled: false }]);
+    editor.destroy();
+  });
+});
