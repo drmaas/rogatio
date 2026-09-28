@@ -232,7 +232,11 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
       const policy = controller.getActivePolicy();
       interceptProxy = await startInterceptProxy({
         policy: policy
-          ? { project: policy.project, operations: policy.operations }
+          ? {
+              project: policy.project,
+              operations: policy.operations,
+              presetDigest: policy.presetDigest,
+            }
           : null,
       });
       return interceptProxy.endpoint;
@@ -262,7 +266,11 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
       const policy = controller.getActivePolicy();
       interceptProxy?.setPolicy(
         policy
-          ? { project: policy.project, operations: policy.operations }
+          ? {
+              project: policy.project,
+              operations: policy.operations,
+              presetDigest: policy.presetDigest,
+            }
           : null,
       );
       return endpoint;

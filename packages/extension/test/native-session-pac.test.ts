@@ -38,18 +38,30 @@ const bodyProject = {
           type: "request-body",
           requestBody: { mode: "replace", body: '{"replaced":true}' },
         },
+        {
+          id: "rule-response-prefix",
+          name: "Rewrite capture path",
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://example\\.com/data\\.json/([^/]+)",
+          },
+          resourceTypes: ["main_frame"],
+          priority: 70,
+          type: "response-body",
+          responseBody: {
+            replacements: [{ pattern: "old", replacement: "new" }],
+          },
+        },
       ],
     },
   ],
 };
 
 describe("startNativeSession pacRoutes", () => {
-  it("derives pacRoutes from literal hosts and exact URL body rules", async () => {
+  it("steers request-body hosts and omits response-body rules", async () => {
     const start = vi.fn(async (config: { pacRoutes: readonly string[] }) => {
-      expect(config.pacRoutes).toEqual([
-        "127.0.0.1",
-        "http://127.0.0.1:8080/submit",
-      ]);
+      expect(config.pacRoutes).toEqual(["steer:http://127.0.0.1:8080"]);
       return { state: "started" as const };
     });
     const result = await startNativeSession({

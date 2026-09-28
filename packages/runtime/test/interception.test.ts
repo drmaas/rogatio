@@ -106,6 +106,28 @@ describe(" interception provider", () => {
     expect(platform.removePac).not.toHaveBeenCalled();
   });
 
+  it("starts the listener without PAC or CA when there are no routes", async () => {
+    const platform = adapter({
+      detect: () => ({
+        supported: true,
+        reasons: [],
+        trustedDeviceLocalCa: false,
+        controllingProxy: false,
+        controllingPac: false,
+        controllingExtension: false,
+        enterprisePolicy: false,
+      }),
+    });
+    const provider = createPlatformInterceptionProvider(platform);
+    const endpoint = await provider.start(activation, []);
+    expect(endpoint).toEqual({ host: "127.0.0.1", port: 9999 });
+    expect(platform.installPac).not.toHaveBeenCalled();
+    expect(platform.provisionOrVerifyCa).not.toHaveBeenCalled();
+    await provider.stop();
+    expect(platform.removePac).not.toHaveBeenCalled();
+    expect(platform.stopTlsProxy).toHaveBeenCalledOnce();
+  });
+
   it("reports unsupported capability without provisioning or routing", async () => {
     const platform = adapter({
       detect: () => ({

@@ -1,7 +1,8 @@
 import {
+  isPacSafeSource,
   literalHostname,
-  literalUrl,
   type NormalizedMatcher,
+  steeredRequestOrigin,
 } from "@rogatio/compiler";
 
 export interface ProjectedSourceCondition {
@@ -50,9 +51,15 @@ export function projectSourceCondition(
   };
 }
 
-export function isPacRoutableBodySource(matcher: NormalizedMatcher): boolean {
+/**
+ * Request-body PAC steer. A host-key literal, or a URL regex that names one
+ * literal host (`^https://api.example.com/` with escaped dots, a slash after
+ * the host, and no top-level `|`). Response-body rules are not PAC routes.
+ */
+export function isRequestBodySteerable(matcher: NormalizedMatcher): boolean {
+  if (!isPacSafeSource(matcher.source)) return false;
   return (
     literalHostname(matcher.source) !== null ||
-    literalUrl(matcher.source) !== null
+    steeredRequestOrigin(matcher.source) !== null
   );
 }

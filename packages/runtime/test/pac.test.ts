@@ -25,6 +25,29 @@ describe("generatePacScript", () => {
     expect(script).toContain("return 'DIRECT';");
   });
 
+  it("steers scheme and host without a path regex or RegExp", () => {
+    const script = generatePacScript(
+      [{ steer: { scheme: "https", host: "example.com" } }],
+      { host: "127.0.0.1", port: 8080 },
+    );
+    expect(script).toContain(
+      'if (host === "example.com" && url.indexOf("https://example.com") === 0)',
+    );
+    expect(script).not.toContain("data.json");
+    expect(script).not.toMatch(/RegExp/);
+    expect(script).not.toMatch(/new URL/);
+  });
+
+  it("pins an explicit port so a longer port is not steered", () => {
+    const script = generatePacScript(
+      [{ steer: { scheme: "http", host: "127.0.0.1", port: 8080 } }],
+      { host: "127.0.0.1", port: 9 },
+    );
+    expect(script).toContain('url.indexOf("http://127.0.0.1:8080/") === 0');
+    expect(script).toContain('url === "http://127.0.0.1:8080"');
+    expect(script).not.toContain("data.json");
+  });
+
   it("proxies an exact URL with string equality and no RegExp", () => {
     const script = generatePacScript(
       [{ url: "https://example.com/data.json" }],
@@ -69,11 +92,39 @@ describe("pacRoutesFromSources", () => {
     ]);
     expect(routes).toEqual([
       { hostname: "127.0.0.1" },
-      { url: "http://127.0.0.1:8080/data.json" },
+      { steer: { scheme: "http", host: "127.0.0.1", port: 8080 } },
     ]);
   });
 
-  it("refuses unsafe regex sources", () => {
+  it("steers one literal host and omits an unsafe path and top-level alternation", () => {
+    const routes = pacRoutesFromSources([
+      {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/data\\.json/([^/]+)",
+      },
+      {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/.*$",
+      },
+      {
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/x/((a+)+)",
+      },
+      {
+        key: "url",
+        operator: "regex",
+        value: "^https://a\\.example\\.com/|^https://b\\.example\\.com/",
+      },
+    ]);
+    expect(routes).toEqual([
+      { steer: { scheme: "https", host: "example.com" } },
+    ]);
+  });
+
+  it("refuses a quantified group that contains an unbounded quantifier", () => {
     expect(
       isPacSafeSource({
         key: "host",
@@ -81,5 +132,12 @@ describe("pacRoutesFromSources", () => {
         value: "^(a+)+$",
       }),
     ).toBe(false);
+    expect(
+      isPacSafeSource({
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/data\\.json/([^/]+)",
+      }),
+    ).toBe(true);
   });
 });

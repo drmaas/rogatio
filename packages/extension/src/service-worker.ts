@@ -32,7 +32,7 @@ import {
 } from "./native-session.js";
 import { type ExtensionRequest, parseRequest } from "./protocol.js";
 import {
-  isPacRoutableBodySource,
+  isRequestBodySteerable,
   projectSourceCondition,
 } from "./source-projection.js";
 
@@ -80,6 +80,7 @@ export interface ExtensionApplicationOptions {
     start(config: NativeRuntimeConfig): Promise<{
       readonly state: NativeRuntimePhase | "unsupported";
       readonly message?: string;
+      readonly proxy?: { readonly host: string; readonly port: number };
     }>;
     stop(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
     status(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
@@ -204,7 +205,10 @@ function operationStatuses(
           diagnostics: [extensionDiagnostic("extension.unsupported")],
         };
       }
-      if (!isPacRoutableBodySource(operation.matcher)) {
+      if (
+        operation.kind === "request-body" &&
+        !isRequestBodySteerable(operation.matcher)
+      ) {
         return {
           groupId: status.groupId,
           ruleId: status.ruleId,

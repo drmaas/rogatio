@@ -12,8 +12,14 @@ import type {
 import { sourceMatches } from "@rogatio/compiler";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { rewriteRequestBody } from "./request-body.js";
-import { rewriteResponseBody } from "./response-body.js";
+import {
+  fetchAndRewriteAuthorizedResponse,
+  rewriteResponseBody,
+} from "./response-body.js";
+import { parseResponseBodyRedirect } from "./response-body-listener.js";
 import { revalidateAuthority } from "./revalidate.js";
+import type { PresetDigest } from "./types.js";
+import { canonicalizeOutboundTarget } from "./url.js";
 
 export interface ProxyEndpoint {
   readonly host: string;
@@ -23,6 +29,7 @@ export interface ProxyEndpoint {
 export interface InterceptProxyPolicy {
   readonly project: unknown;
   readonly operations: readonly RogatioOperation[];
+  readonly presetDigest?: string;
 }
 
 export interface InterceptProxyOptions {
@@ -335,6 +342,10 @@ function writeResponse(
   res.end(body);
 }
 
+function asPresetDigest(value: string): PresetDigest | null {
+  return value.startsWith("sha256:") ? (value as PresetDigest) : null;
+}
+
 function initiatorFromHeaders(
   headers: IncomingMessage["headers"],
   targetUrl: string,
@@ -379,8 +390,10 @@ function authorizeOp(
 }
 
 /**
- * Loopback HTTP forward proxy for body-rule rewrite (F23 REQ-5..11).
- * Absolute-form HTTP is matched and optionally rewritten; CONNECT is a blind tunnel.
+ * Loopback listener for body-rule rewrite.
+ * Response-body redirects arrive as origin-form `/.rogatio/body/...` and are
+ * revalidated, then fetched with a credential-free GET.
+ * Request-body HTTP arrives as absolute-form. CONNECT stays a blind tunnel.
  */
 export async function startInterceptProxy(
   options: InterceptProxyOptions = {},
@@ -401,6 +414,10 @@ export async function startInterceptProxy(
   ): Promise<void> {
     try {
       const targetUrl = req.url ?? "";
+      if (targetUrl.startsWith("/.rogatio/body/")) {
+        await handleResponseBodyRedirect(req, res, targetUrl);
+        return;
+      }
       if (!/^https?:\/\//i.test(targetUrl)) {
         res.writeHead(400);
         res.end();
@@ -545,6 +562,119 @@ export async function startInterceptProxy(
         res.end();
       }
     }
+  }
+
+  async function handleResponseBodyRedirect(
+    req: IncomingMessage,
+    res: ServerResponse,
+    rawUrl: string,
+  ): Promise<void> {
+    const method = (req.method ?? "GET").toUpperCase();
+    if (method !== "GET") {
+      res.writeHead(405);
+      res.end();
+      return;
+    }
+    const parsed = parseResponseBodyRedirect(rawUrl);
+    const active = policy;
+    if (
+      parsed === null ||
+      active === null ||
+      active.presetDigest === undefined
+    ) {
+      res.writeHead(parsed === null ? 400 : 403);
+      res.end();
+      return;
+    }
+    const presetDigest = asPresetDigest(active.presetDigest);
+    if (presetDigest === null || parsed.digest !== presetDigest) {
+      res.writeHead(403);
+      res.end();
+      return;
+    }
+    const operation = active.operations.find(
+      (op): op is ResponseBodyOperation =>
+        op.kind === "response-body" && op.ruleId === parsed.ruleId,
+    );
+    if (
+      operation === undefined ||
+      !sourceMatches(operation.matcher.source, parsed.originalUrl)
+    ) {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
+    if (
+      operation.matcher.method !== undefined &&
+      operation.matcher.method !== "GET"
+    ) {
+      res.writeHead(405);
+      res.end();
+      return;
+    }
+    const target = canonicalizeOutboundTarget(parsed.originalUrl);
+    if (target === null) {
+      res.writeHead(400);
+      res.end();
+      return;
+    }
+    const allowed = revalidateAuthority(active.project, active.operations, {
+      groupId: operation.groupId,
+      ruleId: operation.ruleId,
+      url: parsed.originalUrl,
+      target,
+      method: "GET",
+      initiator:
+        initiatorFromHeaders(req.headers, parsed.originalUrl) ??
+        new URL(target).origin,
+      resourceType: operation.matcher.resourceTypes[0],
+    });
+    if (!allowed.allowed) {
+      res.writeHead(403);
+      res.end();
+      return;
+    }
+    const fetched = await fetchAndRewriteAuthorizedResponse(
+      {
+        groupId: operation.groupId,
+        ruleId: operation.ruleId,
+        operationId: operation.ruleId,
+        kind: "outbound-http",
+        target,
+        method: "GET",
+        sourceValue: operation.matcher.source.value,
+        presetDigest,
+      },
+      operation.responseBody,
+    );
+    if (!fetched.ok) {
+      res.writeHead(502);
+      res.end();
+      return;
+    }
+    const headers: Record<string, string | string[]> = {};
+    for (const [name, value] of fetched.value.headers) {
+      const lower = name.toLowerCase();
+      if (
+        lower === "set-cookie" ||
+        lower === "cookie" ||
+        lower === "authorization" ||
+        lower === "proxy-authorization"
+      ) {
+        continue;
+      }
+      const existing = headers[lower];
+      if (existing === undefined) headers[lower] = value;
+      else if (Array.isArray(existing)) existing.push(value);
+      else headers[lower] = [existing, value];
+    }
+    writeResponse(
+      res,
+      fetched.value.status,
+      fetched.value.status === 200 ? "OK" : "Upstream",
+      headers,
+      Buffer.from(fetched.value.body),
+    );
   }
 
   function handleConnect(

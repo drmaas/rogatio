@@ -78,9 +78,11 @@ per-origin grant step.
 2. After the group is enabled, each rule shows a status in the management page and the toolbar popup:
    `active`, `disabled`, `needs runtime`, `unsupported`, or `error`. Redirect, query, and
    header rules should read `active` once installed; response-body and request-body rules
-   read `needs runtime` until the native runtime is started. The sample body rules use exact
-   URLs, so they become `active` after start. A URL pattern that is not one exact URL stays
-   `needs runtime`, because the proxy cannot route it.
+   read `needs runtime` until the native runtime is started. A response-body rule matches
+   its URL regex in the browser and becomes `active` after start. A request-body rule
+   becomes `active` when its regex names one literal host, like `^https://api.example.com/`,
+   with escaped dots, a slash after the host, and no top-level `|`. The proxy then steers
+   that host. A request-body regex that does not name one literal host stays `needs runtime`.
 
 ## 5. Start the runtime (response-body, request-body)
 

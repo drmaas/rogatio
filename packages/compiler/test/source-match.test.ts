@@ -4,6 +4,7 @@ import {
   literalUrl,
   sameOrigin,
   sourceMatches,
+  steeredRequestOrigin,
 } from "../src/source-match.js";
 
 describe("sourceMatches", () => {
@@ -97,6 +98,70 @@ describe("literalUrl", () => {
         key: "url",
         operator: "regex",
         value: "^http://127\\.0\\.0\\.1/",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("steeredRequestOrigin", () => {
+  it("steers scheme and literal host, leaving the path regex out of the origin", () => {
+    expect(
+      steeredRequestOrigin({
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/data\\.json/([^/]+)",
+      }),
+    ).toEqual({ scheme: "https", host: "example.com" });
+    expect(
+      steeredRequestOrigin({
+        key: "url",
+        operator: "regex",
+        value: "^http://127\\.0\\.0\\.1:8080/submit$",
+      }),
+    ).toEqual({ scheme: "http", host: "127.0.0.1", port: 8080 });
+    expect(
+      steeredRequestOrigin({
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/.*$",
+      }),
+    ).toEqual({ scheme: "https", host: "example.com" });
+  });
+
+  it("rejects unescaped dots, a missing slash, top-level alternation, and unanchored patterns", () => {
+    expect(
+      steeredRequestOrigin({
+        key: "url",
+        operator: "regex",
+        value: "^https://example.com/data.json/",
+      }),
+    ).toBeNull();
+    expect(
+      steeredRequestOrigin({
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com$",
+      }),
+    ).toBeNull();
+    expect(
+      steeredRequestOrigin({
+        key: "url",
+        operator: "regex",
+        value: "^https://a\\.example\\.com/|^https://b\\.example\\.com/",
+      }),
+    ).toBeNull();
+    expect(
+      steeredRequestOrigin({
+        key: "url",
+        operator: "regex",
+        value: "https://example\\.com/data.json/",
+      }),
+    ).toBeNull();
+    expect(
+      steeredRequestOrigin({
+        key: "host",
+        operator: "regex",
+        value: "^example\\.com$",
       }),
     ).toBeNull();
   });

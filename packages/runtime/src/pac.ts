@@ -1,6 +1,12 @@
-import { literalHostname, literalUrl } from "@rogatio/compiler";
+import {
+  decodePacSteer,
+  isPacSafeSource,
+  literalHostname,
+  literalUrl,
+  type SteeredOrigin,
+  steeredRequestOrigin,
+} from "@rogatio/compiler";
 import type { SourceCondition } from "@rogatio/schema";
-import { isPacSafeSource } from "./pac-safety.js";
 import { MAX_PAC_ROUTES } from "./types.js";
 
 export interface PacEndpoint {
@@ -15,12 +21,14 @@ export interface PacOptions {
 export interface PacRoute {
   readonly hostname?: string;
   readonly url?: string;
+  readonly steer?: SteeredOrigin;
 }
 
 /**
- * Derive PAC routes from body-rule sources.
- * Literal hosts and exact http(s) URLs only. Wildcard URL patterns and
- * unsafe sources are omitted. No RegExp and no host extraction.
+ * Derive request-body PAC routes from sources.
+ * Host-key rules compare the PAC host. A URL regex that names one literal
+ * host steers `scheme://host/*`. The path regex is not copied into the script.
+ * Unsafe sources are omitted. No RegExp in the script.
  */
 export function pacRoutesFromSources(
   sources: readonly SourceCondition[],
@@ -33,6 +41,16 @@ export function pacRoutesFromSources(
     if (hostname !== null && !seen.has(`host:${hostname}`)) {
       seen.add(`host:${hostname}`);
       routes.push({ hostname });
+      continue;
+    }
+    const steer = steeredRequestOrigin(source);
+    if (steer !== null) {
+      const key = steerKey(steer);
+      if (!seen.has(key)) {
+        seen.add(key);
+        routes.push({ steer });
+      }
+      continue;
     }
     const url = literalUrl(source);
     if (url !== null && !seen.has(`url:${url}`)) {
@@ -45,8 +63,25 @@ export function pacRoutesFromSources(
   );
 }
 
+function steerKey(origin: SteeredOrigin): string {
+  const port = origin.port !== undefined ? `:${origin.port}` : "";
+  return `steer:${origin.scheme}://${origin.host}${port}`;
+}
+
 function routeValue(route: PacRoute): string {
+  if (route.steer !== undefined) return steerKey(route.steer);
   return route.url ?? route.hostname ?? "";
+}
+
+/** Decode a session pacRoutes string into a PAC route. Invalid entries are omitted. */
+export function pacRouteFromEntry(entry: string): PacRoute | null {
+  const steer = decodePacSteer(entry);
+  if (steer !== null) return { steer };
+  if (entry.includes("://")) {
+    return isExactHttpUrl(entry) ? { url: entry } : null;
+  }
+  if (entry.length === 0) return null;
+  return { hostname: entry };
 }
 
 function pacCheck(
@@ -56,6 +91,12 @@ function pacCheck(
     return {
       key: `url:${route.url}`,
       line: `url === ${JSON.stringify(route.url)}`,
+    };
+  }
+  if (route.steer !== undefined) {
+    return {
+      key: steerKey(route.steer),
+      line: steerPredicate(route.steer),
     };
   }
   if (
@@ -69,6 +110,21 @@ function pacCheck(
     };
   }
   return null;
+}
+
+function steerPredicate(origin: SteeredOrigin): string {
+  const hostCheck = `host === ${JSON.stringify(origin.host)}`;
+  const base =
+    origin.port !== undefined
+      ? `${origin.scheme}://${origin.host}:${origin.port}`
+      : `${origin.scheme}://${origin.host}`;
+  if (origin.port !== undefined) {
+    const withSlash = JSON.stringify(`${base}/`);
+    const exact = JSON.stringify(base);
+    const withQuery = JSON.stringify(`${base}?`);
+    return `${hostCheck} && (url.indexOf(${withSlash}) === 0 || url === ${exact} || url.indexOf(${withQuery}) === 0)`;
+  }
+  return `${hostCheck} && url.indexOf(${JSON.stringify(base)}) === 0`;
 }
 
 function isExactHttpUrl(value: string): boolean {
@@ -87,7 +143,8 @@ function isExactHttpUrl(value: string): boolean {
 
 /**
  * Generate a deterministic Chrome PAC script.
- * Literal hosts compare the PAC `host` argument. Exact URLs compare `url`.
+ * Literal hosts compare the PAC `host` argument. Steered origins compare
+ * `host` and a `scheme://host` prefix of `url`. Exact URLs compare `url`.
  * No RegExp and no URL parsing inside the script.
  */
 export function generatePacScript(

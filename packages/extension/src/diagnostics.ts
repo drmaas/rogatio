@@ -55,7 +55,7 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.source-unprojectable":
     "The rule source condition cannot be projected to browser rules.",
   "runtime.pac-unroutable":
-    "This body rule's URL pattern is not an exact URL, so the proxy leaves traffic direct.",
+    "This request-body rule does not name one literal host, so the proxy leaves traffic direct.",
   "extension.native-runtime-unavailable":
     "The runtime is unavailable on this platform.",
   "extension.native-runtime-transition": "The runtime could not change state.",

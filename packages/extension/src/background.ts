@@ -39,6 +39,7 @@ interface NativeRuntimeAdapter {
   start(config: NativeRuntimeConfig): Promise<{
     state: NativeRuntimePhase | "unsupported";
     message?: string;
+    proxy?: { readonly host: string; readonly port: number };
   }>;
   stop(): Promise<{ state: NativeRuntimePhase | "unsupported" }>;
   status(): Promise<{ state: NativeRuntimePhase | "unsupported" }>;
@@ -251,6 +252,7 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
     async start(config: NativeRuntimeConfig): Promise<{
       state: NativeRuntimePhase | "unsupported";
       message?: string;
+      proxy?: { readonly host: string; readonly port: number };
     }> {
       try {
         console.log("[rogatio] background.start: ensurePort + runtime.start");
@@ -263,6 +265,7 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
             policyDigest: config.policyDigest,
             extensionId: config.extensionId,
             pacRoutes: [...config.pacRoutes],
+            contentListener: config.contentListener,
             targetPolicy: {
               publicAllowed: config.targetPolicy.publicAllowed,
               localOrigins: [...config.targetPolicy.localOrigins],
@@ -272,9 +275,10 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
         const interception = response.metadata.interception as
           | { active?: boolean; reasons?: string[] }
           | undefined;
-        const needsPac = config.pacRoutes.length > 0;
+        const needsRoute =
+          config.pacRoutes.length > 0 || config.contentListener;
         const active = interception?.active === true;
-        if (needsPac && !active) {
+        if (needsRoute && !active) {
           const reasons = Array.isArray(interception?.reasons)
             ? interception.reasons.join(",")
             : "interception-inactive";
@@ -287,7 +291,7 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
             message: reasons || "interception-inactive",
           };
         }
-        if (response.metadata.ok === false && needsPac) {
+        if (response.metadata.ok === false && needsRoute) {
           return {
             state: "failed",
             message:
@@ -296,7 +300,21 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
                 : "runtime.start-failed",
           };
         }
-        return { state: "started" };
+        const proxy = response.metadata.proxy;
+        const endpoint =
+          typeof proxy === "object" &&
+          proxy !== null &&
+          typeof (proxy as { host?: unknown }).host === "string" &&
+          typeof (proxy as { port?: unknown }).port === "number"
+            ? {
+                host: (proxy as { host: string }).host,
+                port: (proxy as { port: number }).port,
+              }
+            : undefined;
+        return {
+          state: "started",
+          ...(endpoint !== undefined ? { proxy: endpoint } : {}),
+        };
       } catch (error) {
         console.log("[rogatio] background.start error:", error);
         if (isNativeHostMissingError(error))
