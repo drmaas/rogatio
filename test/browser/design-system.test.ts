@@ -680,10 +680,10 @@ test("workspace group toggle keeps dirty editor draft mounted", async ({
   await expect(page.locator("[data-badge-state]")).toContainText(
     "Active rules: 0",
   );
-  // A rule row is a link carrying the identity plus a sibling status token.
+  // A rule row is a link carrying the name plus a sibling status token.
   await expect(
     page.locator("[data-rule-statuses] [data-rule-link]"),
-  ).toHaveText("group-one/rule-one");
+  ).toHaveText("One / First rule");
   await expect(
     page.locator("[data-rule-statuses] [data-rule-status]"),
   ).toHaveText("disabled");

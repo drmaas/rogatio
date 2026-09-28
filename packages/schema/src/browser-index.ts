@@ -19,6 +19,12 @@ export {
   FORBIDDEN_RESPONSE_HEADERS,
   isForbiddenHeader,
 } from "./headers.js";
+export {
+  deriveEntityId,
+  type EntityKind,
+  normalizeNameKey,
+  uniqueName,
+} from "./identity.js";
 export { LIMITS } from "./limits.js";
 export type {
   MigrateV1Result,

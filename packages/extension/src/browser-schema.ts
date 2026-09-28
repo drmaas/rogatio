@@ -8,6 +8,7 @@ import {
   containsUrlCaptureReference,
   validateCaptureTemplate,
 } from "../../schema/src/captures.js";
+import { normalizeNameKey } from "../../schema/src/identity.js";
 import { hasLoneSurrogate } from "../../schema/src/utf16.js";
 
 // These helpers live canonically in @rogatio/schema (clone.ts/control.ts/digest.ts).
@@ -16,6 +17,12 @@ import { hasLoneSurrogate } from "../../schema/src/utf16.js";
 export { safeClone } from "../../schema/src/clone.js";
 export { hasControl } from "../../schema/src/control.js";
 export { formatSha256, isSha256Digest } from "../../schema/src/digest.js";
+export {
+  deriveEntityId,
+  type EntityKind,
+  normalizeNameKey,
+  uniqueName,
+} from "../../schema/src/identity.js";
 export { migrateV1Project } from "../../schema/src/migrate-v1.js";
 export { containsUrlCaptureReference, hasLoneSurrogate };
 
@@ -615,6 +622,25 @@ export function validateProjectDetailed(
   )
     return { valid: false, errors: [...errors, issue("/groups", "required")] };
   const ids = new Set<string>();
+  // Name uniqueness is per project across groups and rules together, keyed by
+  // the normalized name. It is separate from `ids` so a duplicate name is
+  // reported independently of whether the two entities also share an id.
+  const names = new Map<string, string>();
+  const claimName = (name: unknown, namePath: string): void => {
+    // An absent or empty name is already reported as invalid; a duplicate error
+    // on top of it would be two errors for one defect.
+    if (typeof name !== "string" || name.length === 0) return;
+    const key = normalizeNameKey(name);
+    const previous = names.get(key);
+    if (previous === undefined) {
+      names.set(key, namePath);
+      return;
+    }
+    errors.push({
+      ...issue(namePath, "duplicate-name"),
+      params: { previousPath: previous },
+    });
+  };
   let ruleCount = 0;
   for (
     let groupIndex = 0;
@@ -646,6 +672,7 @@ export function validateProjectDetailed(
       !/\S/u.test(group.name)
     )
       errors.push(issue(`${groupPath}/name`, "invalid-value"));
+    claimName(group.name, `${groupPath}/name`);
     if (
       !Array.isArray(group.rules) ||
       group.rules.length > LIMITS.maxRulesPerGroup
@@ -680,6 +707,7 @@ export function validateProjectDetailed(
         !/\S/u.test(rule.name)
       )
         errors.push(issue(`${rulePath}/name`, "invalid-value"));
+      claimName(rule.name, `${rulePath}/name`);
       validateSource(errors, rule.source, `${rulePath}/source`);
       if (
         !Array.isArray(rule.resourceTypes) ||

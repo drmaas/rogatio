@@ -398,6 +398,33 @@
   margin: 0;
   min-width: 0;
 }
+.rogatio-editor [data-rename-controls] {
+  display: flex;
+  flex: 1 1 16rem;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+/* The global input rule is `width: 100%`, which in a flex heading row would
+   push the neighbouring actions off the row. The inline editor is bounded here
+   and grows to fill whatever space the row has left. */
+.rogatio-editor [data-rename-controls] input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 32rem;
+}
+/* Icon-only control, following the extension's `.rogatio-copy-icon`: a fixed
+   square in the mono face. The accessible name comes from `aria-label`. */
+.rogatio-editor button[data-icon] {
+  flex: none;
+  width: 1.8rem;
+  min-height: 1.8rem;
+  padding: 0.15rem;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.9rem;
+  line-height: 1;
+}
 .rogatio-editor [data-group-list] {
   list-style: none;
   margin: 0;
@@ -415,10 +442,6 @@
   border-radius: var(--rogatio-radius);
   background: var(--rogatio-card-group);
   padding: 0.65rem 0.85rem;
-}
-.rogatio-editor [data-group-card] {
-  background: var(--rogatio-card-group);
-  border-color: rgba(148, 163, 184, 0.2);
 }
 .rogatio-editor [data-rules-section] {
   display: grid;

@@ -18,7 +18,6 @@ import {
   importAndEnableSample,
   loadShippedSample,
   rewriteSampleToValidateOrigin,
-  SAMPLE_GROUP_ID,
   statusFor,
   VALIDATE_HOST_PATTERN,
 } from "./sample-basic-helpers.js";
@@ -31,6 +30,17 @@ const DNR_RULE_IDS = [
 ] as const;
 
 const BODY_RULE_IDS = ["rule-response-body", "rule-request-body"] as const;
+
+/** The names the Workspace sidebar prints for each shipped sample rule. */
+const SAMPLE_GROUP_NAME = "Sample Rules Group";
+const SAMPLE_RULE_NAMES: Readonly<Record<string, string>> = {
+  "rule-redirect": "Redirect to docs",
+  "rule-query": "Add tracking param",
+  "rule-header-set": "Set request header",
+  "rule-header-remove": "Remove response header",
+  "rule-response-body": "Rewrite response body",
+  "rule-request-body": "Replace request body",
+};
 
 async function getDynamicRuleIds(page: Page): Promise<number[]> {
   return page.evaluate(async () => {
@@ -71,8 +81,9 @@ function numericIdForRule(
 
 function statusLine(ruleId: string, status: string): string {
   // A rule row is a link carrying the identity plus a sibling status token, so
-  // the row's text is the two concatenated with no separator.
-  return `${SAMPLE_GROUP_ID}/${ruleId}${status}`;
+  // the row's text is the two concatenated with no separator. The identity is
+  // the group and rule *names*; ids are internal and are never printed.
+  return `${SAMPLE_GROUP_NAME} / ${SAMPLE_RULE_NAMES[ruleId] ?? ruleId}${status}`;
 }
 
 function assertNamedStatuses(

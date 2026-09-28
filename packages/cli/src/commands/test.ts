@@ -438,12 +438,34 @@ async function testCommandImpl(
     if (captureOutput) return output;
     console.log(output.trim());
   } else {
+    // Ids are not user-facing, so a rule line names its group and the rule. The
+    // group name comes from the validated project and the rule name from the
+    // compiled operation, both already in hand, so the dry-run contract — and
+    // therefore `--json` — is untouched.
+    const groupNames = new Map<string, string>();
+    if (schemaResult.valid) {
+      for (const group of schemaResult.data.groups) {
+        groupNames.set(group.id, group.name);
+      }
+    }
+    const labels = new Map<string, string>();
+    for (const operation of compileResult.operations) {
+      const groupName = groupNames.get(operation.groupId);
+      labels.set(
+        `${operation.groupId}/${operation.ruleId}`,
+        groupName === undefined
+          ? operation.name
+          : `${groupName} / ${operation.name}`,
+      );
+    }
     let output = "";
     for (const urlResult of dryRunResult.results) {
       output += `\nURL: ${urlResult.url}\n`;
       output += `  Matched rules: ${urlResult.matchedRuleCount}\n`;
       for (const rule of urlResult.rules) {
-        output += `  ${rule.groupId}/${rule.ruleId}: ${rule.matched ? "MATCHED" : "NOT MATCHED"}\n`;
+        const key = `${rule.groupId}/${rule.ruleId}`;
+        const label = labels.get(key) ?? key;
+        output += `  ${label}: ${rule.matched ? "MATCHED" : "NOT MATCHED"}\n`;
         output += `    source: ${rule.source.state} - ${rule.source.detail}\n`;
         output += `    method: ${rule.method.state} - ${rule.method.detail}\n`;
         output += `    resourceType: ${rule.resourceType.state} - ${rule.resourceType.detail}\n`;

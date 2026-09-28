@@ -1,3 +1,5 @@
+import { PROJECT_VERSION } from "./browser-schema.js";
+
 export type GroupStatus =
   | "active"
   | "disabled"
@@ -206,7 +208,7 @@ export function createPopupModel(options: PopupModelOptions): PopupModel {
       const response = await send({
         version: 1,
         command: "create-project",
-        data: { version: 1, name: trimmed, groups: [] },
+        data: { version: PROJECT_VERSION, name: trimmed, groups: [] },
       });
       return response?.ok === true;
     },

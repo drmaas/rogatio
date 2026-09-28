@@ -53,7 +53,9 @@ describe("@rogatio/schema redirect rules", () => {
       expect(
         result.errors.some(
           (error) =>
-            error.instancePath === "/groups/0/rules/0/redirect" &&
+            // The path names the missing property itself, not the object that
+            // lacks it, so a consumer can point at the absent field.
+            error.instancePath === "/groups/0/rules/0/redirect/destination" &&
             (error.params as { missingProperty?: string }).missingProperty ===
               "destination",
         ),

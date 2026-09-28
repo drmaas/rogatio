@@ -64,4 +64,55 @@ describe("F7 browser schema", () => {
       }),
     ).toMatchObject({ valid: false });
   });
+
+  it("rejects duplicate names the same way the Node schema boundary does", () => {
+    const base = project.groups[0];
+    const result = validateProjectDetailed({
+      ...project,
+      groups: [
+        { ...base, rules: [] },
+        { ...base, id: "group-two", name: base.name, rules: [] },
+      ],
+    });
+    expect(result).toMatchObject({
+      valid: false,
+      errors: [{ keyword: "duplicate-name", instancePath: "/groups/1/name" }],
+    });
+  });
+
+  it("treats case-only and spacing-only name differences as duplicates", () => {
+    const base = project.groups[0];
+    const result = validateProjectDetailed({
+      ...project,
+      groups: [
+        { ...base, rules: [] },
+        {
+          ...base,
+          id: "group-two",
+          name: `  ${base.name.toUpperCase()}  `,
+          rules: [],
+        },
+      ],
+    });
+    expect(result).toMatchObject({
+      valid: false,
+      errors: [{ keyword: "duplicate-name" }],
+    });
+  });
+
+  it("does not report a duplicate name for an already invalid name", () => {
+    const base = project.groups[0];
+    const result = validateProjectDetailed({
+      ...project,
+      groups: [
+        { ...base, name: "", rules: [] },
+        { ...base, id: "group-two", name: "", rules: [] },
+      ],
+    });
+    expect(result.valid).toBe(false);
+    if (result.valid) return;
+    expect(result.errors.some((e) => e.keyword === "duplicate-name")).toBe(
+      false,
+    );
+  });
 });

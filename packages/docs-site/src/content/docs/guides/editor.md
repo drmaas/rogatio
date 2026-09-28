@@ -9,6 +9,7 @@ editor.
 ## Editing
 
 - Edit project metadata.
+- Rename a group or rule on its own heading: click the pencil, type, then save with the check mark or `Enter`. Cancel with the cross or `Escape`.
 - Create, copy, reorder, and remove rules; create, copy, and remove groups (groups are selected from the rail, not reordered).
 - Convert URLs to exact-match regular expressions.
 - Validate, save, or cancel unsaved changes.
@@ -22,6 +23,8 @@ editor.
 - A contextual command bar (Validate / Save / Cancel and route actions) and a desktop route
   rail; a compact mobile navigation. Add/copy rule, rule reorder/remove, and Copy/Remove
   group sit next to their section or entity.
+- Group and rule **names are unique per project**: a group and a rule cannot share a name, and names that differ only by case or spacing count as the same. A duplicate is refused where you typed it, and the message names the entity that already holds the name.
+- **IDs are managed for you.** A group's and a rule's ID stay in your `.rogatio.json` file and are derived from the name at the moment the entity is created or copied, but you never see, type, or change one. Renaming a group or rule does not change its ID, so links, installed rules, and enablement survive a rename. If a hand-written file has a duplicate or malformed ID, the error list offers **Assign a new ID**.
 - Full keyboard use, screen-reader support, forced-colors support, and 200% zoom support.
 
 ## Validate and save

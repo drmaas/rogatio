@@ -14,7 +14,7 @@ import {
   parseAIProposal,
   repairProposalIntoProject,
 } from "./ai-assist.js";
-import { validateProjectDetailed } from "./browser-schema.js";
+import { PROJECT_VERSION, validateProjectDetailed } from "./browser-schema.js";
 import type { ChromeApi } from "./chrome.js";
 import {
   type ExtensionDiagnostic,
@@ -706,7 +706,7 @@ export function createExtensionApplication(
         // (Dashboard "Create using AI") need the native runtime and its AI
         // channel before any project exists. Start against an empty project.
         const projectData = project?.data ?? {
-          version: 2,
+          version: PROJECT_VERSION,
           name: "Untitled project",
           groups: [],
         };

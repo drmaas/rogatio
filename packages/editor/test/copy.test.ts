@@ -140,7 +140,7 @@ describe("@rogatio/editor copy rule / copy group", () => {
     const group = draft.groups[0];
     expect(group?.rules.map((rule) => rule.id)).toEqual([
       "rule-source",
-      "rule-new",
+      "SourceRuleCopy",
       "rule-other",
     ]);
     const copy = group?.rules[1] as unknown as
@@ -152,7 +152,7 @@ describe("@rogatio/editor copy rule / copy group", () => {
     expect(editor.isDirty()).toBe(true);
 
     const sourceInput = root.querySelector(
-      '[data-rule-card][data-rule-id="rule-new"] textarea[data-path$="/source/value"]',
+      '[data-rule-card][data-rule-id="SourceRuleCopy"] textarea[data-path$="/source/value"]',
     );
     if (!(sourceInput instanceof HTMLTextAreaElement)) {
       throw new Error("copy source input not found");
@@ -179,20 +179,22 @@ describe("@rogatio/editor copy rule / copy group", () => {
     clickCommand(root, "copy-group", { groupId: "group-one" });
 
     const draft = editor.getDraft();
+    // Ids are derived from the entity's name, so the copy of "One (copy)" is
+    // `OneCopy` rather than a placeholder.
     expect(draft.groups.map((group) => group.id)).toEqual([
       "group-one",
-      "group-new",
+      "OneCopy",
       "group-two",
     ]);
     const copy = draft.groups[1];
     expect(copy?.name).toBe("One (copy)");
     expect(copy?.rules.map((rule) => rule.id)).toEqual([
-      "rule-new",
-      "rule-new-2",
+      "SourceRule2",
+      "OtherRule2",
     ]);
     expect(copy?.rules.map((rule) => rule.name)).toEqual([
-      "Source rule",
-      "Other rule",
+      "Source rule 2",
+      "Other rule 2",
     ]);
     expect(new Set(allDraftIds(draft)).size).toBe(allDraftIds(draft).length);
     expect(editor.isDirty()).toBe(true);
@@ -215,25 +217,40 @@ describe("@rogatio/editor copy rule / copy group", () => {
     );
   });
 
-  it("keeps the original name when a (copy) suffix would exceed maxLabelLength", () => {
-    const longName = "n".repeat(LIMITS.maxLabelLength);
+  it("gives a copy a unique name that still fits the label bound", () => {
+    // A copy may no longer keep its source's name: names are unique per project,
+    // so a copy that reused the name would be an invalid project.
+    const longRuleName = "n".repeat(LIMITS.maxLabelLength);
+    const longGroupName = "g".repeat(LIMITS.maxLabelLength);
     const project = projectWithNestedRule();
-    project.groups[0].rules[0].name = longName;
-    project.groups[0].name = longName;
+    project.groups[0].rules[0].name = longRuleName;
+    project.groups[0].name = longGroupName;
 
     const { root, editor } = createTestEditor(project);
-    openGroup(root, longName);
+    openGroup(root, longGroupName);
     clickCommand(root, "copy-rule", {
       groupId: "group-one",
       ruleId: "rule-source",
     });
-    expect(editor.getDraft().groups[0]?.rules[1]?.name).toBe(longName);
+    const copiedRuleName = editor.getDraft().groups[0]?.rules[1]?.name;
+    expect(copiedRuleName).not.toBe(longRuleName);
+    expect(copiedRuleName?.length).toBeLessThanOrEqual(LIMITS.maxLabelLength);
+    expect(copiedRuleName?.trim()).toBe(copiedRuleName);
 
     openProject(root);
     clickCommand(root, "copy-group", { groupId: "group-one" });
     const groups = editor.getDraft().groups;
-    const copiedGroup = groups.find((group) => group.id === "group-new");
-    expect(copiedGroup?.name).toBe(longName);
+    const copiedGroup = groups[1];
+    expect(copiedGroup?.name).not.toBe(longGroupName);
+    expect(copiedGroup?.name?.length).toBeLessThanOrEqual(
+      LIMITS.maxLabelLength,
+    );
+    // Every name in the project is still distinct.
+    const names = groups.flatMap((group) => [
+      group.name,
+      ...group.rules.map((rule) => rule.name),
+    ]);
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it("exposes copy-group on the project list and copy-rule on rule actions (AC-196-05)", () => {
@@ -297,10 +314,10 @@ describe("@rogatio/editor copy rule / copy group", () => {
     const savedProject = saved[0] as {
       groups: Array<{ id: string; rules: Array<{ id: string }> }>;
     };
-    expect(savedProject.groups.map((group) => group.id)).toContain("group-new");
+    expect(savedProject.groups.map((group) => group.id)).toContain("OneCopy");
     expect(savedProject.groups[1]?.rules.map((rule) => rule.id)).toEqual([
-      "rule-new",
-      "rule-new-2",
+      "SourceRule2",
+      "OtherRule2",
     ]);
     editor.destroy();
   });
