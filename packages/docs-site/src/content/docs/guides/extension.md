@@ -24,7 +24,10 @@ or rule-authoring controls.
 The management page uses a **Dashboard** overview and a **Workspace** editor shell. The
 Workspace sidebar is a set of cards. **Runtime** holds Start/Stop, the runtime status, the
 extension ID, and a **Show diagnostics** control when the runtime has failed. **AI** reports
-whether AI is available. **Rules** lists every rule with its install status; each rule is a
+whether AI is configured: `Configured` with the provider URL and model the native host will
+use (the API key never reaches the extension), `Not configured`, `not reported` against an
+older runtime host, or `needs runtime` before the runtime starts. **Rules** lists every rule
+with its install status; each rule is a
 link that opens that rule in the editor, and a rule that failed to install also selects a
 card showing the concrete install failure reason. **Match logging** sits in the **Rules**
 card.

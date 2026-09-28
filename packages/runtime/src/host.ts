@@ -29,6 +29,11 @@ export interface NativeHostOptions {
   /** Loopback port for the mock-body faucet (browser DNR redirect target). */
   readonly mockPort?: number;
   readonly aiProviderConfig?: AIProviderConfig;
+  /**
+   * Reader used to re-read the AI provider config while the host runs, so
+   * `rogatio ai setup` takes effect without a host restart (spec REQ-003).
+   */
+  readonly aiConfigReader?: () => Promise<AIProviderConfig | null>;
   readonly clock?: () => number;
   /** Override CA material root used by provisionOrVerifyCa (tests). */
   readonly trustRoot?: string;
@@ -126,6 +131,9 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
     ...(options.mockPort !== undefined ? { mockPort: options.mockPort } : {}),
     ...(options.aiProviderConfig !== undefined
       ? { aiProviderConfig: options.aiProviderConfig }
+      : {}),
+    ...(options.aiConfigReader !== undefined
+      ? { aiConfigReader: options.aiConfigReader }
       : {}),
     ...(options.clock ? { clock: options.clock } : {}),
   });

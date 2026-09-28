@@ -236,7 +236,7 @@ test("reports an actionable message and failed status when the native host is mi
   ).toBeVisible();
 });
 
-test("shows AI needs runtime before start and ready after a successful start", async ({
+test("shows AI needs runtime before start and configured after a successful start", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -266,7 +266,15 @@ test("shows AI needs runtime before start and ready after a successful start", a
           state.nativeRuntimeState = { phase: "started" };
           callback({ ok: true, value: state });
         } else if (message.command === "check-ai-support") {
-          callback({ ok: true, value: { supported: true } });
+          callback({
+            ok: true,
+            value: {
+              supported: true,
+              reported: true,
+              providerUrl: "https://api.example.com/v1",
+              model: "example-model-1",
+            },
+          });
         } else callback({ ok: true, value: state });
       },
       onMessage: { addListener() {} },
@@ -299,7 +307,13 @@ test("shows AI needs runtime before start and ready after a successful start", a
     page.getByRole("button", { name: "Stop runtime" }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Start runtime" }).click();
-  await expect(page.locator("[data-ai-status]")).toHaveText("AI: Ready");
+  await expect(page.locator("[data-ai-status]")).toHaveText("AI: Configured");
+  await expect(page.locator("[data-ai-provider]")).toHaveText(
+    "Provider: https://api.example.com/v1",
+  );
+  await expect(page.locator("[data-ai-model]")).toHaveText(
+    "Model: example-model-1",
+  );
   await expect(
     page.getByRole("button", { name: "Start runtime" }),
   ).toBeDisabled();

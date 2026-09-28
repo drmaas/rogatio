@@ -159,7 +159,7 @@ async function openWithAISupport(
   await waitForOrFail(
     "AI-ready status",
     () => status.textContent(),
-    async () => (await status.textContent()) === "AI: Ready",
+    async () => (await status.textContent()) === "AI: Configured",
   );
 }
 

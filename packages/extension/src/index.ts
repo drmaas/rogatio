@@ -27,11 +27,12 @@ export {
 export {
   type AICompleteRequest,
   type AICompleteResponse,
+  type AIStatusReport,
   buildNativePolicy,
-  checkAISupport,
   type NativeRuntimeConfig,
   type NativeSessionOptions,
   requestAIComplete,
+  requestAIStatus,
   requestAIStream,
   startNativeSession,
   stopNativeSession,

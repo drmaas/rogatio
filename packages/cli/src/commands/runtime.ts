@@ -292,6 +292,7 @@ async function runtimeHostCommand(
       fileRoot: root,
       ...(mockPort !== undefined ? { mockPort } : {}),
       ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
+      aiConfigReader: readProviderConfig,
       onReady: () =>
         console.error(
           "rogatio runtime-host active (deferred, waiting for project)",
@@ -361,6 +362,7 @@ async function runtimeHostCommand(
     fileRoot: rootDir,
     ...(mockPort !== undefined ? { mockPort } : {}),
     ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
+    aiConfigReader: readProviderConfig,
     onReady: () => console.error("rogatio runtime-host active"),
   });
   return 0;

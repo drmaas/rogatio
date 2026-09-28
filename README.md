@@ -191,7 +191,7 @@ The config file has `600` permissions (owner read/write only). The API key never
 
 ### In the Chrome Extension
 
-When the native runtime is started (`Start runtime`) and a provider is configured (`rogatio ai setup`), the extension management page shows an **AI Status** indicator. **Create using AI** on the Dashboard and **AI Assist** in the Workspace editor both go through the service worker to the native host — they do not call the CLI edit server. If you configure AI while the management page is already open, use **Refresh** (or restart the runtime) so Workspace remounts with Assist available.
+When the native runtime is started (`Start runtime`) and a provider is configured (`rogatio ai setup`), the extension management page shows an **AI Status** card that also lists the configured provider URL and model — the API key never leaves your machine. **Create using AI** on the Dashboard and **AI Assist** in the Workspace editor both go through the service worker to the native host — they do not call the CLI edit server. `rogatio ai setup` takes effect immediately: the running runtime re-reads its provider configuration without a restart. If the management page is already open, click **Refresh** so it picks up the new configuration and remounts Workspace with Assist available.
 
 ### Security & Privacy
 

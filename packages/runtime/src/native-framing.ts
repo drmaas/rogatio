@@ -17,6 +17,7 @@ export enum NativeFrameType {
   AIComplete = "ai.complete",
   AIStreamChunk = "ai.stream.chunk",
   AIError = "ai.error",
+  AIStatus = "ai.status",
 }
 
 export interface NativeFrame {
@@ -97,6 +98,25 @@ export interface AIErrorResponse {
     readonly code: string;
     readonly message: string;
     readonly retryable: boolean;
+  };
+}
+
+export interface AIStatusRequest {
+  readonly protocol: "v1";
+  readonly type: NativeFrameType.AIStatus;
+  readonly requestId: string;
+  readonly extensionId?: string;
+  readonly metadata: Record<string, never>;
+}
+
+export interface AIStatusResponse {
+  readonly protocol: "v1";
+  readonly type: NativeFrameType.AIStatus;
+  readonly requestId: string;
+  readonly metadata: {
+    readonly configured: boolean;
+    readonly providerUrl?: string;
+    readonly model?: string;
   };
 }
 
