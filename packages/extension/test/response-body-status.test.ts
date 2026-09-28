@@ -154,6 +154,76 @@ describe("response-body extension status", () => {
     });
   });
 
+  it("reports exact URL body rules as active after the runtime starts", async () => {
+    const exactUrlProject: RogatioProject = {
+      version: 2,
+      name: "Exact URL body",
+      groups: [
+        {
+          id: "group-exact",
+          name: "Exact group",
+          rules: [
+            {
+              id: "rule-response-exact",
+              name: "Rewrite response body",
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://example\\.com/data\\.json$",
+              },
+              resourceTypes: ["main_frame"],
+              priority: 500,
+              type: "response-body",
+              responseBody: {
+                replacements: [
+                  { pattern: "oldValue", replacement: "newValue" },
+                ],
+              },
+            },
+            {
+              id: "rule-request-exact",
+              name: "Replace request body",
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://example\\.com/(submit)$",
+              },
+              resourceTypes: ["xmlhttprequest"],
+              priority: 600,
+              method: "POST",
+              type: "request-body",
+              requestBody: { mode: "replace", body: '{"user":"$1"}' },
+            },
+          ],
+        },
+      ],
+    };
+    const { app } = harness();
+    await app.handle({
+      version: 1,
+      command: "create-project",
+      data: exactUrlProject,
+    });
+    await app.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "response-project",
+      groupId: "group-exact",
+      enabled: true,
+    });
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: true,
+      value: {
+        nativeRuntimeState: { phase: "started" },
+        ruleStatuses: [{ status: "active" }, { status: "active" }],
+      },
+    });
+  });
+
   it("keeps URL-regex body rules needs runtime with runtime.pac-unroutable after start", async () => {
     const urlRegexProject: RogatioProject = {
       version: 2,

@@ -25,6 +25,16 @@ describe("generatePacScript", () => {
     expect(script).toContain("return 'DIRECT';");
   });
 
+  it("proxies an exact URL with string equality and no RegExp", () => {
+    const script = generatePacScript(
+      [{ url: "https://example.com/data.json" }],
+      { host: "127.0.0.1", port: 8080 },
+    );
+    expect(script).toContain('if (url === "https://example.com/data.json")');
+    expect(script).not.toMatch(/RegExp/);
+    expect(script).not.toMatch(/new URL/);
+  });
+
   it("uses HTTPS proxy type when requested", () => {
     const script = generatePacScript(
       [{ hostname: "a.example" }],
@@ -57,7 +67,10 @@ describe("pacRoutesFromSources", () => {
         value: "^http://127\\.0\\.0\\.1:8080/data\\.json$",
       },
     ]);
-    expect(routes).toEqual([{ hostname: "127.0.0.1" }]);
+    expect(routes).toEqual([
+      { hostname: "127.0.0.1" },
+      { url: "http://127.0.0.1:8080/data.json" },
+    ]);
   });
 
   it("refuses unsafe regex sources", () => {

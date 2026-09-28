@@ -220,7 +220,9 @@ export function createPlatformInterceptionProvider(
       // Proxy first so PAC can target a real listening endpoint.
       const endpoint = await adapter.startTlsProxy(activation);
       const pac = generatePacScript(
-        pacRoutes.map((hostname) => ({ hostname })),
+        pacRoutes.map((entry) =>
+          entry.includes("://") ? { url: entry } : { hostname: entry },
+        ),
         endpoint,
       );
       try {

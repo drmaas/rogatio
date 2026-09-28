@@ -326,7 +326,7 @@ Observed request/response bodies are processed in-process only. The native-messa
 ### Alternatives rejected
 
 - Trusting the browser grant as authority is rejected; revalidation re-derives from the canonical project.
-- A general forward proxy is rejected; only literal hostnames derived from enabled body-rule `key: "host"` sources are routed through the scoped PAC (URL-regex body rules stay unroutable / `DIRECT`).
+- A general forward proxy is rejected. Scoped PAC routes literal hostnames from enabled body-rule `key: "host"` sources and exact `http(s)` URLs from `key: "url"` sources, both by string equality. Other URL patterns stay unroutable / `DIRECT`. The script contains no `RegExp`. Extracting a host from a URL pattern is rejected because it would route the whole host.
 - Persisting interception, capability, or traffic state is rejected; the macOS runtime keeps no history.
 - Live TLS interception and CA trust installation require a platform where a trusted device-local CA can be provisioned and Chrome PAC routing does not collide with an existing controlling proxy/PAC/enterprise policy. macOS is the reference supported platform; Linux/Windows may also activate when those capabilities are present. CA trust installation requires elevated privileges on all platforms: Linux uses `sudo` to write to `/usr/local/share/ca-certificates/` and run `update-ca-certificates`, macOS prompts for keychain authorization, and Windows requires Administrator for `certutil -addstore Root`. The macOS runtime ships the capability-gated module and deterministic PAC generation; the live interception is completed by the response-body and request-body rules where the capabilities exist.
 

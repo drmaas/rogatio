@@ -35,6 +35,14 @@ export function attentionFromRuleStatuses(input: {
       };
     }
     if (blocking === "needs runtime") {
+      if (everyNeedsRuntimeIsUnroutable(input.statuses)) {
+        return {
+          blocking: "needs runtime: source has no PAC route",
+          explanation:
+            "some body rules use a URL pattern the proxy cannot route.",
+          fix: "Use an exact host or an exact URL.",
+        };
+      }
       return {
         blocking: "needs runtime: start the native runtime",
         explanation: "some rules need the native runtime.",
@@ -48,4 +56,23 @@ export function attentionFromRuleStatuses(input: {
     };
   }
   return null;
+}
+
+function everyNeedsRuntimeIsUnroutable(
+  statuses: readonly Readonly<Record<string, unknown>>[],
+): boolean {
+  const needsRuntime = statuses.filter(
+    (status) => status.status === "needs runtime",
+  );
+  if (needsRuntime.length === 0) return false;
+  return needsRuntime.every((status) => hasPacUnroutable(status.diagnostics));
+}
+
+function hasPacUnroutable(diagnostics: unknown): boolean {
+  if (!Array.isArray(diagnostics)) return false;
+  return diagnostics.some((entry) => {
+    if (typeof entry !== "object" || entry === null) return false;
+    if (!Object.hasOwn(entry, "code")) return false;
+    return (entry as { code?: unknown }).code === "runtime.pac-unroutable";
+  });
 }

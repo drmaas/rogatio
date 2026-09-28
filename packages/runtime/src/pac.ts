@@ -1,4 +1,4 @@
-import { literalHostname } from "@rogatio/compiler";
+import { literalHostname, literalUrl } from "@rogatio/compiler";
 import type { SourceCondition } from "@rogatio/schema";
 import { isPacSafeSource } from "./pac-safety.js";
 import { MAX_PAC_ROUTES } from "./types.js";
@@ -13,28 +13,82 @@ export interface PacOptions {
 }
 
 export interface PacRoute {
-  readonly hostname: string;
+  readonly hostname?: string;
+  readonly url?: string;
 }
 
 /**
- * Derive literal-host PAC routes from compiled body-rule sources.
- * Non-literal and unsafe sources are omitted (fail-closed for T13).
+ * Derive PAC routes from body-rule sources.
+ * Literal hosts and exact http(s) URLs only. Wildcard URL patterns and
+ * unsafe sources are omitted. No RegExp and no host extraction.
  */
 export function pacRoutesFromSources(
   sources: readonly SourceCondition[],
 ): readonly PacRoute[] {
-  const hosts = new Set<string>();
+  const routes: PacRoute[] = [];
+  const seen = new Set<string>();
   for (const source of sources) {
     if (!isPacSafeSource(source)) continue;
     const hostname = literalHostname(source);
-    if (hostname !== null) hosts.add(hostname);
+    if (hostname !== null && !seen.has(`host:${hostname}`)) {
+      seen.add(`host:${hostname}`);
+      routes.push({ hostname });
+    }
+    const url = literalUrl(source);
+    if (url !== null && !seen.has(`url:${url}`)) {
+      seen.add(`url:${url}`);
+      routes.push({ url });
+    }
   }
-  return [...hosts].sort().map((hostname) => ({ hostname }));
+  return routes.sort((left, right) =>
+    routeValue(left).localeCompare(routeValue(right)),
+  );
+}
+
+function routeValue(route: PacRoute): string {
+  return route.url ?? route.hostname ?? "";
+}
+
+function pacCheck(
+  route: PacRoute,
+): { readonly key: string; readonly line: string } | null {
+  if (typeof route.url === "string" && isExactHttpUrl(route.url)) {
+    return {
+      key: `url:${route.url}`,
+      line: `url === ${JSON.stringify(route.url)}`,
+    };
+  }
+  if (
+    typeof route.hostname === "string" &&
+    route.hostname.length > 0 &&
+    !route.hostname.includes("://")
+  ) {
+    return {
+      key: `host:${route.hostname}`,
+      line: `host === ${JSON.stringify(route.hostname)}`,
+    };
+  }
+  return null;
+}
+
+function isExactHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.username === "" &&
+      url.password === "" &&
+      url.href === value
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Generate a deterministic Chrome PAC script for literal host routes only.
- * Uses string equality on the PAC `host` argument — no RegExp, no URL parsing.
+ * Generate a deterministic Chrome PAC script.
+ * Literal hosts compare the PAC `host` argument. Exact URLs compare `url`.
+ * No RegExp and no URL parsing inside the script.
  */
 export function generatePacScript(
   routes: readonly PacRoute[],
@@ -45,10 +99,15 @@ export function generatePacScript(
     throw new Error("runtime.pac-route-limit");
   }
 
-  const unique = routes
-    .map((route) => route.hostname)
-    .filter((hostname) => typeof hostname === "string" && hostname.length > 0);
-  const sorted = [...new Set(unique)].sort();
+  const checksByKey = new Map<string, string>();
+  for (const route of routes) {
+    const check = pacCheck(route);
+    if (check === null) continue;
+    checksByKey.set(check.key, check.line);
+  }
+  const sorted = [...checksByKey.entries()].sort(([left], [right]) =>
+    left.localeCompare(right),
+  );
   if (sorted.length > MAX_PAC_ROUTES) {
     throw new Error("runtime.pac-route-limit");
   }
@@ -58,8 +117,8 @@ export function generatePacScript(
   const proxyLiteral = JSON.stringify(proxy);
 
   const checks = sorted.map(
-    (hostname) =>
-      `  if (host === ${JSON.stringify(hostname)}) {\n    return ${proxyLiteral};\n  }`,
+    ([, predicate]) =>
+      `  if (${predicate}) {\n    return ${proxyLiteral};\n  }`,
   );
 
   return [

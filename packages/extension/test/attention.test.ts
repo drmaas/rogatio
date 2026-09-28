@@ -59,6 +59,24 @@ describe("P3b attentionFromRuleStatuses", () => {
     );
   });
 
+  it("explains pac-unroutable body rules without telling the user to start", () => {
+    const attention = attentionFromRuleStatuses({
+      attention: true,
+      statuses: [
+        {
+          status: "needs runtime",
+          diagnostics: [{ code: "runtime.pac-unroutable" }],
+        },
+      ],
+    });
+    expect(attention).toEqual({
+      blocking: "needs runtime: source has no PAC route",
+      explanation: "some body rules use a URL pattern the proxy cannot route.",
+      fix: "Use an exact host or an exact URL.",
+    });
+    expect(JSON.stringify(attention)).not.toContain("Start runtime");
+  });
+
   it("still explains needs runtime with start guidance", () => {
     const attention = attentionFromRuleStatuses({
       attention: true,

@@ -1,4 +1,8 @@
-import { literalHostname, type NormalizedMatcher } from "@rogatio/compiler";
+import {
+  literalHostname,
+  literalUrl,
+  type NormalizedMatcher,
+} from "@rogatio/compiler";
 
 export interface ProjectedSourceCondition {
   readonly regexFilter: string;
@@ -47,5 +51,8 @@ export function projectSourceCondition(
 }
 
 export function isPacRoutableBodySource(matcher: NormalizedMatcher): boolean {
-  return literalHostname(matcher.source) !== null;
+  return (
+    literalHostname(matcher.source) !== null ||
+    literalUrl(matcher.source) !== null
+  );
 }
