@@ -63,7 +63,7 @@ describe("projectSourceCondition", () => {
 });
 
 describe("isPacRoutableBodySource", () => {
-  it("is true only for literal host sources", () => {
+  it("is true for literal hosts and exact URLs", () => {
     expect(
       isPacRoutableBodySource(
         matcher({
@@ -78,7 +78,25 @@ describe("isPacRoutableBodySource", () => {
         matcher({
           key: "url",
           operator: "regex",
+          value: "^https://example\\.com/data\\.json$",
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isPacRoutableBodySource(
+        matcher({
+          key: "url",
+          operator: "regex",
           value: "^http://127\\.0\\.0\\.1/",
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isPacRoutableBodySource(
+        matcher({
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/api/.*$",
         }),
       ),
     ).toBe(false);

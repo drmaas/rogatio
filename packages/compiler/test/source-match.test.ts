@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   literalHostname,
+  literalUrl,
   sameOrigin,
   sourceMatches,
 } from "../src/source-match.js";
@@ -53,6 +54,49 @@ describe("literalHostname", () => {
         key: "host",
         operator: "regex",
         value: "^example\\.com/path$",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("literalUrl", () => {
+  it("returns one exact URL for an anchored literal, including a literal capture", () => {
+    expect(
+      literalUrl({
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/data\\.json$",
+      }),
+    ).toBe("https://example.com/data.json");
+    expect(
+      literalUrl({
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/(submit)$",
+      }),
+    ).toBe("https://example.com/submit");
+  });
+
+  it("returns null for wildcards, host keys, and unanchored patterns", () => {
+    expect(
+      literalUrl({
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/api/.*$",
+      }),
+    ).toBeNull();
+    expect(
+      literalUrl({
+        key: "host",
+        operator: "regex",
+        value: "^example\\.com$",
+      }),
+    ).toBeNull();
+    expect(
+      literalUrl({
+        key: "url",
+        operator: "regex",
+        value: "^http://127\\.0\\.0\\.1/",
       }),
     ).toBeNull();
   });

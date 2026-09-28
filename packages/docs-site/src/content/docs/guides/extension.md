@@ -42,8 +42,8 @@ card.
 
 ## Rule status and badge
 
-Rules report `active`, `disabled`, `needs runtime`, `unsupported`, or `error`. Body rules report `needs runtime` until the native runtime
-is started. The toolbar badge reflects the successfully installed active rules. Actionless
+Rules report `active`, `disabled`, `needs runtime`, `unsupported`, or `error`. Body rules whose source is an exact host or an exact URL report `needs runtime` until the native runtime
+is started. A URL pattern that is not one exact URL stays `needs runtime` after start, because the proxy cannot route it. The toolbar badge reflects the successfully installed active rules. Actionless
 matcher operations are reported as `unsupported` and are not installed until a later
 action slice defines their DNR action.
 

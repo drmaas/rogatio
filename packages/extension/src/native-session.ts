@@ -1,6 +1,7 @@
 import {
   compileProject,
   literalHostname,
+  literalUrl,
   type RogatioOperation,
 } from "@rogatio/compiler";
 import { formatSha256, validateProjectDetailed } from "@rogatio/schema";
@@ -241,17 +242,22 @@ async function syncBodyMarkersAfterStart(
   });
 }
 
-/** Derive literal-host PAC routes from compiled body-rule sources. */
+/**
+ * PAC routes for enabled body rules: literal hosts, plus exact http(s) URLs.
+ * Wildcard URL patterns stay omitted (no RegExp, no host extraction).
+ */
 function pacRoutesFromBodyOperations(
   operations: readonly RogatioOperation[],
 ): readonly string[] {
-  const hosts = new Set<string>();
+  const routes = new Set<string>();
   for (const op of operations) {
     if (op.kind !== "request-body" && op.kind !== "response-body") continue;
     const host = literalHostname(op.matcher.source);
-    if (host !== null) hosts.add(host);
+    if (host !== null) routes.add(host);
+    const url = literalUrl(op.matcher.source);
+    if (url !== null) routes.add(url);
   }
-  return [...hosts].sort();
+  return [...routes].sort();
 }
 
 export async function startNativeSession(

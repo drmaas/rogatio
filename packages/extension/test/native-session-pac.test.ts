@@ -44,9 +44,12 @@ const bodyProject = {
 };
 
 describe("startNativeSession pacRoutes", () => {
-  it("derives pacRoutes from literal-host body-rule sources only", async () => {
+  it("derives pacRoutes from literal hosts and exact URL body rules", async () => {
     const start = vi.fn(async (config: { pacRoutes: readonly string[] }) => {
-      expect(config.pacRoutes).toEqual(["127.0.0.1"]);
+      expect(config.pacRoutes).toEqual([
+        "127.0.0.1",
+        "http://127.0.0.1:8080/submit",
+      ]);
       return { state: "started" as const };
     });
     const result = await startNativeSession({

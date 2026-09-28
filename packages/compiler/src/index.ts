@@ -20,6 +20,7 @@ export {
 } from "./selector.js";
 export {
   literalHostname,
+  literalUrl,
   sameOrigin,
   sourceMatches,
 } from "./source-match.js";
