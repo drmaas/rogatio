@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  PROJECT_VERSION,
+  validateProjectDetailed,
+} from "../src/browser-schema.js";
+import {
   aggregateGroupStatus,
   createPopupModel,
   groupUrl,
@@ -154,10 +158,24 @@ describe("F25 popup project actions", () => {
     const model = createPopupModel({ envelope: envelope(), send });
     expect(await model.createProject("Fresh")).toBe(true);
     expect(send).toHaveBeenCalledWith({
+      // Message envelope version, not the project version.
       version: 1,
       command: "create-project",
-      data: { version: 1, name: "Fresh", groups: [] },
+      // The project version must be the current one: the repository validates it
+      // against a schema that pins it, so a stale literal fails every popup
+      // project creation.
+      data: { version: PROJECT_VERSION, name: "Fresh", groups: [] },
     });
+  });
+
+  it("sends a project version the repository accepts", async () => {
+    const send = vi.fn(async (_message: Record<string, unknown>) => ({
+      ok: true,
+    }));
+    const model = createPopupModel({ envelope: envelope(), send });
+    await model.createProject("Fresh");
+    const data = send.mock.calls[0]?.[0]?.data;
+    expect(validateProjectDetailed(data)).toMatchObject({ valid: true });
   });
 
   it("does not send create-project for an empty or whitespace-only name", async () => {

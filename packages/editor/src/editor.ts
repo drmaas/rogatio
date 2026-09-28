@@ -1,5 +1,11 @@
 import type { HttpMethod, ResourceType } from "@rogatio/schema";
-import { hasControl, LIMITS } from "@rogatio/schema";
+import {
+  deriveEntityId,
+  hasControl,
+  LIMITS,
+  normalizeNameKey,
+  uniqueName,
+} from "@rogatio/schema";
 import { createAIAssistPanel } from "./ai-assist-panel.js";
 import { builtInRuleTypes } from "./rule-types/index.js";
 import {
@@ -134,6 +140,19 @@ type DraftProject = JsonRecord & {
   groups: DraftGroup[];
 };
 type FormControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+/**
+ * The entity whose name is being edited in place. Identity is by id, not by
+ * index, because ids are frozen at creation and a move or copy reorders the
+ * draft without changing them. The name path is index-based, matching every
+ * other control key in the editor.
+ */
+type RenameTarget = {
+  readonly kind: "group" | "rule";
+  readonly groupId: string;
+  readonly ruleId?: string;
+  namePath: string;
+  value: string;
+};
 type Route =
   | { kind: "project" }
   | { kind: "group"; groupId: string }
@@ -703,6 +722,14 @@ class EditorControllerImpl implements EditorController {
   private aiAssistInFlight = false;
   private aiRepairTargets: readonly RuleRepairTarget[] = [];
   private migrationNoticesDismissed = false;
+  /**
+   * The entity whose name is being edited in place, if any. The buffer lives
+   * here rather than in the DOM because every render rebuilds the heading, and
+   * the draft is deliberately untouched until an explicit commit.
+   */
+  private renameTarget: RenameTarget | undefined;
+  /** Re-entrancy guard: committing a rename renders, which asks again. */
+  private renamingInProgress = false;
 
   constructor(
     options: EditorOptions,
@@ -884,6 +911,14 @@ class EditorControllerImpl implements EditorController {
     ) {
       return;
     }
+    if (target.dataset.renameInput !== undefined) {
+      // The inline name editor holds an uncommitted buffer. Writing it into the
+      // draft on every keystroke would make the explicit save meaningless, would
+      // clear the rejection message through `markChanged`, and would leave
+      // Escape nothing to revert to.
+      if (this.renameTarget) this.renameTarget.value = target.value;
+      return;
+    }
     if (target.dataset.search !== undefined) {
       this.searchQuery = target.value;
       this.render();
@@ -978,15 +1013,53 @@ class EditorControllerImpl implements EditorController {
 
   private readonly handleSubmit = (event: Event): void => {
     event.preventDefault();
+    // Every button in the editor is `type="button"`, so the form has no submit
+    // button and implicit submission applies when the inline name editor is the
+    // only field — a group page with no rules. Guard here as well as on keydown;
+    // the keydown alone does not prevent it. Keyed on focus rather than on the
+    // event target, because implicit submission fires the event at the form: what
+    // distinguishes the two cases is which field the user pressed Enter in.
+    if (this.renameTarget && this.renameInputFocused()) {
+      this.commitRename();
+      return;
+    }
     this.dispatchCommand("save", this.form);
   };
 
+  private renameInputFocused(): boolean {
+    const active = this.document.activeElement;
+    return (
+      active instanceof HTMLElement && active.dataset.renameInput !== undefined
+    );
+  }
+
   private readonly handleKeydown = (event: KeyboardEvent): void => {
+    // Escape dismissing the remove/discard dialog keeps working during an IME
+    // composition elsewhere in the editor, so the composition guard is scoped to
+    // the rename editor's own keys.
     if (event.key === "Escape" && this.confirmation) {
       event.preventDefault();
       this.confirmation = undefined;
       this.statusMessage = "No changes were discarded.";
       this.render();
+      return;
+    }
+    const target = event.target;
+    const inRenameInput =
+      target instanceof HTMLElement && target.dataset.renameInput !== undefined;
+    if (!inRenameInput) return;
+    // Enter pressed to accept an IME candidate also arrives as a keydown, with
+    // `isComposing` set. Neither Enter nor Escape may act on a half-composed
+    // string.
+    if (this.composing || event.isComposing) return;
+    if (event.key === "Enter") {
+      event.preventDefault();
+      this.commitRename();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.cancelRename();
     }
   };
 
@@ -1087,6 +1160,31 @@ class EditorControllerImpl implements EditorController {
       const groupId = element.dataset.groupId;
       const ruleId = element.dataset.ruleId;
       if (groupId && ruleId) this.copyRule(groupId, ruleId);
+      return;
+    }
+    if (command === "rename-entity") {
+      const groupId = element.dataset.groupId;
+      if (!groupId) return;
+      const ruleId = element.dataset.ruleId;
+      this.openRename(
+        element.dataset.renameKind === "rule" ? "rule" : "group",
+        groupId,
+        ruleId,
+      );
+      return;
+    }
+    if (command === "commit-rename") {
+      this.commitRename();
+      return;
+    }
+    if (command === "cancel-rename") {
+      this.cancelRename();
+      return;
+    }
+    if (command === "repair-id") {
+      const path = element.dataset.repairPath;
+      if (!path) return;
+      this.repairEntityId(path);
       return;
     }
     if (command === "dismiss-migration-notices") {
@@ -1352,16 +1450,24 @@ class EditorControllerImpl implements EditorController {
     return ids;
   }
 
-  private allocateId(prefix: string, reserved: Set<string>): string {
-    let candidate = prefix;
-    let suffix = 2;
-    while (reserved.has(candidate)) candidate = `${prefix}-${suffix++}`;
-    reserved.add(candidate);
-    return candidate;
-  }
-
-  private nextId(prefix: string): string {
-    return this.allocateId(prefix, this.allIds());
+  /**
+   * Every name currently in the project, keyed for uniqueness comparison. Names
+   * are unique per project across groups and rules together, so a new entity
+   * must claim a free one or the project it produces is invalid.
+   */
+  private allNameKeys(): Set<string> {
+    const reserved = new Set<string>();
+    for (const group of this.draft.groups) {
+      if (typeof group.name === "string") {
+        reserved.add(normalizeNameKey(group.name));
+      }
+      for (const rule of group.rules) {
+        if (typeof rule.name === "string") {
+          reserved.add(normalizeNameKey(rule.name));
+        }
+      }
+    }
+    return reserved;
   }
 
   private copyLabel(name: unknown): string {
@@ -1375,43 +1481,36 @@ class EditorControllerImpl implements EditorController {
 
   private addGroup(): void {
     if (this.saving) return;
-    const groupId = this.nextId("group-new");
+    const name = uniqueName("New group", this.allNameKeys());
+    const groupId = deriveEntityId(name, "group", this.allIds());
     this.draft.groups.push({
       id: groupId,
-      name: "New group",
+      name,
       rules: [],
     });
     this.markChanged();
     this.route = { kind: "group", groupId };
-    this.focusRequest = pointer("groups", this.draft.groups.length - 1, "name");
     this.statusMessage = "Group added.";
-    this.render();
+    this.openRename("group", groupId);
   }
 
   private addRule(groupId: string): void {
     if (this.saving) return;
     const group = this.groupById(groupId);
     if (!group) return;
-    const ruleId = this.nextId("rule-new");
+    const name = uniqueName("New rule", this.allNameKeys());
+    const ruleId = deriveEntityId(name, "rule", this.allIds());
     group.rules.push({
       id: ruleId,
-      name: "New rule",
+      name,
       source: { key: "url", operator: "regex", value: "" },
       resourceTypes: ["main_frame"],
       priority: 100,
     });
     this.markChanged();
     this.route = { kind: "group", groupId };
-    const groupIndex = this.groupIndex(groupId);
-    this.focusRequest = pointer(
-      "groups",
-      groupIndex,
-      "rules",
-      group.rules.length - 1,
-      "name",
-    );
     this.statusMessage = "Rule added.";
-    this.render();
+    this.openRename("rule", groupId, ruleId);
   }
 
   private copyRule(groupId: string, ruleId: string): void {
@@ -1431,21 +1530,18 @@ class EditorControllerImpl implements EditorController {
       return;
     }
     const copied = snapshot.value as DraftRule;
-    copied.id = this.nextId("rule-new");
-    copied.name = this.copyLabel(group.rules[sourceIndex].name);
+    // The copy's name is claimed first, so the id is derived from the name the
+    // user will actually see, and a copy is never a duplicate of its source.
+    copied.name = uniqueName(
+      this.copyLabel(group.rules[sourceIndex].name),
+      this.allNameKeys(),
+    );
+    copied.id = deriveEntityId(copied.name, "rule", this.allIds());
     group.rules.splice(sourceIndex + 1, 0, copied);
     this.markChanged();
     this.route = { kind: "group", groupId };
-    const groupIndex = this.groupIndex(groupId);
-    this.focusRequest = pointer(
-      "groups",
-      groupIndex,
-      "rules",
-      sourceIndex + 1,
-      "name",
-    );
     this.statusMessage = "Rule copied.";
-    this.render();
+    this.openRename("rule", groupId, String(copied.id));
   }
 
   private copyGroup(groupId: string): void {
@@ -1469,18 +1565,23 @@ class EditorControllerImpl implements EditorController {
       this.render();
       return;
     }
-    const reserved = this.allIds();
-    copied.id = this.allocateId("group-new", reserved);
-    copied.name = this.copyLabel(source.name);
+    const names = this.allNameKeys();
+    const ids = this.allIds();
+    copied.name = uniqueName(this.copyLabel(source.name), names);
+    copied.id = deriveEntityId(copied.name, "group", ids);
     for (const rule of copied.rules) {
-      rule.id = this.allocateId("rule-new", reserved);
+      // The id is reassigned unconditionally: skipping it for a rule whose name
+      // is not a string would leave the copy sharing the source rule's id.
+      // `deriveEntityId` is total, so a hostile name still yields a valid id.
+      if (typeof rule.name === "string") {
+        rule.name = uniqueName(rule.name, names);
+      }
+      rule.id = deriveEntityId(rule.name, "rule", ids);
     }
     this.draft.groups.splice(sourceIndex + 1, 0, copied);
     this.markChanged();
-    this.route = { kind: "group", groupId: String(copied.id) };
-    this.focusRequest = pointer("groups", sourceIndex + 1, "name");
     this.statusMessage = "Group copied.";
-    this.render();
+    this.openRename("group", String(copied.id));
   }
 
   private moveGroup(groupId: string, delta: number): void {
@@ -1543,6 +1644,14 @@ class EditorControllerImpl implements EditorController {
     if (!this.confirmation || this.confirmation.kind === "cancel") return;
     const confirmation = this.confirmation;
     this.confirmation = undefined;
+    // An uncommitted rename belongs to the entity it was started on, so
+    // removing that entity must not leave its buffer armed against whatever
+    // takes its place.
+    this.closeRenameFor(
+      confirmation.kind === "remove-group"
+        ? { groupId: confirmation.groupId, ruleId: undefined }
+        : { groupId: confirmation.groupId, ruleId: confirmation.ruleId },
+    );
     if (confirmation.kind === "remove-group") {
       const index = this.groupIndex(confirmation.groupId);
       if (index < 0) return;
@@ -1598,6 +1707,8 @@ class EditorControllerImpl implements EditorController {
     this.errors = [];
     this.conversionDiagnostics.clear();
     this.confirmation = undefined;
+    // The discarded draft is gone, so an uncommitted rename against it is too.
+    this.renameTarget = undefined;
     this.statusMessage = "Changes discarded.";
     try {
       this.options.onCancel?.();
@@ -1666,6 +1777,7 @@ class EditorControllerImpl implements EditorController {
   private applyAIProposal(proposal: AIProposal): void {
     const repairs = [...this.aiRepairTargets];
     this.aiRepairTargets = [];
+    let lastApplied: { groupId: string; ruleId: string } | undefined;
     for (const ruleProposal of proposal.rules) {
       // Find or create the group
       let group = this.groupById(ruleProposal.groupId);
@@ -1674,7 +1786,7 @@ class EditorControllerImpl implements EditorController {
         const groupId = ruleProposal.groupId;
         this.draft.groups.push({
           id: groupId,
-          name: "AI Group",
+          name: uniqueName("AI Group", this.allNameKeys()),
           rules: [],
         });
         group = this.groupById(groupId);
@@ -1690,7 +1802,19 @@ class EditorControllerImpl implements EditorController {
           rules.some((existing) => String(existing.id) === target.ruleId),
       );
       let repairIndex = -1;
-      let ruleId = this.nextId("rule-ai");
+      // A repair keeps its own name when the proposal restates it, so the name
+      // being repaired must not be counted as taken — otherwise every fix would
+      // append " 2" to the name it was asked to keep.
+      const proposedName = uniqueName(
+        ruleProposal.name,
+        repair === undefined
+          ? this.allNameKeys()
+          : this.reservedNameKeys(repair),
+      );
+      let ruleId =
+        repair === undefined
+          ? deriveEntityId(proposedName, "rule", this.allIds())
+          : repair.ruleId;
       if (repair) {
         repairs.splice(repairs.indexOf(repair), 1);
         ruleId = repair.ruleId;
@@ -1702,7 +1826,7 @@ class EditorControllerImpl implements EditorController {
       // Build the rule object
       const rule: DraftRule = {
         id: ruleId,
-        name: ruleProposal.name,
+        name: proposedName,
         source: {
           key: ruleProposal.source.key,
           operator: "regex",
@@ -1729,17 +1853,14 @@ class EditorControllerImpl implements EditorController {
 
       // Mark as changed and update focus
       this.markChanged();
-      const groupIdStr = String(group.id);
-      this.focusRequest = pointer(
-        "groups",
-        this.groupIndex(groupIdStr),
-        "rules",
-        repairIndex >= 0 ? repairIndex : rules.length - 1,
-        "name",
-      );
+      lastApplied = { groupId: String(group.id), ruleId: String(rule.id) };
     }
 
     this.statusMessage = `Applied ${proposal.rules.length} rule${proposal.rules.length === 1 ? "" : "s"} from AI.`;
+    if (lastApplied) {
+      this.openRename("rule", lastApplied.groupId, lastApplied.ruleId);
+      return;
+    }
     this.render();
   }
 
@@ -2027,7 +2148,9 @@ class EditorControllerImpl implements EditorController {
         const ruleHeader = this.document.createElement("div");
         ruleHeader.dataset.testRuleHeader = "true";
         const ruleName = this.document.createElement("strong");
-        ruleName.textContent = `${rule.groupId}/${rule.ruleId}`;
+        // Resolved from the draft the editor already handed to the dry-run host,
+        // so the dry-run contract keeps carrying ids only.
+        ruleName.textContent = this.testRuleLabel(rule.groupId, rule.ruleId);
         const ruleBadge = this.document.createElement("span");
         ruleBadge.dataset.testBadge = "true";
         ruleBadge.dataset.variant = rule.matched ? "matched" : "unmatched";
@@ -2073,6 +2196,23 @@ class EditorControllerImpl implements EditorController {
     }
   }
 
+  /**
+   * A test-result row is identified by the names the user actually sees. The dry
+   * result carries ids only, and the draft the editor handed over is the source
+   * of truth for both, so no contract changes. A rule that is no longer in the
+   * draft falls back to its id rather than rendering a blank row.
+   */
+  private testRuleLabel(groupId: string, ruleId: string): string {
+    const group = this.groupById(groupId);
+    if (!group) return `${groupId}/${ruleId}`;
+    const groupName = displayName(group.name, "Unnamed group");
+    const rule = this.ruleById(groupId, ruleId);
+    if (!rule) return `${groupName} / ${ruleId}`;
+    // The same `group / rule` shape the extension sidebar uses, so a rule is
+    // labelled identically wherever it appears.
+    return `${groupName} / ${displayName(rule.name, "Unnamed rule")}`;
+  }
+
   private navigate(route: string, groupId: string | undefined): void {
     if (route === "project") {
       this.route = { kind: "project" };
@@ -2083,9 +2223,32 @@ class EditorControllerImpl implements EditorController {
     } else {
       return;
     }
+    this.closeRenameOnLeave();
     this.testRequestId += 1;
     this.statusMessage = "";
     this.render();
+  }
+
+  /**
+   * An uncommitted rename belongs to the entity it was started on. Leaving that
+   * entity, removing it, or discarding the draft closes the editor, so no buffer
+   * survives against a heading that is no longer on screen.
+   */
+  private closeRenameOnLeave(): void {
+    const target = this.renameTarget;
+    if (!target) return;
+    const onGroup =
+      this.route.kind === "group" && this.route.groupId === target.groupId;
+    if (!onGroup) this.renameTarget = undefined;
+  }
+
+  /** Close an open rename when the entity it belongs to goes away. */
+  private closeRenameFor(entity: { groupId: string; ruleId?: string }): void {
+    const target = this.renameTarget;
+    if (!target) return;
+    if (target.groupId === entity.groupId && target.ruleId === entity.ruleId) {
+      this.renameTarget = undefined;
+    }
   }
 
   navigateToGroup(groupId: string | null | undefined): void {
@@ -2116,15 +2279,26 @@ class EditorControllerImpl implements EditorController {
     );
     for (const button of buttons) {
       const groupId = button.dataset.groupId ?? "";
-      const headingName = button.parentElement
-        ?.querySelector("h2")
-        ?.textContent?.trim();
-      const groupName =
-        headingName && headingName.length > 0
-          ? headingName
-          : displayName(this.groupById(groupId)?.name, "Unnamed group");
+      // The control carries the *committed* id, but the name must come from the
+      // draft. Resolving through `groupById` would find nothing once an
+      // id-repair has moved the draft's id, and the label would degrade to
+      // "Unnamed group".
+      const draftGroup = this.draftGroupForSavedId(groupId);
+      const groupName = displayName(
+        draftGroup?.name,
+        button.parentElement?.querySelector("h2")?.textContent?.trim() ?? "",
+      );
       this.applyGroupEnablementLabel(button, enabled.has(groupId), groupName);
     }
+  }
+
+  /** The draft group bound to a committed id, through the index-based binding. */
+  private draftGroupForSavedId(savedId: string): DraftGroup | undefined {
+    if (savedId.length === 0) return undefined;
+    for (const group of this.draft.groups) {
+      if (this.savedGroupId(group) === savedId) return group;
+    }
+    return undefined;
   }
 
   /**
@@ -2197,11 +2371,24 @@ class EditorControllerImpl implements EditorController {
       return;
     }
     const groupIndex = arrayIndex(segments[1] ?? "");
-    const group =
-      groupIndex === undefined ? undefined : this.draft.groups[groupIndex];
+    if (groupIndex === undefined) return;
+    const group = this.draft.groups[groupIndex];
     if (!group || typeof group.id !== "string") return;
     this.route = { kind: "group", groupId: group.id };
-    this.focusRequest = path;
+    // A diagnostic naming an entity rather than its `name` property still means
+    // "this name needs fixing": the schema reports a missing required property at
+    // the property's own path, but a host adapter is not obliged to.
+    const last = segments[segments.length - 1];
+    const ruleIndex = arrayIndex(segments[3] ?? "");
+    const entityPath =
+      last === "name"
+        ? path
+        : segments.length === 2
+          ? pointer("groups", groupIndex, "name")
+          : segments.length === 4 && ruleIndex !== undefined
+            ? pointer("groups", groupIndex, "rules", ruleIndex, "name")
+            : path;
+    this.focusRequest = entityPath;
     this.render();
   }
 
@@ -2237,6 +2424,10 @@ class EditorControllerImpl implements EditorController {
 
   private render(): void {
     if (this.destroyed) return;
+    // A render during composition removes the composing element, so
+    // `compositionend` never fires and the flag would otherwise latch, silently
+    // disabling re-render-on-keystroke for every field in the editor.
+    this.composing = false;
     this.previousFocus = this.captureFocus();
     this.cleanupExtensions();
     this.controlNumber = 0;
@@ -2493,7 +2684,6 @@ class EditorControllerImpl implements EditorController {
     const headingRow = this.document.createElement("div");
     headingRow.dataset.groupHeading = "true";
     const heading = this.document.createElement("h2");
-    heading.textContent = groupName;
     const copyGroup = this.createCommandButton(
       "Copy group",
       "copy-group",
@@ -2509,6 +2699,7 @@ class EditorControllerImpl implements EditorController {
     );
     const savedGroupId = this.savedGroupId(group);
     const enablement = this.options.groupEnablement;
+    const commands: HTMLElement[] = [];
     if (enablement && savedGroupId) {
       const enableButton = this.document.createElement("button");
       enableButton.type = "button";
@@ -2532,41 +2723,21 @@ class EditorControllerImpl implements EditorController {
           },
         );
       });
-      headingRow.append(heading, enableButton, copyGroup, removeGroup);
-    } else {
-      headingRow.append(heading, copyGroup, removeGroup);
+      commands.push(enableButton);
     }
+    commands.push(copyGroup, removeGroup);
+    this.renderNameHeading({
+      row: headingRow,
+      heading,
+      headingId: `${this.instanceId}-group-title-${groupIndex}`,
+      kind: "group",
+      groupId,
+      namePath: pointer("groups", groupIndex, "name"),
+      name: group.name,
+      fallback: "Unnamed group",
+      commands,
+    });
     this.form.append(headingRow);
-
-    const settings = this.document.createElement("fieldset");
-    settings.dataset.groupCard = "true";
-    const legend = this.document.createElement("legend");
-    legend.textContent = "Group details";
-    settings.append(legend);
-    const fields = this.document.createElement("div");
-    fields.dataset.editorFields = "true";
-    const id = this.document.createElement("input");
-    id.type = "text";
-    id.maxLength = 64;
-    id.value = safeText(group.id);
-    this.renderField(
-      fields,
-      "Group ID",
-      pointer("groups", groupIndex, "id"),
-      id,
-    );
-    const name = this.document.createElement("input");
-    name.type = "text";
-    name.maxLength = 100;
-    name.value = safeText(group.name);
-    this.renderField(
-      fields,
-      "Group name",
-      pointer("groups", groupIndex, "name"),
-      name,
-    );
-    settings.append(fields);
-    this.form.append(settings);
 
     const rulesSection = this.document.createElement("section");
     rulesSection.dataset.rulesSection = "true";
@@ -2734,7 +2905,6 @@ class EditorControllerImpl implements EditorController {
   ): HTMLElement {
     const groupId = safeText(group.id);
     const ruleId = safeText(rule.id);
-    const ruleName = displayName(rule.name, "Unnamed rule");
     const rulePath = pointer("groups", groupIndex, "rules", ruleIndex);
     const card = this.document.createElement("article");
     card.dataset.ruleCard = "true";
@@ -2744,9 +2914,8 @@ class EditorControllerImpl implements EditorController {
     const headingRow = this.document.createElement("div");
     headingRow.dataset.ruleHeading = "true";
     const heading = this.document.createElement("h3");
-    heading.id = `${this.instanceId}-rule-title-${groupIndex}-${ruleIndex}`;
-    heading.textContent = ruleName;
-    card.setAttribute("aria-labelledby", heading.id);
+    const headingId = `${this.instanceId}-rule-title-${groupIndex}-${ruleIndex}`;
+    card.setAttribute("aria-labelledby", headingId);
     const actions = this.document.createElement("div");
     actions.dataset.ruleActions = "true";
     actions.append(
@@ -2774,28 +2943,21 @@ class EditorControllerImpl implements EditorController {
         "danger",
       ),
     );
-    headingRow.append(heading, actions);
+    this.renderNameHeading({
+      row: headingRow,
+      heading,
+      headingId,
+      kind: "rule",
+      groupId,
+      ruleId,
+      namePath: `${rulePath}/name`,
+      name: rule.name,
+      fallback: "Unnamed rule",
+      commands: [actions],
+    });
     card.append(headingRow);
 
-    const fields = this.document.createElement("fieldset");
-    const legend = this.document.createElement("legend");
-    legend.textContent = "Common rule matcher";
-    fields.append(legend);
-    const grid = this.document.createElement("div");
-    grid.dataset.editorFields = "true";
-    const id = this.document.createElement("input");
-    id.type = "text";
-    id.maxLength = 64;
-    id.value = safeText(rule.id);
-    this.renderField(grid, "Rule ID", `${rulePath}/id`, id);
-    const name = this.document.createElement("input");
-    name.type = "text";
-    name.maxLength = 100;
-    name.value = safeText(rule.name);
-    this.renderField(grid, "Rule name", `${rulePath}/name`, name);
-    fields.append(grid);
-    this.renderSource(fields, rule, rulePath, groupId, ruleId);
-    card.append(fields);
+    this.renderSource(card, rule, rulePath, groupId, ruleId);
     this.renderResourceTypes(card, rule, rulePath);
     const matcherFields = this.document.createElement("fieldset");
     const matcherLegend = this.document.createElement("legend");
@@ -3252,6 +3414,382 @@ class EditorControllerImpl implements EditorController {
     parent.append(field);
   }
 
+  /**
+   * Attach a control's diagnostics the same way `renderField` does, for a control
+   * that is not wrapped in a labelled field — the inline name editor.
+   */
+  private decorateWithErrors(control: HTMLElement, path: string): void {
+    const errors = this.errors.filter((value) => value.path === path);
+    if (errors.length === 0) {
+      control.removeAttribute("aria-invalid");
+      control.removeAttribute("aria-describedby");
+      return;
+    }
+    control.setAttribute("aria-invalid", "true");
+    const error = this.document.createElement("div");
+    error.id = `${control.id}-error`;
+    error.dataset.editorFieldError = "true";
+    error.textContent = errors.map((value) => value.message).join(" ");
+    control.setAttribute("aria-describedby", error.id);
+    control.insertAdjacentElement("afterend", error);
+  }
+
+  /**
+   * Render a group or rule heading together with its inline rename control.
+   *
+   * The heading element is always present, even while the inline editor is open,
+   * because a rule card names itself through `aria-labelledby` and an `<input>`
+   * has no text content to name it with. While editing, the heading is moved
+   * into the visually-hidden state rather than removed, so the card keeps its
+   * accessible name and the shared action buttons keep their per-entity context.
+   */
+  private renderNameHeading(options: {
+    readonly row: HTMLElement;
+    readonly heading: HTMLHeadingElement;
+    readonly headingId: string;
+    readonly kind: "group" | "rule";
+    readonly groupId: string;
+    readonly ruleId?: string;
+    readonly namePath: string;
+    readonly name: unknown;
+    readonly fallback: string;
+    readonly commands: ReadonlyArray<HTMLElement>;
+  }): void {
+    const { row, heading, headingId, kind, namePath } = options;
+    const entityName = displayName(options.name, options.fallback);
+    const target = this.renameTargetFor(options);
+    const editing = target !== undefined;
+    const label = kind === "group" ? "group" : "rule";
+    const entityLabel = `${label} ${entityName}`;
+
+    heading.id = headingId;
+    heading.textContent = entityName;
+    if (editing) {
+      heading.dataset.editorVisuallyHidden = "true";
+    }
+    row.append(heading);
+
+    if (editing && target) {
+      const wrap = this.document.createElement("div");
+      wrap.dataset.renameControls = "true";
+      const input = this.document.createElement("input");
+      input.type = "text";
+      input.maxLength = LIMITS.maxLabelLength;
+      input.value = target.value;
+      input.id = this.controlId(namePath);
+      // Deliberately no `data-path`: the draft is not written on keystroke, so
+      // this input is not wired into the live-apply input handler.
+      input.dataset.renameInput = "true";
+      input.dataset.editorKey = namePath;
+      input.disabled = this.saving;
+      input.setAttribute(
+        "aria-label",
+        // Named for the action and the entity. The removed field labels must
+        // not reappear as an accessible name.
+        `Rename ${entityLabel}`,
+      );
+      const save = this.createCommandButton(
+        "Save name",
+        "commit-rename",
+        this.saving,
+        { renameKind: kind, groupId: options.groupId, ruleId: options.ruleId },
+        "primary",
+      );
+      save.setAttribute("aria-label", `Save ${entityLabel} name`);
+      save.textContent = "✓";
+      save.dataset.icon = "true";
+      const cancel = this.createCommandButton(
+        "Cancel rename",
+        "cancel-rename",
+        this.saving,
+        { renameKind: kind, groupId: options.groupId, ruleId: options.ruleId },
+      );
+      cancel.setAttribute("aria-label", `Cancel renaming ${entityLabel}`);
+      cancel.textContent = "×";
+      cancel.dataset.icon = "true";
+      wrap.append(input, save, cancel);
+      row.append(wrap);
+      // After the input is in the document: the error element is inserted as its
+      // sibling, which requires a parent.
+      this.decorateWithErrors(input, namePath);
+      // Registered under the entity's `/name` path so a pending focus request
+      // for that path resolves here, and so a diagnostic at that path decorates
+      // this control.
+      this.controls.set(namePath, input);
+    } else {
+      const pencil = this.createCommandButton(
+        `Rename ${label}`,
+        "rename-entity",
+        this.saving,
+        { renameKind: kind, groupId: options.groupId, ruleId: options.ruleId },
+      );
+      pencil.setAttribute("aria-label", `Rename ${entityLabel}`);
+      pencil.title = `Rename ${entityLabel}`;
+      pencil.textContent = "✎";
+      pencil.dataset.icon = "true";
+      row.append(pencil);
+    }
+
+    for (const command of options.commands) row.append(command);
+  }
+
+  /**
+   * The rename target for an entity, when it should be open.
+   *
+   * It is open when the entity is already being renamed, or when a focus request
+   * names its `/name` path. The second case is what makes add, copy, move, AI
+   * apply, and a name diagnostic all land in the inline editor with one
+   * mechanism.
+   */
+  private renameTargetFor(options: {
+    readonly kind: "group" | "rule";
+    readonly groupId: string;
+    readonly ruleId?: string;
+    readonly namePath: string;
+  }): RenameTarget | undefined {
+    const open = this.renameTarget;
+    if (
+      open &&
+      open.groupId === options.groupId &&
+      open.ruleId === options.ruleId
+    ) {
+      open.namePath = options.namePath;
+      return open;
+    }
+    // Only the heading the focus request actually names may open an editor, and
+    // this runs for every heading on the page — so a heading that is not the
+    // target must have no side effects at all.
+    if (this.focusRequest !== options.namePath) return undefined;
+    if (open && !this.renamingInProgress) {
+      // The request names a *different* entity than the one being renamed, so it
+      // must not silently drop an uncommitted buffer. The open rename is
+      // committed instead; if that commit is refused, the new one does not open
+      // and the user resolves it first. Guarded against re-entry because a
+      // commit renders, and rendering asks this question again.
+      this.renamingInProgress = true;
+      try {
+        this.commitRename();
+      } finally {
+        this.renamingInProgress = false;
+      }
+      if (this.renameTarget) return undefined;
+    }
+    const value = this.currentName(options.groupId, options.ruleId);
+    if (value === undefined) return undefined;
+    const target: RenameTarget = {
+      kind: options.kind,
+      groupId: options.groupId,
+      ruleId: options.ruleId,
+      namePath: options.namePath,
+      value,
+    };
+    this.renameTarget = target;
+    return target;
+  }
+
+  private currentName(groupId: string, ruleId?: string): string | undefined {
+    const group = this.groupById(groupId);
+    if (!group) return undefined;
+    if (ruleId === undefined) return safeText(group.name);
+    const rule = this.ruleById(groupId, ruleId);
+    return rule ? safeText(rule.name) : undefined;
+  }
+
+  /**
+   * Every group and rule name in the project, except the entity being renamed.
+   * Compared through the shared normalized key, so a rename is refused for a name
+   * that differs only by case or internal spacing.
+   */
+  private reservedNameKeys(exclude: {
+    groupId: string;
+    ruleId?: string;
+  }): Set<string> {
+    const reserved = new Set<string>();
+    for (const group of this.draft.groups) {
+      const isTargetGroup = group.id === exclude.groupId;
+      // A group rename leaves the group's own name out, but the group's rules
+      // still hold names the new name must not collide with.
+      if (!isTargetGroup && typeof group.name === "string") {
+        reserved.add(normalizeNameKey(group.name));
+      }
+      for (const rule of group.rules) {
+        if (isTargetGroup && rule.id === exclude.ruleId) continue;
+        if (typeof rule.name === "string") {
+          reserved.add(normalizeNameKey(rule.name));
+        }
+      }
+    }
+    return reserved;
+  }
+
+  /**
+   * A human description of whichever entity already holds a normalized name, so
+   * a refused rename can name the conflict instead of only reporting that one
+   * exists.
+   */
+  private nameHolderFor(
+    key: string,
+    exclude: { groupId: string; ruleId?: string },
+  ): string | undefined {
+    for (const group of this.draft.groups) {
+      if (
+        typeof group.name === "string" &&
+        normalizeNameKey(group.name) === key
+      ) {
+        if (group.id === exclude.groupId && exclude.ruleId === undefined)
+          continue;
+        return `group “${displayName(group.name, "Unnamed group")}”`;
+      }
+      for (const rule of group.rules) {
+        if (typeof rule.name !== "string") continue;
+        if (normalizeNameKey(rule.name) !== key) continue;
+        if (group.id === exclude.groupId && rule.id === exclude.ruleId)
+          continue;
+        return `rule “${displayName(rule.name, "Unnamed rule")}”`;
+      }
+    }
+    return undefined;
+  }
+
+  private openRename(
+    kind: "group" | "rule",
+    groupId: string,
+    ruleId?: string,
+  ): void {
+    if (this.saving) return;
+    const groupIndex = this.groupIndex(groupId);
+    if (groupIndex === -1) return;
+    const group = this.draft.groups[groupIndex];
+    if (!group) return;
+    const namePath =
+      ruleId === undefined
+        ? pointer("groups", groupIndex, "name")
+        : pointer(
+            "groups",
+            groupIndex,
+            "rules",
+            this.ruleIndex(group, ruleId),
+            "name",
+          );
+    const value = this.currentName(groupId, ruleId);
+    if (value === undefined) return;
+    // Editing a name implies showing that entity, so a newly added or copied one
+    // becomes the open group rather than staying off-screen.
+    this.route = { kind: "group", groupId };
+    this.renameTarget = { kind, groupId, ruleId, namePath, value };
+    this.composing = false;
+    this.focusRequest = namePath;
+    this.render();
+  }
+
+  private cancelRename(): void {
+    const target = this.renameTarget;
+    if (!target) return;
+    this.renameTarget = undefined;
+    this.statusMessage = "Name change discarded.";
+    this.render();
+    this.focusRenameControl(target.groupId, target.ruleId);
+  }
+
+  private focusRenameControl(groupId: string, ruleId?: string): void {
+    for (const button of this.host.querySelectorAll<HTMLElement>(
+      '[data-command="rename-entity"]',
+    )) {
+      if (button.dataset.groupId !== groupId) continue;
+      if ((button.dataset.ruleId ?? undefined) !== ruleId) continue;
+      button.focus();
+      return;
+    }
+  }
+
+  /** Refuse a commit, keep the editor open, and say why. */
+  private rejectRename(target: RenameTarget, message: string): void {
+    this.statusMessage = message;
+    // The draft is untouched, so the editor stays open with the typed text and
+    // focus returns to the input.
+    this.focusRequest = target.namePath;
+    this.render();
+  }
+
+  /**
+   * Write a name onto the entity the rename targets, resolved by identity.
+   *
+   * `setValueAtPath` refuses to create a property that is not already there,
+   * because its allowlist exists to stop a field input inventing arbitrary keys.
+   * A `name` is different: a hand-authored project can legitimately arrive with
+   * the property *absent*, and the diagnostic that reports it is exactly the one
+   * the inline editor exists to repair. So the name is written here, onto a
+   * record resolved by id, which also means a stale index cannot land the value
+   * on a different entity.
+   */
+  private writeEntityName(
+    groupId: string,
+    ruleId: string | undefined,
+    value: string,
+  ): boolean {
+    const group = this.groupById(groupId);
+    if (!group) return false;
+    const rule =
+      ruleId === undefined ? undefined : this.ruleById(groupId, ruleId);
+    if (ruleId !== undefined && !rule) return false;
+    const target = rule ?? group;
+    if (target === undefined) return false;
+    if (target.name === value) return false;
+    Object.defineProperty(target, "name", {
+      configurable: true,
+      enumerable: true,
+      value,
+      writable: true,
+    });
+    return true;
+  }
+
+  private commitRename(): void {
+    const target = this.renameTarget;
+    if (!target || this.saving) return;
+    const trimmed = target.value.trim();
+    if (trimmed.length === 0) {
+      this.rejectRename(target, "A name cannot be empty.");
+      return;
+    }
+    if (trimmed.length > LIMITS.maxLabelLength) {
+      this.rejectRename(
+        target,
+        `A name cannot be longer than ${LIMITS.maxLabelLength} characters.`,
+      );
+      return;
+    }
+    const key = normalizeNameKey(trimmed);
+    if (this.reservedNameKeys(target).has(key)) {
+      const holder = this.nameHolderFor(key, target);
+      this.rejectRename(
+        target,
+        holder
+          ? `The ${holder} already uses that name. Pick a different name.`
+          : "That name is already used in this project.",
+      );
+      return;
+    }
+    // Re-resolve by identity: the entity may have been removed or reordered
+    // while the buffer was open, and a stale path would write to the wrong one.
+    const changed = this.writeEntityName(
+      target.groupId,
+      target.ruleId,
+      trimmed,
+    );
+    this.renameTarget = undefined;
+    if (!changed) {
+      this.statusMessage = "Name unchanged.";
+      this.render();
+      return;
+    }
+    // Order matters: `markChanged` clears the status message, so the result is
+    // announced only after the draft has actually changed.
+    this.markChanged();
+    this.statusMessage = "Name updated.";
+    this.render();
+  }
+
   private renderSummary(): void {
     this.summary.replaceChildren();
     this.summary.hidden = this.errors.length === 0;
@@ -3266,9 +3804,104 @@ class EditorControllerImpl implements EditorController {
       button.dataset.errorPath = error.path;
       button.textContent = `${error.message} (${error.path || "project"})`;
       item.append(button);
+      // An id is never authored, so a diagnostic on one is repaired by the
+      // program rather than by the user. Without this, a project with a duplicate
+      // or malformed id would open, block Save, and offer no way forward.
+      const repair = this.idRepairFor(error.path);
+      if (repair) {
+        const fix = this.createCommandButton(
+          "Assign a new ID",
+          "repair-id",
+          this.saving,
+          { repairPath: error.path },
+          "secondary",
+        );
+        fix.setAttribute("aria-label", repair.label);
+        item.append(fix);
+      }
       list.append(item);
     }
     this.summary.append(heading, list);
+  }
+
+  /** A label for the entity an id diagnostic names, when it names one. */
+  private idRepairFor(path: string): { label: string } | undefined {
+    const segments = decodePointer(path);
+    if (segments?.[0] !== "groups" || segments[segments.length - 1] !== "id") {
+      return undefined;
+    }
+    const entity = this.entityAtIdPath(segments);
+    if (!entity) return undefined;
+    return { label: entity.label };
+  }
+
+  /**
+   * Resolve the entity an id path names.
+   *
+   * By index, not by id: the whole point of this path is that the id is wrong,
+   * and two entities can share it, so an id lookup would be ambiguous and could
+   * repair the wrong one.
+   */
+  private entityAtIdPath(
+    segments: readonly string[] | undefined,
+  ): { group: DraftGroup; rule?: DraftRule; label: string } | undefined {
+    if (!segments) return undefined;
+    const groupIndex = arrayIndex(segments[1] ?? "");
+    if (groupIndex === undefined) return undefined;
+    const group = this.draft.groups[groupIndex];
+    if (!group) return undefined;
+    if (segments.length === 3) {
+      return {
+        group,
+        label: `Assign a new ID to group ${displayName(group.name, "Unnamed group")}`,
+      };
+    }
+    if (segments.length === 5) {
+      const ruleIndex = arrayIndex(segments[3] ?? "");
+      if (ruleIndex === undefined) return undefined;
+      const rule = group.rules[ruleIndex];
+      if (!rule) return undefined;
+      return {
+        group,
+        rule,
+        label: `Assign a new ID to rule ${displayName(rule.name, "Unnamed rule")}`,
+      };
+    }
+    return undefined;
+  }
+
+  private repairEntityId(path: string): void {
+    if (this.saving) return;
+    const entity = this.entityAtIdPath(decodePointer(path));
+    if (!entity) return;
+    const { group, rule } = entity;
+    // The route addresses a group by id. A repair changes a draft id, so the open
+    // group is tracked by index across the change and re-pointed afterwards,
+    // rather than left pointing at an id that no longer exists.
+    const openIndex =
+      this.route.kind === "group" ? this.groupIndex(this.route.groupId) : -1;
+    const repairedIndex = this.draft.groups.indexOf(group);
+    const name = rule === undefined ? group.name : rule.name;
+    // The replacement is derived from the entity's own name, so a repaired id is
+    // the one the program would have minted.
+    const next = deriveEntityId(
+      name,
+      rule === undefined ? "group" : "rule",
+      this.allIds(),
+    );
+    if (!setValueAtPath(this.draft, path, next)) {
+      this.statusMessage = "ID unchanged.";
+      this.render();
+      return;
+    }
+    this.markChanged();
+    this.statusMessage = `Assigned the ID ${next}.`;
+    if (openIndex === repairedIndex) {
+      this.route = { kind: "group", groupId: String(group.id) };
+    }
+    // Re-validate so the summary reflects the repair instead of being cleared
+    // without a verdict.
+    this.validate();
   }
 
   private renderSearchResults(): void {

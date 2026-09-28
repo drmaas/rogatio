@@ -18,6 +18,7 @@ const ISSUE_CODES: Record<string, CompilerDiagnosticCode> = {
   uniqueItems: "schema.out-of-range",
   ownProperties: "schema.invalid-structure",
   uniqueId: "schema.duplicate-id",
+  uniqueName: "schema.duplicate-name",
   maxRulesPerProject: "schema.rule-limit",
 };
 
@@ -49,6 +50,8 @@ const MESSAGES: Record<CompilerDiagnosticCode, string> = {
     "The project contains a value outside its allowed bounds.",
   "schema.invalid-structure": "The project contains invalid structure.",
   "schema.duplicate-id": "Project and rule IDs must be unique.",
+  "schema.duplicate-name":
+    "Group and rule names must be unique within a project.",
   "schema.rule-limit": "The project contains too many rules.",
   "compiler.invariant":
     "The compiler could not normalize validated project data.",

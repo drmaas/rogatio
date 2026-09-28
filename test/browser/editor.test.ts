@@ -81,8 +81,9 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
   await expect(
     page.getByRole("heading", { name: "First rule (copy)", exact: true }),
   ).toBeVisible();
+  // The copy's id is derived from its copied name, not from a `rule-new` prefix.
   await expect(
-    page.locator('[data-rule-card][data-rule-id="rule-new"]'),
+    page.locator('[data-rule-card][data-rule-id^="FirstRule"]'),
   ).toBeVisible();
   await expect(
     page.locator('[data-rule-list="group-one"] [data-rule-card]'),
@@ -135,10 +136,21 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
   await expect(
     page.getByRole("heading", { name: "Two (copy)", exact: true }),
   ).toBeVisible();
-  await expect(page.getByLabel("Group ID")).toHaveValue("group-new");
-  const copiedRuleId = await page.getByLabel("Rule ID").inputValue();
-  expect(copiedRuleId).not.toBe("rule-three");
-  expect(copiedRuleId.startsWith("rule-new")).toBe(true);
+  // Ids are no longer authored. What must still hold is that the copy is a
+  // distinct entity whose id is derived from its own name, and is neither the
+  // source group's id nor the source rule's id.
+  const copiedRuleIds = await page
+    .locator("[data-rule-card]")
+    .evaluateAll((cards) =>
+      cards.map((card) => card.getAttribute("data-rule-id") ?? ""),
+    );
+  expect(copiedRuleIds).toHaveLength(1);
+  expect(copiedRuleIds[0]).not.toBe("rule-three");
+  expect(copiedRuleIds[0]).toMatch(/^ThirdRule/);
+  // The copy's own names are distinct from the source's.
+  await expect(page.locator("[data-group-heading] h2")).toHaveText(
+    "Two (copy)",
+  );
 
   await page
     .locator("[data-desktop-route-rail]")
@@ -187,6 +199,40 @@ test("renders validation errors and never saves an invalid draft", async ({
   await page.getByRole("button", { name: "Save", exact: true }).click();
   expect(await page.evaluate(() => window.editorTest.saveCalls)).toHaveLength(
     0,
+  );
+});
+
+test("Enter in a heading's inline editor never saves the project", async ({
+  page,
+}) => {
+  // Adding a group lands on an empty group page with the inline name editor
+  // focused, which makes that input the form's only field. Every button in the
+  // editor is `type="button"`, so the form has no submit button and the browser
+  // applies implicit submission here. This journey is the only place that
+  // behaviour is observable: the unit suite's DOM does not implement it.
+  await page
+    .locator('[data-editor-command-bar] [data-command="add-group"]')
+    .click();
+
+  const nameEditor = page.locator("[data-group-heading] [data-rename-input]");
+  await expect(nameEditor).toBeVisible();
+  await expect(nameEditor).toBeFocused();
+  // The trap state: no rules, so the inline editor is the only field on the page.
+  await expect(page.locator("[data-rule-card]")).toHaveCount(0);
+
+  await nameEditor.fill("Enter must not save");
+  await page.keyboard.press("Enter");
+
+  expect(await page.evaluate(() => window.editorTest.saveCalls)).toHaveLength(
+    0,
+  );
+  // The name was committed instead, and the editor closed.
+  await expect(page.locator("[data-group-heading] h2")).toHaveText(
+    "Enter must not save",
+  );
+  await expect(page.locator("[data-rename-input]")).toHaveCount(0);
+  await expect(page.locator("[data-dirty-state]")).toHaveText(
+    "Unsaved changes",
   );
 });
 

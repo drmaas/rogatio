@@ -83,6 +83,7 @@ export type CompilerDiagnosticCode =
   | "schema.out-of-range"
   | "schema.invalid-structure"
   | "schema.duplicate-id"
+  | "schema.duplicate-name"
   | "schema.rule-limit"
   | "compiler.invariant"
   | "compiler.forbidden-header"

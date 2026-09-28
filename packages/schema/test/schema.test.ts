@@ -546,3 +546,224 @@ describe("@rogatio/schema", () => {
     expect(validateProject(longName)).toBe(false);
   });
 });
+
+describe("per-project name uniqueness", () => {
+  function projectWith(
+    groups: Array<{
+      id: string;
+      name: string;
+      rules: Array<{ id: string; name: string }>;
+    }>,
+  ): RogatioProject {
+    return {
+      version: 2,
+      name: "Example project",
+      groups: groups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        rules: group.rules.map((rule) => ({
+          ...makeRule(0),
+          id: rule.id,
+          name: rule.name,
+        })),
+      })),
+    };
+  }
+
+  function uniqueNameErrors(value: unknown): Array<{
+    instancePath: string;
+    params: Record<string, unknown>;
+  }> {
+    const result = validateProjectDetailed(value);
+    if (result.valid) return [];
+    return result.errors
+      .filter((error) => error.keyword === "uniqueName")
+      .map((error) => ({
+        instancePath: error.instancePath,
+        params: error.params,
+      }));
+  }
+
+  it("rejects two groups with the same name", () => {
+    const errors = uniqueNameErrors(
+      projectWith([
+        { id: "group-a", name: "Main sites", rules: [] },
+        { id: "group-b", name: "Main sites", rules: [] },
+      ]),
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.instancePath).toBe("/groups/1/name");
+    expect(errors[0]?.params.previousPath).toBe("/groups/0/name");
+  });
+
+  it("rejects two rules with the same name in one group", () => {
+    const errors = uniqueNameErrors(
+      projectWith([
+        {
+          id: "group-a",
+          name: "Main sites",
+          rules: [
+            { id: "rule-a", name: "Block ads" },
+            { id: "rule-b", name: "Block ads" },
+          ],
+        },
+      ]),
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.instancePath).toBe("/groups/0/rules/1/name");
+    expect(errors[0]?.params.previousPath).toBe("/groups/0/rules/0/name");
+  });
+
+  it("rejects a group and a rule sharing a name", () => {
+    const errors = uniqueNameErrors(
+      projectWith([
+        {
+          id: "group-a",
+          name: "Shared",
+          rules: [{ id: "rule-a", name: "Shared" }],
+        },
+      ]),
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.instancePath).toBe("/groups/0/rules/0/name");
+    expect(errors[0]?.params.previousPath).toBe("/groups/0/name");
+  });
+
+  it("treats case-only and spacing-only differences as duplicates", () => {
+    expect(
+      uniqueNameErrors(
+        projectWith([
+          { id: "group-a", name: "Main sites", rules: [] },
+          { id: "group-b", name: "MAIN  Sites", rules: [] },
+        ]),
+      ),
+    ).toHaveLength(1);
+
+    expect(
+      uniqueNameErrors(
+        projectWith([
+          {
+            id: "group-a",
+            name: "Main sites",
+            rules: [{ id: "rule-a", name: "Block ads" }],
+          },
+          {
+            id: "group-b",
+            name: "Other",
+            rules: [{ id: "rule-b", name: "block   ADS" }],
+          },
+        ]),
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("keeps names that differ by punctuation or digits distinct", () => {
+    const project = projectWith([
+      { id: "group-a", name: "ads-blocker", rules: [] },
+      { id: "group-b", name: "Ads Blocker", rules: [] },
+    ]);
+    expect(uniqueNameErrors(project)).toHaveLength(0);
+    expect(validateProject(project)).toBe(true);
+  });
+
+  it("does not add a duplicate error on top of an already invalid name", () => {
+    const errors = uniqueNameErrors(
+      projectWith([
+        { id: "group-a", name: "   ", rules: [] },
+        { id: "group-b", name: "   ", rules: [] },
+      ]),
+    );
+    // Both names are already reported as out of range; one defect, one error.
+    expect(errors).toHaveLength(0);
+  });
+
+  it("accepts a project whose names are all distinct", () => {
+    const project = projectWith([
+      {
+        id: "group-a",
+        name: "Main sites",
+        rules: [
+          { id: "rule-a", name: "Block ads" },
+          { id: "rule-b", name: "Block trackers" },
+        ],
+      },
+      { id: "group-b", name: "Other sites", rules: [] },
+    ]);
+    expect(uniqueNameErrors(project)).toHaveLength(0);
+    expect(validateProject(project)).toBe(true);
+  });
+
+  it("reports the second and later occurrences, not the first", () => {
+    const errors = uniqueNameErrors(
+      projectWith([
+        { id: "group-a", name: "Same", rules: [] },
+        { id: "group-b", name: "Same", rules: [] },
+        { id: "group-c", name: "Same", rules: [] },
+      ]),
+    );
+    expect(errors.map((error) => error.instancePath)).toEqual([
+      "/groups/1/name",
+      "/groups/2/name",
+    ]);
+  });
+});
+
+describe("required issues report the missing property path", () => {
+  it("reports a missing project name at /name", () => {
+    const project = makeProject() as unknown as Record<string, unknown>;
+    delete project.name;
+    const result = validateProjectDetailed(project);
+    expect(result.valid).toBe(false);
+    if (result.valid) return;
+    const required = result.errors.filter(
+      (error) => error.keyword === "required",
+    );
+    expect(required).toHaveLength(1);
+    expect(required[0]?.instancePath).toBe("/name");
+  });
+
+  it("reports a missing group name at the group property path", () => {
+    const project = makeProject() as unknown as {
+      groups: Array<Record<string, unknown>>;
+    };
+    delete project.groups[0]?.name;
+    const result = validateProjectDetailed(project);
+    expect(result.valid).toBe(false);
+    if (result.valid) return;
+    const required = result.errors.filter(
+      (error) => error.keyword === "required",
+    );
+    expect(required).toHaveLength(1);
+    expect(required[0]?.instancePath).toBe("/groups/0/name");
+  });
+
+  it("reports a missing rule name at the rule property path", () => {
+    const project = makeProject() as unknown as {
+      groups: Array<{ rules: Array<Record<string, unknown>> }>;
+    };
+    delete project.groups[0]?.rules[0]?.name;
+    const result = validateProjectDetailed(project);
+    expect(result.valid).toBe(false);
+    if (result.valid) return;
+    const required = result.errors.filter(
+      (error) => error.keyword === "required",
+    );
+    expect(required).toHaveLength(1);
+    expect(required[0]?.instancePath).toBe("/groups/0/rules/0/name");
+  });
+
+  it("reports a missing group id at the group property path", () => {
+    const project = makeProject() as unknown as {
+      groups: Array<Record<string, unknown>>;
+    };
+    delete project.groups[0]?.id;
+    const result = validateProjectDetailed(project);
+    expect(result.valid).toBe(false);
+    if (result.valid) return;
+    const required = result.errors.filter(
+      (error) => error.keyword === "required",
+    );
+    expect(required).toHaveLength(1);
+    expect(required[0]?.instancePath).toBe("/groups/0/id");
+  });
+});

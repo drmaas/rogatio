@@ -114,6 +114,42 @@ describe("ai-prompt", () => {
       expect(prompt.toLowerCase()).toContain("diagnostic");
       expect(prompt.toLowerCase()).toContain("code");
     });
+
+    it("lists every real compiler diagnostic code", () => {
+      // A code the compiler can never emit teaches the model nothing, and a code
+      // it can emit but the prompt omits leaves the model unable to repair it.
+      const real = [
+        "schema.required",
+        "schema.unknown-property",
+        "schema.invalid-type",
+        "schema.invalid-format",
+        "schema.invalid-value",
+        "schema.out-of-range",
+        "schema.invalid-structure",
+        "schema.duplicate-id",
+        "schema.duplicate-name",
+        "schema.rule-limit",
+        "compiler.invariant",
+        "compiler.forbidden-header",
+        "compiler.header-value-required",
+        "compiler.header-value-unexpected",
+        "compiler.invalid-header-direction",
+        "compiler.invalid-header-operation",
+      ];
+      for (const code of real) expect(prompt).toContain(code);
+    });
+
+    it("does not list codes the compiler cannot emit", () => {
+      for (const invented of [
+        "schema.invalid-regex",
+        "schema.invalid-resource-type",
+        "schema.invalid-method",
+        "schema.regex-too-long",
+        "compiler.unsupported-operation",
+      ]) {
+        expect(prompt).not.toContain(invented);
+      }
+    });
   });
 
   describe("Output format", () => {

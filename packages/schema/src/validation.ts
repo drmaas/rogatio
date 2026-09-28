@@ -2,6 +2,7 @@ import type { ErrorObject, ValidateFunction } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { validateCaptureTemplate } from "./captures.js";
 import { type HeaderDirection, isForbiddenHeader } from "./headers.js";
+import { normalizeNameKey } from "./identity.js";
 import { LIMITS } from "./limits.js";
 import { isSiteOrigin, normalizeSiteOrigin } from "./origins.js";
 import { compileUrlRegex } from "./regex.js";
@@ -44,11 +45,24 @@ function ajvIssues(
   errors: ErrorObject[] | null | undefined,
 ): ValidationIssue[] {
   return (errors ?? []).map((error) => ({
-    instancePath: error.instancePath,
+    // Ajv reports a `required` violation against the object that lacks the
+    // property, with the property named in `params.missingProperty`. Left alone,
+    // that parent path names a location no field or entity owns, so the missing
+    // property's own path is reconstructed here — once, for every Ajv consumer.
+    instancePath: missingPropertyPath(error),
     keyword: error.keyword,
     message: error.message ?? "validation failed",
     params: error.params,
   }));
+}
+
+function missingPropertyPath(error: ErrorObject): string {
+  if (error.keyword !== "required") return error.instancePath;
+  const missing = error.params?.missingProperty;
+  if (typeof missing !== "string" || missing.length === 0) {
+    return error.instancePath;
+  }
+  return `${error.instancePath}/${missing}`;
 }
 
 type SnapshotResult = { valid: true; value: unknown } | { valid: false };
@@ -175,7 +189,30 @@ export const projectValidator: ValidateFunction<RogatioProject> =
 function semanticIssues(project: RogatioProject): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const ids = new Map<string, string>();
+  // Names live in their own registry, keyed by their normalized form, because
+  // uniqueness is per project across groups and rules together. It is separate
+  // from `ids` so that reporting a duplicate name never depends on whether the
+  // two entities happened to share an id as well.
+  const names = new Map<string, string>();
   let ruleCount = 0;
+
+  const claimName = (name: unknown, namePath: string): void => {
+    // An absent or empty name is already reported by the structural pass. Adding
+    // a duplicate error on top of it would put two errors on one defect.
+    if (typeof name !== "string" || name.length === 0) return;
+    const key = normalizeNameKey(name);
+    const previous = names.get(key);
+    if (previous === undefined) {
+      names.set(key, namePath);
+      return;
+    }
+    issues.push({
+      instancePath: namePath,
+      keyword: "uniqueName",
+      message: `must be unique; already used at ${previous}`,
+      params: { previousPath: previous },
+    });
+  };
 
   for (
     let groupIndex = 0;
@@ -195,6 +232,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
     } else {
       ids.set(group.id, `${groupPath}/id`);
     }
+    claimName(group.name, `${groupPath}/name`);
 
     for (let ruleIndex = 0; ruleIndex < group.rules.length; ruleIndex += 1) {
       const rule = group.rules[ruleIndex];
@@ -211,6 +249,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
       } else {
         ids.set(rule.id, `${rulePath}/id`);
       }
+      claimName(rule.name, `${rulePath}/name`);
 
       if (
         rule.type !== undefined &&

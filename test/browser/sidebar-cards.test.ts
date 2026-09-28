@@ -449,10 +449,20 @@ test("rule navigation keeps unsaved editor work", async ({ page }) => {
   await openWorkspace(page);
 
   await page.locator('[data-rule-link][data-rule-id="rule-one"]').click();
+  // Names are edited in place on the heading, so the draft change is made
+  // through the pencil and committed with the save control.
+  const rename = page
+    .locator('[data-rule-card][data-rule-id="rule-one"]')
+    .getByRole("button", { name: "Rename rule First rule", exact: true });
+  await rename.click();
   const nameField = page
     .locator('[data-rule-card][data-rule-id="rule-one"]')
-    .getByLabel("Rule name", { exact: true });
+    .getByLabel("Rename rule First rule", { exact: true });
   await nameField.fill("Unsaved draft name");
+  await page
+    .locator('[data-rule-card][data-rule-id="rule-one"]')
+    .getByRole("button", { name: "Save rule First rule name", exact: true })
+    .click();
   await expect(page.locator("[data-dirty-state]")).toHaveText(
     "Unsaved changes",
   );
@@ -465,10 +475,8 @@ test("rule navigation keeps unsaved editor work", async ({ page }) => {
   );
   await page.locator('[data-rule-link][data-rule-id="rule-one"]').click();
   await expect(
-    page
-      .locator('[data-rule-card][data-rule-id="rule-one"]')
-      .getByLabel("Rule name", { exact: true }),
-  ).toHaveValue("Unsaved draft name");
+    page.locator('[data-rule-card][data-rule-id="rule-one"]').locator("h3"),
+  ).toHaveText("Unsaved draft name");
   await expect(page.locator("[data-dirty-state]")).toHaveText(
     "Unsaved changes",
   );
@@ -556,7 +564,11 @@ test("a rule that fails still selects it and shows the error card", async ({
   await expect(failing.locator("[data-rule-status]")).toHaveText("error");
   await failing.locator("[data-rule-link]").click();
   await expect(page.locator("[data-rule-error-card]")).toHaveCount(1);
+  // The card names the rule the way the rest of the page does, by name.
   await expect(page.locator("[data-rule-error-card]")).toContainText(
+    "One / First rule",
+  );
+  await expect(page.locator("[data-rule-error-card]")).not.toContainText(
     "group-one/rule-one",
   );
 });

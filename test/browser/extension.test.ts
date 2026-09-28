@@ -643,20 +643,69 @@ test("renders the DNR error reason in the rule error card", async ({
   await openWorkspace(page);
   const card = page.locator("[data-rule-error-card]");
   await expect(card).toHaveCount(1);
-  await expect(card).toContainText("group-a/rule-one");
+  await expect(card).toContainText("Group A / Rule one");
   await expect(card).toContainText(
     "Rule with id 2000001 cannot have an empty list",
   );
   await expect(
-    page.getByRole("link", { name: "group-a/rule-one" }),
+    page.getByRole("link", { name: "Group A / Rule one" }),
   ).toBeVisible();
   // A rule row is a link carrying the identity plus a sibling status token.
   await expect(
     page.locator("[data-rule-statuses] [data-rule-link]"),
-  ).toHaveText("group-a/rule-one");
+  ).toHaveText("Group A / Rule one");
   await expect(
     page.locator("[data-rule-statuses] [data-rule-status]"),
   ).toHaveText("error");
+});
+
+test("disambiguates two sidebar rows that would render the same text", async ({
+  page,
+}) => {
+  // Per-project name uniqueness makes this rare, but a status can outlive the
+  // name it was filed under, so the list must never show two identical rows.
+  await installExtensionChromeMock(page, {
+    ...errorSurfaceProject,
+    ruleStatuses: [
+      // Two status entries for the same rule: the committed project has one name
+      // for it, so both rows would otherwise read "Group A / Rule one".
+      {
+        groupId: "group-a",
+        ruleId: "rule-one",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: { ruleId: "rule-one", reason: "first" },
+          },
+        ],
+      },
+      {
+        groupId: "group-a",
+        ruleId: "rule-one",
+        status: "error",
+        diagnostics: [
+          {
+            code: "extension.dnr-error",
+            message: DNR_ERROR_MESSAGE,
+            params: { ruleId: "rule-one", reason: "second" },
+          },
+        ],
+      },
+    ],
+  });
+  await openWorkspace(page);
+  const rows = await page
+    .locator("[data-rule-statuses] [data-rule-link]")
+    .evaluateAll((links) =>
+      links.map((link) => (link.textContent ?? "").trim()),
+    );
+  expect(rows).toHaveLength(2);
+  // The rows are textually distinct: the later one carries its id.
+  expect(rows[0]).not.toBe(rows[1]);
+  expect(rows[0]).toBe("Group A / Rule one");
+  expect(rows[1]).toContain("rule-one");
 });
 
 test("falls back to the stable diagnostic message when params.reason is absent", async ({
@@ -940,14 +989,14 @@ test("keys the error card by group and rule id instead of merging equal reasons"
   await openWorkspace(page);
   await expect(page.locator("[data-rule-error-card]")).toHaveCount(1);
   await expect(page.locator("[data-rule-error-card]")).toContainText(
-    "group-a/rule-one",
+    "Group A / Rule one",
   );
   await expect(page.locator("[data-rule-error-card]")).not.toContainText(
-    "group-b/rule-one",
+    "Group B / Rule one",
   );
   await expect(
     page.locator("[data-rule-statuses] [data-rule-link]"),
-  ).toHaveText(["group-a/rule-one", "group-b/rule-one"]);
+  ).toHaveText(["Group A / Rule one", "group-b/rule-one"]);
   await expect(
     page.locator("[data-rule-statuses] [data-rule-status]"),
   ).toHaveText(["error", "error"]);
@@ -1047,7 +1096,7 @@ test("reconciles stale error selection after refresh and removes the card when e
   );
   await openWorkspace(page);
   await expect(page.locator("[data-rule-error-card]")).toContainText(
-    "group-a/rule-one",
+    "Group A / Rule one",
   );
   await page.getByRole("button", { name: "Refresh" }).click();
   await expect(page.locator("[data-rule-error-card]")).toContainText(
@@ -1131,7 +1180,7 @@ test("activates the error link by keyboard and focuses the failing rule card", a
   await expect(
     page.locator("[data-editor-root] [data-rogatio-editor]"),
   ).toBeVisible();
-  const errorLink = page.getByRole("link", { name: "group-b/rule-two" });
+  const errorLink = page.getByRole("link", { name: "Group B / Rule two" });
   await errorLink.focus();
   await expect(errorLink).toBeFocused();
   await page.keyboard.press("Enter");
@@ -1140,7 +1189,7 @@ test("activates the error link by keyboard and focuses the failing rule card", a
   ).toHaveAttribute("aria-current", "page");
   await expect(page.locator("#rogatio-rule-group-b\\:rule-two")).toBeFocused();
   await expect(page.locator("[data-rule-error-card]")).toContainText(
-    "group-b/rule-two",
+    "Group B / Rule two",
   );
   await expect(page.locator("[data-rule-error-card]")).toContainText(reason);
 });

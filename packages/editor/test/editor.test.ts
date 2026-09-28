@@ -571,7 +571,13 @@ describe("group enablement heading button", () => {
     editor.destroy();
   });
 
-  it("enables the saved group id when the draft id is unsaved", () => {
+  it("enables the saved group id, not a draft-only group", () => {
+    // Ids are no longer authored, so the only way a draft id can differ from the
+    // committed one is the id-repair path, covered in identity-surface.test.ts.
+    // What must hold everywhere is that the heading control targets the
+    // committed group, which a copy makes observable: a copied group exists only
+    // in the draft, so it must have no enable control at all, and the original
+    // must still target its own committed id.
     const calls: Array<{ groupId: string; enabled: boolean }> = [];
     const root = document.createElement("div");
     document.body.append(root);
@@ -590,24 +596,12 @@ describe("group enablement heading button", () => {
     root
       .querySelector('[data-desktop-route-rail] button[data-route="group"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    const idInput = root.querySelector<HTMLInputElement>(
-      '[data-path="/groups/0/id"]',
-    );
-    if (!idInput) throw new Error("group id field missing");
-    idInput.value = "renamed-group";
-    idInput.dispatchEvent(new Event("input", { bubbles: true }));
-    root
-      .querySelector(
-        '[data-desktop-route-rail] button[data-group-id="renamed-group"]',
-      )
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const button = root.querySelector<HTMLButtonElement>(
       "[data-group-heading] [data-group-enable]",
     );
     expect(button?.dataset.groupId).toBe("group-one");
     button?.click();
     expect(calls).toEqual([{ groupId: "group-one", enabled: true }]);
-    expect(editor.isDirty()).toBe(true);
     editor.destroy();
   });
 

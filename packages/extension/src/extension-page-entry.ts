@@ -5,7 +5,7 @@ import {
   type EditorController,
 } from "@rogatio/editor";
 import { attentionFromRuleStatuses } from "./attention.js";
-import { validateProjectDetailed } from "./browser-schema.js";
+import { PROJECT_VERSION, validateProjectDetailed } from "./browser-schema.js";
 import {
   MATCH_LOGGING_ENABLED_KEY,
   readMatchLoggingEnabledFromStorageResult,
@@ -115,10 +115,10 @@ let diagnosticsData: {
 
 function safeProjectData(): unknown {
   if (!state.activeProjectId)
-    return { version: 2, name: "Rogatio project", groups: [] };
+    return { version: PROJECT_VERSION, name: "Rogatio project", groups: [] };
   return (
     state.projects[state.activeProjectId]?.data ?? {
-      version: 2,
+      version: PROJECT_VERSION,
       name: "Rogatio project",
       groups: [],
     }
@@ -354,6 +354,76 @@ function navigateToRuleDeepLink(
 let ruleStatusSerial = 0;
 
 /**
+ * The names the user recognizes, resolved from the **committed** active project.
+ *
+ * The sidebar is rebuilt from the committed envelope, so it shows what is
+ * actually installed. Reading the editor's draft instead would show an unsaved
+ * rename here, which `docs/architecture.md:156` forbids: Workspace controls
+ * always target the committed active project. A status whose rule is no longer
+ * in the project falls back to its id, because a rule that is gone still needs a
+ * row that names it.
+ */
+function committedRuleLabels(): Map<string, string> {
+  const labels = new Map<string, string>();
+  const project = state.activeProjectId
+    ? state.projects[state.activeProjectId]
+    : undefined;
+  const data = asRecord(project?.data);
+  if (data === null) return labels;
+  const groups = Array.isArray(data.groups) ? data.groups : [];
+  for (const rawGroup of groups) {
+    const group = asRecord(rawGroup);
+    if (group === null) continue;
+    // Own-string reads, not plain property access: the rest of this file never
+    // invokes an inherited or throwing accessor on project data.
+    const groupId = readOwnString(group, "id") ?? "";
+    if (groupId.length === 0) continue;
+    const groupName = readOwnString(group, "name") ?? "";
+    const rules = Array.isArray(group.rules) ? group.rules : [];
+    for (const rawRule of rules) {
+      const rule = asRecord(rawRule);
+      if (rule === null) continue;
+      const ruleId = readOwnString(rule, "id") ?? "";
+      if (ruleId.length === 0) continue;
+      const ruleName = readOwnString(rule, "name") ?? "";
+      labels.set(
+        ruleIdentityKey(groupId, ruleId),
+        `${groupName.length > 0 ? groupName : groupId} / ${ruleName.length > 0 ? ruleName : ruleId}`,
+      );
+    }
+  }
+  return labels;
+}
+
+/**
+ * A separator that cannot occur inside an id, so two different
+ * (group, rule) pairs can never collide on one key.
+ */
+function ruleIdentityKey(groupId: string, ruleId: string): string {
+  return `${groupId}\u0000${ruleId}`;
+}
+
+/**
+ * How a rule is named in the sidebar and the install-error card.
+ *
+ * Two rows in one list can otherwise render identical text: a status can
+ * outlive the name it was filed under, and the product's own default names
+ * repeat. The later entry therefore carries its id, which is the only value that
+ * is guaranteed distinct.
+ */
+function ruleDisplayLabel(
+  labels: ReadonlyMap<string, string>,
+  groupId: string,
+  ruleId: string,
+  seen: ReadonlySet<string>,
+): string {
+  const base =
+    labels.get(ruleIdentityKey(groupId, ruleId)) ?? `${groupId}/${ruleId}`;
+  if (!seen.has(base)) return base;
+  return `${base} (${ruleId})`;
+}
+
+/**
  * One rule row: a real link to the rule's section, with its status as a
  * separate right-aligned token.
  *
@@ -369,6 +439,7 @@ function createRuleEntry(
   groupId: string,
   ruleId: string,
   statusValue: string,
+  label: string,
 ): HTMLLIElement {
   ruleStatusSerial += 1;
   const item = document.createElement("li");
@@ -379,7 +450,7 @@ function createRuleEntry(
   link.dataset.groupId = groupId;
   link.dataset.ruleId = ruleId;
   link.href = ruleDeepLink(groupId, ruleId);
-  link.textContent = `${groupId}/${ruleId}`;
+  link.textContent = label;
   const status = document.createElement("span");
   status.className = "rogatio-rule-status";
   status.dataset.ruleStatus = "true";
@@ -687,16 +758,26 @@ function createSidebar(): HTMLElement {
           ? "warn"
           : "muted",
   );
+  // One pass over the committed project per sidebar render, shared by the rule
+  // rows and the install-error card.
+  const labels = committedRuleLabels();
   const ruleStatuses = document.createElement("ul");
   ruleStatuses.className = "rogatio-rule-list";
   ruleStatuses.dataset.ruleStatuses = "true";
+  const seenLabels = new Set<string>();
   for (const ruleStatus of statuses) {
+    const groupId = text(ruleStatus.groupId, UNKNOWN_GROUP_ID);
+    const ruleId = text(ruleStatus.ruleId, UNKNOWN_RULE_ID);
     ruleStatuses.append(
       createRuleEntry(
-        text(ruleStatus.groupId, UNKNOWN_GROUP_ID),
-        text(ruleStatus.ruleId, UNKNOWN_RULE_ID),
+        groupId,
+        ruleId,
         text(ruleStatus.status, "error"),
+        ruleDisplayLabel(labels, groupId, ruleId, seenLabels),
       ),
+    );
+    seenLabels.add(
+      labels.get(ruleIdentityKey(groupId, ruleId)) ?? `${groupId}/${ruleId}`,
     );
   }
   rules.body.append(ruleStatuses);
@@ -720,7 +801,12 @@ function createSidebar(): HTMLElement {
     heading.textContent = "Rule install error";
     const identity = document.createElement("p");
     identity.className = "rogatio-rule-error-card-identity";
-    identity.textContent = `${selectedError.groupId}/${selectedError.ruleId}`;
+    // The same committed-project label the rule rows use, so the card names the
+    // rule the way the rest of the page does. The map is built once per render.
+    identity.textContent =
+      labels.get(
+        ruleIdentityKey(selectedError.groupId, selectedError.ruleId),
+      ) ?? `${selectedError.groupId}/${selectedError.ruleId}`;
     const reason = document.createElement("p");
     reason.className = "rogatio-rule-error-card-reason";
     reason.textContent = ruleErrorReasonFor(
@@ -1452,7 +1538,7 @@ async function createProject(): Promise<void> {
   const response = await client.send({
     version: 1,
     command: "create-project",
-    data: { version: 2, name, groups: [] },
+    data: { version: PROJECT_VERSION, name, groups: [] },
   });
   statusMessage =
     response.ok === true

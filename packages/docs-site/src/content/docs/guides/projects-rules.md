@@ -27,8 +27,9 @@ Groups organize rules. Matching scope is expressed per rule through a **source c
 
 Every rule can specify:
 
-- A stable **ID**.
-- A **label**.
+- A stable **ID**. You do not write this: the editor derives it from the name when the rule
+  is created or copied, and keeps it for the rule's lifetime.
+- A **name**, unique across every group and rule in the project.
 - A **source condition**: `key` (`url` or `host`), `operator` (`regex` only), and `value`
   (case-sensitive regular expression).
 - Allowed **resource types**.

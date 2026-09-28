@@ -337,7 +337,8 @@ describe("@rogatio/compiler", () => {
 
     expect(diagnostics(compileProject(cases[0]))[0]).toMatchObject({
       code: "schema.required",
-      path: "",
+      // A `required` violation names the missing property, not its parent.
+      path: "/groups",
       severity: "error",
     });
     expect(diagnostics(compileProject(cases[1]))[0]).toMatchObject({
@@ -352,18 +353,56 @@ describe("@rogatio/compiler", () => {
     ).toBe(true);
   });
 
-  it("fails closed for duplicate IDs, invalid actions, and limits", () => {
-    const duplicate = makeProject();
-    duplicate.groups[0].rules.push(makeRule(1));
-    expect(diagnostics(compileProject(duplicate))).toEqual(
+  it("reports per-project name uniqueness as its own diagnostic code", () => {
+    const project = makeProject();
+    const group = project.groups[0];
+    if (!group) throw new Error("fixture group missing");
+    group.rules.push(makeRule(1));
+    group.rules.push(makeRule(2, { name: group.rules[0]?.name }));
+    expect(diagnostics(compileProject(project))).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: "schema.duplicate-id",
-          path: "/groups/0/rules/1/id",
+          code: "schema.duplicate-name",
+          path: "/groups/0/rules/2/name",
+          params: { previousPath: "/groups/0/rules/0/name" },
         }),
       ]),
     );
+  });
 
+  it("treats case-only and spacing-only name differences as duplicates", () => {
+    const project = makeProject();
+    const group = project.groups[0];
+    if (!group) throw new Error("fixture group missing");
+    group.name = "Main  Sites";
+    project.groups.push({
+      ...group,
+      id: "group-two",
+      name: "main sites",
+      rules: [],
+    });
+    expect(diagnostics(compileProject(project))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "schema.duplicate-name",
+          path: "/groups/1/name",
+        }),
+      ]),
+    );
+  });
+
+  it("does not report a duplicate name for an already invalid name", () => {
+    const project = makeProject();
+    const group = project.groups[0];
+    if (!group) throw new Error("fixture group missing");
+    group.name = "";
+    project.groups.push({ ...group, id: "group-two", rules: [] });
+    const codes = diagnostics(compileProject(project)).map(({ code }) => code);
+    expect(codes).not.toContain("schema.duplicate-name");
+    expect(codes).toContain("schema.out-of-range");
+  });
+
+  it("fails closed for duplicate IDs, invalid actions, and limits", () => {
     const sourceOnly = compileProject(makeProject());
     expect(sourceOnly.ok).toBe(true);
     expect(sourceOnly.diagnostics).toEqual([]);

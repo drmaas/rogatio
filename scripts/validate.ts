@@ -186,7 +186,9 @@ async function checkEmittedModules(): Promise<void> {
         rules: [
           {
             id: "rule-check",
-            name: "Check",
+            // Names are unique per project across groups and rules together, so
+            // the rule cannot reuse its group's name.
+            name: "Check rule",
             source: {
               key: "url",
               operator: "regex",

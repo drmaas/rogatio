@@ -124,12 +124,22 @@ Replace-mode body may use URL captures. Regex-mode replacement strings use captu
 Replace-mode body may use URL captures. Regex-mode replacement strings use captures from the body pattern, not the source pattern.
 
 ## Compiler Diagnostic Codes (stable)
-- schema.invalid-regex - Invalid regex syntax
-- schema.duplicate-id - Duplicate group/rule ID
-- schema.invalid-resource-type - Unknown resource type
-- schema.invalid-method - Unknown HTTP method
-- schema.regex-too-long - Regex exceeds 2048 chars
-- compiler.unsupported-operation - Operation kind not supported
+- schema.required - Required project data is missing
+- schema.unknown-property - The project contains an unknown property
+- schema.invalid-type - A value has an invalid type
+- schema.invalid-format - A value has an invalid format
+- schema.invalid-value - A value is invalid
+- schema.out-of-range - A value is outside its allowed bounds
+- schema.invalid-structure - A value has invalid structure
+- schema.duplicate-id - Duplicate group or rule ID
+- schema.duplicate-name - Duplicate group or rule name; every group and rule name must be unique in the project
+- schema.rule-limit - The project contains too many rules
+- compiler.invariant - The compiler could not normalize the project
+- compiler.forbidden-header - The header is forbidden for this direction
+- compiler.header-value-required - A header value is required for set and append
+- compiler.header-value-unexpected - A header value is not allowed for remove
+- compiler.invalid-header-direction - Invalid header direction
+- compiler.invalid-header-operation - Invalid header operation
 
 ## Current Project
 ${projectJson}
