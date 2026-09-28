@@ -224,7 +224,77 @@ describe("response-body extension status", () => {
     });
   });
 
-  it("keeps URL-regex body rules needs runtime with runtime.pac-unroutable after start", async () => {
+  it("reports path-prefix body rules as active after the runtime starts", async () => {
+    const prefixProject: RogatioProject = {
+      version: 2,
+      name: "Prefix body",
+      groups: [
+        {
+          id: "group-prefix",
+          name: "Prefix group",
+          rules: [
+            {
+              id: "rule-response-prefix",
+              name: "Rewrite response body",
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://example\\.com/data\\.json/([^/]+)",
+              },
+              resourceTypes: ["main_frame"],
+              priority: 500,
+              type: "response-body",
+              responseBody: {
+                replacements: [
+                  { pattern: "oldValue", replacement: "newValue" },
+                ],
+              },
+            },
+            {
+              id: "rule-request-prefix",
+              name: "Replace request body",
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://example\\.com/submit/([^/]+)",
+              },
+              resourceTypes: ["xmlhttprequest"],
+              priority: 600,
+              method: "POST",
+              type: "request-body",
+              requestBody: { mode: "replace", body: '{"user":"$1"}' },
+            },
+          ],
+        },
+      ],
+    };
+    const { app } = harness();
+    await app.handle({
+      version: 1,
+      command: "create-project",
+      data: prefixProject,
+    });
+    await app.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "response-project",
+      groupId: "group-prefix",
+      enabled: true,
+    });
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: true,
+      value: {
+        nativeRuntimeState: { phase: "started" },
+        ruleStatuses: [{ status: "active" }, { status: "active" }],
+      },
+    });
+  });
+
+  it("keeps a request-body rule needs runtime when the regex does not name one literal host", async () => {
     const urlRegexProject: RogatioProject = {
       version: 2,
       name: "URL regex body",
@@ -239,15 +309,13 @@ describe("response-body extension status", () => {
               source: {
                 key: "url",
                 operator: "regex",
-                value: "^https://example\\.com/api/.*$",
+                value: "^https://.*\\.example\\.com/submit",
               },
               resourceTypes: ["xmlhttprequest"],
               priority: 100,
-              method: "GET",
-              type: "response-body",
-              responseBody: {
-                replacements: [{ pattern: "old", replacement: "new" }],
-              },
+              method: "POST",
+              type: "request-body",
+              requestBody: { mode: "replace", body: "{}" },
             },
           ],
         },

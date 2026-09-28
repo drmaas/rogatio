@@ -1,5 +1,5 @@
 import type { CapabilityProfile, RuntimeActivation } from "./lifecycle.js";
-import { generatePacScript } from "./pac.js";
+import { generatePacScript, pacRouteFromEntry } from "./pac.js";
 
 export interface ProxyEndpoint {
   readonly host: string;
@@ -196,6 +196,7 @@ export function createPlatformInterceptionProvider(
 ): PlatformInterceptionProvider {
   let state: "stopped" | "running" | "unsupported" = "stopped";
   let active = false;
+  let pacInstalled = false;
   return {
     platform: adapter.platform,
     detect() {
@@ -207,6 +208,18 @@ export function createPlatformInterceptionProvider(
       };
     },
     async start(activation, pacRoutes) {
+      const decoded = pacRoutes.flatMap((entry) => {
+        const route = pacRouteFromEntry(entry);
+        return route === null ? [] : [route];
+      });
+      // Response-body listener only: no PAC, and no device-local CA.
+      if (pacRoutes.length === 0) {
+        const endpoint = await adapter.startTlsProxy(activation);
+        active = true;
+        pacInstalled = false;
+        state = "running";
+        return endpoint;
+      }
       const capabilities = adapter.detect();
       const reasons = unsupportedReasons(capabilities);
       if (!capabilities.supported || reasons.length > 0) {
@@ -219,21 +232,18 @@ export function createPlatformInterceptionProvider(
       }
       // Proxy first so PAC can target a real listening endpoint.
       const endpoint = await adapter.startTlsProxy(activation);
-      const pac = generatePacScript(
-        pacRoutes.map((entry) =>
-          entry.includes("://") ? { url: entry } : { hostname: entry },
-        ),
-        endpoint,
-      );
+      const pac = generatePacScript(decoded, endpoint);
       try {
         await adapter.installPac(pac);
         active = true;
+        pacInstalled = true;
         state = "running";
         return endpoint;
       } catch (error) {
         // PAC never installed successfully — tear down proxy only.
         await adapter.stopTlsProxy();
         active = false;
+        pacInstalled = false;
         state = "stopped";
         throw error;
       }
@@ -244,9 +254,10 @@ export function createPlatformInterceptionProvider(
         return;
       }
       // Stop routing before tearing down the listener.
-      await adapter.removePac();
+      if (pacInstalled) await adapter.removePac();
       await adapter.stopTlsProxy();
       active = false;
+      pacInstalled = false;
       state = "stopped";
     },
     status() {

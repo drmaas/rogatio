@@ -59,6 +59,8 @@ export interface SessionConfig {
   readonly policyDigest: string;
   readonly extensionId: string;
   readonly pacRoutes: readonly string[];
+  /** Start the response-body listener even when there are no PAC routes. */
+  readonly contentListener?: boolean;
   readonly targetPolicy: {
     readonly public: boolean;
     readonly localOrigins: readonly string[];
@@ -103,6 +105,7 @@ export interface RuntimeStartResult {
 export interface ActiveRuntimePolicy {
   readonly project: unknown;
   readonly operations: readonly RogatioOperation[];
+  readonly presetDigest: string;
 }
 
 export interface NativeRuntimeController {
@@ -219,7 +222,10 @@ export function createNativeRuntimeController(
     session: SessionProvider | null;
     interception: { active: boolean; reasons: string[] };
   }> {
-    if (sessionConfig.pacRoutes.length === 0) {
+    if (
+      sessionConfig.pacRoutes.length === 0 &&
+      sessionConfig.contentListener !== true
+    ) {
       return {
         activation: { ...current, pacRoutes: [] },
         session: null,
@@ -454,6 +460,7 @@ export function createNativeRuntimeController(
         activePolicy = {
           project: schemaResult.data,
           operations: compileResult.operations,
+          presetDigest: preset.digest,
         };
 
         // Start the controller now that we have a preset
@@ -505,6 +512,7 @@ export function createNativeRuntimeController(
           policyDigest?: string;
           extensionId?: string;
           pacRoutes?: readonly string[];
+          contentListener?: boolean;
           requestUrl?: string;
           targetPolicy?: {
             public?: boolean;
@@ -518,6 +526,7 @@ export function createNativeRuntimeController(
           extensionId:
             typeof meta.extensionId === "string" ? meta.extensionId : "",
           pacRoutes: Array.isArray(meta.pacRoutes) ? meta.pacRoutes : [],
+          contentListener: meta.contentListener === true,
           targetPolicy: {
             public:
               meta.targetPolicy?.public === true ||

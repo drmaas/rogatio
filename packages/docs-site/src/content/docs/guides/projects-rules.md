@@ -40,8 +40,11 @@ Every rule can specify:
   [match logging](/guides/extension/#match-logging).
 
 Rules visibly report one of: `active`, `disabled`, `needs runtime`, `unsupported`, or
-`error`. Body rules whose source is an exact host or an exact URL report
-`needs runtime` until the native runtime is started. A URL pattern that is not one exact URL stays `needs runtime` after start, because the proxy cannot route it. The toolbar badge reflects the count of successfully installed
+`error`. Response-body rules match their URL regex in the browser and report
+`needs runtime` until the native runtime is started, then `active`. Request-body rules
+report `active` after start when the regex names one literal host
+(`^https://api.example.com/`, escaped dots, a slash after the host, no top-level `|`).
+A request-body regex that does not name one literal host stays `needs runtime`. The toolbar badge reflects the count of successfully installed
 active rules.
 
 See the [rules reference](/rules/redirects/) for each rule type's behavior.

@@ -1,7 +1,7 @@
 import type { NormalizedMatcher } from "@rogatio/compiler";
 import { describe, expect, it } from "vitest";
 import {
-  isPacRoutableBodySource,
+  isRequestBodySteerable,
   projectSourceCondition,
 } from "../src/source-projection.js";
 
@@ -62,10 +62,10 @@ describe("projectSourceCondition", () => {
   });
 });
 
-describe("isPacRoutableBodySource", () => {
-  it("is true for literal hosts and exact URLs", () => {
+describe("isRequestBodySteerable", () => {
+  it("steers a literal host and a URL regex that names one literal host", () => {
     expect(
-      isPacRoutableBodySource(
+      isRequestBodySteerable(
         matcher({
           key: "host",
           operator: "regex",
@@ -74,7 +74,7 @@ describe("isPacRoutableBodySource", () => {
       ),
     ).toBe(true);
     expect(
-      isPacRoutableBodySource(
+      isRequestBodySteerable(
         matcher({
           key: "url",
           operator: "regex",
@@ -83,20 +83,56 @@ describe("isPacRoutableBodySource", () => {
       ),
     ).toBe(true);
     expect(
-      isPacRoutableBodySource(
+      isRequestBodySteerable(
+        matcher({
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/data\\.json/([^/]+)",
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isRequestBodySteerable(
+        matcher({
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/api/.*$",
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isRequestBodySteerable(
         matcher({
           key: "url",
           operator: "regex",
           value: "^http://127\\.0\\.0\\.1/",
         }),
       ),
-    ).toBe(false);
+    ).toBe(true);
     expect(
-      isPacRoutableBodySource(
+      isRequestBodySteerable(
         matcher({
           key: "url",
           operator: "regex",
-          value: "^https://example\\.com/api/.*$",
+          value: "^https://example\\.com/.*$",
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      isRequestBodySteerable(
+        matcher({
+          key: "url",
+          operator: "regex",
+          value: "^https://.*\\.example\\.com/",
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isRequestBodySteerable(
+        matcher({
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/x/((a+)+)",
         }),
       ),
     ).toBe(false);

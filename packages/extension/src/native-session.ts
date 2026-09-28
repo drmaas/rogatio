@@ -1,8 +1,10 @@
 import {
   compileProject,
+  encodePacSteer,
+  isPacSafeSource,
   literalHostname,
-  literalUrl,
   type RogatioOperation,
+  steeredRequestOrigin,
 } from "@rogatio/compiler";
 import { formatSha256, validateProjectDetailed } from "@rogatio/schema";
 import {
@@ -12,6 +14,10 @@ import {
   removeSessionBodyMarkers,
 } from "./body-marker-lifecycle.js";
 import type { ChromeApi } from "./chrome.js";
+import {
+  installResponseBodyRedirects,
+  removeResponseBodyRedirects,
+} from "./response-body-redirect.js";
 
 /**
  * Local structural copy of the native host envelope wire shape. The extension
@@ -122,9 +128,11 @@ async function createHash(
 export interface NativeSessionOptions {
   readonly extensionId: string;
   readonly nativeRuntime: {
-    start(
-      config: NativeRuntimeConfig,
-    ): Promise<{ state: string; message?: string }>;
+    start(config: NativeRuntimeConfig): Promise<{
+      state: string;
+      message?: string;
+      proxy?: { readonly host: string; readonly port: number };
+    }>;
     stop(): Promise<{ state: string }>;
     status(): Promise<{ state: string }>;
     sendPolicy(frames: Uint8Array[]): Promise<void>;
@@ -155,6 +163,8 @@ export interface NativeRuntimeConfig {
   readonly policyDigest: string;
   readonly extensionId: string;
   readonly pacRoutes: readonly string[];
+  /** Response-body rules need the loopback listener even when PAC is empty. */
+  readonly contentListener: boolean;
   readonly targetPolicy: {
     publicAllowed: boolean;
     localOrigins: readonly string[];
@@ -243,19 +253,24 @@ async function syncBodyMarkersAfterStart(
 }
 
 /**
- * PAC routes for enabled body rules: literal hosts, plus exact http(s) URLs.
- * Wildcard URL patterns stay omitted (no RegExp, no host extraction).
+ * PAC routes for enabled request-body rules only.
+ * Host-key rules steer the hostname. A URL regex that names one literal host
+ * steers `scheme://host/*`. Response-body rules are not PAC routes.
  */
 function pacRoutesFromBodyOperations(
   operations: readonly RogatioOperation[],
 ): readonly string[] {
   const routes = new Set<string>();
   for (const op of operations) {
-    if (op.kind !== "request-body" && op.kind !== "response-body") continue;
+    if (op.kind !== "request-body") continue;
+    if (!isPacSafeSource(op.matcher.source)) continue;
     const host = literalHostname(op.matcher.source);
-    if (host !== null) routes.add(host);
-    const url = literalUrl(op.matcher.source);
-    if (url !== null) routes.add(url);
+    if (host !== null) {
+      routes.add(host);
+      continue;
+    }
+    const steer = steeredRequestOrigin(op.matcher.source);
+    if (steer !== null) routes.add(encodePacSteer(steer));
   }
   return [...routes].sort();
 }
@@ -292,6 +307,7 @@ export async function startNativeSession(
   // the project, builds the preset, and transitions to running.
   const send = options.nativeRuntime.send;
   console.log("[rogatio] send available:", !!send);
+  let presetDigest: string | undefined;
   if (send) {
     console.log("[rogatio] sending runtime.project.set");
     try {
@@ -306,6 +322,9 @@ export async function startNativeSession(
         JSON.stringify(projectSetResponse),
       );
 
+      if (typeof projectSetResponse.metadata.presetDigest === "string") {
+        presetDigest = projectSetResponse.metadata.presetDigest;
+      }
       if (
         !projectSetResponse.metadata.ok &&
         projectSetResponse.metadata.error !== "runtime.already-started"
@@ -342,12 +361,14 @@ export async function startNativeSession(
     ? (policyOps as RogatioOperation[])
     : [];
   const pacRoutes = pacRoutesFromBodyOperations(operations);
+  const contentListener = operations.some((op) => op.kind === "response-body");
 
   const config: NativeRuntimeConfig = {
     sessionId,
     policyDigest,
     extensionId: options.extensionId,
     pacRoutes,
+    contentListener,
     targetPolicy: { publicAllowed: true, localOrigins: [] },
   };
 
@@ -363,12 +384,42 @@ export async function startNativeSession(
     project.enabledGroupIds,
   );
 
+  const proxy = startResult.proxy;
+  const redirectApi = options.bodyMarkers?.api;
+  if (
+    contentListener &&
+    redirectApi !== undefined &&
+    proxy !== undefined &&
+    typeof proxy.port === "number" &&
+    presetDigest !== undefined
+  ) {
+    const responseOps = operations.filter(
+      (op): op is Extract<RogatioOperation, { kind: "response-body" }> =>
+        op.kind === "response-body",
+    );
+    const installed = await installResponseBodyRedirects({
+      api: redirectApi,
+      operations: responseOps,
+      port: proxy.port,
+      digest: presetDigest,
+    });
+    if (!installed.ok) {
+      await removeResponseBodyRedirects(redirectApi);
+      await rollbackBodyMarkers(options.bodyMarkers);
+      await options.nativeRuntime.stop();
+      return { ok: false, reason: installed.reason };
+    }
+  }
+
   return { ok: true, sessionId, policyDigest: config.policyDigest };
 }
 
 export async function stopNativeSession(
   options: NativeSessionOptions,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (options.bodyMarkers !== undefined) {
+    await removeResponseBodyRedirects(options.bodyMarkers.api);
+  }
   await rollbackBodyMarkers(options.bodyMarkers);
   await options.nativeRuntime.stop();
   return { ok: true };

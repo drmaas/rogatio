@@ -71,8 +71,9 @@ describe("P3b attentionFromRuleStatuses", () => {
     });
     expect(attention).toEqual({
       blocking: "needs runtime: source has no PAC route",
-      explanation: "some body rules use a URL pattern the proxy cannot route.",
-      fix: "Use an exact host or an exact URL.",
+      explanation:
+        "some request-body rules do not name one literal host, so the proxy cannot steer them.",
+      fix: "Start the URL regex like ^https://api.example.com/ with escaped dots, a slash after the host, and no top-level |.",
     });
     expect(JSON.stringify(attention)).not.toContain("Start runtime");
   });
