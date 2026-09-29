@@ -141,6 +141,31 @@ describe("identifiers are not authored in the editor", () => {
         ?.textContent,
     ).toBe("First rule");
   });
+
+  it("keeps the rename control beside the rule name, like the group", () => {
+    const { root } = mount();
+    openGroup(root, "group-one");
+    const groupIdentity = root.querySelector(
+      "[data-group-heading] [data-group-identity]",
+    );
+    expect(
+      groupIdentity
+        ?.querySelector("h2")
+        ?.nextElementSibling?.getAttribute("data-command"),
+    ).toBe("rename-entity");
+    const ruleHeading = root.querySelector(
+      '[data-rule-card][data-rule-id="rule-one"] [data-rule-heading]',
+    );
+    const ruleIdentity = ruleHeading?.querySelector("[data-rule-identity]");
+    expect(
+      ruleIdentity
+        ?.querySelector("h3")
+        ?.nextElementSibling?.getAttribute("data-command"),
+    ).toBe("rename-entity");
+    const actions = ruleHeading?.querySelector("[data-rule-actions]");
+    expect(ruleIdentity?.contains(actions ?? null)).toBe(false);
+    expect(ruleHeading?.lastElementChild).toBe(actions);
+  });
 });
 
 function renameButton(

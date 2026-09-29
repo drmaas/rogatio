@@ -3059,6 +3059,8 @@ class EditorControllerImpl implements EditorController {
     card.tabIndex = -1;
     const headingRow = this.document.createElement("div");
     headingRow.dataset.ruleHeading = "true";
+    const identity = this.document.createElement("div");
+    identity.dataset.ruleIdentity = "true";
     const heading = this.document.createElement("h3");
     const headingId = `${this.instanceId}-rule-title-${groupIndex}-${ruleIndex}`;
     card.setAttribute("aria-labelledby", headingId);
@@ -3090,7 +3092,7 @@ class EditorControllerImpl implements EditorController {
       ),
     );
     this.renderNameHeading({
-      row: headingRow,
+      row: identity,
       heading,
       headingId,
       kind: "rule",
@@ -3099,8 +3101,9 @@ class EditorControllerImpl implements EditorController {
       namePath: `${rulePath}/name`,
       name: rule.name,
       fallback: "Unnamed rule",
-      commands: [actions],
+      commands: [],
     });
+    headingRow.append(identity, actions);
     card.append(headingRow);
 
     this.renderSource(card, rule, rulePath, groupId, ruleId);
