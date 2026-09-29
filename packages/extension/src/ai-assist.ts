@@ -54,21 +54,73 @@ function ownString(
   return undefined;
 }
 
+function proposalKind(
+  entry: Record<string, unknown>,
+): ExtensionRuleProposal["kind"] | null {
+  if (typeof entry.kind === "string" && RULE_KINDS.has(entry.kind)) {
+    return entry.kind as ExtensionRuleProposal["kind"];
+  }
+  // Models copy the project rule's `type` and sometimes set `kind` to the
+  // prompt's schema label instead of a rule type.
+  if (typeof entry.type === "string" && RULE_KINDS.has(entry.type)) {
+    return entry.type as ExtensionRuleProposal["kind"];
+  }
+  return null;
+}
+
+const HEADER_ACTION_KEYS = [
+  "headerDirection",
+  "direction",
+  "headerOperation",
+  "operation",
+  "headerName",
+  "name",
+  "headerValue",
+  "value",
+] as const;
+
+/**
+ * Action payload for a proposal rule. Prefers `action`. When the model copies
+ * a project rule instead, lift the kind's sibling fields into `action`.
+ */
+function proposalAction(
+  entry: Record<string, unknown>,
+  kind: ExtensionRuleProposal["kind"],
+): unknown {
+  if (Object.hasOwn(entry, "action")) return entry.action;
+  if (kind === "header") {
+    const action: Record<string, unknown> = {};
+    for (const key of HEADER_ACTION_KEYS) {
+      if (!Object.hasOwn(entry, key)) continue;
+      action[key] = entry[key];
+    }
+    return Object.keys(action).length > 0 ? action : undefined;
+  }
+  if (kind === "redirect" && Object.hasOwn(entry, "redirect")) {
+    return entry.redirect;
+  }
+  if (kind === "response-body" && Object.hasOwn(entry, "responseBody")) {
+    return entry.responseBody;
+  }
+  if (kind === "request-body" && Object.hasOwn(entry, "requestBody")) {
+    return entry.requestBody;
+  }
+  return undefined;
+}
+
 export function parseAIProposal(value: unknown): ExtensionAIProposal | null {
   if (!isRecord(value) || typeof value.explanation !== "string") return null;
   if (!Array.isArray(value.rules)) return null;
   const rules: ExtensionRuleProposal[] = [];
   for (const entry of value.rules) {
     if (!isRecord(entry)) return null;
-    if (typeof entry.kind !== "string" || !RULE_KINDS.has(entry.kind)) {
-      return null;
-    }
+    const kind = proposalKind(entry);
+    if (kind === null) return null;
     if (typeof entry.groupId !== "string" || typeof entry.name !== "string") {
       return null;
     }
-    if (!isRecord(entry.source) || !Object.hasOwn(entry, "action")) {
-      return null;
-    }
+    const action = proposalAction(entry, kind);
+    if (!isRecord(entry.source) || action === undefined) return null;
     const source = entry.source;
     if (
       (source.key !== "url" && source.key !== "host") ||
@@ -79,7 +131,7 @@ export function parseAIProposal(value: unknown): ExtensionAIProposal | null {
       return null;
     }
     rules.push({
-      kind: entry.kind as ExtensionRuleProposal["kind"],
+      kind,
       groupId: entry.groupId,
       name: entry.name,
       source: {
@@ -94,7 +146,7 @@ export function parseAIProposal(value: unknown): ExtensionAIProposal | null {
         : undefined,
       priority: typeof entry.priority === "number" ? entry.priority : undefined,
       method: typeof entry.method === "string" ? entry.method : undefined,
-      action: entry.action,
+      action,
     });
   }
   return { rules, explanation: value.explanation };
@@ -315,10 +367,12 @@ export function buildAssistSystemPrompt(project: unknown): string {
   }
   return [
     "You are an expert Rogatio rule author.",
-    'Return ONLY valid JSON: {"rules":RuleProposal[],"explanation":string}.',
-    'RuleProposal: kind, groupId, name, source { key "url"|"host", operator "regex", value }, optional resourceTypes/priority/method, action.',
+    'Return ONLY valid JSON: {"rules":[...],"explanation":string}.',
+    'Each rule kind is exactly "redirect", "query", "header", "response-body", or "request-body".',
+    'Required: kind, groupId, name, source { key "url"|"host", operator "regex", value }, action. Optional: resourceTypes, priority, method.',
     "redirect action: {destination} (http/https absolute URL; $1-$9 for captures).",
-    "query action: query parameter ops; header: direction/operation/name/value; body rules: replace or regex modes.",
+    'header action: {headerDirection:"request"|"response", headerOperation:"set"|"append"|"remove", headerName, headerValue}. Use headerOperation "set" when assigning a header value.',
+    "query action: query parameter ops; body rules: replace or regex modes.",
     "source.value must be valid ECMAScript regex, max 2048 chars, case-sensitive, no flags. Prefer existing groups. Minimal changes.",
     `Current project JSON: ${projectJson}`,
   ].join(" ");

@@ -1,11 +1,37 @@
 import type { RogatioOperation } from "@rogatio/compiler";
 import { describe, expect, it, vi } from "vitest";
+import { buildAssistSystemPrompt } from "../src/ai-assist.js";
 import type {
   NativeEnvelope,
   NativeEnvelopeInput,
 } from "../src/native-session.js";
 import { createExtensionApplication } from "../src/service-worker.js";
 import { project } from "./fixtures.js";
+
+/** Live gemini-2.5-flash-lite reply for a plain "add request header" prompt. */
+const projectShapedHeader = {
+  rules: [
+    {
+      kind: "RuleProposal",
+      groupId: "grp-sample",
+      name: "Add X-Test-Header",
+      source: {
+        key: "url",
+        operator: "regex",
+        value: "^https://www\\.example\\.com/",
+      },
+      resourceTypes: ["main_frame", "xmlhttprequest"],
+      priority: 400,
+      type: "header",
+      headerDirection: "request",
+      headerOperation: "set",
+      headerName: "X-Test-Header",
+      headerValue: "value",
+    },
+  ],
+  explanation:
+    "Added a rule to set the 'X-Test-Header' to 'value' for requests to 'https://www.example.com/'.",
+};
 
 const proposal = {
   rules: [
@@ -156,6 +182,92 @@ describe("extension AI Assist", () => {
     expect(send.mock.calls.every((call) => call[0].protocol === "v1")).toBe(
       true,
     );
+  });
+
+  it("accepts a project-shaped header rule that omits action", async () => {
+    const { app } = harness({
+      protocol: "v1",
+      type: "ai.complete",
+      metadata: { content: JSON.stringify(projectShapedHeader) },
+    });
+    await start(app);
+
+    const result = await app.handle({
+      version: 1,
+      command: "ai-assist",
+      kind: "generate",
+      prompt:
+        "add a rule to add the request header x-test-header=value to url https://www.example.com",
+      context: { project },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        proposal: {
+          explanation: projectShapedHeader.explanation,
+          rules: [
+            {
+              kind: "header",
+              groupId: "grp-sample",
+              name: "Add X-Test-Header",
+              action: {
+                headerDirection: "request",
+                headerOperation: "set",
+                headerName: "X-Test-Header",
+                headerValue: "value",
+              },
+            },
+          ],
+        },
+      },
+    });
+  });
+
+  it("rejects a schema-label kind that has no rule type or action", async () => {
+    const { app } = harness({
+      protocol: "v1",
+      type: "ai.complete",
+      metadata: {
+        content: JSON.stringify({
+          rules: [
+            {
+              kind: "RuleProposal",
+              groupId: "group-a",
+              name: "Missing type",
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://example\\.com/",
+              },
+            },
+          ],
+          explanation: "no rule type",
+        }),
+      },
+    });
+    await start(app);
+
+    await expect(
+      app.handle({
+        version: 1,
+        command: "ai-assist",
+        kind: "generate",
+        prompt: "Add a header",
+        context: { project },
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      diagnostic: { code: "extension.ai-invalid-response" },
+    });
+  });
+
+  it("names the rule kind enum in the Assist system prompt", () => {
+    const prompt = buildAssistSystemPrompt(project);
+    expect(prompt).toContain(
+      'Each rule kind is exactly "redirect", "query", "header", "response-body", or "request-body".',
+    );
+    expect(prompt).toContain('headerOperation "set"');
   });
 
   it("rejects schema-invalid proposals", async () => {

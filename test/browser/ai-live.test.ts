@@ -6,7 +6,9 @@
  * platform config file):
  *   1. Dashboard "Create using AI" creates and saves a project.
  *   2. Workspace AI Assist generates a new rule that saves cleanly and works.
- *   3. Workspace AI Assist fixes a deliberately broken rule in place; after
+ *   3. Workspace AI Assist adds a request header from a plain-language prompt
+ *      and Chrome installs that header rule.
+ *   4. Workspace AI Assist fixes a deliberately broken rule in place; after
  *      Apply + Save the project validates and the fixed redirect works live.
  *
  * Prerequisites (the run fails with the exact fix command otherwise):
@@ -71,6 +73,24 @@ function totalRules(project: RogatioProject): number {
     (sum, group) => sum + (group.rules?.length ?? 0),
     0,
   );
+}
+
+/** Request-header rule produced by the plain "x-test-header=value" prompt. */
+function addedRequestHeader(
+  project: RogatioProject,
+): Record<string, unknown> | undefined {
+  for (const group of project.groups) {
+    for (const rule of group.rules) {
+      if (
+        String(rule.headerName ?? "").toLowerCase() === "x-test-header" &&
+        rule.headerValue === "value" &&
+        rule.headerDirection === "request"
+      ) {
+        return rule;
+      }
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -169,11 +189,20 @@ async function waitForOrFail(
   condition: () => Promise<boolean>,
 ): Promise<void> {
   const deadline = Date.now() + AI_WAIT_MS;
+  let last = "";
   for (;;) {
-    if (await condition()) return;
+    try {
+      if (await condition()) return;
+      last = await context();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // Refresh replaces the status node while the poll still holds it.
+      if (!/stale element/i.test(message)) throw error;
+      last = message;
+    }
     if (Date.now() > deadline) {
       throw new Error(
-        `${label} not reached within ${AI_WAIT_MS}ms; surface said: ${await context()}`,
+        `${label} not reached within ${AI_WAIT_MS}ms; surface said: ${last}`,
       );
     }
     await new Promise((r) => setTimeout(r, 250));
@@ -428,6 +457,105 @@ if (AI_LIVE) {
   );
 
   testStandalone(
+    "AI live: plain prompt adds a request header and Chrome installs it",
+    async ({ registerDriver }) => {
+      await startAI();
+      const { driver, page, extensionId, profile, close } =
+        await extensionContext({});
+      registerDriver(driver, close);
+      try {
+        await page.goto(`chrome-extension://${extensionId}/index.html`);
+        await expect(
+          page.getByRole("heading", { name: "Rogatio" }),
+        ).toBeVisible();
+
+        // Start against the empty first-run project. Starting after the
+        // sample is loaded asks the host to intercept body rules and the
+        // handshake times out in this browser.
+        await openWithAISupport(page, extensionId, profile);
+
+        const project = await loadShippedSample();
+        const before = totalRules(project);
+        await importAndEnableSample(page, project);
+        await page
+          .getByRole("button", { name: "Refresh", exact: true })
+          .click();
+        await page
+          .getByRole("button", { name: "Workspace", exact: true })
+          .click();
+
+        await page
+          .locator("[data-editor-command-bar]")
+          .getByRole("button", { name: "AI Assist", exact: true })
+          .click();
+        const panel = page.locator(".ai-assist-panel");
+        await sendAssistWithRetry(
+          panel,
+          "add a rule to add the request header x-test-header=value to url https://www.example.com",
+          "AI Assist header proposal",
+        );
+
+        const applyButtons = panel.getByRole("button", { name: "Apply Rule" });
+        const applyCount = await applyButtons.count();
+        await applyButtons.first().click();
+        await expect(page.locator("[data-editor-status]")).toContainText(
+          "Applied",
+        );
+
+        await page
+          .locator("[data-editor-command-bar]")
+          .getByRole("button", { name: "Save", exact: true })
+          .click();
+        await waitForPersisted(
+          page,
+          "saved header rule",
+          (stored) =>
+            stored !== undefined &&
+            totalRules(stored) === before + applyCount &&
+            addedRequestHeader(stored) !== undefined,
+        );
+
+        await enableSampleGroup(page);
+
+        const installed = await page.evaluate(async () => {
+          const dnr = chrome.declarativeNetRequest;
+          if (!dnr) {
+            throw new Error("chrome.declarativeNetRequest is unavailable");
+          }
+          const rules = (await dnr.getDynamicRules()) as Array<{
+            action?: {
+              requestHeaders?: Array<{
+                header: string;
+                operation: string;
+                value?: string;
+              }>;
+            };
+          }>;
+          return rules.flatMap((rule) =>
+            (rule.action?.requestHeaders ?? []).map((header) => ({
+              header: header.header,
+              operation: header.operation,
+              value: header.value ?? null,
+            })),
+          );
+        });
+        vitestExpect(
+          installed.some(
+            (header) =>
+              header.header.toLowerCase() === "x-test-header" &&
+              header.value === "value" &&
+              (header.operation === "set" || header.operation === "append"),
+          ),
+          `dynamic request headers: ${JSON.stringify(installed)}`,
+        ).toBe(true);
+      } finally {
+        await close();
+      }
+    },
+    300_000,
+  );
+
+  testStandalone(
     "AI live: Workspace AI Assist fixes a broken rule in place (AC-007)",
     async ({ registerDriver }) => {
       await startAI();
@@ -550,6 +678,9 @@ if (AI_LIVE) {
     //
   });
   it.skip("AI live: Workspace AI Assist adds a new rule that saves and works", () => {
+    //
+  });
+  it.skip("AI live: plain prompt adds a request header and Chrome installs it", () => {
     //
   });
   it.skip("AI live: Workspace AI Assist fixes a broken rule in place", () => {
