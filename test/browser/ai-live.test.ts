@@ -370,6 +370,7 @@ if (AI_LIVE) {
         await openWithAISupport(page, extensionId, profile);
 
         await page
+          .locator("[data-editor-command-bar]")
           .getByRole("button", { name: "AI Assist", exact: true })
           .click();
         const panel = page.locator(".ai-assist-panel");
@@ -392,7 +393,10 @@ if (AI_LIVE) {
           "Applied",
         );
 
-        await page.getByRole("button", { name: "Save", exact: true }).click();
+        await page
+          .locator("[data-editor-command-bar]")
+          .getByRole("button", { name: "Save", exact: true })
+          .click();
         await waitForPersisted(
           page,
           "saved project rule count",
@@ -461,11 +465,13 @@ if (AI_LIVE) {
         });
         await urlRegexField.fill("([");
         await page
+          .locator("[data-editor-command-bar]")
           .getByRole("button", { name: "Validate", exact: true })
           .click();
         await expect(urlRegexField).toHaveAttribute("aria-invalid", "true");
 
         await page
+          .locator("[data-editor-command-bar]")
           .getByRole("button", { name: "AI Assist", exact: true })
           .click();
         const panel = page.locator(".ai-assist-panel");
@@ -489,7 +495,10 @@ if (AI_LIVE) {
           "Applied",
         );
 
-        await page.getByRole("button", { name: "Save", exact: true }).click();
+        await page
+          .locator("[data-editor-command-bar]")
+          .getByRole("button", { name: "Save", exact: true })
+          .click();
         await waitForPersisted(
           page,
           "repaired rule persisted",

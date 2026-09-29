@@ -89,7 +89,10 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
     page.locator('[data-rule-list="group-one"] [data-rule-card]'),
   ).toHaveCount(3);
 
-  await page.getByRole("button", { name: "Add rule" }).click();
+  await page
+    .locator("[data-section-heading]")
+    .getByRole("button", { name: "Add rule" })
+    .click();
   await expect(page.getByRole("heading", { name: "New rule" })).toBeVisible();
   await page.getByLabel("Search rules by name").fill("Second rule");
   const result = page.locator("[data-search-results] button").filter({
@@ -189,14 +192,20 @@ test("renders validation errors and never saves an invalid draft", async ({
   page,
 }) => {
   await page.getByLabel("Project name").fill("");
-  await page.getByRole("button", { name: "Validate" }).click();
+  await page
+    .locator("[data-editor-command-bar]")
+    .getByRole("button", { name: "Validate" })
+    .click();
 
   await expect(page.getByRole("alert")).toContainText("Enter a project name.");
   await expect(page.getByLabel("Project name")).toHaveAttribute(
     "aria-invalid",
     "true",
   );
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page
+    .locator("[data-editor-command-bar]")
+    .getByRole("button", { name: "Save", exact: true })
+    .click();
   expect(await page.evaluate(() => window.editorTest.saveCalls)).toHaveLength(
     0,
   );
@@ -241,7 +250,10 @@ test("supports keyboard commands and exposes screen-reader error associations", 
 }) => {
   const projectName = page.getByLabel("Project name");
   await projectName.fill("");
-  await page.getByRole("button", { name: "Validate" }).focus();
+  await page
+    .locator("[data-editor-command-bar]")
+    .getByRole("button", { name: "Validate" })
+    .focus();
   await page.keyboard.press("Enter");
 
   await expect(projectName).toHaveAttribute("aria-invalid", "true");
@@ -251,7 +263,10 @@ test("supports keyboard commands and exposes screen-reader error associations", 
     "Enter a project name.",
   );
 
-  await page.getByRole("button", { name: "Cancel" }).focus();
+  await page
+    .locator("[data-editor-command-bar]")
+    .getByRole("button", { name: "Cancel" })
+    .focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -326,7 +341,10 @@ test("preserves draft on save failure and prevents pending-save races", async ({
 }) => {
   await page.getByLabel("Project name").fill("Retry project");
   await page.evaluate(() => window.editorTest.setSaveMode("fail"));
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page
+    .locator("[data-editor-command-bar]")
+    .getByRole("button", { name: "Save", exact: true })
+    .click();
   await expect(page.getByRole("alert")).toContainText("could not save");
   await expect(page.getByLabel("Project name")).toHaveValue("Retry project");
   expect(await page.evaluate(() => window.editorTest.saveCalls)).toHaveLength(
@@ -334,8 +352,18 @@ test("preserves draft on save failure and prevents pending-save races", async ({
   );
 
   await page.evaluate(() => window.editorTest.setSaveMode("pending"));
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  await page
+    .locator("[data-editor-command-bar]")
+    .getByRole("button", { name: "Save", exact: true })
+    .click();
+  await expect(
+    page
+      .locator("[data-editor-command-bar]")
+      .getByRole("button", { name: "Cancel" }),
+  ).toBeDisabled();
+  await expect(
+    page.locator("[data-action-dock]").getByRole("button", { name: "Cancel" }),
+  ).toBeDisabled();
   await expect(page.getByLabel("Project name")).toBeDisabled();
   await page.evaluate(() => window.editorTest.resolveSave(0, { ok: true }));
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
@@ -358,7 +386,11 @@ test("keeps route and mobile navigation accessible at narrow width and zoom", as
   ).toBeVisible();
 
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
-  await expect(page.getByRole("button", { name: "Validate" })).toBeVisible();
+  await expect(
+    page
+      .locator("[data-editor-command-bar]")
+      .getByRole("button", { name: "Validate" }),
+  ).toBeVisible();
   await page.getByLabel("Project name").focus();
   await page.evaluate(() => {
     document.documentElement.style.zoom = "2";
@@ -607,10 +639,16 @@ test("selects the Query parameters rule type and round-trips the action through 
     .first();
   await valueInput.fill("rogatio");
 
-  await page.getByRole("button", { name: "Validate" }).click();
+  await page
+    .locator("[data-editor-command-bar]")
+    .getByRole("button", { name: "Validate" })
+    .click();
   await expect(page.getByRole("alert")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page
+    .locator("[data-editor-command-bar]")
+    .getByRole("button", { name: "Save", exact: true })
+    .click();
   const saved = await page.evaluate(() => window.editorTest.saveCalls.at(-1));
   expect(saved?.groups?.[0]?.rules?.[0]?.action).toEqual({
     type: "query",

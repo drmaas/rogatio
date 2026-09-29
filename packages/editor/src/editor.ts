@@ -792,7 +792,7 @@ class EditorControllerImpl implements EditorController {
     this.commandBar = this.document.createElement("div");
     this.commandBar.dataset.editorCommandBar = "true";
     this.commandBar.setAttribute("role", "toolbar");
-    this.commandBar.setAttribute("aria-label", "Editor commands");
+    this.commandBar.setAttribute("aria-label", "Project actions");
     this.form = this.document.createElement("form");
     this.form.dataset.editorForm = "true";
     this.form.noValidate = true;
@@ -2286,7 +2286,9 @@ class EditorControllerImpl implements EditorController {
       const draftGroup = this.draftGroupForSavedId(groupId);
       const groupName = displayName(
         draftGroup?.name,
-        button.parentElement?.querySelector("h2")?.textContent?.trim() ?? "",
+        this.host
+          .querySelector("[data-group-heading] h2")
+          ?.textContent?.trim() ?? "",
       );
       this.applyGroupEnablementLabel(button, enabled.has(groupId), groupName);
     }
@@ -2447,6 +2449,7 @@ class EditorControllerImpl implements EditorController {
     } else {
       this.renderGroup(this.route.groupId);
     }
+    this.renderActionDock();
     this.decorateExtensionControls();
     this.renderSummary();
     this.renderMigrationNotices();
@@ -2560,25 +2563,17 @@ class EditorControllerImpl implements EditorController {
   private renderCommandBar(): void {
     this.commandBar.replaceChildren();
     this.commandBar.setAttribute("aria-busy", this.saving ? "true" : "false");
-    // AI Assist button (only when AI is configured)
+    this.commandBar.setAttribute("aria-label", "Project actions");
+    const tools = this.document.createElement("div");
+    tools.dataset.actionCluster = "tools";
     if (this.aiAssistPanel) {
-      this.commandBar.append(
+      tools.append(
         this.createCommandButton("AI Assist", "ai-assist", this.saving),
       );
     }
-    this.commandBar.append(
-      this.createCommandButton("Validate", "validate", this.saving),
-      this.createCommandButton(
-        "Save",
-        "save",
-        this.saving || !this.isDirty(),
-        {},
-        "primary",
-      ),
-      this.createCommandButton("Cancel", "cancel", this.saving),
-    );
+    tools.append(this.createCommandButton("Validate", "validate", this.saving));
     if (this.route.kind === "project") {
-      this.commandBar.append(
+      tools.append(
         this.createCommandButton(
           "Add group",
           "add-group",
@@ -2587,19 +2582,206 @@ class EditorControllerImpl implements EditorController {
           "primary",
         ),
       );
-      return;
-    }
-    if (this.route.kind === "test") {
-      this.commandBar.append(
+    } else if (this.route.kind === "test") {
+      tools.append(
         this.createCommandButton(
           "Run test",
           "test:run",
-          this.saving,
+          this.saving || this.testRunning,
           {},
           "primary",
         ),
       );
     }
+    const commit = this.document.createElement("div");
+    commit.dataset.actionCluster = "commit";
+    commit.append(
+      this.createCommandButton("Cancel", "cancel", this.saving),
+      this.createCommandButton(
+        "Save",
+        "save",
+        this.saving || !this.isDirty(),
+        {},
+        "primary",
+      ),
+    );
+    this.commandBar.append(tools, commit);
+  }
+
+  private createGroupEnableButton(
+    savedGroupId: string,
+    groupName: string,
+  ): HTMLButtonElement {
+    const enablement = this.options.groupEnablement;
+    const enableButton = this.document.createElement("button");
+    enableButton.type = "button";
+    enableButton.dataset.groupEnable = "true";
+    enableButton.dataset.groupId = savedGroupId;
+    enableButton.dataset.btn = "primary";
+    this.applyGroupEnablementLabel(
+      enableButton,
+      enablement?.isEnabled(savedGroupId) === true,
+      groupName,
+    );
+    enableButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (enableButton.disabled || !enablement) return;
+      const next = enablement.isEnabled(savedGroupId) !== true;
+      const peers = Array.from(
+        this.host.querySelectorAll<HTMLButtonElement>(
+          "button[data-group-enable]",
+        ),
+      ).filter((peer) => peer.dataset.groupId === savedGroupId);
+      for (const peer of peers) peer.disabled = true;
+      void Promise.resolve(enablement.setEnabled(savedGroupId, next)).finally(
+        () => {
+          for (const peer of peers) {
+            if (peer.isConnected) peer.disabled = false;
+          }
+        },
+      );
+    });
+    return enableButton;
+  }
+
+  /** Enable/Disable, Copy, and Remove as one toolbar. Remove stays visually last. */
+  private createGroupActionClusters(
+    groupId: string,
+    groupName: string,
+  ): HTMLElement {
+    const actions = this.document.createElement("div");
+    actions.dataset.groupActions = "true";
+    actions.setAttribute("role", "toolbar");
+    actions.setAttribute("aria-label", `Actions for group ${groupName}`);
+    const safe = this.document.createElement("div");
+    safe.dataset.actionCluster = "safe";
+    const group = this.groupById(groupId);
+    const savedGroupId = group ? this.savedGroupId(group) : undefined;
+    if (this.options.groupEnablement && savedGroupId) {
+      safe.append(this.createGroupEnableButton(savedGroupId, groupName));
+    }
+    safe.append(
+      this.createCommandButton("Copy group", "copy-group", this.saving, {
+        groupId,
+      }),
+    );
+    const danger = this.document.createElement("div");
+    danger.dataset.actionCluster = "danger";
+    danger.append(
+      this.createCommandButton(
+        "Remove group",
+        "remove-group",
+        this.saving,
+        { groupId },
+        "danger",
+      ),
+    );
+    actions.append(safe, danger);
+    return actions;
+  }
+
+  private createProjectActionRow(): HTMLElement {
+    const actions = this.document.createElement("div");
+    const tools = this.document.createElement("div");
+    tools.dataset.actionCluster = "tools";
+    if (this.aiAssistPanel) {
+      tools.append(
+        this.createCommandButton("AI Assist", "ai-assist", this.saving),
+      );
+    }
+    tools.append(this.createCommandButton("Validate", "validate", this.saving));
+    const commit = this.document.createElement("div");
+    commit.dataset.actionCluster = "commit";
+    commit.append(
+      this.createCommandButton("Cancel", "cancel", this.saving),
+      this.createCommandButton(
+        "Save",
+        "save",
+        this.saving || !this.isDirty(),
+        {},
+        "primary",
+      ),
+    );
+    actions.append(tools, commit);
+    return actions;
+  }
+
+  private appendDockRow(
+    dock: HTMLElement,
+    label: string,
+    actions: HTMLElement,
+  ): void {
+    const row = this.document.createElement("div");
+    row.dataset.dockRow = "true";
+    const labelEl = this.document.createElement("span");
+    labelEl.dataset.dockLabel = "true";
+    labelEl.textContent = label;
+    actions.dataset.dockActions = "true";
+    row.append(labelEl, actions);
+    dock.append(row);
+  }
+
+  /**
+   * Repeats the actions a long page would otherwise hide: under the last rule,
+   * under the project group list, or under the test results.
+   */
+  private renderActionDock(): void {
+    const dock = this.document.createElement("section");
+    dock.dataset.actionDock = "end";
+    dock.setAttribute("aria-label", "Repeated actions");
+    if (this.route.kind === "group") {
+      const groupId = this.route.groupId;
+      const group = this.groupById(groupId);
+      if (group) {
+        const groupName = displayName(group.name, "Unnamed group");
+        const addRule = this.document.createElement("div");
+        addRule.dataset.actionCluster = "safe";
+        addRule.append(
+          this.createCommandButton(
+            "Add rule",
+            "add-rule",
+            this.saving,
+            { groupId },
+            "primary",
+          ),
+        );
+        this.appendDockRow(dock, "Rules", addRule);
+        this.appendDockRow(
+          dock,
+          "Group",
+          this.createGroupActionClusters(groupId, groupName),
+        );
+      }
+    } else if (this.route.kind === "project") {
+      const addGroup = this.document.createElement("div");
+      addGroup.dataset.actionCluster = "safe";
+      addGroup.append(
+        this.createCommandButton(
+          "Add group",
+          "add-group",
+          this.saving,
+          {},
+          "primary",
+        ),
+      );
+      this.appendDockRow(dock, "Groups", addGroup);
+    } else {
+      const run = this.document.createElement("div");
+      run.dataset.actionCluster = "safe";
+      run.append(
+        this.createCommandButton(
+          "Run test",
+          "test:run",
+          this.saving || this.testRunning,
+          {},
+          "primary",
+        ),
+      );
+      this.appendDockRow(dock, "Test", run);
+    }
+    this.appendDockRow(dock, "Project", this.createProjectActionRow());
+    this.form.append(dock);
   }
 
   private renderProject(): void {
@@ -2683,51 +2865,11 @@ class EditorControllerImpl implements EditorController {
     const groupName = displayName(group.name, "Unnamed group");
     const headingRow = this.document.createElement("div");
     headingRow.dataset.groupHeading = "true";
+    const identity = this.document.createElement("div");
+    identity.dataset.groupIdentity = "true";
     const heading = this.document.createElement("h2");
-    const copyGroup = this.createCommandButton(
-      "Copy group",
-      "copy-group",
-      this.saving,
-      { groupId },
-    );
-    const removeGroup = this.createCommandButton(
-      "Remove group",
-      "remove-group",
-      this.saving,
-      { groupId },
-      "danger",
-    );
-    const savedGroupId = this.savedGroupId(group);
-    const enablement = this.options.groupEnablement;
-    const commands: HTMLElement[] = [];
-    if (enablement && savedGroupId) {
-      const enableButton = this.document.createElement("button");
-      enableButton.type = "button";
-      enableButton.dataset.groupEnable = "true";
-      enableButton.dataset.groupId = savedGroupId;
-      enableButton.dataset.btn = "primary";
-      this.applyGroupEnablementLabel(
-        enableButton,
-        enablement.isEnabled(savedGroupId) === true,
-        groupName,
-      );
-      enableButton.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (enableButton.disabled) return;
-        const next = enablement.isEnabled(savedGroupId) !== true;
-        enableButton.disabled = true;
-        void Promise.resolve(enablement.setEnabled(savedGroupId, next)).finally(
-          () => {
-            if (enableButton.isConnected) enableButton.disabled = false;
-          },
-        );
-      });
-      commands.push(enableButton);
-    }
-    commands.push(copyGroup, removeGroup);
     this.renderNameHeading({
-      row: headingRow,
+      row: identity,
       heading,
       headingId: `${this.instanceId}-group-title-${groupIndex}`,
       kind: "group",
@@ -2735,8 +2877,12 @@ class EditorControllerImpl implements EditorController {
       namePath: pointer("groups", groupIndex, "name"),
       name: group.name,
       fallback: "Unnamed group",
-      commands,
+      commands: [],
     });
+    headingRow.append(
+      identity,
+      this.createGroupActionClusters(groupId, groupName),
+    );
     this.form.append(headingRow);
 
     const rulesSection = this.document.createElement("section");
