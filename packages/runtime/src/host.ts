@@ -400,9 +400,85 @@ export async function runNativeHost(
   await host.start();
   const stdin = (options.stdin ??
     (process.stdin as unknown as Readable)) as Readable;
-  if (options.onReady) options.onReady();
+  // Chrome closes the pipe on disconnect. Without a listener that write
+  // surfaces as an unhandled 'error' and kills the host.
+  stdout.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EPIPE") return;
+    console.error("[rogatio-host] stdout error:", error.message);
+  });
 
   let buffer = Buffer.alloc(0);
+  // Extension commands run one at a time. A host- reply (PAC install/remove)
+  // arrives while that command is still awaiting it, so replies bypass the
+  // queue. The frame is copied out of `buffer` before any await; otherwise a
+  // reply chunk re-reads the in-flight command and the reply is never parsed.
+  let commandChain: Promise<void> = Promise.resolve();
+  let pumping = false;
+
+  function writeResponse(response: Uint8Array | null): void {
+    if (response && stdout.writable) {
+      console.error(
+        "[rogatio-host] writing response:",
+        response.length,
+        "bytes",
+      );
+      stdout.write(Buffer.from(response));
+      return;
+    }
+    console.error("[rogatio-host] no response to write");
+  }
+
+  function isHostReply(frame: Uint8Array): boolean {
+    try {
+      const envelope = decodeEnvelopeFrame(frame);
+      return (
+        typeof envelope.requestId === "string" &&
+        envelope.requestId.startsWith("host-")
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  function dispatch(frame: Uint8Array): void {
+    if (isHostReply(frame)) {
+      void host.processFrame(frame).then(writeResponse);
+      return;
+    }
+    commandChain = commandChain
+      .then(async () => {
+        console.error(
+          "[rogatio-host] processing frame:",
+          frame.byteLength,
+          "bytes",
+        );
+        writeResponse(await host.processFrame(frame));
+      })
+      .catch((error: unknown) => {
+        console.error(
+          "[rogatio-host] frame failed:",
+          error instanceof Error ? error.message : String(error),
+        );
+      });
+  }
+
+  function pump(): void {
+    if (pumping) return;
+    pumping = true;
+    try {
+      for (;;) {
+        if (buffer.length < 4) break;
+        const length = buffer.readUInt32LE(0);
+        if (buffer.length < 4 + length) break;
+        const frame = Buffer.from(buffer.subarray(0, 4 + length));
+        buffer = buffer.subarray(4 + length);
+        dispatch(frame);
+      }
+    } finally {
+      pumping = false;
+    }
+  }
+
   stdin.on("data", (chunk: Buffer | string) => {
     const buf = Buffer.isBuffer(chunk)
       ? Buffer.from(chunk)
@@ -414,37 +490,15 @@ export async function runNativeHost(
       buffer.length,
     );
     buffer = Buffer.concat([buffer, buf]);
-    void (async () => {
-      for (;;) {
-        if (buffer.length < 4) break;
-        const length = buffer.readUInt32LE(0);
-        if (buffer.length < 4 + length) break;
-        const frame = new Uint8Array(
-          buffer.buffer,
-          buffer.byteOffset,
-          4 + length,
-        );
-        console.error("[rogatio-host] processing frame:", 4 + length, "bytes");
-        const response = await host.processFrame(frame);
-        buffer = buffer.subarray(4 + length);
-        if (response && stdout.writable) {
-          console.error(
-            "[rogatio-host] writing response:",
-            response.length,
-            "bytes",
-          );
-          stdout.write(Buffer.from(response));
-        } else {
-          console.error("[rogatio-host] no response to write");
-        }
-      }
-    })();
+    pump();
   });
 
   await new Promise<void>((resolve) => {
     stdin.on("end", () => {
-      void host.stop().then(resolve);
+      void commandChain.finally(() => host.stop()).then(() => resolve());
     });
+    if (options.onReady) options.onReady();
+    pump();
   });
 }
 
