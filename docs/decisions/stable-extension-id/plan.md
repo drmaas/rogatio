@@ -26,6 +26,7 @@ Every build that contains the committed public `key` has one Chrome extension ID
 - CLI: `install` with no flag passes the release ID; an explicit ID still works; invalid IDs still exit 2; `verify` prints the mismatch command.
 - Service worker: a forbidden-host send failure returns `extension.native-host-origin-forbidden` and the re-pin command.
 - Browser journey: the runtime card and guidance show that command when the page is told the origin was rejected.
+- `test/browser/extension-context.ts` derives the loaded ID from the manifest `key` when present, and still hashes the directory path when the key is absent. The harness previously always hashed the path, which no longer matches Chrome.
 
 ## Docs
 
