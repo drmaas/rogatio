@@ -220,7 +220,7 @@ test("Enter in a heading's inline editor never saves the project", async ({
   // applies implicit submission here. This journey is the only place that
   // behaviour is observable: the unit suite's DOM does not implement it.
   await page
-    .locator('[data-editor-command-bar] [data-command="add-group"]')
+    .locator('[data-section-heading] [data-command="add-group"]')
     .click();
 
   const nameEditor = page.locator("[data-group-heading] [data-rename-input]");
@@ -361,9 +361,7 @@ test("preserves draft on save failure and prevents pending-save races", async ({
       .locator("[data-editor-command-bar]")
       .getByRole("button", { name: "Cancel" }),
   ).toBeDisabled();
-  await expect(
-    page.locator("[data-action-dock]").getByRole("button", { name: "Cancel" }),
-  ).toBeDisabled();
+  await expect(page.locator("[data-action-dock]")).toHaveCount(0);
   await expect(page.getByLabel("Project name")).toBeDisabled();
   await page.evaluate(() => window.editorTest.resolveSave(0, { ok: true }));
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();

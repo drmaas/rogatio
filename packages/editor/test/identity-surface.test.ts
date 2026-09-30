@@ -470,7 +470,7 @@ describe("inline rename", () => {
 describe("rename focus after structural commands", () => {
   it("opens the editor focused after add group, add rule, copy, and move", () => {
     const { root } = mount();
-    click(root, '[data-editor-command-bar] [data-command="add-group"]');
+    click(root, '[data-section-heading] [data-command="add-group"]');
     expect(document.activeElement).toBe(openGroupEditor(root));
 
     const input = openGroupEditor(root);
@@ -735,7 +735,7 @@ describe("generated identity", () => {
 
   it("derives a group id from the name it was created with, then freezes it", () => {
     const { root, editor } = mount();
-    click(root, '[data-editor-command-bar] [data-command="add-group"]');
+    click(root, '[data-section-heading] [data-command="add-group"]');
     const input = openGroupEditor(root);
     // The id is minted from the placeholder name the group was created with.
     expect(input.value).toBe("New group");
@@ -754,7 +754,7 @@ describe("generated identity", () => {
     for (const name of ["ads-blocker", "ad blocker"]) {
       // Add group is scoped to the project route, and adding one navigates to it.
       click(root, '[data-desktop-route-rail] button[data-route="project"]');
-      click(root, '[data-editor-command-bar] [data-command="add-group"]');
+      click(root, '[data-section-heading] [data-command="add-group"]');
       const input = openGroupEditor(root);
       type(input, name);
       press(input, "Enter");

@@ -20,10 +20,11 @@ editor.
 - In the CLI editor and extension Workspace: project destination, one destination per
   group, **Test console**, and project-wide group/rule **search**.
 - The extension management shell also provides a **Dashboard** overview (including **Create using AI** when the native runtime is started and a provider is configured via `rogatio ai`) and a **Workspace** for rule editing. Workspace **AI Assist** uses the same native-host path when available; the CLI editor uses `rogatio edit`'s local `/api/ai/assist` route instead. When the draft has validation errors, AI Assist sends a **fix** request: the returned proposal repairs the offending rules in place (keeping their rule ids and positions) and the host validates the repaired project before accepting it — the extension rejects proposals that do not repair the project (`extension.ai-invalid-proposal`). Otherwise the proposal's rules are appended as new rules.
-- A contextual command bar (Validate / Save / Cancel and route actions) and a desktop route
-  rail; a compact mobile navigation. Add/copy rule, rule reorder/remove, and Copy/Remove
-  group sit next to their section or entity. The same project and group actions repeat in a
-  labeled ledger under the last rule, under the group list, or under the test results.
+- A contextual command bar (Validate / Save / Cancel, and Run test on Test console) and a
+  desktop route rail; a compact mobile navigation. Add group sits on the Groups heading.
+  Add/copy rule, rule reorder/remove, and Copy/Remove group sit next to their section or
+  entity. Project and group actions repeat in a labeled ledger under the last rule and under
+  the test results.
 - Group and rule **names are unique per project**: a group and a rule cannot share a name, and names that differ only by case or spacing count as the same. A duplicate is refused where you typed it, and the message names the entity that already holds the name.
 - **IDs are managed for you.** A group's and a rule's ID stay in your `.rogatio.json` file and are derived from the name at the moment the entity is created or copied, but you never see, type, or change one. Renaming a group or rule does not change its ID, so links, installed rules, and enablement survive a rename. If a hand-written file has a duplicate or malformed ID, the error list offers **Assign a new ID**.
 - Full keyboard use, screen-reader support, forced-colors support, and 200% zoom support.
