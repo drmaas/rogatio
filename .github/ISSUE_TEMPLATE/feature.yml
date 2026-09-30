@@ -1,0 +1,56 @@
+name: Feature request
+description: Propose a change to the editor, extension, CLI, runtime, or schema/compiler.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Rogatio stays local-first: no telemetry, no retained traffic history, and no accounts, hosted runtime, or cloud sync.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard or impossible today, and who hits it?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should change, and how would you use it?
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Where the change belongs.
+      options:
+        - editor
+        - extension
+        - cli
+        - runtime
+        - schema/compiler
+        - not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: non-goals
+    attributes:
+      label: Non-goals
+      description: Confirm this request stays inside Rogatio's boundaries.
+      options:
+        - label: This request does not add telemetry.
+          required: true
+        - label: This request does not add retained traffic history.
+          required: true
+        - label: This request does not add accounts, a hosted runtime, or cloud sync.
+          required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Optional examples, constraints, or related docs pages.
+    validations:
+      required: false

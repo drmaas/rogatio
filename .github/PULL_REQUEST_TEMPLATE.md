@@ -1,75 +1,33 @@
----
-name: 🔐 Pull Request
-about: Open a pull request for TSLock
----
-
-<!-- 🔐 Another lock acquired. Let's make sure it holds. -->
-<!-- 👋 Thanks for contributing! Fill out what's relevant — we'll review fast. -->
-
-## 📎 Linked issue
+## Linked issue
 
 Closes #
 
-## 🗺️ What this does
+## What this does
 
-<!-- A clear summary of the change. What problem does it solve? How? -->
+<!-- What problem does this solve, and how? -->
 
-## 🏷️ Change type
+## Change type
 
-<!-- Check the one that fits -->
+- [ ] `feat` — new feature
+- [ ] `fix` — bug fix
+- [ ] `docs` — documentation
+- [ ] `refactor` / `chore` / `test` / `ci` / `style`
 
-- [ ] 🚀 `feat` — new feature / provider
-- [ ] 🐛 `fix` — bug fix
-- [ ] 📝 `docs` — documentation
-- [ ] 🔧 `refactor` / `chore` / `test` / `ci` / `style`
+## Scope
 
-## 🧩 Scope
+<!-- Which package(s)? schema, compiler, editor, browser-core, extension, cli, runtime, dry-run, docs-site. -->
 
-<!-- Which package(s) are affected? e.g. core, redis, s3, test-support, etc. -->
+## Verification
 
-## 🛡️ Verification checklist
+- [ ] `pnpm validate` passes (format, lint, typecheck, build, unit tests, and browser smoke)
+- [ ] No secrets, tokens, or keys in the change
+- [ ] User-facing docs updated when behavior or the public contract changed
 
-<!-- The CI gate is the same one you run locally. Check each box. -->
-
-### 🧹 Linting & formatting
-
-- [ ] `pnpm check` passes (format + lint via Biome)
-
-### 🏗️ Build
-
-- [ ] `pnpm -r build` passes (tsup ESM + CJS + declarations)
-
-### 🔍 TypeScript
-
-- [ ] `pnpm -r typecheck` passes (`tsc --noEmit` across all packages)
-
-### 🧪 Tests
-
-- [ ] `pnpm -r test` passes (unit tests)
-- [ ] `pnpm -r test:integration` passes (or confirmed no integration tests are expected for this change)
-
-### 📦 Packaging
-
-- [ ] `package.json` follows workspace conventions (peer deps, engines.node >= 22, dual format)
-- [ ] No secrets, tokens, or keys in code
-
-### 📚 Docs
-
-- [ ] Package `README.md` updated (if public API changed)
-- [ ] Main `README.md` updated (if adding a new provider or changing the matrix)
-- [ ] Changeset added via `pnpm changeset` (for user-facing changes)
-- [ ] Branch is up to date with `main`
-
-### ✍️ Commits
+## Commits
 
 - [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
 - [ ] Every commit references an issue (`#<NN>` or `Closes #<NN>`)
 
-## 🧠 Review notes
+## Review notes
 
-<!-- Anything the reviewer should pay special attention to? -->
-<!-- Trade-offs, tricky edge cases, deferred items, known limitations? -->
-
-## 📸 Screenshots / output
-
-<!-- If the change is visual, or you want to show test output, paste it here. -->
+<!-- Trade-offs, edge cases, or follow-ups. -->

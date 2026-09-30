@@ -1,0 +1,130 @@
+name: Bug report
+description: Something in the CLI, extension, editor, or runtime does not behave as documented.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. Search existing issues first, and omit credentials, API keys, cookies, and private URLs.
+
+        CLI version comes from `rogatio --version`. The extension version is on the management-page sidebar when it is shown there, and otherwise under `chrome://extensions` → Rogatio → Details.
+  - type: input
+    id: cli-version
+    attributes:
+      label: CLI version
+      description: Output of `rogatio --version`.
+      placeholder: "0.0.0"
+    validations:
+      required: true
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension version
+      description: From the Rogatio management-page sidebar, or `chrome://extensions` → Rogatio → Details.
+      placeholder: "0.0.0"
+    validations:
+      required: true
+  - type: input
+    id: chrome-version
+    attributes:
+      label: Chrome version
+      description: From `chrome://settings/help`.
+      placeholder: "140.0.0.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: Linux, macOS, or Windows, including the version.
+      placeholder: "macOS 15.6"
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime-state
+    attributes:
+      label: Runtime installed
+      description: Response-body and request-body rules need `rogatio runtime install`. Redirect, query, and header rules do not.
+      options:
+        - "Installed, and rogatio runtime verify passed"
+        - "Installed, but rogatio runtime verify failed"
+        - "Not installed"
+        - "Not applicable (no body rules)"
+    validations:
+      required: true
+  - type: textarea
+    id: runtime-verify
+    attributes:
+      label: rogatio runtime verify output
+      description: Paste the full output of `rogatio runtime verify`. If you did not run it, say why.
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: rule-kind
+    attributes:
+      label: Rule kind
+      description: The rule type involved. Choose other when more than one kind is involved.
+      options:
+        - redirect
+        - query
+        - header
+        - response-body
+        - request-body
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: project-snippet
+    attributes:
+      label: Minimal .rogatio.json snippet
+      description: The smallest project that reproduces the bug. Remove secrets and private hosts.
+      render: json
+      placeholder: |
+        {
+          "version": 2,
+          "name": "repro",
+          "groups": [
+            {
+              "id": "grp-repro",
+              "name": "Repro",
+              "rules": []
+            }
+          ]
+        }
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, in order, including CLI commands or extension actions.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead. Include the rule status (`active`, `disabled`, `needs runtime`, `unsupported`, or `error`) when the extension is involved.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Optional console output, `Show diagnostics` text, or screenshots. Do not include credentials or body contents.
+      render: shell
+    validations:
+      required: false
