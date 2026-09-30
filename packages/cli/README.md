@@ -40,7 +40,7 @@ rogatio <command> [options]
 | `rogatio verify [path]` | Validate a `.rogatio.json` file (schema + compiler). |
 | `rogatio test [path] [url...]` | Run offline dry-run tests against `.rogatio.json`. |
 | `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
-| `rogatio runtime <install\|uninstall\|verify>` | Register the native-messaging host with `install --extension-id <id>` and trust the device-local CA in one **transactional** call; it needs elevated privileges (Linux `sudo`, macOS keychain authorization, Windows Administrator) and rolls back with exit `1` and `trust unsupported: <reasons>` when a capability or elevation is missing. `uninstall` removes the host manifest, the device-local CA files, and the CA trust installation (idempotent). `verify` reports whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all valid. |
+| `rogatio runtime <install\|uninstall\|verify>` | Register the native-messaging host with `install` (optional `--extension-id <id>`; release builds use the pinned ID) and trust the device-local CA in one **transactional** call; it needs elevated privileges (Linux `sudo`, macOS keychain authorization, Windows Administrator) and rolls back with exit `1` and `trust unsupported: <reasons>` when a capability or elevation is missing. `uninstall` removes the host manifest, the device-local CA files, and the CA trust installation (idempotent). `verify` reports whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all valid, and fails when `allowed_origins` omits the release ID (or `--extension-id`). |
 | `rogatio runtime host [path]` | Run the consolidated native-messaging host for the project (pair/authorize/body transforms over stdio). Normally launched by the browser; run manually only for debugging. `--root <dir>` overrides the confined file root; `--mock-port <n>` binds the loopback mock-response faucet. |
 
 Global options: `--help, -h` and `--version, -v`. Run `rogatio <command> --help`
@@ -72,8 +72,9 @@ rogatio runtime host .rogatio.json
 ## Local runtime
 
 ```sh
-# Register the native-messaging host and trust the device-local CA (needs elevation)
-rogatio runtime install --extension-id <id>
+# Register the native-messaging host and trust the device-local CA (needs elevation).
+# Release builds omit --extension-id. Dev or forked builds pass --extension-id <id>.
+rogatio runtime install
 
 # Check manifest, runtime-host wrapper, allowed origins, and CA trust
 rogatio runtime verify

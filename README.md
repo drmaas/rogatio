@@ -211,15 +211,20 @@ Response-body and request-body rules run through the consolidated native-messagi
 host. Register it once, then start the runtime from the extension.
 
 ```sh
-# Register the native-messaging host once (required before Start runtime works)
-# <extension ID> is shown in the extension sidebar ("Extension ID: …")
+# Register the native-messaging host once (required before Start runtime works).
+# Release builds use the pinned extension ID, so --extension-id is optional.
 # This also trusts the device-local CA, so run it with elevated privileges:
-#   Linux: sudo rogatio runtime install --extension-id <id>
+#   Linux: sudo rogatio runtime install
 #   macOS: authorize the login-keychain prompt
 #   Windows: run from an Administrator shell
-rogatio runtime install --extension-id <extension ID>
+rogatio runtime install
 
-# Confirm manifest, runtime-host wrapper, allowed origins, and CA trust
+# Dev or forked builds whose ID is not the pinned release ID:
+# rogatio runtime install --extension-id <id>
+
+# Confirm manifest, runtime-host wrapper, allowed origins, and CA trust.
+# Fails with the re-pin command when allowed_origins does not include the
+# release ID (or the ID passed with --extension-id).
 rogatio runtime verify
 
 # Start the runtime from the extension's Start runtime control
@@ -235,17 +240,30 @@ rogatio runtime host .rogatio.json --root ~/projects/demo
 Then open the extension, click **Start runtime**, and response-body and
 request-body rules become active through the native host. The
 sidebar runtime status line shows the current phase next to the Start/Stop
-controls, with the browser-assigned extension ID shown beneath it. If the host
-manifest is not installed, starting shows the exact ready-to-run
-`rogatio runtime install --extension-id <your extension ID>` command with a
-one-click copy button. If the project has request-body rules and the
-device-local CA is not yet trusted, the message points to
-`rogatio runtime install --extension-id <your extension ID>` instead (the same
-install command also provisions the device-local CA, transactionally — if the CA
-cannot be trusted it rolls the manifest back and exits `1`, so nothing is
-half-installed).
+controls, with the loaded extension ID shown beneath it. Release builds carry
+a public `key` in the extension manifest, so that ID stays the same when a new
+ZIP is unpacked into a different folder. If the host manifest is not installed,
+starting shows the ready-to-run install command with a one-click copy button
+(`rogatio runtime install` for a release build, or
+`rogatio runtime install --extension-id <id>` for a dev or forked build). If
+Chrome refuses the connection because this ID is not in the host manifest
+`allowed_origins`, the runtime card says so and shows that same command. If the
+project has request-body rules and the device-local CA is not yet trusted, the
+message points at the same install command (it also provisions the device-local
+CA, transactionally — if the CA cannot be trusted it rolls the manifest back
+and exits `1`, so nothing is half-installed).
 To remove the host and the device-local CA trust, run
 `rogatio runtime uninstall` (idempotent).
+
+### Upgrading an existing runtime install
+
+Installs created before the stable extension ID stored a path-derived ID in the
+host manifest. After you load a release build that includes the public key,
+Chrome will refuse the native host until `allowed_origins` matches the pinned
+ID. Run `rogatio runtime install` again with the same elevation as the first
+install (no `--extension-id`). `rogatio runtime verify` prints that command
+when the old ID is still pinned. Dev and forked builds that do not use the
+release key keep passing `--extension-id`.
 
 ## Project layout
 

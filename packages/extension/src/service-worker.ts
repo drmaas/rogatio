@@ -21,6 +21,10 @@ import {
   extensionDiagnostic,
 } from "./diagnostics.js";
 import type { DnrInstallError, DnrInstallerWithMatchIndex } from "./dnr.js";
+import {
+  isNativeHostOriginForbiddenMessage,
+  nativeHostOriginMismatchMessage,
+} from "./extension-id.js";
 
 import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
@@ -745,6 +749,16 @@ export function createExtensionApplication(
                   },
           });
         } catch (error) {
+          const message = error instanceof Error ? error.message : "";
+          if (isNativeHostOriginForbiddenMessage(message)) {
+            nativePhase = "failed";
+            nativeRuntimeError = nativeHostOriginMismatchMessage(
+              options.extensionId,
+            );
+            return failure("extension.native-host-origin-forbidden", {
+              reason: nativeRuntimeError,
+            });
+          }
           nativePhase = "failed";
           nativeRuntimeError =
             options.nativeRuntime.lastConnectError?.() ??
@@ -761,6 +775,16 @@ export function createExtensionApplication(
           // Preserve the concrete adapter error for both the workspace and
           // diagnostics modal while keeping the public diagnostic code stable.
           nativePhase = "failed";
+          if (
+            sessionResult.reason === "extension.native-host-origin-forbidden"
+          ) {
+            nativeRuntimeError = nativeHostOriginMismatchMessage(
+              options.extensionId,
+            );
+            return failure("extension.native-host-origin-forbidden", {
+              reason: nativeRuntimeError,
+            });
+          }
           nativeRuntimeError =
             options.nativeRuntime.lastConnectError?.() ?? sessionResult.reason;
           if (sessionResult.reason === "extension.native-host-missing")

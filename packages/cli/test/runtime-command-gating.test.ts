@@ -1,4 +1,9 @@
+import { RELEASE_EXTENSION_ID } from "@rogatio/runtime";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const recorded = vi.hoisted(() => ({
+  extensionIds: [] as string[],
+}));
 
 // Never touch the real install root (~/.local/share/rogatio): the CLI writes
 // the runtime-host wrapper outside the mocked trust controller.
@@ -24,7 +29,10 @@ vi.mock("@rogatio/runtime", async () => {
   return {
     ...actual,
     createRequestBodyTrustController: () => ({
-      install: async () => ({ ok: true, state: "installed" as const }),
+      install: async (extensionId: string) => {
+        recorded.extensionIds.push(extensionId);
+        return { ok: true, state: "installed" as const };
+      },
       uninstall: async () => ({ ok: true, state: "uninstalled" as const }),
       status: async () => ({
         installed: true,
@@ -56,12 +64,12 @@ function silence(): void {
 }
 
 describe("rogatio runtime command ()", () => {
-  it("requires explicit extension ID for install", async () => {
+  it("defaults install to the pinned release extension ID", async () => {
     silence();
-    const err = vi.spyOn(console, "error");
+    recorded.extensionIds.length = 0;
     const code = await runtimeCommand(["install"]);
-    expect(code).toBe(2);
-    expect(err.mock.calls.join("\n")).toContain("extension-id");
+    expect(code).toBe(0);
+    expect(recorded.extensionIds).toEqual([RELEASE_EXTENSION_ID]);
   });
 
   it("rejects invalid extension ID format", async () => {
@@ -82,12 +90,13 @@ describe("rogatio runtime command ()", () => {
 
   it("accepts valid 32-character lowercase a-p extension ID", async () => {
     silence();
+    recorded.extensionIds.length = 0;
     const code = await runtimeCommand([
       "install",
       "--extension-id",
       "abcdefghijklmnopabcdefghijklmnop",
     ]);
-    // Should not fail with extension-id error (may fail on missing trust/manifest)
-    expect(code).not.toBe(2);
+    expect(code).toBe(0);
+    expect(recorded.extensionIds).toEqual(["abcdefghijklmnopabcdefghijklmnop"]);
   });
 });

@@ -32,9 +32,10 @@ Runs the offline dry-run test engine against a `.rogatio.json` file (see
 
 Trust lifecycle and native-host entry (see [Local runtime](/guides/runtime/)):
 
-- `rogatio runtime install --extension-id <id>` — register the native-messaging host
-  manifest for your loaded extension ID and provision and trust the device-local CA for
-  request-body rules in one **transactional** call. CA trust needs elevated privileges
+- `rogatio runtime install` — register the native-messaging host manifest for the
+  pinned release extension ID and provision and trust the device-local CA for
+  request-body rules in one **transactional** call. `--extension-id <id>` overrides
+  the release ID for a dev or forked build. CA trust needs elevated privileges
   (Linux `sudo`, macOS keychain authorization, Windows Administrator). When elevation or
   any required capability is unavailable the command prints `trust unsupported: <reasons>`
   with a remediation hint and exits `1` after rolling the manifest back — nothing is
@@ -42,8 +43,9 @@ Trust lifecycle and native-host entry (see [Local runtime](/guides/runtime/)):
 - `rogatio runtime uninstall` — remove the host manifest, the device-local CA files, and
   the trust installation (idempotent).
 - `rogatio runtime verify` — report whether the manifest, the `runtime-host` wrapper, the
-  allowed origins, and the device-local CA trust are all present and valid. Exits `0` only
-  when every check passes.
+  allowed origins, and the device-local CA trust are all present and valid, and whether
+  `allowed_origins` includes the release ID (or `--extension-id`). Exits `0` only
+  when every check passes. A mismatch prints the re-pin command.
 - `rogatio runtime host [path]` — run the consolidated native-messaging host for a project
   on stdio (normally launched by the browser extension; run manually only for debugging).
   Accepts `--root <dir>` to override the confined file root and `--mock-port <n>` to bind

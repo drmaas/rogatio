@@ -340,11 +340,11 @@ The **request-body trust lifecycle** that request-body interception (the request
 
 `@rogatio/runtime` gains a `trust` module with a `createRequestBodyTrustController` controller and pure helper functions. `@rogatio/cli` extends `rogatio runtime` with `install | uninstall | verify`. Three owned controller operations:
 
-- **install:** register the native-messaging host and provision the device-local CA in a single, **fully transactional** call. Writes the native-messaging host manifest (`com.rogatio.runtime.json`) into the platform's Chrome native-messaging manifest directory, pointing at the installed runtime host; then, capability-gated, generates the device-local CA key + certificate, writes them under the install root, and invokes the platform-native `caTrustInstaller` to record the CA in the OS trust store. There is no partial-success state: when the manifest capability or the CA-trust capability is missing, or when the OS trust installer fails, the manifest and the CA files are rolled back and the call returns `unsupported`. The CLI prints `trust unsupported: <reasons>` with a per-reason remediation hint and **exits 1**; the user re-runs with elevated privileges. On success it returns `installed` and the CLI prints `runtime install complete: manifest + device-local CA trusted + runtime-host wrapper created` and exits 0. Idempotent across repeated calls with the same extension ID. CA trust needs root/admin privileges per platform: Linux `sudo`, macOS login-keychain authorization, Windows Administrator.
+- **install:** register the native-messaging host and provision the device-local CA in a single, **fully transactional** call. Writes the native-messaging host manifest (`com.rogatio.runtime.json`) into the platform's Chrome native-messaging manifest directory, pointing at the installed runtime host; then, capability-gated, generates the device-local CA key + certificate, writes them under the install root, and invokes the platform-native `caTrustInstaller` to record the CA in the OS trust store. There is no partial-success state: when the manifest capability or the CA-trust capability is missing, or when the OS trust installer fails, the manifest and the CA files are rolled back and the call returns `unsupported`. The CLI prints `trust unsupported: <reasons>` with a per-reason remediation hint and **exits 1**; the user re-runs with elevated privileges. On success it returns `installed` and the CLI prints `runtime install complete: manifest + device-local CA trusted + runtime-host wrapper created` and exits 0. Idempotent across repeated calls with the same extension ID. `--extension-id` is optional and defaults to the release extension ID derived from the public `key` in the extension manifest. An explicit ID remains for a dev or forked build whose manifest does not carry that key. CA trust needs root/admin privileges per platform: Linux `sudo`, macOS login-keychain authorization, Windows Administrator.
 - **uninstall:** remove the native-messaging host manifest, the three device-local CA files (`caKeyFile`, `caPubFile`, `caCertFile`) under the install root, and the OS trust-store trust installation via the capability-provided `caTrustRemover` when present. Unconditional on capabilities and idempotent across repeated calls (no-op exit-0 once the manifest and CA are gone). Returns `runtime uninstall complete: manifest + device-local CA removed` on success. The store removal is skipped when the CA key file was already absent.
 - **status:** report `{ installed, trusted, platform, capabilityReasons }` without side effects; reads the manifest (present + well-formed) and the CA trust standing. It never leaks paths, key material, or platform tooling text.
 
-`verify` is a CLI-side administrative check over the same controller state, not a fourth controller operation: it reports manifest existence/validity, `runtime-host` wrapper presence and execute bit, `allowed_origins` count, and CA trust, each with a remediation hint, and exits 0 only when all pass.
+`verify` is a CLI-side administrative check over the same controller state, not a fourth controller operation: it reports manifest existence/validity, `runtime-host` wrapper presence and execute bit, `allowed_origins` (the list, not only the count), and CA trust, each with a remediation hint, and exits 0 only when all pass. When the manifest is valid and its origins do not include the release ID (or `--extension-id` when passed), it exits 1 and prints that ID, the pinned origins, and the re-pin command. That is the CLI view of Chrome's `Access to the specified native messaging host is forbidden.` refusal. The controller still does not own the release ID; it returns the origins and the CLI compares them.
 
 Three owned layers:
 
@@ -411,9 +411,9 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 - Never contacts tested URLs, requests permission, or starts a runtime
 
 **5. Runtime Command (`src/commands/runtime.ts`)**
-- `install --extension-id <id>`: register native-messaging host manifest and provision/trust the device-local CA in one transactional call (rolls back and exits 1 when a required capability is missing)
+- `install [--extension-id <id>]`: register native-messaging host manifest and provision/trust the device-local CA in one transactional call (rolls back and exits 1 when a required capability is missing). The flag defaults to the release extension ID pinned by the manifest public key.
 - `uninstall`: remove host manifest, CA files, and trust (idempotent)
-- `verify`: report whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all present and valid
+- `verify [--extension-id <id>]`: report whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all present and valid, and whether `allowed_origins` includes the release ID or the explicit ID
 - `host [path] [--root <dir>] [--mock-port <n>]`: stdio native-messaging host entry (browser-launched; manual use for debugging)
 
 **6. AI Command (`src/commands/ai.ts`)**
@@ -884,8 +884,11 @@ and still returns authorization decisions only.
   runtime state through `RuntimeStateController` (`disconnected → checking →
   connected/failed` with `lastCheck`), installs the mock DNR rules, and recomputes
 The user experience is: register the native-messaging host once with
-`rogatio runtime install --extension-id <extension ID>`, then use the extension's
-**Start runtime** control. The separate
+`rogatio runtime install` (release builds) or
+`rogatio runtime install --extension-id <extension ID>` (dev or forked builds),
+then use the extension's
+**Start runtime** control. When the loaded ID is not in `allowed_origins`, the
+runtime card names that mismatch and shows the re-pin command. The separate
 Check-and-connect command and mock-connection state are superseded. The sidebar runtime
 status line sits directly beneath the Start/Stop controls.
 - **Statuses:** mock ops were historically reported as `needs proxy` while the runtime was not connected; `active` when connected and installed. Mock rules have been removed — mock behavior is covered by response-body and request-body rules under the native host.

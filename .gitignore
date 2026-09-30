@@ -157,3 +157,7 @@ test-results/
 
 # Graphify generated analysis output
 graphify-out/
+
+# Chrome extension signing keys. Only the public key belongs in manifest.json.
+*.pem
+**/key.pem

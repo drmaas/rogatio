@@ -23,7 +23,9 @@ or rule-authoring controls.
 
 The management page uses a **Dashboard** overview and a **Workspace** editor shell. The
 Workspace sidebar is a set of cards. **Runtime** holds Start/Stop, the runtime status, the
-extension ID, and a **Show diagnostics** control when the runtime has failed. **AI** reports
+extension ID, and a **Show diagnostics** control when the runtime has failed. When Chrome
+rejects the native host because that ID is not in `allowed_origins`, the card names the
+mismatch and shows the `rogatio runtime install` command that re-pins it. **AI** reports
 whether AI is configured: `Configured` with the provider URL and model the native host will
 use (the API key never reaches the extension), `Not configured`, `not reported` against an
 older runtime host, or `needs runtime` before the runtime starts. **Rules** lists every rule

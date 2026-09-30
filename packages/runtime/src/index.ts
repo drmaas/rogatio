@@ -6,6 +6,7 @@ export * from "./ai-prompt.js";
 export { authorizeExact } from "./authorization.js";
 export { isConfinedFileSupported, readConfinedFile } from "./confined-file.js";
 export * from "./envelope.js";
+export * from "./extension-id.js";
 export * from "./host.js";
 export {
   type InterceptProxyHandle,

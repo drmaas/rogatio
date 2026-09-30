@@ -3,6 +3,7 @@
   "name": "Rogatio",
   "version": "0.0.0",
   "description": "Local-first browser request and response rules.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA/oNRLPaGA1JJ03Tab680KtW4eO+4Im+BIq3kEdIzTZ7PuyT+K1MppeXJMpjlGNVN7hsNyxb+45eQNSXLrDXx+ql/3unwdVpML7goA3t5RKKwKO3UDPTLtcCgg7c8Hd8Yt1B2oHXbVYShcGFm17VrKVfbSf/vXiEg3AuNew3iLXAsR9NSJEU34RvRAWxgxcsfXuUrGZ2gvvkX8vnzEGFH0b+GM1XK8LWVaJfLZoBm9KaS/5N3dJfSoVI5JzSQMmv/uHYeUV2//3PPif2sJSmEyUwFaf5HmVzWEaIUiiVRVGD43dJsE+vf6cppQY1frdYpR0aZ7COoUTprysxpbQ+lGwIDAQAB",
   "background": {
     "service_worker": "background.js",
     "type": "module"

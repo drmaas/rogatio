@@ -94,8 +94,10 @@ CA that request-body interception depends on, so Chrome can route eligible POST/
 bodies through the runtime:
 
 ```sh
-rogatio runtime install --extension-id <your extension ID>
-# the extension's Workspace sidebar shows the extension ID
+rogatio runtime install
+# Release builds use the pinned extension ID.
+# Dev or forked builds: rogatio runtime install --extension-id <id>
+# (the Workspace sidebar shows the loaded extension ID)
 ```
 
 Then, in the Rogatio management page's **Workspace** view, click **Start runtime**. Click **Stop runtime** to stop the session.

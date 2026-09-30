@@ -7,6 +7,10 @@ import {
 import { attentionFromRuleStatuses } from "./attention.js";
 import { PROJECT_VERSION, validateProjectDetailed } from "./browser-schema.js";
 import {
+  nativeHostOriginMismatchMessage,
+  runtimeInstallCommand,
+} from "./extension-id.js";
+import {
   MATCH_LOGGING_ENABLED_KEY,
   readMatchLoggingEnabledFromStorageResult,
 } from "./match-logging-enabled.js";
@@ -499,6 +503,9 @@ function runtimeStatusText(): string {
 
 function runtimeRecoveryText(): string {
   const error = state.nativeRuntimeError?.toLowerCase() ?? "";
+  if (error.includes("allowed_origins") || error.includes("origin-forbidden")) {
+    return "This extension ID is not in the host manifest allowed_origins. Re-pin the host with the command below, reload Rogatio from chrome://extensions, then click Start runtime again.";
+  }
   if (error.includes("native-host-missing")) {
     return "Install the host using the command below once, reload Rogatio from chrome://extensions, then click Start runtime again.";
   }
@@ -680,6 +687,13 @@ function createSidebar(): HTMLElement {
       runtimeErrorLine.className = "rogatio-runtime-error";
       runtimeErrorLine.textContent = `Runtime error: ${runtimeError}`;
       runtime.body.append(runtimeErrorLine);
+      if (runtimeError.includes("allowed_origins")) {
+        const mismatchCommand = document.createElement("p");
+        mismatchCommand.dataset.runtimeOriginMismatch = "true";
+        mismatchCommand.className = "rogatio-runtime-error";
+        mismatchCommand.textContent = `Re-pin the host: ${runtimeInstallCommand(extensionId())}`;
+        runtime.body.append(mismatchCommand);
+      }
     }
   }
   sidebar.append(runtime.card);
@@ -1201,10 +1215,7 @@ function renderShell(): void {
     guidance.append(guidanceTitle, guidanceError, guidanceFix);
     if (runtimePhase === "failed") {
       const id = extensionId();
-      const cmd =
-        id.length > 0
-          ? `rogatio runtime install --extension-id ${id}`
-          : installCommand;
+      const cmd = id.length > 0 ? runtimeInstallCommand(id) : installCommand;
       if (cmd) {
         const installCommandRow = document.createElement("div");
         installCommandRow.className = "rogatio-install-command";
@@ -1611,13 +1622,17 @@ async function nativeRuntimeCommand(
       command === "start-native-runtime"
         ? "Runtime started."
         : "Runtime stopped.";
+  } else if (code === "extension.native-host-origin-forbidden") {
+    const id = extensionId();
+    installCommand = runtimeInstallCommand(id);
+    statusMessage = nativeHostOriginMismatchMessage(id);
   } else if (
     code === "extension.native-host-missing" ||
     code === "extension.request-body-needs-trust"
   ) {
     const id = extensionId();
     if (id.length > 0) {
-      installCommand = `rogatio runtime install --extension-id ${id}`;
+      installCommand = runtimeInstallCommand(id);
     } else {
       installCommand = null;
     }
@@ -1637,7 +1652,11 @@ async function nativeRuntimeCommand(
       .join(" ");
   }
   await refresh();
-  if (response?.ok !== true && state.nativeRuntimeError) {
+  if (
+    response?.ok !== true &&
+    state.nativeRuntimeError &&
+    code !== "extension.native-host-origin-forbidden"
+  ) {
     statusMessage = [
       "The runtime action failed.",
       `Runtime error: ${state.nativeRuntimeError}`,
@@ -1652,9 +1671,7 @@ async function copyInstallCommand(): Promise<void> {
   const phase = state.nativeRuntimeState?.phase ?? "stopped";
   const cmd =
     installCommand ??
-    (phase === "failed" && id.length > 0
-      ? `rogatio runtime install --extension-id ${id}`
-      : null);
+    (phase === "failed" && id.length > 0 ? runtimeInstallCommand(id) : null);
   if (!cmd) return;
   statusMessage = (await copyText(cmd))
     ? "Install command copied. Paste it in a terminal, run it, then click Start runtime again."

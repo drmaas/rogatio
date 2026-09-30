@@ -16,6 +16,7 @@ export type ExtensionDiagnosticCode =
   | "extension.native-runtime-unavailable"
   | "extension.native-runtime-transition"
   | "extension.native-host-missing"
+  | "extension.native-host-origin-forbidden"
   | "extension.request-body-needs-trust"
   | "extension.ai-unavailable"
   | "extension.ai-invalid-prompt"
@@ -60,7 +61,9 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
     "The runtime is unavailable on this platform.",
   "extension.native-runtime-transition": "The runtime could not change state.",
   "extension.native-host-missing":
-    "The native runtime host is not installed or not detected. Run `rogatio runtime install --extension-id <extension ID>`, then reload the extension at chrome://extensions (click the circular-arrow reload button on the Rogatio card) and start the runtime again.",
+    "The native runtime host is not installed or not detected. Run `rogatio runtime install` for a release build, or `rogatio runtime install --extension-id <extension ID>` for a dev or forked build, then reload the extension at chrome://extensions (click the circular-arrow reload button on the Rogatio card) and start the runtime again.",
+  "extension.native-host-origin-forbidden":
+    "This extension's ID is not in the native host manifest allowed_origins, so Chrome refused the connection. Run `rogatio runtime install` for a release build, or `rogatio runtime install --extension-id <extension ID>` for a dev or forked build, then reload the extension at chrome://extensions and click Start runtime again.",
   "extension.request-body-needs-trust":
     "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime install --extension-id <extension ID>` to register the host and (on capable platforms) trust the device-local CA, then restart Chrome and click Start runtime again. Response-body rules do not need trust.",
   "extension.ai-unavailable":

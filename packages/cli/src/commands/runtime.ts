@@ -5,7 +5,10 @@ import { compileProject } from "@rogatio/compiler";
 import {
   createRequestBodyTrustController,
   defaultTrustInstallRoot,
+  describeExtensionIdMismatch,
+  extensionOriginListed,
   normalizeRuntimePreset,
+  RELEASE_EXTENSION_ID,
   RUNTIME_LIMITS,
   readProviderConfig,
   runNativeHost,
@@ -137,25 +140,45 @@ function reportTrust(
   return 1;
 }
 
+/**
+ * `--extension-id` is optional. Omitted, install and verify use the release
+ * ID pinned by the extension manifest public key. An explicit value is for
+ * a dev or forked build whose ID is different.
+ */
+function parseExtensionIdFlag(
+  args: readonly string[],
+): { extensionId: string } | { error: string; showHelp: boolean } {
+  const extIdIndex = args.indexOf("--extension-id");
+  if (extIdIndex === -1) return { extensionId: RELEASE_EXTENSION_ID };
+  const extensionId = args[extIdIndex + 1];
+  if (extensionId === undefined || extensionId.startsWith("-")) {
+    return {
+      error: "Error: --extension-id requires a value",
+      showHelp: true,
+    };
+  }
+  if (!/^[a-p]{32}$/.test(extensionId)) {
+    return {
+      error:
+        "Error: --extension-id must be exactly 32 lowercase characters from a through p",
+      showHelp: false,
+    };
+  }
+  return { extensionId };
+}
+
 async function trustRuntimeCommand(args: string[]): Promise<number> {
   const subcommand = args[0];
-  let extensionId: string | undefined;
+  let extensionId = RELEASE_EXTENSION_ID;
 
-  if (subcommand === "install") {
-    const extIdIndex = args.indexOf("--extension-id");
-    if (extIdIndex === -1 || extIdIndex + 1 >= args.length) {
-      console.error("Error: --extension-id is required for install command");
-      showRuntimeHelp();
+  if (subcommand === "install" || subcommand === "verify") {
+    const parsed = parseExtensionIdFlag(args);
+    if ("error" in parsed) {
+      console.error(parsed.error);
+      if (parsed.showHelp) showRuntimeHelp();
       return 2;
     }
-    extensionId = args[extIdIndex + 1];
-
-    if (!/^[a-p]{32}$/.test(extensionId)) {
-      console.error(
-        "Error: --extension-id must be exactly 32 lowercase characters from a through p",
-      );
-      return 2;
-    }
+    extensionId = parsed.extensionId;
   }
 
   const controller = makeTrustController();
@@ -163,7 +186,7 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
   const hostPath = join(installRoot, "runtime-host");
   switch (subcommand) {
     case "install": {
-      const installResult = await controller.install(extensionId ?? "");
+      const installResult = await controller.install(extensionId);
       if (installResult.ok) {
         try {
           await writeHostWrapper(hostPath, installRoot);
@@ -176,7 +199,7 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
       return reportTrust(
         "install",
         installResult,
-        "runtime install complete: manifest + device-local CA trusted + runtime-host wrapper created\nNote: reload the extension at chrome://extensions for the native host to be detected.",
+        `runtime install complete: manifest + device-local CA trusted + runtime-host wrapper created\nPinned extension ID: ${extensionId}\nNote: reload the extension at chrome://extensions for the native host to be detected.`,
       );
     }
     case "uninstall": {
@@ -199,9 +222,13 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
     }
     case "verify": {
       const result = await controller.verify();
-      if (result.ok) {
+      const originMismatch =
+        result.manifestValid &&
+        result.allowedOrigins.length > 0 &&
+        !extensionOriginListed(extensionId, result.allowedOrigins);
+      if (result.ok && !originMismatch) {
         console.log(
-          "runtime verification passed: manifest, binary, and CA trust all OK",
+          `runtime verification passed: manifest, binary, and CA trust all OK\nallowed_origins includes chrome-extension://${extensionId}/`,
         );
         return 0;
       }
@@ -216,10 +243,18 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
       if (result.allowedOriginsCount === 0)
         console.error("  no allowed_origins in manifest");
       if (!result.caTrusted) console.error("  device-local CA not trusted");
+      if (originMismatch) {
+        for (const line of describeExtensionIdMismatch(
+          extensionId,
+          result.allowedOrigins,
+        ).split("\n")) {
+          console.error(`  ${line}`);
+        }
+      }
       for (const reason of result.reasons) {
         if (reason === "manifest-not-found")
           console.error(
-            "  Hint: run 'rogatio runtime install --extension-id <id>' to register the host manifest",
+            "  Hint: run 'rogatio runtime install' to register the host manifest (dev or forked builds: add --extension-id <id>)",
           );
         if (reason === "binary-not-found")
           console.error(
@@ -231,11 +266,11 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
           );
         if (reason === "no-allowed-origins")
           console.error(
-            "  Hint: re-run 'rogatio runtime install --extension-id <id>' to pin your extension ID",
+            "  Hint: re-run 'rogatio runtime install' to pin your extension ID (dev or forked builds: add --extension-id <id>)",
           );
         if (reason === "ca-not-trusted")
           console.error(
-            "  Hint: re-run 'rogatio runtime install --extension-id <id>' with elevated privileges to trust the CA",
+            "  Hint: re-run 'rogatio runtime install' with elevated privileges to trust the CA",
           );
       }
       return 1;
