@@ -1,0 +1,31 @@
+name: Documentation
+description: Report a wrong, missing, or unclear page in the docs or repository guides.
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Point at the page that is wrong. The published docs are at https://drmaas.github.io/rogatio/.
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: Docs URL or repository path.
+      placeholder: "https://drmaas.github.io/rogatio/guides/runtime/"
+    validations:
+      required: true
+  - type: textarea
+    id: what-is-wrong
+    attributes:
+      label: What is wrong
+      description: Quote the incorrect or missing text and say what it should say instead.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Optional command output or screenshots that show the mismatch.
+    validations:
+      required: false

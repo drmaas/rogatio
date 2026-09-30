@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Rogatio documentation
+    url: https://drmaas.github.io/rogatio/
+    about: Read the docs before opening an issue.
+  - name: Security vulnerability
+    url: https://drmaas.github.io/rogatio/reference/security/
+    about: Do not open a public issue for a vulnerability. Read the security and privacy policy.

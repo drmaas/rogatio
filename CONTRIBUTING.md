@@ -101,8 +101,36 @@ Raw brainstorm output is ephemeral and is not part of durable documentation.
 
 ## Reporting issues
 
-Open an issue with a clear reproduction, the expected behavior, and what you observed.
-Include your Node and pnpm versions and the browser you tested against.
+Open a GitHub issue using a form under `.github/ISSUE_TEMPLATE/`. Blank issues
+are disabled. Search existing issues first, and read the
+[docs](https://drmaas.github.io/rogatio/) before filing. Do not report a
+vulnerability in a public issue; see the
+[security and privacy policy](https://drmaas.github.io/rogatio/reference/security/).
+
+### Bug
+
+Use [bug.yml](.github/ISSUE_TEMPLATE/bug.yml). Include:
+
+- CLI version (`rogatio --version`)
+- Extension version (management-page sidebar, or `chrome://extensions` → Rogatio → Details)
+- Chrome version
+- Operating system
+- Whether the runtime is installed, and the output of `rogatio runtime verify`
+- Rule kind (`redirect`, `query`, `header`, `response-body`, `request-body`, or other)
+- A minimal `.rogatio.json` snippet
+- Steps to reproduce, the expected behavior, and what actually happened
+- Logs, when you have them (optional)
+
+### Feature
+
+Use [feature.yml](.github/ISSUE_TEMPLATE/feature.yml). Include the problem, the
+proposal, and the package (`editor`, `extension`, `cli`, `runtime`,
+`schema`/`compiler`, or not sure). Confirm the request does not add telemetry,
+retained traffic history, or accounts, a hosted runtime, or cloud sync.
+
+### Docs
+
+Use [docs.yml](.github/ISSUE_TEMPLATE/docs.yml). Name the page and what is wrong.
 
 ## License
 
