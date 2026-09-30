@@ -14,8 +14,9 @@ native-messaging envelope (spec REQ-001..REQ-005).
   launched by the browser via the native-messaging manifest once `install` has
   registered it.
 - `rogatio runtime install` registers the device-local native-messaging host
-  for the pinned release extension ID. Pass `--extension-id <id>` for a dev or
-  forked build whose ID is different. The same invocation also
+  for the pinned release extension ID. Release users never pass `--extension-id`.
+  That flag is only for development (a local unpacked build without the release
+  key) and for forks. The same invocation also
   provisions and trusts the device-local CA (required for request-body interception).
   The call is **transactional**: CA trust requires elevated privileges — Linux
   (`sudo`), macOS (keychain authorization), Windows (Administrator) — and when elevation
@@ -27,12 +28,15 @@ native-messaging envelope (spec REQ-001..REQ-005).
 - `rogatio runtime verify` reports whether the manifest, the `runtime-host` wrapper, the
   allowed origins, and the device-local CA trust are all present and valid. It exits `0`
   only when every check passes, and prints a remediation hint per failed check. When
-  `allowed_origins` does not include the release ID (or `--extension-id`), it names that
-  mismatch and prints the re-pin command.
+  `allowed_origins` does not include the release ID, it names that
+  mismatch and prints the re-pin command. Release users never pass
+  `--extension-id` on verify. That flag is only for development (a local unpacked
+  build without the release key) and for forks.
 - If the host manifest is missing, or Chrome refuses the connection because the loaded
   ID is not in `allowed_origins`, the extension's runtime card shows the ready-to-run
   install command with a copy affordance (`rogatio runtime install` for a release
-  build, `rogatio runtime install --extension-id <id>` otherwise). The loaded extension
+  build). `--extension-id` appears only for development (a local unpacked build
+  without the release key) and for forks. Release users never need it. The loaded extension
   ID is shown in the UI.
 - Upgrading from a path-derived ID: load the new release ZIP (any folder), then run
   `rogatio runtime install` again so the host manifest matches the pinned ID.

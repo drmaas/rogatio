@@ -42,8 +42,10 @@ Native messaging runtime control for response-body and request-body rules.
 
 Commands:
   install   Install the native-messaging host manifest and (on capable
-            platforms) provision the device-local CA. Defaults to the pinned
-            release extension ID; pass --extension-id for a dev or forked build.
+            platforms) provision the device-local CA. Uses the pinned release
+            extension ID. Release users never pass --extension-id. That flag is
+            only for development (a local unpacked build without the release
+            key) and for forks.
             CA trust requires root/admin privileges (Linux: sudo, macOS: keychain
             password, Windows: Administrator). Transactional: when CA trust is
             unavailable the manifest is rolled back and the command exits 1.
@@ -51,7 +53,9 @@ Commands:
             (idempotent).
   verify    Check that the manifest, runtime-host wrapper, allowed origins, and
             device-local CA trust are all present and valid. Fails when
-            allowed_origins does not include the release ID (or --extension-id).
+            allowed_origins does not include the release ID. Release users
+            never pass --extension-id. That flag is only for development (a
+            local unpacked build without the release key) and for forks.
   host [path]  Run the native-messaging runtime host. The browser launches this
                process via the native-messaging manifest to handle rule matching.
 
@@ -60,9 +64,9 @@ Start/Stop controls, not the CLI. Run 'rogatio runtime install' once to
 register the host for a release build, then use the extension.
 
 Options:
-  --extension-id  Extension ID for the native messaging manifest. Optional for
-                  release builds (defaults to the pinned ID). Use it for a dev
-                  or forked build whose ID is different.
+  --extension-id  Extension ID for the native messaging manifest. Release users
+                  never need this. It is only for development (a local unpacked
+                  build without the release key) and for forks.
   --root <dir>    Root for confined runtime file access (host only; default: project directory)
   --mock-port <n> Bind the loopback mock-response faucet to this port (host only, 1-65535)
   --help, -h      Show this help

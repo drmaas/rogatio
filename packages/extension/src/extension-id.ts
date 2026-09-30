@@ -5,7 +5,7 @@
  * test derives the ID from the key and fails if this constant drifts.
  * See `docs/adrs/0011-stable-extension-id-key-custody.md`.
  */
-export const RELEASE_EXTENSION_ID = "ieaimkhfimopjkfamallppgmdfadpbko";
+export const RELEASE_EXTENSION_ID = "dkngkciiiabbdjcopbipkpndfmpbmjom";
 
 const EXTENSION_ID_RE = /^[a-p]{32}$/;
 

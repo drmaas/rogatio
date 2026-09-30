@@ -141,9 +141,10 @@ function reportTrust(
 }
 
 /**
- * `--extension-id` is optional. Omitted, install and verify use the release
- * ID pinned by the extension manifest public key. An explicit value is for
- * a dev or forked build whose ID is different.
+ * `--extension-id` is omitted for release builds, which use the ID pinned by
+ * the extension manifest public key. Release users never pass it. An explicit
+ * value is only for development (a local unpacked build without the release
+ * key) and for forks.
  */
 function parseExtensionIdFlag(
   args: readonly string[],
@@ -254,7 +255,7 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
       for (const reason of result.reasons) {
         if (reason === "manifest-not-found")
           console.error(
-            "  Hint: run 'rogatio runtime install' to register the host manifest (dev or forked builds: add --extension-id <id>)",
+            "  Hint: run 'rogatio runtime install' to register the host manifest (release users never pass --extension-id; it is only for development without the release key, and for forks)",
           );
         if (reason === "binary-not-found")
           console.error(
@@ -266,7 +267,7 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
           );
         if (reason === "no-allowed-origins")
           console.error(
-            "  Hint: re-run 'rogatio runtime install' to pin your extension ID (dev or forked builds: add --extension-id <id>)",
+            "  Hint: re-run 'rogatio runtime install' to pin your extension ID (release users never pass --extension-id; it is only for development without the release key, and for forks)",
           );
         if (reason === "ca-not-trusted")
           console.error(

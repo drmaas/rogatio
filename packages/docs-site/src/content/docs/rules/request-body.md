@@ -24,8 +24,10 @@ captures from the body regex. The two capture namespaces are not mixed.
 ## Requirements and capabilities
 
 - Requires the native-messaging host registered via
-  `rogatio runtime install` (or `--extension-id <id>` for a dev or forked build) and the runtime session started from the
-  extension's **Start runtime** control. Without a started session, enabled granted
+  `rogatio runtime install` and the runtime session started from the
+  extension's **Start runtime** control. Release users never pass `--extension-id`.
+  That flag is only for development (a local unpacked build without the release
+  key) and for forks. Without a started session, enabled granted
   request-body rules report `needs runtime`.
 - Request-body interception is **capability-based**: it needs a trusted device-local CA
   and non-colliding Chrome PAC routing, excludes private browsing, and cannot compose with

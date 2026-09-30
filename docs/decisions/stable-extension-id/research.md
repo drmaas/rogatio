@@ -53,15 +53,13 @@ If a listing is added later:
 
 ## Key custody
 
-Only the public key belongs in git. The private key is required later to sign a CRX or to make the store keep this ID (`key.pem` on first upload). It is not required for unpacked ID stability.
+Only the public key belongs in git. The maintainer holds the matching private key outside the repository. It is used for CRX signing and for the first Chrome Web Store upload (`key.pem` at the ZIP root, with the manifest `key` omitted from that upload). It is not required for unpacked ID stability, and it is not in the repository.
 
-This change generates an RSA-2048 key pair in memory, records the SPKI public key and the derived ID, and discards the private key in the same step. The private key is not in the repository, the pull request, or the logs, and it is not recoverable from them. That is enough for unpacked release builds. It is not enough for CRX or Web Store signing.
-
-The maintainer must generate and hold a private key outside the repo before any signed or store release that should keep a chosen ID. Replacing the committed public key changes the unpacked ID, so that replacement has to happen before users depend on the ID if store parity matters.
+The committed public key is the maintainer's. The release ID derived from it is `dkngkciiiabbdjcopbipkpndfmpbmjom`.
 
 ## Dev and forked builds
 
-A build that ships this public `key` has the release ID whether it is loaded from `packages/extension/dist` or from a release ZIP. A fork or a local manifest that removes or replaces `key` gets a different ID. `--extension-id` has to remain available for those builds. The release default must not prevent an explicit ID.
+A build that ships this public `key` has the release ID whether it is loaded from `packages/extension/dist` or from a release ZIP. `--extension-id` is only for development (a local unpacked build without the release key) and for forks. Release users never need it. The release default must not prevent an explicit ID on those builds.
 
 ## Migration
 
@@ -71,6 +69,6 @@ Existing host manifests pin a path-derived ID. After this ships, loading the rel
 
 - Leaving the ID path-derived and documenting "always unpack into the same folder". Users already lose pairing on ordinary upgrades. A folder convention does not survive a second directory.
 - Committing the private key, or printing it in the PR, so the maintainer can sign later. The private key must stay out of the repo and the logs.
-- Blocking the unpacked ID on a key the maintainer has not generated yet. Unpacked stability needs only the public key. Waiting would leave the upgrade bug in place. The ADR records the signing-key step the maintainer still has to do by hand.
+- Blocking the unpacked ID on a key the maintainer has not generated yet. Unpacked stability needs only the public key. The maintainer now holds the private key outside the repo and the committed `key` is that pair's public half.
 - Putting the release ID in `@rogatio/schema`. Schema does not own browser identity. The runtime package already writes `allowed_origins`, and the CLI already depends on it. The extension cannot import the runtime (dependency direction). The manifest `key` is the source of truth; each package holds the derived ID and tests lock both to that key.
 - Teaching the native host to report the mismatch. Chrome never launches the host when the origin is rejected.

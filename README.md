@@ -212,19 +212,20 @@ host. Register it once, then start the runtime from the extension.
 
 ```sh
 # Register the native-messaging host once (required before Start runtime works).
-# Release builds use the pinned extension ID, so --extension-id is optional.
+# Release users never pass --extension-id. That flag is only for development
+# (a local unpacked build without the release key) and for forks.
 # This also trusts the device-local CA, so run it with elevated privileges:
 #   Linux: sudo rogatio runtime install
 #   macOS: authorize the login-keychain prompt
 #   Windows: run from an Administrator shell
 rogatio runtime install
 
-# Dev or forked builds whose ID is not the pinned release ID:
+# Development or a fork, only when the build does not carry the release key:
 # rogatio runtime install --extension-id <id>
 
 # Confirm manifest, runtime-host wrapper, allowed origins, and CA trust.
 # Fails with the re-pin command when allowed_origins does not include the
-# release ID (or the ID passed with --extension-id).
+# release ID. Release users never pass --extension-id on verify either.
 rogatio runtime verify
 
 # Start the runtime from the extension's Start runtime control
@@ -244,8 +245,9 @@ controls, with the loaded extension ID shown beneath it. Release builds carry
 a public `key` in the extension manifest, so that ID stays the same when a new
 ZIP is unpacked into a different folder. If the host manifest is not installed,
 starting shows the ready-to-run install command with a one-click copy button
-(`rogatio runtime install` for a release build, or
-`rogatio runtime install --extension-id <id>` for a dev or forked build). If
+(`rogatio runtime install`). Release users never pass `--extension-id`. That
+flag is only for development (a local unpacked build without the release key)
+and for forks. If
 Chrome refuses the connection because this ID is not in the host manifest
 `allowed_origins`, the runtime card says so and shows that same command. If the
 project has request-body rules and the device-local CA is not yet trusted, the
@@ -261,9 +263,9 @@ Installs created before the stable extension ID stored a path-derived ID in the
 host manifest. After you load a release build that includes the public key,
 Chrome will refuse the native host until `allowed_origins` matches the pinned
 ID. Run `rogatio runtime install` again with the same elevation as the first
-install (no `--extension-id`). `rogatio runtime verify` prints that command
-when the old ID is still pinned. Dev and forked builds that do not use the
-release key keep passing `--extension-id`.
+install. Release users never pass `--extension-id`. `rogatio runtime verify`
+prints that command when the old ID is still pinned. `--extension-id` is only
+for development (a local unpacked build without the release key) and for forks.
 
 ## Project layout
 

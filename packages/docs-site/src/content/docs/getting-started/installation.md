@@ -51,10 +51,11 @@ copy disabled or removed so only one Rogatio is loaded.
 
 If this machine already ran `rogatio runtime install` against an older,
 path-derived extension ID, run `rogatio runtime install` again after loading the
-new build (same elevation as the first install; no `--extension-id` for a release
-build). That rewrites the native host's `allowed_origins`. `rogatio runtime verify`
-prints the command when the host is still pinned to a different ID. Dev or forked
-builds that do not carry the release key pass `--extension-id <id>` instead.
+new build (same elevation as the first install). That rewrites the native host's
+`allowed_origins`. `rogatio runtime verify` prints the command when the host is
+still pinned to a different ID. Release users never pass `--extension-id`. That
+flag is only for development (a local unpacked build without the release key) and
+for forks.
 
 Chrome sideloading may require the organization's extension entitlement. The extension
 declares broad host access (`*://*/*`) at install time so DNR rules can match any HTTP(S)

@@ -61,11 +61,11 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
     "The runtime is unavailable on this platform.",
   "extension.native-runtime-transition": "The runtime could not change state.",
   "extension.native-host-missing":
-    "The native runtime host is not installed or not detected. Run `rogatio runtime install` for a release build, or `rogatio runtime install --extension-id <extension ID>` for a dev or forked build, then reload the extension at chrome://extensions (click the circular-arrow reload button on the Rogatio card) and start the runtime again.",
+    "The native runtime host is not installed or not detected. Run `rogatio runtime install`, then reload the extension at chrome://extensions (click the circular-arrow reload button on the Rogatio card) and start the runtime again. Release users never pass `--extension-id`. That flag is only for development (a local unpacked build without the release key) and for forks.",
   "extension.native-host-origin-forbidden":
-    "This extension's ID is not in the native host manifest allowed_origins, so Chrome refused the connection. Run `rogatio runtime install` for a release build, or `rogatio runtime install --extension-id <extension ID>` for a dev or forked build, then reload the extension at chrome://extensions and click Start runtime again.",
+    "This extension's ID is not in the native host manifest allowed_origins, so Chrome refused the connection. Run `rogatio runtime install`, then reload the extension at chrome://extensions and click Start runtime again. Release users never pass `--extension-id`. That flag is only for development (a local unpacked build without the release key) and for forks.",
   "extension.request-body-needs-trust":
-    "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime install --extension-id <extension ID>` to register the host and (on capable platforms) trust the device-local CA, then restart Chrome and click Start runtime again. Response-body rules do not need trust.",
+    "Request-body rules need the device-local CA trusted on this device. Run `rogatio runtime install` to register the host and (on capable platforms) trust the device-local CA, then restart Chrome and click Start runtime again. Release users never pass `--extension-id`. That flag is only for development (a local unpacked build without the release key) and for forks. Response-body rules do not need trust.",
   "extension.ai-unavailable":
     "AI generation is unavailable until the native runtime is running and configured.",
   "extension.ai-invalid-prompt":

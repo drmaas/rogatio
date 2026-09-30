@@ -83,7 +83,7 @@ rogatio edit
 # Validate the project file
 rogatio verify
 
-# Register the native-messaging host (release builds use the pinned extension ID)
+# Register the native-messaging host. Release users never pass --extension-id.
 rogatio runtime install
 
 # Start/stop body-rule runtime from the extension's Start runtime / Stop runtime controls

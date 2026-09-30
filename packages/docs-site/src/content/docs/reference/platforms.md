@@ -20,8 +20,9 @@ supported browser.
 ## Host install and Start/Stop
 
 - Register the native-messaging host with
-  `rogatio runtime install` (release builds; dev or forked builds pass
-  `--extension-id <id>`) and remove it with `uninstall`.
+  `rogatio runtime install` and remove it with `uninstall`. Release users never
+  pass `--extension-id`. That flag is only for development (a local unpacked
+  build without the release key) and for forks.
   The same transactional `install` also provisions and trusts the device-local CA, or
   rolls back and exits `1` when elevation or a required capability is missing.
 - `rogatio runtime verify` checks the manifest, the `runtime-host` wrapper, the allowed

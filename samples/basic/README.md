@@ -95,9 +95,9 @@ bodies through the runtime:
 
 ```sh
 rogatio runtime install
-# Release builds use the pinned extension ID.
-# Dev or forked builds: rogatio runtime install --extension-id <id>
-# (the Workspace sidebar shows the loaded extension ID)
+# Release users never pass --extension-id.
+# That flag is only for development (a local unpacked build without the
+# release key) and for forks. The Workspace sidebar shows the loaded ID.
 ```
 
 Then, in the Rogatio management page's **Workspace** view, click **Start runtime**. Click **Stop runtime** to stop the session.

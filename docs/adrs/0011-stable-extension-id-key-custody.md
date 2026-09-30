@@ -8,30 +8,23 @@ Chrome hashes the public key, not a private key, to compute that ID. A CRX signa
 
 ## Decision
 
-Commit only the public key, in `packages/extension/public/manifest.json` `key`, as base64 SPKI. The release extension ID is the Chrome ID of that key. `rogatio runtime install` defaults to it. `--extension-id` remains the override for a dev or forked build whose manifest does not carry this key.
+Commit only the public key, in `packages/extension/public/manifest.json` `key`, as base64 SPKI. The release extension ID is the Chrome ID of that key (`dkngkciiiabbdjcopbipkpndfmpbmjom`). `rogatio runtime install` and `rogatio runtime verify` use it. `--extension-id` is only for development (a local unpacked build without the release key) and for forks. Release users never need it.
 
-Do not commit a private key. Do not put a private key in release ZIPs, docs, or logs.
+Do not commit a private key. Do not put a private key in GitHub Release ZIPs, docs, or logs.
 
-The public key in this change was generated so unpacked builds can ship a stable ID. The matching private key was discarded in the same step and is not recoverable from the repository. Unpacked release builds do not need it. CRX packaging and a Web Store listing that must keep this ID do.
+The maintainer holds the matching private key outside the repository. It is used for CRX signing and for the first Chrome Web Store upload. Unpacked release builds use the public `key` only.
 
-The maintainer generates and holds the signing key:
-
-1. Generate a 2048-bit RSA key and store the private key outside the repository.
-2. Replace `key` in `packages/extension/public/manifest.json` with the base64 SPKI public key (one line, no PEM armor).
-3. Set `RELEASE_EXTENSION_ID` in `packages/runtime/src/extension-id.ts` and `packages/extension/src/extension-id.ts` to the Chrome ID of that public key. The manifest test fails if either constant drifts.
-4. For the first Chrome Web Store upload only: omit `key` from the uploaded manifest and place the private key at the ZIP root as `key.pem`. Do not put `key.pem` in the GitHub Release ZIP. Later store updates must not include a new private key.
-
-Replacing the public key changes the unpacked ID. Existing installs must run `rogatio runtime install` again. Do the replacement before users depend on the ID if a later store listing must match it.
+For the first Chrome Web Store upload only: omit `key` from the uploaded manifest and place the private key at the ZIP root as `key.pem`. Later store updates keep the ID from that first upload and must not include a new private key. The GitHub Release ZIP keeps `key` and must not contain `key.pem`.
 
 `runtime verify` and the extension runtime card treat a host whose `allowed_origins` omit the connecting ID as a distinct failure and print the re-pin command. They do not treat it as a missing host.
 
 ## Consequences
 
 - Release ZIPs loaded from different folders share one extension ID.
-- `rogatio runtime install` works without `--extension-id` for those builds.
+- `rogatio runtime install` and `rogatio runtime verify` work without `--extension-id` for those builds. Release users never pass that flag.
 - A path-derived host manifest from an older install keeps failing closed until the user re-runs install. Verify and the runtime card name that mismatch.
-- Nobody can sign a CRX or upload `key.pem` for the committed public key. Store parity requires the maintainer steps above.
-- Forks that change or drop `key` pass `--extension-id`.
+- The maintainer can sign a CRX and perform the first Web Store upload because they hold the private key outside the repo. The repository itself cannot.
+- Development builds that omit the release key, and forks that change or drop `key`, pass `--extension-id`.
 
 ## Alternatives rejected
 

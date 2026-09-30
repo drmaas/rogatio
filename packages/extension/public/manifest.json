@@ -3,7 +3,7 @@
   "name": "Rogatio",
   "version": "0.0.0",
   "description": "Local-first browser request and response rules.",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA/oNRLPaGA1JJ03Tab680KtW4eO+4Im+BIq3kEdIzTZ7PuyT+K1MppeXJMpjlGNVN7hsNyxb+45eQNSXLrDXx+ql/3unwdVpML7goA3t5RKKwKO3UDPTLtcCgg7c8Hd8Yt1B2oHXbVYShcGFm17VrKVfbSf/vXiEg3AuNew3iLXAsR9NSJEU34RvRAWxgxcsfXuUrGZ2gvvkX8vnzEGFH0b+GM1XK8LWVaJfLZoBm9KaS/5N3dJfSoVI5JzSQMmv/uHYeUV2//3PPif2sJSmEyUwFaf5HmVzWEaIUiiVRVGD43dJsE+vf6cppQY1frdYpR0aZ7COoUTprysxpbQ+lGwIDAQAB",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz2dg/lbeT/xGzY/t5VsfMUftnMqXg2GT3VbUdCPbCNfDUEZfWhGcxE4J9ln46rbuRQJK5hse+/qm2Pc1qlBhQsL7mMGs/LWGHQEGJW0qYP6u/CF02l6fvaX1Kn60yZ5R/B/kFqsSuXhv9+Y13LnHWDTUzuyl5Z29OyITY1f0J/QfkpS0j7Lh3yhPpEFbgBUPMwtBy09h0SZVygBCwWLQ+z6hW2hhwz25/4nItFyhxXJJM0PLFzSfsBP/eeSgAO9H/E1QM2gJOz84ztMPzFJ1fCMVIPrAFe6sFcfdy7S9byf0Mc/dVySsI1I4rQVVXO/1Nkbr/Q+y2T9z4c3dDxecVwIDAQAB",
   "background": {
     "service_worker": "background.js",
     "type": "module"

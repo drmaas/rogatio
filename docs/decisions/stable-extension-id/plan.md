@@ -6,7 +6,7 @@ Issue: [#263](https://github.com/drmaas/rogatio/issues/263). Research: `research
 
 ## Outcome
 
-Every build that contains the committed public `key` has one Chrome extension ID, independent of the unpacked folder. `rogatio runtime install` defaults to that ID. `--extension-id` still overrides it for a dev or forked build. `rogatio runtime verify` and the extension runtime card say when the connecting ID is not in `allowed_origins` and print the one command that fixes it. Install docs describe the upgrade from a path-derived ID.
+Every build that contains the committed public `key` has one Chrome extension ID, independent of the unpacked folder. `rogatio runtime install` and `rogatio runtime verify` use that ID. `--extension-id` is only for development (a local unpacked build without the release key) and for forks. Release users never need it. `rogatio runtime verify` and the extension runtime card say when the connecting ID is not in `allowed_origins` and print the one command that fixes it. Install docs describe the upgrade from a path-derived ID.
 
 ## Behavior
 
@@ -40,4 +40,4 @@ Update the install/upgrade wording in `README.md`, `packages/cli/README.md`, `sa
 
 ## Maintainer follow-up
 
-Recorded in ADR 0011. The private key for this public key was not retained. Before a CRX or a Web Store listing that must keep this ID, generate a key pair, hold the private key outside the repo, replace the manifest `key`, and update both ID constants. Do that before the first release users depend on if the store ID must match the unpacked ID.
+Recorded in ADR 0011. The maintainer holds the private key outside the repo for CRX signing and the first Chrome Web Store upload. The committed public key and `RELEASE_EXTENSION_ID` (`dkngkciiiabbdjcopbipkpndfmpbmjom`) are that key's public half. Release users never pass `--extension-id`.

@@ -8,10 +8,11 @@ import { createHash } from "node:crypto";
  * Both copies are tested against the manifest key. Replacing the key
  * changes the ID; update both constants together.
  *
- * The matching private key is not in the repo. See
+ * The maintainer holds the matching private key outside the repo, for CRX
+ * signing and the first Chrome Web Store upload. See
  * `docs/adrs/0011-stable-extension-id-key-custody.md`.
  */
-export const RELEASE_EXTENSION_ID = "ieaimkhfimopjkfamallppgmdfadpbko";
+export const RELEASE_EXTENSION_ID = "dkngkciiiabbdjcopbipkpndfmpbmjom";
 
 const EXTENSION_ID_RE = /^[a-p]{32}$/;
 
