@@ -1,4 +1,4 @@
-import { access, mkdtemp, rm } from "node:fs/promises";
+import { access, chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,6 +6,7 @@ import {
   createRequestBodyTrustController,
   defaultTrustInstallRoot,
   detectTrustCapabilities,
+  extensionOriginListed,
   generateNativeMessagingManifest,
   TRUST_LIMITS,
   TrustError,
@@ -457,6 +458,42 @@ describe(" trust controller lifecycle", () => {
     expect(Object.keys(controller).sort()).toEqual(
       ["install", "status", "uninstall", "verify"].sort(),
     );
+  });
+});
+
+describe("verify allowed_origins", () => {
+  it("reports the pinned origins so a different extension ID can be detected", async () => {
+    const hostPath = join(root, "runtime-host");
+    const pinned = "abcdefghijklmnopabcdefghijklmnop";
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath,
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+    });
+    const installed = await controller.install(pinned);
+    expect(installed.ok).toBe(true);
+    await writeFile(hostPath, "#!/bin/sh\nexit 0\n", "utf8");
+    await chmod(hostPath, 0o755);
+
+    const checked = await controller.verify();
+    expect(checked.allowedOrigins).toEqual([`chrome-extension://${pinned}/`]);
+    expect(checked.manifestValid).toBe(true);
+    expect(checked.binaryExists).toBe(true);
+    expect(checked.caTrusted).toBe(true);
+    // Node's stat mode does not report a Unix execute bit on Windows, so
+    // verify records binary-not-executable there even after chmod 0o755.
+    const reasonsBesidesWindowsMode = checked.reasons.filter(
+      (reason) =>
+        !(process.platform === "win32" && reason === "binary-not-executable"),
+    );
+    expect(reasonsBesidesWindowsMode).toEqual([]);
+    if (process.platform !== "win32") expect(checked.ok).toBe(true);
+    expect(extensionOriginListed(pinned, checked.allowedOrigins)).toBe(true);
+
+    const other = "bcdefghijklmnopabcdefghijklmnopa";
+    expect(extensionOriginListed(other, checked.allowedOrigins)).toBe(false);
   });
 });
 

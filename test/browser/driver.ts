@@ -166,7 +166,8 @@ export async function createDriver(
     chromeOptions.addArguments(`--user-data-dir=${options.userDataDir}`);
   }
   if (options.extensionPath) {
-    // Absolute path — Chrome hashes this for the unpacked extension id.
+    // Absolute path. Without a manifest `key`, Chrome hashes this path for
+    // the unpacked extension id. A `key` pins the ID instead.
     const extensionPath = resolve(options.extensionPath);
     chromeOptions.addArguments(
       `--disable-extensions-except=${extensionPath}`,

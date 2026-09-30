@@ -20,7 +20,7 @@ rewriting via native messaging to the explicitly started local runtime.
 
 ## Requirements
 
-- Requires the native-messaging host to be registered (`rogatio runtime install --extension-id <id>`)
+- Requires the native-messaging host to be registered (`rogatio runtime install`; release users never pass `--extension-id`, which is only for development — a local unpacked build without the release key — and for forks)
   and the runtime session to be started from the extension's **Start runtime** control
   (see [Local runtime](/guides/runtime/)).
 - Enabled, granted response-body rules report `needs runtime` until the host session is

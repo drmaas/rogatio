@@ -83,8 +83,8 @@ rogatio edit
 # Validate the project file
 rogatio verify
 
-# Register the native-messaging host (use the extension ID from chrome://extensions)
-rogatio runtime install --extension-id <your-extension-id>
+# Register the native-messaging host. Release users never pass --extension-id.
+rogatio runtime install
 
 # Start/stop body-rule runtime from the extension's Start runtime / Stop runtime controls
 ```

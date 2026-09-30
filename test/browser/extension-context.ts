@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -113,7 +113,37 @@ export async function seedNativeHostManifest(
   );
 }
 
+/**
+ * Chrome unpacked ID from a manifest `key` (SHA-256 of the decoded SPKI,
+ * first 16 bytes, nibble map a–p). Same mapping as
+ * `extensionIdFromPublicKey` in `@rogatio/runtime`.
+ */
+function extensionIdFromManifestKey(publicKeyBase64: string): string {
+  const der = Buffer.from(publicKeyBase64.replace(/\s+/g, ""), "base64");
+  const digest = createHash("sha256").update(der).digest();
+  let extensionId = "";
+  for (let i = 0; i < 16; i += 1) {
+    extensionId += String.fromCharCode(97 + (digest[i] >> 4));
+    extensionId += String.fromCharCode(97 + (digest[i] & 0x0f));
+  }
+  return extensionId;
+}
+
+/**
+ * ID Chrome will assign when this directory is loaded unpacked.
+ * A manifest `key` wins. Without one, Chrome hashes the absolute path.
+ */
 function computeExtensionId(extensionPath: string): string {
+  try {
+    const manifest = JSON.parse(
+      readFileSync(join(extensionPath, "manifest.json"), "utf8"),
+    ) as { key?: unknown };
+    if (typeof manifest.key === "string" && manifest.key.length > 0) {
+      return extensionIdFromManifestKey(manifest.key);
+    }
+  } catch {
+    // Missing or unreadable manifest: fall through to the path hash.
+  }
   const digest = createHash("sha256").update(extensionPath).digest();
   let extensionId = "";
   for (let i = 0; i < 16; i += 1) {

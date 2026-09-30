@@ -14,6 +14,7 @@ import {
   removeSessionBodyMarkers,
 } from "./body-marker-lifecycle.js";
 import type { ChromeApi } from "./chrome.js";
+import { isNativeHostOriginForbiddenMessage } from "./extension-id.js";
 import {
   installResponseBodyRedirects,
   removeResponseBodyRedirects,
@@ -207,6 +208,8 @@ export async function buildNativePolicy(
 
 function stableStartFailureReason(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
+  if (isNativeHostOriginForbiddenMessage(message))
+    return "extension.native-host-origin-forbidden";
   if (message.includes("extension.native-host-missing"))
     return "extension.native-host-missing";
   if (message.includes("extension.request-body-needs-trust"))

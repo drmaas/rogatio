@@ -55,6 +55,8 @@ export interface VerifyResult {
   readonly binaryExecutable: boolean;
   readonly caTrusted: boolean;
   readonly allowedOriginsCount: number;
+  /** Origins copied from the host manifest, or empty when it cannot be read. */
+  readonly allowedOrigins: readonly string[];
   readonly reasons: readonly string[];
 }
 
@@ -424,17 +426,16 @@ export function createRequestBodyTrustController(
     let manifestValid = false;
     let binaryExists = false;
     let binaryExecutable = false;
-    let allowedOriginsCount = 0;
+    let allowedOrigins: readonly string[] = [];
     try {
       const raw = await readFile(manifestPath(), "utf8");
       manifestExists = true;
       const parsed = JSON.parse(raw) as unknown;
       if (isWellFormedManifest(parsed)) {
         manifestValid = true;
-        const manifest = parsed as NativeMessagingManifest;
-        allowedOriginsCount = manifest.allowed_origins.length;
+        allowedOrigins = [...parsed.allowed_origins];
         try {
-          const fileStat = await stat(manifest.path);
+          const fileStat = await stat(parsed.path);
           binaryExists = fileStat.isFile();
           binaryExecutable = (fileStat.mode & 0o111) !== 0;
           if (!binaryExists) reasons.push("binary-not-found");
@@ -443,7 +444,7 @@ export function createRequestBodyTrustController(
           binaryExists = false;
           reasons.push("binary-not-found");
         }
-        if (allowedOriginsCount === 0) reasons.push("no-allowed-origins");
+        if (allowedOrigins.length === 0) reasons.push("no-allowed-origins");
       } else {
         reasons.push("manifest-invalid");
       }
@@ -459,7 +460,7 @@ export function createRequestBodyTrustController(
       binaryExists &&
       binaryExecutable &&
       caTrusted &&
-      allowedOriginsCount > 0;
+      allowedOrigins.length > 0;
     return {
       ok,
       manifestExists,
@@ -467,7 +468,8 @@ export function createRequestBodyTrustController(
       binaryExists,
       binaryExecutable,
       caTrusted,
-      allowedOriginsCount,
+      allowedOriginsCount: allowedOrigins.length,
+      allowedOrigins,
       reasons,
     };
   }

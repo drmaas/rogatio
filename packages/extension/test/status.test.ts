@@ -206,6 +206,69 @@ describe(" request-body extension status", () => {
     });
   });
 
+  it("reports an origin mismatch when Chrome forbids the native host", async () => {
+    const devId = "b".repeat(32);
+    let stored: unknown;
+    const nativeRuntime = {
+      start: vi.fn(async () => ({ state: "started" as const })),
+      stop: vi.fn(async () => ({ state: "stopped" as const })),
+      status: vi.fn(async () => ({ state: "stopped" as const })),
+      sendPolicy: vi.fn(async (_frames: Uint8Array[]) => {}),
+      send: vi.fn(async () => {
+        throw new Error(
+          "Access to the specified native messaging host is forbidden.",
+        );
+      }),
+    };
+    const app = createExtensionApplication({
+      storage: {
+        read: async () => stored,
+        compareAndSwap: async (previous: unknown, next: unknown) => {
+          if (stored !== previous) return false;
+          stored = next;
+          return true;
+        },
+      },
+      installer: {
+        current: async () => [],
+        install: async () => ({ ok: true as const }),
+      },
+      nativeRuntime,
+      extensionId: devId,
+      generateId: () => "request-body-project",
+      now: () => 1,
+    });
+    await prepare(app);
+
+    const started = await app.handle({
+      version: 1,
+      command: "start-native-runtime",
+    });
+    expect(started).toMatchObject({
+      ok: false,
+      diagnostic: {
+        code: "extension.native-host-origin-forbidden",
+      },
+    });
+    const reason = (
+      started as {
+        diagnostic?: { params?: { reason?: string } };
+      }
+    ).diagnostic?.params?.reason;
+    expect(reason).toContain("allowed_origins");
+    expect(reason).toContain(`rogatio runtime install --extension-id ${devId}`);
+    expect(reason).toContain("Chrome refused the connection");
+
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: {
+        nativeRuntimeState: { phase: "failed" },
+        nativeRuntimeError: reason,
+      },
+    });
+  });
+
   it("reports the request-body-needs-trust diagnostic and failed phase when the host rejects for missing trust", async () => {
     const { app, nativeRuntime } = harness(async () => ({
       state: "failed" as const,

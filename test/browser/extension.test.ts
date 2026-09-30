@@ -236,6 +236,93 @@ test("reports an actionable message and failed status when the native host is mi
   ).toBeVisible();
 });
 
+test("runtime card names an allowed_origins mismatch and the re-pin command", async ({
+  page,
+}) => {
+  const devId = "b".repeat(32);
+  const mismatch = `This extension ID (${devId}) is not in the native host manifest allowed_origins. Chrome refused the connection. Run \`rogatio runtime install --extension-id ${devId}\`, reload the extension at chrome://extensions, then click Start runtime again.`;
+  await page.addInitScript((message: string) => {
+    const state = {
+      version: 1,
+      projects: {
+        "project-a": {
+          id: "project-a",
+          name: "Project A",
+          data: { version: 1, name: "Project A", groups: [] },
+          revision: 1,
+          enabledGroupIds: [],
+          grantedOrigins: [],
+        },
+      },
+      activeProjectId: "project-a",
+      nativeRuntimeState: undefined as { phase: string } | undefined,
+      nativeRuntimeError: undefined as string | undefined,
+    };
+    const runtime = {
+      lastError: undefined,
+      id: "b".repeat(32),
+      sendMessage(
+        commandMessage: { command?: string },
+        callback: (value: unknown) => void,
+      ) {
+        if (commandMessage.command === "start-native-runtime") {
+          state.nativeRuntimeState = { phase: "failed" };
+          state.nativeRuntimeError = message;
+          callback({
+            ok: false,
+            diagnostic: {
+              code: "extension.native-host-origin-forbidden",
+              params: { reason: message },
+            },
+          });
+        } else callback({ ok: true, value: state });
+      },
+      onMessage: { addListener() {} },
+    };
+    Object.defineProperty(window, "chrome", {
+      configurable: true,
+      value: {
+        storage: {
+          local: { get: async () => ({ rogatio: state }), set: async () => {} },
+        },
+        permissions: {
+          contains: async () => false,
+          request: async () => true,
+          remove: async () => true,
+        },
+        action: {
+          setBadgeText: async () => {},
+          setBadgeBackgroundColor: async () => {},
+        },
+        runtime,
+      },
+    });
+  }, mismatch);
+  await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.getByRole("button", { name: "Start runtime" }).click();
+  const runtimeCard = page.locator(
+    '.rogatio-sidebar-card[data-card="runtime"]',
+  );
+  await expect(runtimeCard.locator("[data-runtime-error]")).toContainText(
+    "allowed_origins",
+  );
+  await expect(
+    runtimeCard.locator("[data-runtime-origin-mismatch]"),
+  ).toHaveText(
+    `Re-pin the host: rogatio runtime install --extension-id ${devId}`,
+  );
+  await expect(page.locator("[data-runtime-install-command]")).toHaveText(
+    `rogatio runtime install --extension-id ${devId}`,
+  );
+  await expect(page.locator(".rogatio-status")).toContainText(
+    "allowed_origins",
+  );
+  await expect(page.locator(".rogatio-status")).toContainText(
+    `rogatio runtime install --extension-id ${devId}`,
+  );
+});
+
 test("shows AI needs runtime before start and configured after a successful start", async ({
   page,
 }) => {

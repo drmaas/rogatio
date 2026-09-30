@@ -6,8 +6,8 @@ import {
   setBadge,
 } from "./chrome.js";
 import { createDnrInstaller } from "./dnr.js";
+import { isNativeHostOriginForbiddenMessage } from "./extension-id.js";
 import { registerMatchLogListener } from "./match-listener.js";
-
 import type {
   NativeEnvelope,
   NativeEnvelopeInput,
@@ -152,7 +152,10 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
       console.log("[rogatio] ensurePort: connected successfully");
     } catch (error) {
       console.log("[rogatio] ensurePort: connectNative FAILED:", error);
-      rememberConnectError(error);
+      const wrapped = rememberConnectError(error);
+      if (isNativeHostOriginForbiddenMessage(wrapped.message)) {
+        throw new Error("extension.native-host-origin-forbidden");
+      }
       throw new NativeHostMissingError();
     }
     next.onMessage.addListener((message: unknown) => {

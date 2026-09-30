@@ -24,8 +24,10 @@ captures from the body regex. The two capture namespaces are not mixed.
 ## Requirements and capabilities
 
 - Requires the native-messaging host registered via
-  `rogatio runtime install --extension-id <id>` and the runtime session started from the
-  extension's **Start runtime** control. Without a started session, enabled granted
+  `rogatio runtime install` and the runtime session started from the
+  extension's **Start runtime** control. Release users never pass `--extension-id`.
+  That flag is only for development (a local unpacked build without the release
+  key) and for forks. Without a started session, enabled granted
   request-body rules report `needs runtime`.
 - Request-body interception is **capability-based**: it needs a trusted device-local CA
   and non-colliding Chrome PAC routing, excludes private browsing, and cannot compose with
@@ -33,7 +35,7 @@ captures from the body regex. The two capture namespaces are not mixed.
 - Where those capabilities are absent, request-body activation reports `unsupported`;
   Linux and Windows may still verify, edit, import, export, and dry-run request-body rules.
   The host can still start for response-body rules.
-- CA trust is installed by the same `rogatio runtime install --extension-id <id>` command.
+- CA trust is installed by the same `rogatio runtime install` command.
   Elevation: Linux (`sudo`), macOS (keychain authorization), Windows (Administrator). When
   elevation or any required capability is unavailable, that command is transactional and
   prints `trust unsupported: <reasons>` then exits `1` after rolling the manifest back —
