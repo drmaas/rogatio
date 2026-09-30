@@ -2572,17 +2572,7 @@ class EditorControllerImpl implements EditorController {
       );
     }
     tools.append(this.createCommandButton("Validate", "validate", this.saving));
-    if (this.route.kind === "project") {
-      tools.append(
-        this.createCommandButton(
-          "Add group",
-          "add-group",
-          this.saving,
-          {},
-          "primary",
-        ),
-      );
-    } else if (this.route.kind === "test") {
+    if (this.route.kind === "test") {
       tools.append(
         this.createCommandButton(
           "Run test",
@@ -2723,10 +2713,12 @@ class EditorControllerImpl implements EditorController {
   }
 
   /**
-   * Repeats the actions a long page would otherwise hide: under the last rule,
-   * under the project group list, or under the test results.
+   * Repeats the actions a long page would otherwise hide: under the last rule
+   * on a group page, or under the test results. The project page stays short,
+   * so Add group lives on the Groups heading and that route has no ledger.
    */
   private renderActionDock(): void {
+    if (this.route.kind === "project") return;
     const dock = this.document.createElement("section");
     dock.dataset.actionDock = "end";
     dock.setAttribute("aria-label", "Repeated actions");
@@ -2753,19 +2745,6 @@ class EditorControllerImpl implements EditorController {
           this.createGroupActionClusters(groupId, groupName),
         );
       }
-    } else if (this.route.kind === "project") {
-      const addGroup = this.document.createElement("div");
-      addGroup.dataset.actionCluster = "safe";
-      addGroup.append(
-        this.createCommandButton(
-          "Add group",
-          "add-group",
-          this.saving,
-          {},
-          "primary",
-        ),
-      );
-      this.appendDockRow(dock, "Groups", addGroup);
     } else {
       const run = this.document.createElement("div");
       run.dataset.actionCluster = "safe";
@@ -2813,9 +2792,21 @@ class EditorControllerImpl implements EditorController {
 
     const groups = this.document.createElement("section");
     groups.dataset.groupListSection = "true";
+    const groupsHeadingRow = this.document.createElement("div");
+    groupsHeadingRow.dataset.sectionHeading = "true";
     const groupsHeading = this.document.createElement("h2");
     groupsHeading.textContent = "Groups";
-    groups.append(groupsHeading);
+    groupsHeadingRow.append(
+      groupsHeading,
+      this.createCommandButton(
+        "Add group",
+        "add-group",
+        this.saving,
+        {},
+        "primary",
+      ),
+    );
+    groups.append(groupsHeadingRow);
     if (this.draft.groups.length === 0) {
       const empty = this.document.createElement("p");
       empty.textContent = "No groups yet.";
@@ -2828,13 +2819,13 @@ class EditorControllerImpl implements EditorController {
         const groupName = displayName(group.name, "Unnamed group");
         const item = this.document.createElement("li");
         item.dataset.groupRow = "true";
-        const open = this.createButton(
-          `Edit group ${groupName}`,
-          `route:group:${groupId}`,
-        );
+        const open = this.createButton(groupName, `route:group:${groupId}`);
         open.dataset.route = "group";
         open.dataset.groupId = groupId;
         open.dataset.btn = "secondary";
+        open.setAttribute("aria-label", `Open group ${groupName}`);
+        const actions = this.document.createElement("div");
+        actions.dataset.groupRowActions = "true";
         const copy = this.createCommandButton(
           "Copy group",
           "copy-group",
@@ -2850,7 +2841,8 @@ class EditorControllerImpl implements EditorController {
           "danger",
         );
         remove.setAttribute("aria-label", `Remove group ${groupName}`);
-        item.append(open, copy, remove);
+        actions.append(copy, remove);
+        item.append(open, actions);
         list.append(item);
       }
       groups.append(list);

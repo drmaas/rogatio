@@ -702,16 +702,35 @@ describe("workspace action layout", () => {
     editor.destroy();
   });
 
-  it("repeats Add group and project actions under the group list", () => {
+  it("puts Add group on the project heading and omits the action dock", () => {
     const { root, editor } = createTestEditor();
     root
       .querySelector('[data-desktop-route-rail] button[data-route="project"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    const dock = root.querySelector("[data-action-dock]");
-    expect(dock?.querySelector('[data-command="add-group"]')).not.toBeNull();
-    expect(dock?.querySelector('[data-command="save"]')).not.toBeNull();
-    expect(dock?.querySelector('[data-command="copy-group"]')).toBeNull();
-    expect(dock?.querySelector('[data-command="add-rule"]')).toBeNull();
+    expect(root.querySelector("[data-action-dock]")).toBeNull();
+    expect(
+      root.querySelector(
+        '[data-editor-command-bar] [data-command="add-group"]',
+      ),
+    ).toBeNull();
+    const addGroup = root.querySelector(
+      '[data-group-list-section] [data-section-heading] [data-command="add-group"]',
+    );
+    expect(addGroup?.textContent).toBe("Add group");
+    const open = root.querySelector<HTMLButtonElement>(
+      '[data-group-list] button[data-route="group"]',
+    );
+    expect(open?.textContent).toBe("One");
+    expect(open?.getAttribute("aria-label")).toBe("Open group One");
+    expect(
+      root.querySelector('[data-group-list] [data-command="copy-group"]'),
+    ).not.toBeNull();
+    expect(
+      root.querySelector('[data-group-list] [data-command="remove-group"]'),
+    ).not.toBeNull();
+    open?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-group-heading]")).not.toBeNull();
+    expect(root.querySelector("[data-action-dock]")).not.toBeNull();
     editor.destroy();
   });
 
