@@ -1,0 +1,31 @@
+[
+  {
+    "objectType": "group",
+    "id": "Group_web",
+    "name": "Web app",
+    "status": "Active",
+    "description": "Saved group note",
+    "children": []
+  },
+  {
+    "objectType": "rule",
+    "id": "Redirect_home",
+    "name": "Search redirect",
+    "description": "",
+    "ruleType": "Redirect",
+    "status": "Active",
+    "groupId": "Group_web",
+    "extensionRules": [{ "id": 1, "priority": 1 }],
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Equals",
+          "value": "https://www.google.com/"
+        },
+        "destinationType": "url",
+        "destination": "https://www.bing.com/"
+      }
+    ]
+  }
+]

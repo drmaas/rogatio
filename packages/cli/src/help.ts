@@ -103,6 +103,31 @@ Exit codes:
   2  Usage error (invalid arguments, missing input)`);
 }
 
+export function showImportHelp(): void {
+  console.log(`Usage: rogatio import requestly <export.json> [options]
+
+Migrate a Requestly rule export into a Rogatio project file.
+
+Arguments:
+  export.json     Requestly export (a JSON array of rules and groups, a single
+                  rule, or an object with a rules array)
+
+Options:
+  --out <path>    Project file to write (default: .rogatio.json in the current directory)
+  --merge         Append imported groups onto an existing version-2 project
+  --json          Print the import report as JSON
+  --help, -h      Show this help
+
+The command validates the mapped project with the schema and compiler before
+writing. An existing --out file is left untouched unless --merge is set.
+Skipped and changed rules are listed; nothing is dropped silently.
+
+Exit codes:
+  0  The project was written (skipped rules do not fail the command)
+  1  The mapped or merged project failed validation. Nothing is written.
+  2  Usage, unreadable input, an export that is not Requestly data, or a refusal to overwrite`);
+}
+
 export function showAIHelp(): void {
   console.log(`Usage: rogatio ai <command> [options]
 

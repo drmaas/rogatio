@@ -1,0 +1,209 @@
+[
+  {
+    "objectType": "group",
+    "id": "Group_web",
+    "name": "Web app",
+    "status": "Active",
+    "children": []
+  },
+  {
+    "objectType": "rule",
+    "id": "Redirect_home",
+    "name": "Search redirect",
+    "ruleType": "Redirect",
+    "status": "Active",
+    "groupId": "Group_web",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Equals",
+          "value": "https://www.google.com/"
+        },
+        "destination": "https://www.bing.com/"
+      }
+    ]
+  },
+  {
+    "objectType": "rule",
+    "id": "Replace_api",
+    "name": "Staging API",
+    "ruleType": "Replace",
+    "status": "Active",
+    "groupId": "Group_web",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Wildcard_Matches",
+          "value": "https://api.example.com/*"
+        },
+        "from": "api.example.com",
+        "to": "api.staging.example.com"
+      }
+    ]
+  },
+  {
+    "objectType": "rule",
+    "id": "Query_ref",
+    "name": "Strip campaign params",
+    "ruleType": "QueryParam",
+    "status": "Active",
+    "groupId": "Group_web",
+    "pairs": [
+      {
+        "source": {
+          "key": "host",
+          "operator": "Equals",
+          "value": "example.com"
+        },
+        "modifications": [
+          { "type": "Remove", "param": "utm_source" },
+          {
+            "type": "Add",
+            "param": "ref",
+            "value": "rogatio",
+            "actionWhenParamExists": "Overwrite"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "objectType": "rule",
+    "id": "Headers_debug",
+    "name": "Debug headers",
+    "ruleType": "Headers",
+    "status": "Active",
+    "groupId": "",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Contains",
+          "value": "https://example.com/api/",
+          "filters": [
+            { "requestMethod": ["GET"], "resourceType": ["xmlhttprequest"] }
+          ]
+        },
+        "modifications": {
+          "Request": [{ "type": "Add", "header": "X-Debug", "value": "1" }],
+          "Response": [{ "type": "Remove", "header": "X-Frame-Options" }]
+        }
+      }
+    ]
+  },
+  {
+    "objectType": "rule",
+    "id": "UserAgent_test",
+    "name": "Test agent",
+    "ruleType": "UserAgent",
+    "status": "Active",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Contains",
+          "value": "example.com"
+        },
+        "envType": "custom",
+        "userAgent": "RogatioTest/1.0"
+      }
+    ]
+  },
+  {
+    "objectType": "rule",
+    "id": "Response_data",
+    "name": "Mock data",
+    "ruleType": "Response",
+    "status": "Active",
+    "groupId": "Group_web",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Matches",
+          "value": "/^https:\\/\\/example\\.com\\/data\\.json$/"
+        },
+        "response": {
+          "type": "static",
+          "value": "{\"ok\":true}",
+          "statusCode": "200"
+        }
+      }
+    ]
+  },
+  {
+    "objectType": "rule",
+    "id": "Request_submit",
+    "name": "Rewrite submit",
+    "ruleType": "Request",
+    "status": "Active",
+    "groupId": "Group_web",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Equals",
+          "value": "https://example.com/submit",
+          "filters": {
+            "requestMethod": ["POST"],
+            "resourceType": ["xmlhttprequest"]
+          }
+        },
+        "request": { "type": "static", "value": "{\"sent\":true}" }
+      }
+    ]
+  },
+  {
+    "objectType": "rule",
+    "id": "Cancel_trackers",
+    "name": "Block trackers",
+    "ruleType": "Cancel",
+    "status": "Active",
+    "groupId": "Group_web",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Contains",
+          "value": "tracker.example"
+        }
+      }
+    ]
+  },
+  {
+    "objectType": "rule",
+    "id": "Delay_api",
+    "name": "Slow API",
+    "ruleType": "Delay",
+    "status": "Active",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Contains",
+          "value": "https://example.com/slow"
+        },
+        "delay": 1000
+      }
+    ]
+  },
+  {
+    "objectType": "rule",
+    "id": "Script_helper",
+    "name": "Inject helper",
+    "ruleType": "Script",
+    "status": "Active",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Contains",
+          "value": "example.com"
+        },
+        "scripts": []
+      }
+    ]
+  }
+]

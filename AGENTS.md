@@ -14,6 +14,7 @@ Dependency direction (no cycles, no skipping):
 schema → compiler → { editor, dry-run, browser-core } → { cli, extension }
  ↑
  runtime (depends on schema + compiler only; cli depends on runtime)
+schema → requestly-import → cli
 ```
 
 Package roles — when reading code, start here to know which boundary you are in:
@@ -23,7 +24,8 @@ Package roles — when reading code, start here to know which boundary you are i
 - `packages/browser-core` — browser-neutral core: versioned project storage, migrations, per-project enablement, compare-and-swap lifecycle, atomic install with recovery, in-memory runtime state model, rule statuses (`active | disabled | needs runtime | unsupported | error`), badge math. Platform-specific work enters through injected `StorageAdapter` / `RuleInstallerAdapter` ports.
 - `packages/editor` — framework-free DOM editor (view + controller + draft state). Public boundary is `createEditor(options) → EditorController`; host supplies `validate` and `save` adapters, plus an optional `groupEnablement` port for the heading Enable/Disable button. Browser bundle must contain no `node:` imports or Ajv — hosts wire validation through the `browser-schema`/compiler adapter.
 - `packages/extension` — Chrome MV3 boundary: service worker, popup, management page, DNR projection (`extension/src/dnr.ts`, `projection.ts`), native-session bridge, popup model. Owns Chrome API adapters and the browser-safe `browser-schema.ts` mirror.
-- `packages/cli` — public surface: `rogatio edit | verify | test | runtime | ai`. Hosts the editor over a loopback HTTP server (`127.0.0.1`, random port, CSRF token). `runtime` subcommands: `install | uninstall | verify | host`. `ai` subcommands: `setup | ls | show | delete | test`. `@rogatio/*` siblings are devDependencies here — esbuild bundles them into `dist/node/index.js`, so the published CLI has no workspace deps.
+- `packages/cli` — public surface: `rogatio edit | verify | test | runtime | ai | import`. Hosts the editor over a loopback HTTP server (`127.0.0.1`, random port, CSRF token). `runtime` subcommands: `install | uninstall | verify | host`. `ai` subcommands: `setup | ls | show | delete | test`. `import requestly` migrates a Requestly export. `@rogatio/*` siblings are devDependencies here — esbuild bundles them into `dist/node/index.js`, so the published CLI has no workspace deps.
+- `packages/requestly-import` — pure Requestly export → version-2 project mapping. Depends only on `@rogatio/schema`. No file, network, or compiler I/O. The CLI reads, verifies, and writes.
 - `packages/runtime` — private Node ESM runtime foundation: loopback mock/response server (`policy`, `protocol`, `outbound`, `confined-file`), macOS native-messaging host (`lifecycle`, `revalidate`, `interception`, `intercept-proxy`, `pac`, `proxy`, `tls`, `x509`, `trust`), capability-based activation gate. Owns the F23 unified native host. Response-body rules redirect to the loopback listener (credential-free GET, not PAC). Request-body PAC steers `scheme://literal-host/*`. CONNECT is a blind tunnel.
 - `packages/dry-run` — pure offline rule matcher: `dryRunProject(operations, cases)` with 3-dimension results (source, method, resourceType) and `previewAction` seam. No network, no FS, no permission, no runtime.
 - `packages/sanity` / `packages/smoke` — tiny workspace stubs used by package wiring checks (`sanity` depends on `smoke`); not product packages and not browser e2e fixtures.

@@ -43,6 +43,7 @@
     "@rogatio/compiler": "workspace:*",
     "@rogatio/dry-run": "workspace:*",
     "@rogatio/editor": "workspace:*",
+    "@rogatio/requestly-import": "workspace:*",
     "@rogatio/runtime": "workspace:*",
     "@rogatio/schema": "workspace:*",
     "@types/node": "26.6.2",

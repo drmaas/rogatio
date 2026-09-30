@@ -234,6 +234,9 @@ importers:
       '@rogatio/editor':
         specifier: workspace:*
         version: link:../editor
+      '@rogatio/requestly-import':
+        specifier: workspace:*
+        version: link:../requestly-import
       '@rogatio/runtime':
         specifier: workspace:*
         version: link:../runtime
@@ -307,6 +310,25 @@ importers:
       '@rogatio/schema':
         specifier: workspace:*
         version: link:../schema
+
+  packages/requestly-import:
+    dependencies:
+      '@rogatio/schema':
+        specifier: workspace:*
+        version: link:../schema
+    devDependencies:
+      '@rogatio/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@types/node':
+        specifier: 26.6.2
+        version: 26.6.2
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.1
+        version: 5.0.1(@types/node@26.6.2)(happy-dom@20.14.5)(vite@8.2.2(@types/node@26.6.2)(esbuild@0.28.2)(yaml@2.9.0))
 
   packages/runtime:
     dependencies:

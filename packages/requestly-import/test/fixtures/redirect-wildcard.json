@@ -1,0 +1,17 @@
+{
+  "objectType": "rule",
+  "id": "Redirect_old",
+  "name": "Old path",
+  "ruleType": "Redirect",
+  "status": "Active",
+  "pairs": [
+    {
+      "source": {
+        "key": "Url",
+        "operator": "Wildcard_Matches",
+        "value": "https://example.com/old/*"
+      },
+      "destination": "https://example.com/new/$1"
+    }
+  ]
+}

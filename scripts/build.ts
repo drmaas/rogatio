@@ -94,6 +94,13 @@ const targets: BuildTarget[] = [
     external: ["@rogatio/schema", "@rogatio/compiler"],
   },
   {
+    entry: "packages/requestly-import/src/index.ts",
+    output: "packages/requestly-import/dist/node/index.js",
+    platform: "node",
+    target: "node24",
+    external: ["@rogatio/schema"],
+  },
+  {
     entry: "packages/cli/src/index.ts",
     output: "packages/cli/dist/node/index.js",
     platform: "node",
@@ -107,6 +114,10 @@ const targets: BuildTarget[] = [
       ),
       "@rogatio/dry-run": resolve(root, "packages/dry-run/dist/node/index.js"),
       "@rogatio/runtime": resolve(root, "packages/runtime/dist/node/index.js"),
+      "@rogatio/requestly-import": resolve(
+        root,
+        "packages/requestly-import/dist/node/index.js",
+      ),
     },
   },
   {

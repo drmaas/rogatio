@@ -63,6 +63,7 @@ async function checkArtifacts(): Promise<void> {
     "packages/compiler/dist/node/index.js",
     "packages/browser-core/dist/node/index.js",
     "packages/runtime/dist/node/index.js",
+    "packages/requestly-import/dist/node/index.js",
     "packages/cli/dist/node/index.js",
     "packages/dry-run/dist/node/index.js",
     "packages/extension/dist/browser/index.js",
@@ -378,6 +379,22 @@ async function checkBoundaries(): Promise<void> {
   );
   if (!forbidden.includes("@rogatio/extension"))
     throw new Error("Forbidden-direction fixture was altered");
+
+  const requestlyImportManifest = JSON.parse(
+    await readFile(
+      resolve(root, "packages/requestly-import/package.json"),
+      "utf8",
+    ),
+  ) as { dependencies?: Record<string, string> };
+  const requestlyImportDependencies =
+    requestlyImportManifest.dependencies ?? {};
+  if (
+    Object.keys(requestlyImportDependencies).length !== 1 ||
+    requestlyImportDependencies["@rogatio/schema"] !== "workspace:*"
+  )
+    throw new Error(
+      "Requestly import must depend only on the schema workspace package",
+    );
 
   const editorManifest = JSON.parse(
     await readFile(resolve(root, "packages/editor/package.json"), "utf8"),

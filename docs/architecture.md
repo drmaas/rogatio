@@ -44,8 +44,10 @@ See [F23 Host Session Details](#f23-host-session-details-pac-and-pass-through) b
 │ @rogatio/cli   │ │ @rogatio/extension │
 │ edit, verify,  │ │ Chrome MV3: DNR,   │
 │ test, runtime, │ │ popup, management, │
-│ ai             │ │ native-session     │
+│ ai, import     │ │ native-session     │
 └────────────────┘ └────────────────────┘
+
+`@rogatio/requestly-import` depends only on `@rogatio/schema` and is bundled into the CLI (`rogatio import requestly`). It does not depend on the compiler. The CLI validates the mapped project with schema and compiler before writing.
 
 Off DAG: @rogatio/docs-site (Astro/Starlight). Stubs: @rogatio/smoke, @rogatio/sanity.
 ```
@@ -378,7 +380,7 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 
 **1. CLI Entry Point (`src/index.ts`)**
 - Command router using minimal argument parsing (no external deps)
-- Subcommands: `edit`, `verify`, `test`, `runtime`, `ai`
+- Subcommands: `edit`, `verify`, `test`, `runtime`, `ai`, `import`
 - Global options: `--help`, `--version`
 
 **2. Edit Command (`src/commands/edit.ts`)**
@@ -416,20 +418,26 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 - `verify`: report whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all present and valid
 - `host [path] [--root <dir>] [--mock-port <n>]`: stdio native-messaging host entry (browser-launched; manual use for debugging)
 
-**6. AI Command (`src/commands/ai.ts`)**
+**6. Import Command (`src/commands/import.ts`)**
+- `import requestly <export.json> [--out <path>] [--merge] [--json]`
+- Mapping lives in `@rogatio/requestly-import` (no file, network, or compiler I/O). The CLI reads the export, runs the same schema and compiler checks as `verify` (`diagnoseProject`), and writes with the atomic project writer.
+- Default `--out` is `./.rogatio.json`. An existing file is left untouched unless `--merge` appends imported groups onto a valid version-2 project.
+- The report lists imported, changed, and skipped Requestly rules. Skipped rules do not fail the command.
+
+**7. AI Command (`src/commands/ai.ts`)**
 - Provider configuration: `setup | ls | show | delete | test`
 - Local-only OpenAI-compatible providers; keys stay on the machine
 - Editor/extension surfaces: CLI Assist uses edit-server `/api/ai/assist`; extension Dashboard "Create using AI" and Workspace Assist use native messaging (`ai.complete`) when the runtime is started and configured — not the CLI loopback HTTP server. See root `README.md` for user-facing setup.
 - AI provider metadata: the host answers the additive `ai.status` envelope with `{ configured, providerUrl?, model? }`, built from a pick-type so the API key never crosses the native boundary. The management page's AI capability check is metadata-only — one `ai.status` request, no completion probe, and no provider network call. An older host drops the unknown `ai.status` frame and the card reports `not reported` rather than an error; the bounded wait keeps a stale host from slowing the page. The host re-reads `provider.json` on every AI envelope (`ai.status`, `ai.complete`, `ai.stream.chunk`) and rebuilds its AI client when the content changed, so `rogatio ai setup` takes effect without a host restart and the card can never disagree with the client in force. The project schema carries no AI metadata; host config is the single source of truth.
 
-**7. Editor Hosting (`src/server/`, `src/commands/edit.ts`)**
+**8. Editor Hosting (`src/server/`, `src/commands/edit.ts`)**
 - `editor.html` is generated inline (`generateEditorHtml`) with embedded config (API base URL, CSRF token, file path) plus an import map
 - The import map maps `@rogatio/editor` to `/vendor/editor.js`, served by the CLI's own HTTP server
 - The `@rogatio/editor` browser bundle is resolved at runtime via `import.meta.resolve("@rogatio/editor")` and streamed from disk on `GET /vendor/editor.js` — no separate CLI browser build target is required
 - Editor instantiates via `createEditor(root, options)` with HTTP-based callbacks (`validate`, `save`, `onCancel`)
 
-**8. Utilities (`src/utils/`)**
-- `project-storage.ts`: CLI-owned `ProjectStorage` port (`list` / `get` / `create` / `import` / `update` / `delete`) plus the JSON-file adapter (`createJsonFileProjectStorage`). Path-as-id; atomic write (pretty JSON, mkdir, temp + rename). Production `edit` / `verify` / `test` / `runtime` and save use the port for file-backed I/O. This surface is separate from browser-core `ProjectRepository` / `StorageAdapter` (envelope store); the two are not unified.
+**9. Utilities (`src/utils/`)**
+- `project-storage.ts`: CLI-owned `ProjectStorage` port (`list` / `get` / `create` / `import` / `update` / `delete`) plus the JSON-file adapter (`createJsonFileProjectStorage`). Path-as-id; atomic write (pretty JSON, mkdir, temp + rename). Production `edit` / `verify` / `test` / `runtime` / `import` and save use the port for file-backed I/O. This surface is separate from browser-core `ProjectRepository` / `StorageAdapter` (envelope store); the two are not unified.
 - `file.ts`: thin façade re-exporting the port/adapter and retaining compat `readProject` / `writeProject` wrappers for tests.
 - `browser.ts`: cross-platform `open` with fallback handling
 

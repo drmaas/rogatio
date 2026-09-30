@@ -1,0 +1,23 @@
+[
+  {
+    "objectType": "rule",
+    "id": "Request_submit",
+    "name": "Rewrite submit",
+    "ruleType": "Request",
+    "status": "Active",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Equals",
+          "value": "https://example.com/submit",
+          "filters": {
+            "requestMethod": ["POST"],
+            "resourceType": ["xmlhttprequest"]
+          }
+        },
+        "request": { "type": "static", "value": "{\"sent\":true}" }
+      }
+    ]
+  }
+]
