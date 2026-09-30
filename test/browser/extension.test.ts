@@ -301,9 +301,9 @@ test("runtime card names an allowed_origins mismatch and the re-pin command", as
   await page.goto("/extension/index.html");
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
   await page.getByRole("button", { name: "Start runtime" }).click();
-  const runtimeCard = page.locator(".rogatio-sidebar-card", {
-    has: page.getByRole("heading", { name: "Runtime" }),
-  });
+  const runtimeCard = page.locator(
+    '.rogatio-sidebar-card[data-card="runtime"]',
+  );
   await expect(runtimeCard.locator("[data-runtime-error]")).toContainText(
     "allowed_origins",
   );
