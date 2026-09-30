@@ -22,7 +22,7 @@ Every build that contains the committed public `key` has one Chrome extension ID
 
 - Extension manifest test: the `key` derives to `RELEASE_EXTENSION_ID` (same bytes, same ID; the ID does not depend on a path).
 - Runtime test: empty-input vector `odlameecjipmbmbejkplpemijjgpljce`, plus the manifest key matches `RELEASE_EXTENSION_ID`.
-- Trust controller returns `allowedOrigins` from `verify`. The fixture host is `runtime-host.cmd` on Windows so `stat` reports the executable bit (extensionless names do not).
+- Trust controller returns `allowedOrigins` from `verify`. On Windows, Node does not report a Unix execute bit, so that fixture allows `binary-not-executable` and still requires the manifest, the host file, and CA trust.
 - CLI: `install` with no flag passes the release ID; an explicit ID still works; invalid IDs still exit 2; `verify` prints the mismatch command.
 - Service worker: a forbidden-host send failure returns `extension.native-host-origin-forbidden` and the re-pin command.
 - Browser journey: the runtime card and guidance show that command when the page is told the origin was rejected.

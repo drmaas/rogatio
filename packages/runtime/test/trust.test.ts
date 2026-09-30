@@ -463,11 +463,7 @@ describe(" trust controller lifecycle", () => {
 
 describe("verify allowed_origins", () => {
   it("reports the pinned origins so a different extension ID can be detected", async () => {
-    // Windows stat reports the executable bit only for .exe, .bat, .cmd, and .com.
-    const hostPath = join(
-      root,
-      process.platform === "win32" ? "runtime-host.cmd" : "runtime-host",
-    );
+    const hostPath = join(root, "runtime-host");
     const pinned = "abcdefghijklmnopabcdefghijklmnop";
     const controller = createRequestBodyTrustController({
       installRoot: root,
@@ -483,7 +479,17 @@ describe("verify allowed_origins", () => {
 
     const checked = await controller.verify();
     expect(checked.allowedOrigins).toEqual([`chrome-extension://${pinned}/`]);
-    expect(checked.ok).toBe(true);
+    expect(checked.manifestValid).toBe(true);
+    expect(checked.binaryExists).toBe(true);
+    expect(checked.caTrusted).toBe(true);
+    // Node's stat mode does not report a Unix execute bit on Windows, so
+    // verify records binary-not-executable there even after chmod 0o755.
+    const reasonsBesidesWindowsMode = checked.reasons.filter(
+      (reason) =>
+        !(process.platform === "win32" && reason === "binary-not-executable"),
+    );
+    expect(reasonsBesidesWindowsMode).toEqual([]);
+    if (process.platform !== "win32") expect(checked.ok).toBe(true);
     expect(extensionOriginListed(pinned, checked.allowedOrigins)).toBe(true);
 
     const other = "bcdefghijklmnopabcdefghijklmnopa";
