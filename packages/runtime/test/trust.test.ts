@@ -463,7 +463,11 @@ describe(" trust controller lifecycle", () => {
 
 describe("verify allowed_origins", () => {
   it("reports the pinned origins so a different extension ID can be detected", async () => {
-    const hostPath = join(root, "runtime-host");
+    // Windows stat reports the executable bit only for .exe, .bat, .cmd, and .com.
+    const hostPath = join(
+      root,
+      process.platform === "win32" ? "runtime-host.cmd" : "runtime-host",
+    );
     const pinned = "abcdefghijklmnopabcdefghijklmnop";
     const controller = createRequestBodyTrustController({
       installRoot: root,
@@ -472,7 +476,8 @@ describe("verify allowed_origins", () => {
       detectCapabilities: capable,
       caTrustInstaller: async () => {},
     });
-    await controller.install(pinned);
+    const installed = await controller.install(pinned);
+    expect(installed.ok).toBe(true);
     await writeFile(hostPath, "#!/bin/sh\nexit 0\n", "utf8");
     await chmod(hostPath, 0o755);
 
