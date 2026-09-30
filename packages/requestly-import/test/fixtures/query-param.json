@@ -1,0 +1,29 @@
+{
+  "rules": [
+    {
+      "objectType": "rule",
+      "id": "Query_ref",
+      "name": "Strip campaign params",
+      "ruleType": "QueryParam",
+      "status": "Active",
+      "pairs": [
+        {
+          "source": {
+            "key": "host",
+            "operator": "Equals",
+            "value": "example.com"
+          },
+          "modifications": [
+            { "type": "Remove", "param": "utm_source", "value": "" },
+            {
+              "type": "Add",
+              "param": "ref",
+              "value": "rogatio",
+              "actionWhenParamExists": "Overwrite"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -40,6 +40,10 @@ export default defineConfig({
         "packages/compiler/dist/node/index.js",
       ),
       "@rogatio/schema": resolve(root, "packages/schema/dist/node/index.js"),
+      "@rogatio/requestly-import": resolve(
+        root,
+        "packages/requestly-import/dist/node/index.js",
+      ),
       "@rogatio/editor": resolve(root, "packages/editor/dist/browser/index.js"),
       "@rogatio/runtime": resolve(root, "packages/runtime/dist/node/index.js"),
     },

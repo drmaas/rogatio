@@ -1,0 +1,30 @@
+[
+  {
+    "objectType": "rule",
+    "id": "Headers_debug",
+    "name": "Debug headers",
+    "ruleType": "Headers",
+    "status": "Active",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Contains",
+          "value": "https://example.com/api/",
+          "filters": [
+            {
+              "requestMethod": ["GET"],
+              "resourceType": ["xmlhttprequest"]
+            }
+          ]
+        },
+        "modifications": {
+          "Request": [{ "type": "Add", "header": "X-Debug", "value": "1" }],
+          "Response": [
+            { "type": "Remove", "header": "X-Frame-Options", "value": "" }
+          ]
+        }
+      }
+    ]
+  }
+]

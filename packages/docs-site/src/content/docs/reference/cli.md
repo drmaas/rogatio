@@ -1,9 +1,9 @@
 ---
 title: CLI reference
-description: The rogatio CLI commands edit, verify, test, runtime, and ai.
+description: The rogatio CLI commands edit, verify, test, runtime, ai, and import.
 ---
 
-The public CLI consists of `edit`, `verify`, `test`, `runtime`, and `ai`.
+The public CLI consists of `edit`, `verify`, `test`, `runtime`, `ai`, and `import`.
 
 ## `rogatio edit [path]`
 
@@ -51,6 +51,17 @@ Trust lifecycle and native-host entry (see [Local runtime](/guides/runtime/)):
 
 Start/stop of the runtime session itself is driven from the extension's **Start runtime** /
 **Stop runtime** controls; the CLI does not have a session lifecycle subcommand.
+
+## `rogatio import requestly <export.json>`
+
+Migrates a Requestly rule export into a version-2 `.rogatio.json` file. See
+[Migrating from Requestly](/guides/migrating-from-requestly/).
+
+- `--out <path>` writes that file (default `cwd/.rogatio.json`).
+- `--merge` appends imported groups onto an existing version-2 project. Without it, an existing file is left untouched.
+- `--json` prints the import report as JSON.
+- The mapped project is validated with the schema and compiler before anything is written.
+- Exit codes: `0` = written, `1` = validation failed (nothing written), `2` = usage, unreadable input, or refusal to overwrite.
 
 ## `rogatio ai <subcommand>`
 

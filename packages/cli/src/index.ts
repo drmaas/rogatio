@@ -4,12 +4,14 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { aiCommand } from "./commands/ai.js";
 import { editCommand } from "./commands/edit.js";
+import { importCommand } from "./commands/import.js";
 import { runRuntimeHostEntry, runtimeCommand } from "./commands/runtime.js";
 import { testCommand, testCommandNeedsStdin } from "./commands/test.js";
 import { verifyCommand } from "./commands/verify.js";
 import {
   showAIHelp,
   showEditHelp,
+  showImportHelp,
   showRuntimeHelp,
   showTestHelp,
   showVerifyHelp,
@@ -49,6 +51,8 @@ export async function cli(
       return handleRuntime(commandArgs);
     case "ai":
       return handleAI(commandArgs);
+    case "import":
+      return handleImport(commandArgs);
     case "--help":
     case "-h":
       return showHelp();
@@ -98,6 +102,14 @@ async function handleAI(args: string[]): Promise<number> {
   return await aiCommand(args);
 }
 
+async function handleImport(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    showImportHelp();
+    return 0;
+  }
+  return importCommand(args);
+}
+
 async function handleTest(args: string[]): Promise<number> {
   if (args.includes("--help") || args.includes("-h")) {
     showTestHelp();
@@ -131,6 +143,7 @@ Commands:
   edit [path]     Launch browser editor for .rogatio.json
   test [path] [url...]  Run offline dry-run tests against .rogatio.json
   verify [path]   Validate .rogatio.json file
+  import requestly <export.json>  Migrate a Requestly export into .rogatio.json
   runtime <install|uninstall|verify|host>  Native messaging runtime control
   runtime host [path]  Run the native-messaging runtime host
   ai <setup|ls|show|delete|test>  AI provider configuration

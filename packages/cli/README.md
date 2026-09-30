@@ -38,6 +38,7 @@ rogatio <command> [options]
 | --- | --- |
 | `rogatio edit [path]` | Launch the browser editor for `.rogatio.json`. `--port <n>` fixes the port; `--no-open` skips opening a browser. |
 | `rogatio verify [path]` | Validate a `.rogatio.json` file (schema + compiler). |
+| `rogatio import requestly <export.json>` | Migrate a Requestly export into `.rogatio.json`. `--out <path>` chooses the file (default `.rogatio.json`); `--merge` appends onto an existing project; `--json` prints the report. |
 | `rogatio test [path] [url...]` | Run offline dry-run tests against `.rogatio.json`. |
 | `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
 | `rogatio runtime <install\|uninstall\|verify>` | Register the native-messaging host with `install --extension-id <id>` and trust the device-local CA in one **transactional** call; it needs elevated privileges (Linux `sudo`, macOS keychain authorization, Windows Administrator) and rolls back with exit `1` and `trust unsupported: <reasons>` when a capability or elevation is missing. `uninstall` removes the host manifest, the device-local CA files, and the CA trust installation (idempotent). `verify` reports whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all valid. |

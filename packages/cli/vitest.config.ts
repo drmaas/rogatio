@@ -12,6 +12,10 @@ export default defineConfig({
       "@rogatio/dry-run": resolve(__dirname, "../dry-run/dist/node/index.js"),
       "@rogatio/compiler": resolve(__dirname, "../compiler/dist/node/index.js"),
       "@rogatio/schema": resolve(__dirname, "../schema/dist/node/index.js"),
+      "@rogatio/requestly-import": resolve(
+        __dirname,
+        "../requestly-import/dist/node/index.js",
+      ),
     },
   },
 });

@@ -1,0 +1,23 @@
+[
+  {
+    "objectType": "rule",
+    "id": "Response_data",
+    "name": "Mock data",
+    "ruleType": "Response",
+    "status": "Active",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Matches",
+          "value": "/^https:\\/\\/example\\.com\\/data\\.json$/"
+        },
+        "response": {
+          "type": "static",
+          "value": "{\"ok\":true}",
+          "statusCode": "200"
+        }
+      }
+    ]
+  }
+]

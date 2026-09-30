@@ -1,0 +1,18 @@
+{
+  "objectType": "rule",
+  "id": "Replace_api",
+  "name": "Staging API",
+  "ruleType": "Replace",
+  "status": "Active",
+  "pairs": [
+    {
+      "source": {
+        "key": "Url",
+        "operator": "Wildcard_Matches",
+        "value": "https://api.example.com/*"
+      },
+      "from": "api.example.com",
+      "to": "api.staging.example.com"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "objectType": "rule",
+    "id": "UserAgent_test",
+    "name": "Test agent",
+    "ruleType": "UserAgent",
+    "status": "Active",
+    "pairs": [
+      {
+        "source": {
+          "key": "Url",
+          "operator": "Contains",
+          "value": "example.com"
+        },
+        "envType": "custom",
+        "userAgent": "RogatioTest/1.0"
+      }
+    ]
+  }
+]

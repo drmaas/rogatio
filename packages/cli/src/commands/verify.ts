@@ -1,10 +1,9 @@
 import { resolve } from "node:path";
-import { compileProject } from "@rogatio/compiler";
-import { validateProjectDetailed } from "@rogatio/schema";
 import {
   createJsonFileProjectStorage,
   type ProjectStorage,
 } from "../utils/file.js";
+import { diagnoseProject } from "./diagnose.js";
 
 export interface VerifyCommandOptions {
   storage?: ProjectStorage;
@@ -68,41 +67,7 @@ async function verifyCommandImpl(
     return 2;
   }
 
-  // Schema validation
-  const schemaResult = validateProjectDetailed(projectData);
-  const diagnostics: Array<{
-    code: string;
-    severity: string;
-    path: string;
-    message: string;
-    params: Record<string, unknown>;
-  }> = [];
-
-  if (!schemaResult.valid) {
-    for (const error of schemaResult.errors) {
-      diagnostics.push({
-        code: `schema.${error.keyword}`,
-        severity: "error",
-        path: error.instancePath || "/",
-        message: error.message,
-        params: error.params,
-      });
-    }
-  } else {
-    // Compiler diagnostics
-    const compileResult = compileProject(schemaResult.data);
-    if (!compileResult.ok) {
-      for (const diag of compileResult.diagnostics) {
-        diagnostics.push({
-          code: diag.code,
-          severity: diag.severity,
-          path: diag.path,
-          message: diag.message,
-          params: diag.params,
-        });
-      }
-    }
-  }
+  const diagnostics = diagnoseProject(projectData).diagnostics;
 
   // Output
   let output = "";

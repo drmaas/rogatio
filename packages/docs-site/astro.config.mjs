@@ -51,6 +51,10 @@ export default defineConfig({
             { label: "Offline dry-run", link: "/guides/dry-run/" },
             { label: "Chrome extension", link: "/guides/extension/" },
             { label: "Local runtime", link: "/guides/runtime/" },
+            {
+              label: "Migrating from Requestly",
+              link: "/guides/migrating-from-requestly/",
+            },
           ],
         },
         {

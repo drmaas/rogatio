@@ -43,7 +43,14 @@ describe("CLI entry point", () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await cli(["--help"]);
     const output = consoleSpy.mock.calls.join("\n");
-    for (const command of ["edit", "test", "verify", "runtime", "ai"]) {
+    for (const command of [
+      "edit",
+      "test",
+      "verify",
+      "import",
+      "runtime",
+      "ai",
+    ]) {
       expect(output).toMatch(new RegExp(`^ {2}${command}\\b`, "m"));
     }
     expect(output).toContain("install|uninstall|verify|host");
