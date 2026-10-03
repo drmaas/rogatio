@@ -18,7 +18,10 @@ editor.
 ## Navigation and accessibility
 
 - In the CLI editor and extension Workspace: project destination, one destination per
-  group, **Test console**, and project-wide group/rule **search**.
+  group, **Test console**, and project-wide group/rule **search**. The CLI project page
+  still lists groups in place. The extension Workspace header shows the project name as
+  one breadcrumb, with the open group beside it, and puts the group menu on a bar under
+  that header.
 - The extension management shell also provides a **Dashboard** overview (including **Create using AI** when the native runtime is started and a provider is configured via `rogatio ai`) and a **Workspace** for rule editing. Workspace **AI Assist** uses the same native-host path when available; the CLI editor uses `rogatio edit`'s local `/api/ai/assist` route instead. When the draft has validation errors, AI Assist sends a **fix** request: the returned proposal repairs the offending rules in place (keeping their rule ids and positions) and the host validates the repaired project before accepting it — the extension rejects proposals that do not repair the project (`extension.ai-invalid-proposal`). Otherwise the proposal's rules are appended as new rules.
 - A contextual command bar (Validate / Save / Cancel, and Run test on Test console) and a
   desktop route rail; a compact mobile navigation. Add group sits on the Groups heading.

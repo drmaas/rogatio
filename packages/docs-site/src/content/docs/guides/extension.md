@@ -24,7 +24,12 @@ and **Import project** (a file picker that accepts any filename). The popup has 
 or rule-authoring controls.
 
 The management page uses a **Dashboard** overview and a **Workspace** editor shell. The
-Workspace sidebar is a set of cards. **Runtime** holds Start/Stop, the runtime status, the
+Workspace header keeps the active project name as one breadcrumb, and shows the open
+group beside it. **Refresh**, **Export project**, and **Remove project** sit with the
+group menu on a bar under that header. The Dashboard keeps its project cards and does
+not use this breadcrumb.
+
+The Workspace sidebar is a set of cards. **Runtime** holds Start/Stop, the runtime status, the
 extension ID, and a **Show diagnostics** control when the runtime has failed. When Chrome
 rejects the native host because that ID is not in `allowed_origins`, the card names the
 mismatch and shows the `rogatio runtime install` command that re-pins it. **AI** reports
