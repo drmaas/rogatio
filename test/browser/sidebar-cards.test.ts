@@ -225,6 +225,28 @@ test("sidebar renders runtime, AI, and rules cards in order", async ({
     aiFollowsRuntime: true,
     rulesFollowsAi: true,
   });
+
+  const placed = await page.evaluate(() => {
+    const railEl = document.querySelector("[data-desktop-route-rail]");
+    const searchEl = document.querySelector("[data-search-wrap]");
+    const crumbEl = document.querySelector("[data-route-breadcrumb]");
+    if (!railEl || !searchEl || !crumbEl) return null;
+    const railRect = railEl.getBoundingClientRect();
+    const searchRect = searchEl.getBoundingClientRect();
+    const crumbRect = crumbEl.getBoundingClientRect();
+    const padRight = Number.parseFloat(getComputedStyle(railEl).paddingRight);
+    return {
+      gapToRail: railRect.right - padRight - searchRect.right,
+      afterCrumb: searchRect.left - crumbRect.right,
+      searchWidth: searchRect.width,
+      railWidth: railRect.width,
+    };
+  });
+  expect(placed).not.toBeNull();
+  if (!placed) throw new Error("missing search placement");
+  expect(Math.abs(placed.gapToRail)).toBeLessThanOrEqual(1);
+  expect(placed.afterCrumb).toBeGreaterThan(16);
+  expect(placed.searchWidth).toBeLessThan(placed.railWidth / 2);
 });
 
 test("runtime card holds the session controls, status, and extension ID", async ({

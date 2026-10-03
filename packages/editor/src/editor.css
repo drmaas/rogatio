@@ -215,9 +215,9 @@
 }
 .rogatio-editor [data-search-wrap] {
   margin-left: auto;
-  flex: 1 1 12rem;
+  flex: 0 0 auto;
+  width: min(18rem, 100%);
   min-width: 0;
-  max-width: 100%;
 }
 .rogatio-editor [data-editor-main] {
   min-width: 0;
