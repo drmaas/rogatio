@@ -13,9 +13,10 @@ Test console, and the extension Workspace.
   resource type.
 - Previews a redirect destination, the resulting query, a header value, and a replace-mode
   request or response body, with `$1` through `$9` expanded from the matched URL.
-- In the editor, shows one sentence per matching rule. The rule name opens that rule.
-  Rules that did not match stay collapsed, each with one reason (URL pattern, method, or
-  resource type).
+- In the editor, matching rules sit under an open “1 rule matched”/“N rules matched”
+  heading with a green check, one sentence each. The rule name opens that rule. Rules
+  that did not match stay collapsed under a red-cross “N rules did not match” heading,
+  each with one reason (URL pattern, method, or resource type).
 
 ## What it never does
 

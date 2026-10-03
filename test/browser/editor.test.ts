@@ -729,6 +729,11 @@ test("runs one test, keeps misses collapsed, opens the named rule, and labels a 
   await page.locator("[data-test-urls]").fill("https://one.example/first");
   await page.getByRole("button", { name: "Run test", exact: true }).click();
 
+  const matches = page.locator("details[data-test-matches]");
+  await expect(matches).toHaveCount(1);
+  await expect(matches).toHaveAttribute("open");
+  await expect(matches.locator("summary")).toHaveText("2 rules matched");
+
   const misses = page.locator("details[data-test-misses]");
   await expect(misses).toHaveCount(1);
   await expect(misses).not.toHaveAttribute("open");

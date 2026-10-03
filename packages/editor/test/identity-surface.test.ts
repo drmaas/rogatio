@@ -685,6 +685,11 @@ describe("test console result rows", () => {
       { groupId: "group-one", ruleId: "rule-two", matched: false },
     ]);
     expect(ruleLinks(root)).toEqual(["First rule", "Second rule"]);
+    const matches = root.querySelector("details[data-test-matches]");
+    expect(matches?.hasAttribute("open")).toBe(true);
+    expect(matches?.querySelector("summary")?.textContent).toBe(
+      "1 rule matched",
+    );
     const misses = root.querySelector("details[data-test-misses]");
     expect(misses?.querySelector("summary")?.textContent).toBe(
       "1 rule did not match",
