@@ -108,7 +108,7 @@ export interface PopupModel {
    */
   readonly createProject: (name: string) => Promise<boolean>;
   /**
-   * Imports a parsed `.rogatio.json` value through the existing
+   * Imports a parsed project file through the existing
    * `import-project` lifecycle. Returns whether the service worker accepted
    * the command; the repository validates the data and fails closed.
    */

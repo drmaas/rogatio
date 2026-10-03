@@ -25,7 +25,7 @@ The typical workflow is:
 3. Import the file into Chrome, review the complete project, and enable groups when ready.
 4. Explicitly enable the required groups.
 5. Start the local runtime from the extension's **Start runtime** control when response-body rules or request-body rules require one. Stop it from the extension's **Stop runtime** control when done.
-6. Use the browser normally, inspect visible rule statuses, and export the browser project if browser-side edits should replace the repository file.
+6. Use the browser normally, inspect visible rule statuses, and export the browser project if browser-side edits should replace the repository file. Import accepts any filename and checks the contents. Export suggests `.rogatio.json`, which is also the file the CLI looks for when no path is given.
 
 The CLI and Chrome extension share one accessible, framework-free editor. Users can edit project metadata; create, copy, and remove groups; create, copy, reorder, and remove rules; convert URLs to exact-match regular expressions; validate, save, cancel unsaved changes; and inspect field-level errors. The responsive workspace provides a Project destination, one destination per group, a Test console destination, project-wide group/rule search, a contextual command bar, desktop route rail, and compact mobile navigation. Entity actions (add group, add/copy rule, rule reorder/remove, copy/remove group) sit next to their content, and project and group actions repeat at the bottom of a long group or test page. It supports keyboard use, screen readers, narrow layouts, forced colors, and 200% zoom.
 

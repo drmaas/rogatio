@@ -5,17 +5,25 @@ description: The rogatio CLI commands edit, verify, test, runtime, ai, and impor
 
 The public CLI consists of `edit`, `verify`, `test`, `runtime`, `ai`, and `import`.
 
+`edit`, `verify`, and `test` accept a project file with any filename. When the path is
+omitted they look for `.rogatio.json` in the current directory. A directory listing
+includes that file, `*.rogatio.json`, and any other `*.json` file that validates as a
+Rogatio project. Other JSON, such as `package.json`, is left out.
+
 ## `rogatio edit [path]`
 
 Starts a local editor server (bound to `127.0.0.1`, random port) and opens the shared
-editor in your browser. Edits are validated and saved back to the `.rogatio.json` file.
+editor in your browser. Edits are validated and saved back to the file that was opened.
+Any filename is accepted. When `path` is omitted, the CLI looks for `.rogatio.json`
+in the current directory.
+
 The session is local-only and short-lived; file access is confined to the target path.
 Use `--port <n>` to fix the port and `--no-open` to start the server without launching
 a browser (prints the editor URL instead).
 
 ## `rogatio verify [path]`
 
-Validates a `.rogatio.json` file (default `cwd/.rogatio.json`, or `-` for stdin):
+Validates a project file (any filename; default `cwd/.rogatio.json`, or `-` for stdin):
 
 - Runs schema validation, then compiler validation.
 - Human-readable output by default; `--json` for machine-readable structured diagnostics.
@@ -23,8 +31,9 @@ Validates a `.rogatio.json` file (default `cwd/.rogatio.json`, or `-` for stdin)
 
 ## `rogatio test [path]`
 
-Runs the offline dry-run test engine against a `.rogatio.json` file (see
-[Dry-run testing](/guides/dry-run/)). Accepts `--urls` (comma-separated), `--urls-file`
+Runs the offline dry-run test engine against a project file (any filename; default
+`cwd/.rogatio.json`). See [Dry-run testing](/guides/dry-run/). Accepts `--urls`
+(comma-separated), `--urls-file`
 (JSON array path or `-` for stdin), optional `--method` / `--resource-type` defaults, and
 `--max-cases` (default 256); `--json` for machine-readable output.
 

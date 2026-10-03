@@ -15,6 +15,12 @@ import {
   readMatchLoggingEnabledFromStorageResult,
 } from "./match-logging-enabled.js";
 import { createMatchLoggingToggle } from "./match-logging-toggle.js";
+import {
+  projectImportFailure,
+  type SaveFilePickerOptions,
+  type ShowSaveFilePicker,
+  saveExportedProject,
+} from "./project-file.js";
 import { runtimeControlDisabled } from "./runtime-controls.js";
 import { shouldRemountEditorAfterGroupEnablement } from "./workspace-enablement-refresh.js";
 
@@ -1041,13 +1047,13 @@ function renderOverview(shell: HTMLElement): void {
   importTitle.textContent = "Import Project";
   const importHint = document.createElement("span");
   importHint.className = "rogatio-create-hint";
-  importHint.textContent = "Open a .rogatio.json project from your device.";
+  importHint.textContent =
+    "Open a project file from your device. Any filename works.";
   importCard.append(importIcon, importTitle, importHint);
   creationGrid.append(importCard);
 
   const dashboardImportInput = document.createElement("input");
   dashboardImportInput.type = "file";
-  dashboardImportInput.accept = ".json,.rogatio.json,application/json";
   dashboardImportInput.hidden = true;
   dashboardImportInput.dataset.importInput = "true";
   overview.append(dashboardImportInput);
@@ -1527,7 +1533,6 @@ function importInput(): HTMLInputElement {
   if (input) return input;
   const created = document.createElement("input");
   created.type = "file";
-  created.accept = ".json,.rogatio.json,application/json";
   created.hidden = true;
   created.dataset.importInput = "true";
   created.addEventListener("change", () => void importProject(created));
@@ -1564,15 +1569,20 @@ async function importProject(input: HTMLInputElement): Promise<void> {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text()) as unknown;
-    const response = await client.send({
-      version: 1,
-      command: "import-project",
-      data,
-    });
-    statusMessage =
-      response.ok === true
-        ? "Project imported."
-        : "The project could not be imported.";
+    const rejection = projectImportFailure(data);
+    if (rejection !== null) {
+      statusMessage = rejection;
+    } else {
+      const response = await client.send({
+        version: 1,
+        command: "import-project",
+        data,
+      });
+      statusMessage =
+        response.ok === true
+          ? "Project imported."
+          : "The project could not be imported.";
+    }
   } catch {
     statusMessage = "The selected file is not valid JSON.";
   }
@@ -1979,17 +1989,42 @@ async function exportProject(): Promise<void> {
     renderShell();
     return;
   }
-  const blob = new Blob([JSON.stringify(response.value, null, 2)], {
-    type: "application/json",
-  });
+  const contents = JSON.stringify(response.value, null, 2);
+  try {
+    const result = await saveExportedProject({
+      contents,
+      showSaveFilePicker: saveFilePicker(),
+      promptFilename: (suggested) =>
+        window.prompt("Save project as", suggested),
+      download: downloadProjectFile,
+    });
+    if (result.status === "cancelled") return;
+    statusMessage = "Project exported.";
+  } catch {
+    statusMessage = "The project could not be exported.";
+  }
+  renderShell();
+}
+
+function saveFilePicker(): ShowSaveFilePicker | undefined {
+  const candidate = (window as unknown as { showSaveFilePicker?: unknown })
+    .showSaveFilePicker;
+  if (typeof candidate !== "function") return undefined;
+  const picker = candidate as (
+    this: typeof window,
+    options?: SaveFilePickerOptions,
+  ) => ReturnType<ShowSaveFilePicker>;
+  return (options) => picker.call(window, options);
+}
+
+function downloadProjectFile(contents: string, filename: string): void {
+  const blob = new Blob([contents], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${text(state.projects[projectId]?.name, "rogatio")}.rogatio.json`;
+  anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
-  statusMessage = "Project exported.";
-  renderShell();
 }
 
 async function removeProject(): Promise<void> {

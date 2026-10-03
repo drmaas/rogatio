@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createJsonFileProjectStorage,
   ProjectFileError,
@@ -309,6 +309,11 @@ describe("ProjectStorage (JSON-file)", () => {
     it("returns an empty list when scope has no matching files", async () => {
       await writeFile(join(testDir, "readme.txt"), "nope", "utf-8");
       await writeFile(join(testDir, "other.json"), "{}", "utf-8");
+      await writeFile(
+        join(testDir, "package.json"),
+        JSON.stringify({ name: "rogatio", version: "1.2.3", private: true }),
+        "utf-8",
+      );
       await expect(storage.list(testDir)).resolves.toEqual([]);
     });
 
@@ -382,6 +387,55 @@ describe("ProjectStorage (JSON-file)", () => {
 
     it("returns an empty list when scope is an empty string", async () => {
       await expect(storage.list("")).resolves.toEqual([]);
+    });
+
+    it("lists any .json file whose contents validate, and skips non-projects", async () => {
+      const staging = join(testDir, "staging.json");
+      const legacy = join(testDir, "legacy.json");
+      const extensionless = join(testDir, "checkout-mocks");
+      const broken = join(testDir, "broken.json");
+      const polluted = join(testDir, "polluted.json");
+      const project = { version: 2, name: "Staging", groups: [] };
+      await writeFile(staging, JSON.stringify(project), "utf-8");
+      await writeFile(
+        legacy,
+        JSON.stringify({ version: 1, name: "Legacy", groups: [] }),
+        "utf-8",
+      );
+      await writeFile(
+        extensionless,
+        JSON.stringify({ version: 2, name: "Hidden", groups: [] }),
+        "utf-8",
+      );
+      await writeFile(broken, "{", "utf-8");
+      await writeFile(
+        polluted,
+        '{"version":2,"name":"Polluted","groups":[],"__proto__":{"admin":true}}',
+        "utf-8",
+      );
+
+      const errorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
+      const refs = await storage.list(testDir);
+      errorSpy.mockRestore();
+
+      expect(refs).toEqual(
+        expect.arrayContaining([
+          { id: staging, name: "Staging" },
+          { id: legacy, name: "Legacy" },
+        ]),
+      );
+      expect(refs).toHaveLength(2);
+      expect(refs.map((ref) => ref.id)).not.toContain(extensionless);
+      expect(refs.map((ref) => ref.id)).not.toContain(broken);
+      expect(refs.map((ref) => ref.id)).not.toContain(polluted);
+      expect(Object.hasOwn(Object.prototype, "admin")).toBe(false);
+      await expect(storage.get(extensionless)).resolves.toEqual({
+        version: 2,
+        name: "Hidden",
+        groups: [],
+      });
     });
   });
 

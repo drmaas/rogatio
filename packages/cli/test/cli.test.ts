@@ -23,6 +23,20 @@ describe("CLI entry point", () => {
     consoleSpy.mockRestore();
   });
 
+  it("describes any project filename and the .rogatio.json default", async () => {
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    await cli(["edit", "--help"]);
+    await cli(["verify", "--help"]);
+    await cli(["test", "--help"]);
+    await cli(["--help"]);
+    const output = consoleSpy.mock.calls
+      .map((call) => String(call[0]))
+      .join("\n");
+    expect(output).toContain("any filename");
+    expect(output).toContain(".rogatio.json");
+    consoleSpy.mockRestore();
+  });
+
   it("shows help for runtime command", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await cli(["runtime", "--help"]);

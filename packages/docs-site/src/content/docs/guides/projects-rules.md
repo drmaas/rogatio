@@ -3,8 +3,10 @@ title: Projects & rules
 description: How Rogatio organizes projects, groups, and rules in .rogatio.json.
 ---
 
-Rogatio stores everything in a single version-controlled `.rogatio.json` file. The file is
-the source of truth; the browser holds a copy that you import or export explicitly.
+Rogatio stores everything in a single version-controlled project file. `.rogatio.json` is
+the default name: it is what export suggests, and what the CLI looks for when you omit a
+path. Import and export also accept any other filename. The file is the source of truth;
+the browser holds a copy that you import or export explicitly.
 
 ## Projects
 

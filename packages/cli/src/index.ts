@@ -140,10 +140,10 @@ function showHelp(): number {
 Usage: rogatio <command> [options]
 
 Commands:
-  edit [path]     Launch browser editor for .rogatio.json
-  test [path] [url...]  Run offline dry-run tests against .rogatio.json
-  verify [path]   Validate .rogatio.json file
-  import requestly <export.json>  Migrate a Requestly export into .rogatio.json
+  edit [path]     Launch browser editor (default: .rogatio.json; any filename)
+  test [path] [url...]  Run offline dry-run tests (default: .rogatio.json; any filename)
+  verify [path]   Validate a project file (default: .rogatio.json; any filename)
+  import requestly <export.json>  Migrate a Requestly export (default --out: .rogatio.json)
   runtime <install|uninstall|verify|host>  Native messaging runtime control
   runtime host [path]  Run the native-messaging runtime host
   ai <setup|ls|show|delete|test>  AI provider configuration
