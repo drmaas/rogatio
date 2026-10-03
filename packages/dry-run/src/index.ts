@@ -1,4 +1,5 @@
 export { dryRunProject } from "./dryrun.js";
+export { previewRuleAction } from "./preview.js";
 export type {
   ActionPreview,
   DryRunError,

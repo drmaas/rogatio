@@ -2,6 +2,7 @@ import {
   type AIAssistRequest,
   type AIProposal,
   createEditor,
+  type DryRunResult,
   type EditorController,
 } from "@rogatio/editor";
 import { attentionFromRuleStatuses } from "./attention.js";
@@ -45,6 +46,65 @@ interface ExtensionResponse {
   readonly ok?: boolean;
   readonly value?: unknown;
   readonly diagnostic?: { readonly code?: string };
+  readonly diagnostics?: readonly {
+    readonly code?: string;
+    readonly path?: string;
+    readonly message?: string;
+  }[];
+}
+
+function isDryRunValue(value: unknown): value is DryRunResult {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  const summary = record.summary;
+  return (
+    Array.isArray(record.results) &&
+    Array.isArray(record.errors) &&
+    typeof summary === "object" &&
+    summary !== null &&
+    typeof (summary as { matchedUrlCount?: unknown }).matchedUrlCount ===
+      "number" &&
+    typeof (summary as { urlCount?: unknown }).urlCount === "number"
+  );
+}
+
+function dryRunDiagnostics(response: ExtensionResponse | undefined): {
+  code: string;
+  severity: "error";
+  path: string;
+  message: string;
+}[] {
+  const source = Array.isArray(response?.diagnostics)
+    ? response.diagnostics
+    : [];
+  const diagnostics = [];
+  for (const item of source) {
+    if (!item || typeof item !== "object") continue;
+    if (
+      typeof item.code !== "string" ||
+      typeof item.path !== "string" ||
+      typeof item.message !== "string"
+    ) {
+      continue;
+    }
+    diagnostics.push({
+      code: item.code,
+      severity: "error" as const,
+      path: item.path,
+      message: item.message,
+    });
+  }
+  if (diagnostics.length > 0) return diagnostics;
+  return [
+    {
+      code: response?.diagnostic?.code ?? "extension.project-invalid",
+      severity: "error" as const,
+      path: "",
+      message: "The project could not be tested.",
+    },
+  ];
 }
 
 interface MessageClient {
@@ -1606,6 +1666,22 @@ function renderShell(): void {
               response?.diagnostic?.code === "extension.conflict"
                 ? "The committed project changed. Refresh before saving."
                 : "The project could not be saved.",
+          };
+        },
+        dryRun: async (draft, cases, options) => {
+          const response = await client.send({
+            version: 1,
+            command: "dry-run",
+            project: draft,
+            cases,
+            options,
+          });
+          if (response?.ok === true && isDryRunValue(response.value)) {
+            return response.value;
+          }
+          return {
+            ok: false as const,
+            diagnostics: dryRunDiagnostics(response),
           };
         },
         ...(aiSupported

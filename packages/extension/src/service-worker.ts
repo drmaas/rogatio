@@ -21,6 +21,7 @@ import {
   extensionDiagnostic,
 } from "./diagnostics.js";
 import type { DnrInstallError, DnrInstallerWithMatchIndex } from "./dnr.js";
+import { runExtensionDryRun } from "./dry-run-command.js";
 import {
   isNativeHostOriginForbiddenMessage,
   nativeHostOriginMismatchMessage,
@@ -107,6 +108,12 @@ type Failure = {
   readonly diagnostic: ExtensionDiagnostic;
   readonly kind?: "conflict";
   readonly current?: unknown;
+  readonly diagnostics?: readonly {
+    readonly code: string;
+    readonly severity: "error";
+    readonly path: string;
+    readonly message: string;
+  }[];
 };
 export type ApplicationResponse = Success | Failure;
 
@@ -411,6 +418,26 @@ export function createExtensionApplication(
     const data = request as Record<string, unknown>;
     if (request.command === "get-state" || request.command === "refresh") {
       return state();
+    }
+    if (request.command === "dry-run") {
+      const project = data.project;
+      if (
+        typeof project !== "object" ||
+        project === null ||
+        Array.isArray(project) ||
+        !Array.isArray(data.cases)
+      ) {
+        return failure("extension.invalid-message");
+      }
+      const outcome = runExtensionDryRun(project, data.cases, data.options);
+      if (!outcome.ok) {
+        return {
+          ok: false,
+          diagnostic: extensionDiagnostic("extension.project-invalid"),
+          diagnostics: outcome.diagnostics,
+        };
+      }
+      return { ok: true, value: outcome.result };
     }
     if (request.command === "check-ai-support") {
       if (

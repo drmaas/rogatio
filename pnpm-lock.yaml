@@ -304,6 +304,9 @@ importers:
       '@rogatio/compiler':
         specifier: workspace:*
         version: link:../compiler
+      '@rogatio/dry-run':
+        specifier: workspace:*
+        version: link:../dry-run
       '@rogatio/editor':
         specifier: workspace:*
         version: link:../editor

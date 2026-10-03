@@ -19,7 +19,7 @@ file `docs/architecture.md`. This page is the short user-facing summary.
 | `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (3-dim matching: source, method, resource type; preview seam). |
 | `@rogatio/runtime` | Bounded response-body and request-body transformation/runtime components (native host). |
 | `@rogatio/cli` | Editor host, file verification, dry-run (`test`), AI config (`ai`), runtime dispatch (`install` / `uninstall` / `verify` / `host`). |
-| `@rogatio/extension` | Chrome MV3 service worker, popup, management page, DNR projection, native-session bridge. |
+| `@rogatio/extension` | Chrome MV3 service worker, popup, management page, DNR projection, native-session bridge. The service worker runs the Test console `dry-run` command; the management page does not bundle that package. |
 | `@rogatio/docs-site` | Astro + Starlight static documentation site (this site); off the product package DAG. |
 | `@rogatio/smoke` / `@rogatio/sanity` | Tiny workspace stubs for package wiring checks (not browser e2e fixtures). |
 

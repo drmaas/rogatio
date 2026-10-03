@@ -154,6 +154,7 @@ const targets: BuildTarget[] = [
         "packages/browser-core/src/index.ts",
       ),
       "@rogatio/editor": resolve(root, "packages/editor/src/index.ts"),
+      "@rogatio/dry-run": resolve(root, "packages/dry-run/src/index.ts"),
     },
     requireExports: false,
   },

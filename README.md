@@ -45,9 +45,10 @@ supported) an HTTP method.
   POST/PUT/PATCH XHR bodies, via native messaging to a local runtime. Replace bodies can
   use `$1`–`$9` URL captures; regex-mode `$1`–`$9` remain body captures.
 
-Every rule can be dry-run against a bounded batch of URLs before saving. The offline check
-reports source, method, and resource-type results, plus substituted action previews,
-without contacting the target or changing installed rules.
+Every rule can be dry-run against a bounded batch of URLs before saving. `rogatio test`
+reports the URL pattern, method, and resource type, plus substituted action previews.
+The editor Test console checks the same draft as a page load (GET) and says what the
+browser would do. Nothing is contacted, and nothing is saved.
 
 ## CLI
 

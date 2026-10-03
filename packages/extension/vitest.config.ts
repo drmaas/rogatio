@@ -13,6 +13,7 @@ export default defineConfig({
         "browser-core/src/index.ts",
       ),
       "@rogatio/editor": resolve(packageRoot, "editor/src/index.ts"),
+      "@rogatio/dry-run": resolve(packageRoot, "dry-run/src/index.ts"),
     },
   },
   test: {

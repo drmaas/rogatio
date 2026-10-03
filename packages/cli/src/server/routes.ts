@@ -2,10 +2,9 @@ import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
-import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
-import { dryRunProject } from "@rogatio/dry-run";
+import { dryRunProject, previewRuleAction } from "@rogatio/dry-run";
 import type {
   AIClient,
   AICompletionOptions,
@@ -114,21 +113,6 @@ function bodyErrorResponse(error: unknown): {
     status: 400,
     body: { code: "invalid-json", message: "Invalid JSON body" },
   };
-}
-
-function toMatcherOperations(
-  operations: readonly RogatioOperation[],
-): readonly MatcherOperation[] {
-  return operations.map(
-    ({ groupId, ruleId, name, matcher, redactSensitiveInLogs }) => ({
-      kind: "matcher",
-      groupId,
-      ruleId,
-      name,
-      matcher,
-      redactSensitiveInLogs,
-    }),
-  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -532,10 +516,19 @@ export function createRoutes(context: RouteContext) {
         return;
       }
 
+      const requested =
+        isRecord(body.options) &&
+        typeof body.options.maxCases === "number" &&
+        Number.isSafeInteger(body.options.maxCases) &&
+        body.options.maxCases > 0
+          ? body.options.maxCases
+          : undefined;
+      const options: DryRunOptions = { previewAction: previewRuleAction };
+      if (requested !== undefined) options.maxCases = requested;
       const result = dryRunProject(
-        toMatcherOperations(compileResult.operations),
+        compileResult.operations,
         body.cases as DryRunTestCase[],
-        (body.options as DryRunOptions | undefined) ?? {},
+        options,
       );
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(result));

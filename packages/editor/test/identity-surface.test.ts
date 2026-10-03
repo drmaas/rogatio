@@ -641,10 +641,10 @@ describe("test console result rows", () => {
     await Promise.resolve();
   }
 
-  function rowLabels(root: HTMLElement): string[] {
-    return Array.from(
-      root.querySelectorAll("[data-test-rule-header] strong"),
-    ).map((node) => node.textContent ?? "");
+  function ruleLinks(root: HTMLElement): string[] {
+    return Array.from(root.querySelectorAll("[data-test-rule-link]")).map(
+      (node) => node.textContent ?? "",
+    );
   }
 
   it("identifies a matched rule by group name and rule name", async () => {
@@ -653,7 +653,8 @@ describe("test console result rows", () => {
     await runTest(root, [
       { groupId: "group-one", ruleId: "rule-one", matched: true },
     ]);
-    expect(rowLabels(root)).toEqual(["One / First rule"]);
+    expect(ruleLinks(root)).toEqual(["First rule"]);
+    expect(root.textContent).toContain("in One / ");
   });
 
   it("falls back to the rule id when the rule is not in the draft", async () => {
@@ -662,7 +663,8 @@ describe("test console result rows", () => {
     await runTest(root, [
       { groupId: "group-one", ruleId: "rule-gone", matched: true },
     ]);
-    expect(rowLabels(root)).toEqual(["One / rule-gone"]);
+    expect(ruleLinks(root)).toEqual(["rule-gone"]);
+    expect(root.textContent).toContain("in One / ");
   });
 
   it("falls back to the id pair when the group is not in the draft", async () => {
@@ -671,17 +673,24 @@ describe("test console result rows", () => {
     await runTest(root, [
       { groupId: "group-z", ruleId: "rule-one", matched: true },
     ]);
-    expect(rowLabels(root)).toEqual(["group-z/rule-one"]);
+    expect(ruleLinks(root)).toEqual(["group-z/rule-one"]);
   });
 
-  it("labels two rules in different groups separately", async () => {
+  it("keeps a non-matching rule collapsed under its group", async () => {
     const root = document.createElement("div");
     document.body.append(root);
     await runTest(root, [
       { groupId: "group-one", ruleId: "rule-one", matched: true },
       { groupId: "group-one", ruleId: "rule-two", matched: false },
     ]);
-    expect(rowLabels(root)).toEqual(["One / First rule", "One / Second rule"]);
+    expect(ruleLinks(root)).toEqual(["First rule", "Second rule"]);
+    const misses = root.querySelector("details[data-test-misses]");
+    expect(misses?.querySelector("summary")?.textContent).toBe(
+      "1 rule did not match",
+    );
+    expect(misses?.hasAttribute("open")).toBe(false);
+    expect(misses?.textContent).toContain("Second rule");
+    expect(misses?.textContent).toContain("URL pattern");
   });
 });
 

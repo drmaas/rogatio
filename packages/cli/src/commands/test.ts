@@ -1,14 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { NormalizedMatcher, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
-import { dryRunProject, parseTestUrl } from "@rogatio/dry-run";
 import {
-  matchUrlCaptures,
-  substituteUrlCaptures,
-  validateProjectDetailed,
-} from "@rogatio/schema";
+  dryRunProject,
+  parseTestUrl,
+  previewRuleAction,
+} from "@rogatio/dry-run";
+import { validateProjectDetailed } from "@rogatio/schema";
 import {
   createJsonFileProjectStorage,
   type ProjectStorage,
@@ -33,75 +32,6 @@ interface Diagnostic {
 
 function usageError(message: string): string {
   return `Error: ${message}\n`;
-}
-
-function captureSubject(
-  matcher: NormalizedMatcher,
-  url: string,
-): string | null {
-  if (matcher.source.key === "url") return url;
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return null;
-  }
-}
-
-function previewAction(
-  operation: RogatioOperation,
-  url: string,
-): { kind: string; summary: string } | null {
-  const subject = captureSubject(operation.matcher, url);
-  if (subject === null) return null;
-  const captures = matchUrlCaptures(operation.matcher.source.value, subject);
-  if (captures === null) return null;
-  const expand = (value: string): string =>
-    substituteUrlCaptures(value, captures);
-  if (operation.kind === "redirect") {
-    return {
-      kind: "redirect",
-      summary: expand(operation.redirect.destination),
-    };
-  }
-  if (operation.kind === "query") {
-    const values = operation.action.params
-      .map((param) =>
-        param.operation === "remove"
-          ? `${param.name}=<removed>`
-          : `${param.name}=${expand(param.value ?? "")}`,
-      )
-      .join(", ");
-    return { kind: "query", summary: values };
-  }
-  if (operation.kind === "header") {
-    if (operation.header.operation === "remove") {
-      return { kind: "header", summary: `${operation.header.name}=<removed>` };
-    }
-    return {
-      kind: "header",
-      summary: `${operation.header.name}=${expand(operation.header.value ?? "")}`,
-    };
-  }
-  if (
-    operation.kind === "request-body" &&
-    operation.requestBody.mode === "replace"
-  ) {
-    return {
-      kind: operation.kind,
-      summary: expand(operation.requestBody.body),
-    };
-  }
-  if (
-    operation.kind === "response-body" &&
-    "mode" in operation.responseBody &&
-    operation.responseBody.mode === "replace"
-  ) {
-    return {
-      kind: operation.kind,
-      summary: expand(operation.responseBody.body),
-    };
-  }
-  return null;
 }
 
 function isUrl(value: string): boolean {
@@ -177,7 +107,7 @@ function addDefaults(
 }
 
 function resultOptions(maxCases: number | undefined): DryRunOptions {
-  const options: DryRunOptions = { previewAction };
+  const options: DryRunOptions = { previewAction: previewRuleAction };
   if (maxCases !== undefined) options.maxCases = maxCases;
   return options;
 }
