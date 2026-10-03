@@ -853,6 +853,80 @@ body {
   color: var(--rogatio-muted);
   font-size: 0.875rem;
 }
+.rogatio-ai-preview-details {
+  display: grid;
+  gap: 0.5rem;
+}
+.rogatio-ai-preview-description {
+  margin: 0;
+  color: var(--rogatio-muted);
+  font-size: 0.875rem;
+}
+.rogatio-ai-preview-list,
+.rogatio-ai-preview-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.rogatio-ai-preview-list {
+  max-height: 24rem;
+  overflow: auto;
+}
+.rogatio-ai-preview-group details {
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface);
+  padding: 0.5rem 0.65rem;
+}
+.rogatio-ai-preview-group summary {
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.rogatio-ai-preview-count {
+  color: var(--rogatio-muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+.rogatio-ai-preview-rule {
+  border-top: 1px solid var(--rogatio-border);
+  padding-top: 0.5rem;
+  display: grid;
+  gap: 0.25rem;
+}
+.rogatio-ai-preview-rule-title {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.rogatio-ai-preview-type {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  color: var(--rogatio-muted);
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  padding: 0.05rem 0.35rem;
+}
+.rogatio-ai-preview-source code,
+.rogatio-ai-preview-action {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.rogatio-ai-preview-source code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.8rem;
+}
+.rogatio-ai-preview-meta,
+.rogatio-ai-preview-omitted {
+  color: var(--rogatio-muted);
+  font-size: 0.8rem;
+}
 
 @media (forced-colors: active) {
   .rogatio-create-ai,
