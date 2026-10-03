@@ -18,7 +18,7 @@ Branch: `cursor/test-console-e906`
 - [x] Unit tests: CLI route, extension command, default GET/`main_frame` case, editor render after an invalid draft.
 - [x] Browser tests: one Run test control, collapsed misses, rule-name navigation, disabled-group label.
 - [x] Update the quick start, the dry-run guide, and the architecture editor section.
-- [ ] `pnpm validate` passes.
+- [x] `pnpm validate` passes.
 
 ## Notes
 
