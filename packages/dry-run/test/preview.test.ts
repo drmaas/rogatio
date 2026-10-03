@@ -146,7 +146,11 @@ describe("previewRuleAction", () => {
     );
     expect(result.results[0]?.rules[0]).toMatchObject({
       matched: false,
-      actionPreview: null,
+      method: { state: "unmatched" },
+      actionPreview: {
+        kind: "redirect",
+        summary: "https://example.com/new/",
+      },
     });
     const matched = dryRunProject(
       compiled.operations,
