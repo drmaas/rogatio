@@ -124,6 +124,15 @@ describe("extension AI project generation", () => {
         type: "ai.complete",
         metadata: expect.objectContaining({
           responseFormat: { type: "json_object" },
+          messages: [
+            expect.objectContaining({
+              role: "system",
+              content: expect.stringMatching(
+                /version \(integer 2\).*Do not put a rules array on the project root.*csp_report.*Do not emit fetch/s,
+              ),
+            }),
+            expect.objectContaining({ role: "user" }),
+          ],
         }),
       }),
     );

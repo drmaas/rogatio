@@ -339,18 +339,7 @@ if (AI_LIVE) {
 
         await generateWithRetry(
           page,
-          "Return a Rogatio version-1 project as exactly one JSON object " +
-            "with keys: version (number, 1), name (string), groups (array). " +
-            "Each group: id (string), name (string), origins (array of origin " +
-            "strings), rules (array). Each rule: id (string), name (string), " +
-            "urlRegex (string), origins (array), resourceTypes (array; use " +
-            'exactly ["main_frame"]), priority (number), type "redirect", and ' +
-            "redirect (object with key destination, a string). No other keys " +
-            'anywhere. Create a project named "Live AI demo" with one group ' +
-            'with id "demo-group" and name "demo" whose origins are ' +
-            '["http://localhost:8080"] containing exactly one redirect rule ' +
-            'with id "demo-rule" that matches "^http://localhost:8080/old/" ' +
-            'and redirects to "http://localhost:8080/new/".',
+          "redirect example.com/docs to the new guide",
         );
 
         const preview = page.locator(".rogatio-ai-preview");

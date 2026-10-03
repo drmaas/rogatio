@@ -14,7 +14,12 @@ import {
   parseAIProposal,
   repairProposalIntoProject,
 } from "./ai-assist.js";
-import { PROJECT_VERSION, validateProjectDetailed } from "./browser-schema.js";
+import {
+  HTTP_METHODS,
+  PROJECT_VERSION,
+  RESOURCE_TYPES,
+  validateProjectDetailed,
+} from "./browser-schema.js";
 import type { ChromeApi } from "./chrome.js";
 import {
   type ExtensionDiagnostic,
@@ -138,8 +143,51 @@ function stringValue(value: unknown): string | undefined {
 }
 
 const MAX_AI_PROMPT_LENGTH = 4000;
-const AI_GENERATION_SYSTEM_PROMPT =
-  'Return only one complete Rogatio version-2 JSON project. Each rule requires source: { key: "url"|"host", operator: "regex", value: string }. Do not include group or rule origins, urlRegex, markdown, commentary, credentials, or unknown properties.';
+const AI_GENERATION_EXAMPLE = {
+  version: 2,
+  name: "Docs redirect",
+  groups: [
+    {
+      id: "grp-docs",
+      name: "Docs",
+      rules: [
+        {
+          id: "rule-docs",
+          name: "Redirect docs",
+          source: {
+            key: "url",
+            operator: "regex",
+            value: "^https://example\\.com/docs",
+          },
+          resourceTypes: ["main_frame"],
+          priority: 100,
+          type: "redirect",
+          redirect: { destination: "https://example.com/guide" },
+        },
+      ],
+    },
+  ],
+} as const;
+const AI_GENERATION_SYSTEM_PROMPT = [
+  "You are an expert Rogatio rule author.",
+  "Return ONLY one JSON object: a complete Rogatio version-2 project. No markdown, no wrapper key, no commentary.",
+  "Required project keys: version (integer 2), name (non-empty string), groups (array). Optional: description. No other project keys.",
+  "Do not put a rules array on the project root. Rules belong inside groups.",
+  "Each group requires id, name, and rules. No other group keys. Do not include origins.",
+  "Each rule requires id, name, source, resourceTypes, priority, and type.",
+  "id matches ^[A-Za-z0-9][A-Za-z0-9._-]*$ and is at most 64 characters. name is at most 100 characters.",
+  'source is {"key":"url"|"host","operator":"regex","value":"<ECMAScript regex, no flags, max 2048 characters>"}.',
+  `resourceTypes is a non-empty array containing only these values: ${RESOURCE_TYPES.join(", ")}. Prefer ["main_frame"] for page navigations and ["xmlhttprequest"] for API calls. Do not emit fetch, manifest, or any type outside that list.`,
+  "priority is an integer from 1 to 1000. Use 100 unless the user asks otherwise.",
+  'type is "redirect", "query", "header", "response-body", or "request-body".',
+  "redirect rules also require redirect: {destination: absolute http or https URL with no credentials}.",
+  'query rules require action: {"type":"query","params":[{"name":"...","value":"..."}]}.',
+  'header rules require headerDirection "request" or "response", headerOperation "set", "append", or "remove", headerName, and headerValue when the operation is set or append.',
+  'response-body rules require responseBody: {"mode":"replace","body":"..."} or {"mode":"regex","replacements":[{"pattern":"...","replacement":"..."}]}.',
+  `request-body rules require method (${HTTP_METHODS.join(", ")}), resourceTypes, and requestBody: {"mode":"replace","body":"..."} or {"mode":"regex","pattern":"...","replacement":"..."}.`,
+  "Do not emit urlRegex, origins, kind, explanation, match, or credentials.",
+  `Example: ${JSON.stringify(AI_GENERATION_EXAMPLE)}`,
+].join(" ");
 
 function operationStatuses(
   operations: readonly RogatioOperation[],
