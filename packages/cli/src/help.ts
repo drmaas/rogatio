@@ -1,10 +1,10 @@
 export function showEditHelp(): void {
   console.log(`Usage: rogatio edit [options] [path]
 
-Launch browser-based editor for .rogatio.json project file.
+Launch browser-based editor for a Rogatio project file.
 
 Arguments:
-  path            Path to .rogatio.json (default: .rogatio.json in current directory)
+  path            Project file (any filename; default: .rogatio.json in the current directory)
 
 Options:
   --port <n>      Fixed port for editor server (default: random)
@@ -12,16 +12,17 @@ Options:
   --help, -h      Show this help
 
 The editor runs in your default browser and communicates with a local server
-bound to 127.0.0.1. Changes are saved atomically to the project file.`);
+bound to 127.0.0.1. Changes are saved atomically to the file that was opened.
+When path is omitted, the CLI looks for .rogatio.json in the current directory.`);
 }
 
 export function showVerifyHelp(): void {
   console.log(`Usage: rogatio verify [options] [path]
 
-Validate a .rogatio.json project file using schema and compiler.
+Validate a Rogatio project file using schema and compiler.
 
 Arguments:
-  path            Path to .rogatio.json (default: .rogatio.json in current directory)
+  path            Project file (any filename; default: .rogatio.json in the current directory)
                   Use '-' to read from stdin
 
 Options:
@@ -81,10 +82,10 @@ Exit codes:
 export function showTestHelp(): void {
   console.log(`Usage: rogatio test [options] [path] [url...]
 
-Run offline dry-run tests against a .rogatio.json project file.
+Run offline dry-run tests against a Rogatio project file.
 
 Arguments:
-  path            Path to .rogatio.json (default: .rogatio.json in current directory)
+  path            Project file (any filename; default: .rogatio.json in the current directory)
                    Use '-' to read project JSON from stdin
   url...          URLs to test; when path is omitted, first URL is detected automatically
 
@@ -121,7 +122,7 @@ Arguments:
                   rule, or an object with a rules array)
 
 Options:
-  --out <path>    Project file to write (default: .rogatio.json in the current directory)
+  --out <path>    Project file to write (any filename; default: .rogatio.json in the current directory)
   --merge         Append imported groups onto an existing version-2 project
   --json          Print the import report as JSON
   --help, -h      Show this help

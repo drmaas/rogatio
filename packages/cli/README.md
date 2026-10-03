@@ -36,10 +36,10 @@ rogatio <command> [options]
 
 | Command | Description |
 | --- | --- |
-| `rogatio edit [path]` | Launch the browser editor for `.rogatio.json`. `--port <n>` fixes the port; `--no-open` skips opening a browser. |
-| `rogatio verify [path]` | Validate a `.rogatio.json` file (schema + compiler). |
+| `rogatio edit [path]` | Launch the browser editor. Any filename is accepted; the default is `.rogatio.json` in the current directory. `--port <n>` fixes the port; `--no-open` skips opening a browser. Edits save back to the file that was opened. |
+| `rogatio verify [path]` | Validate a project file (schema + compiler). Any filename is accepted; the default is `.rogatio.json` in the current directory. |
 | `rogatio import requestly <export.json>` | Migrate a Requestly export into `.rogatio.json`. `--out <path>` chooses the file (default `.rogatio.json`); `--merge` appends onto an existing project; `--json` prints the report. |
-| `rogatio test [path] [url...]` | Run offline dry-run tests against `.rogatio.json`. |
+| `rogatio test [path] [url...]` | Run offline dry-run tests. Any filename is accepted; the default is `.rogatio.json` in the current directory. |
 | `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
 | `rogatio runtime <install\|uninstall\|verify>` | Register the native-messaging host with `install` and trust the device-local CA in one **transactional** call; it needs elevated privileges (Linux `sudo`, macOS keychain authorization, Windows Administrator) and rolls back with exit `1` and `trust unsupported: <reasons>` when a capability or elevation is missing. Release users never pass `--extension-id`. That flag is only for development (a local unpacked build without the release key) and for forks. `uninstall` removes the host manifest, the device-local CA files, and the CA trust installation (idempotent). `verify` reports whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all valid, and fails when `allowed_origins` omits the release ID. Release users never pass `--extension-id` on verify either. |
 | `rogatio runtime host [path]` | Run the consolidated native-messaging host for the project (pair/authorize/body transforms over stdio). Normally launched by the browser; run manually only for debugging. `--root <dir>` overrides the confined file root; `--mock-port <n>` binds the loopback mock-response faucet. |

@@ -13,12 +13,14 @@ to WebExtensions Declarative Net Request (DNR) rules and manages project lifecyc
 - Merely choosing a project in the selector has no effect until you select **Switch
   project**.
 - Creation, import/update, and browser save leave every group disabled.
+- **Import** accepts any filename, including a file with no extension. Rogatio decides by the file contents. A file that is not a project fails with `not a Rogatio project: <reason>`.
+- **Export** opens a save dialog filled in with `.rogatio.json`. You can change the name and folder (for example `staging.json`). `.rogatio.json` is the name `rogatio verify` finds when you run it with no path. If the save dialog is unavailable, Rogatio asks for a filename and downloads that file, appending `.json` only when you type no extension.
 
 The toolbar **popup** lists the active project's saved groups. Each row has the group
 name, a separate status indicator, a prominent **Enable** or **Disable** button, and a
 pencil that opens the management page on that group. The popup also has **Match logging**,
 **Open app** (management page Overview / Dashboard), **New project** (inline name form),
-and **Import project** (file picker). The popup has no editor, search, proxy, permission,
+and **Import project** (a file picker that accepts any filename). The popup has no editor, search, proxy, permission,
 or rule-authoring controls.
 
 The management page uses a **Dashboard** overview and a **Workspace** editor shell. The

@@ -520,11 +520,151 @@ test("popup create and import projects", async ({ page }) => {
   await page.locator("[data-import-input]").setInputFiles({
     name: "imported.rogatio.json",
     mimeType: "application/json",
-    buffer: Buffer.from('{"version":1,"name":"Imported","groups":[]}'),
+    buffer: Buffer.from('{"version":2,"name":"Imported","groups":[]}'),
   });
   await expect(page.locator("[data-popup-status]")).toHaveText(
     "Project imported.",
   );
+});
+
+const validImportedProject = Buffer.from(
+  '{"version":2,"name":"Imported","groups":[]}',
+);
+
+test("imports a project from any filename and rejects a non-project", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, emptyEnvelope());
+  await page.goto("/extension/index.html");
+  await expect(page.getByText("Any filename works.")).toBeVisible();
+  const dashboardInput = page.locator("[data-import-input]");
+  expect(
+    await dashboardInput.evaluate((input) => input.getAttribute("accept")),
+  ).toBeNull();
+
+  await dashboardInput.setInputFiles({
+    name: "package.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('{"name":"pkg","version":"1.0.0"}'),
+  });
+  await expect(page.locator(".rogatio-status")).toHaveText(
+    /^not a Rogatio project:/,
+  );
+
+  await dashboardInput.setInputFiles({
+    name: "anything.json",
+    mimeType: "application/json",
+    buffer: validImportedProject,
+  });
+  await expect(page.locator(".rogatio-status")).toHaveText("Project imported.");
+
+  await dashboardInput.setInputFiles({
+    name: "checkout-mocks",
+    mimeType: "application/octet-stream",
+    buffer: validImportedProject,
+  });
+  await expect(page.locator(".rogatio-status")).toHaveText("Project imported.");
+
+  await page.goto("/extension/popup.html");
+  const popupInput = page.locator("[data-import-input]");
+  expect(
+    await popupInput.evaluate((input) => input.getAttribute("accept")),
+  ).toBeNull();
+  await popupInput.setInputFiles({
+    name: "notes",
+    mimeType: "application/octet-stream",
+    buffer: validImportedProject,
+  });
+  await expect(page.locator("[data-popup-status]")).toHaveText(
+    "Project imported.",
+  );
+  await popupInput.setInputFiles({
+    name: "not-a-project.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('{"hello":"world"}'),
+  });
+  await expect(page.locator("[data-popup-status]")).toHaveText(
+    /^not a Rogatio project:/,
+  );
+});
+
+test("exports with the default name and a custom name", async ({ page }) => {
+  await page.addInitScript(installChromeMock, oneProjectEnvelope());
+  await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+
+  await page.evaluate(() => {
+    const view = window as unknown as {
+      __save: { suggestedName?: string; written?: string } | null;
+      showSaveFilePicker: (options?: { suggestedName?: string }) => Promise<{
+        name: string;
+        createWritable: () => Promise<{
+          write: (data: string) => Promise<void>;
+          close: () => Promise<void>;
+        }>;
+      }>;
+    };
+    view.__save = null;
+    view.showSaveFilePicker = async (options) => {
+      let written = "";
+      return {
+        name: "checkout.json",
+        createWritable: async () => ({
+          write: async (data: string) => {
+            written = String(data);
+          },
+          close: async () => {
+            view.__save = {
+              suggestedName: options?.suggestedName,
+              written,
+            };
+          },
+        }),
+      };
+    };
+  });
+  await page.getByRole("button", { name: "Export project" }).click();
+  await expect(page.locator(".rogatio-status")).toHaveText("Project exported.");
+  const saved = await page.evaluate(() => {
+    return (
+      window as unknown as {
+        __save: { suggestedName?: string; written?: string } | null;
+      }
+    ).__save;
+  });
+  expect(saved?.suggestedName).toBe(".rogatio.json");
+  expect(saved?.written ?? "").toContain("Project A");
+
+  await page.evaluate(() => {
+    const view = window as unknown as {
+      showSaveFilePicker?: unknown;
+      __downloads: string[];
+      prompt: (message?: string, value?: string) => string | null;
+    };
+    // Own undefined shadows a prototype save dialog so the download fallback runs.
+    view.showSaveFilePicker = undefined;
+    view.__downloads = [];
+    view.prompt = (_message, value) => {
+      if (value !== ".rogatio.json") {
+        throw new Error(`prompt default was ${String(value)}`);
+      }
+      return "staging.json";
+    };
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+      view.__downloads.push(this.download);
+    };
+  });
+  await page.getByRole("button", { name: "Export project" }).click();
+  await expect
+    .poll(async () =>
+      page.evaluate(() =>
+        (
+          (window as unknown as { __downloads?: string[] }).__downloads ?? []
+        ).join(","),
+      ),
+    )
+    .toBe("staging.json");
+  await expect(page.locator(".rogatio-status")).toHaveText("Project exported.");
 });
 
 test("popup hides project picker when there are zero projects", async ({

@@ -36,11 +36,23 @@ test("drives the real extension page lifecycle and mounts the editor", async ({
     await extensionContext();
   registerDriver(driver, close);
   const projectFile = join(profile, "project.json");
+  const extensionless = join(profile, "checkout-mocks");
+  const invalidFile = join(profile, "package.json");
   await writeFile(projectFile, JSON.stringify(project));
+  await writeFile(extensionless, JSON.stringify(project));
+  await writeFile(
+    invalidFile,
+    JSON.stringify({ name: "pkg", version: "1.0.0" }),
+  );
   await page.goto(`chrome-extension://${extensionId}/index.html`);
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
 
-  await page.locator('[data-import-input="true"]').setInputFiles(projectFile);
+  const importInput = page.locator('[data-import-input="true"]');
+  await importInput.setInputFiles(invalidFile);
+  await expect(page.getByText(/^not a Rogatio project:/)).toBeVisible();
+  await importInput.setInputFiles(extensionless);
+  await expect(page.getByText("Project imported.")).toBeVisible();
+  await importInput.setInputFiles(projectFile);
   await expect(page.getByText("Project imported.")).toBeVisible();
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
 

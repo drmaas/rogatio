@@ -11,7 +11,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { migrateV1Project } from "@rogatio/schema";
+import { migrateV1Project, validateProject } from "@rogatio/schema";
 
 export type ProjectStorageErrorCode =
   | "not-found"
@@ -166,6 +166,46 @@ function pickWord(words: readonly string[], byte: number): string {
 
 function isRogatioProjectFilename(name: string): boolean {
   return name === ".rogatio.json" || name.endsWith(".rogatio.json");
+}
+
+function isJsonFilename(name: string): boolean {
+  return name.toLowerCase().endsWith(".json");
+}
+
+/**
+ * Cheap discovery check for a `*.json` file that is not on the
+ * `*.rogatio.json` fast path. Requires an own numeric `version` of 1 or 2,
+ * then a schema validate (after v1 migration). Non-project JSON such as
+ * `package.json` is rejected.
+ */
+async function isDiscoverableProjectFile(id: string): Promise<boolean> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(id, "utf-8"));
+  } catch {
+    return false;
+  }
+  const version = projectVersion(parsed);
+  if (version === null) return false;
+  const candidate = version === 1 ? migrateDiscoveredV1(parsed) : parsed;
+  if (candidate === null) return false;
+  return validateProject(candidate);
+}
+
+function projectVersion(data: unknown): 1 | 2 | null {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    return null;
+  }
+  if (!Object.hasOwn(data, "version")) return null;
+  const version = (data as { version: unknown }).version;
+  if (version === 1 || version === 2) return version;
+  return null;
+}
+
+function migrateDiscoveredV1(data: unknown): unknown | null {
+  const migrated = migrateV1Project(data);
+  if (!migrated.ok) return null;
+  return migrated.project;
 }
 
 function projectName(data: unknown): string {
@@ -331,10 +371,13 @@ export function createJsonFileProjectStorage(): ProjectStorage {
       const refs: ProjectRef[] = [];
       for (const entry of entries) {
         // Files and symlinks only — skip directories that happen to match the name pattern.
-        if (entry.isDirectory() || !isRogatioProjectFilename(entry.name)) {
-          continue;
-        }
+        if (entry.isDirectory()) continue;
+        const named = isRogatioProjectFilename(entry.name);
+        // Fast path keeps `*.rogatio.json` even when the contents are invalid.
+        // Any other `*.json` is included only when its contents validate.
+        if (!named && !isJsonFilename(entry.name)) continue;
         const id = join(scope, entry.name);
+        if (!named && !(await isDiscoverableProjectFile(id))) continue;
         let name = "";
         try {
           const data = await readDocument(id);

@@ -141,6 +141,8 @@ cat .rogatio.json | rogatio verify - --json
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome and enable the groups you need.
 
+Import and export accept any filename. The extension decides by the file contents and reports `not a Rogatio project: <reason>` when the file is not a project. Export opens with `.rogatio.json` filled in, and you can save it under another name such as `staging.json`. `rogatio edit`, `verify`, and `test` accept any path and write back to the file they opened. When the path is omitted they look for `.rogatio.json` in the current directory. Scanning a directory lists `.rogatio.json`, `*.rogatio.json`, and any other `*.json` file that validates as a project. Other JSON, such as `package.json`, is left out.
+
 ## AI-Assisted Rule Authoring
 
 Rogatio includes an AI assistant to help generate, fix, and explain rules. The AI runs locally on your machine using your configured provider (OpenAI, Ollama, OpenRouter, vLLM, or any OpenAI-compatible endpoint).

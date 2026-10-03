@@ -4,6 +4,7 @@ import {
 } from "./match-logging-enabled.js";
 import { createMatchLoggingToggle } from "./match-logging-toggle.js";
 import { createPopupModel, type PopupModel } from "./popup-model.js";
+import { projectImportFailure } from "./project-file.js";
 
 const rootElement = document.querySelector<HTMLElement>("#rogatio-popup-root");
 if (!rootElement) throw new Error("popup.invalid-root");
@@ -149,7 +150,6 @@ function statusLine(): HTMLParagraphElement {
 function importField(): HTMLInputElement {
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".json,.rogatio.json,application/json";
   input.hidden = true;
   input.tabIndex = -1;
   input.setAttribute("aria-hidden", "true");
@@ -191,6 +191,12 @@ async function importProjectFile(input: HTMLInputElement): Promise<void> {
     data = JSON.parse(await file.text()) as unknown;
   } catch {
     statusMessage = "The selected file is not valid JSON.";
+    render();
+    return;
+  }
+  const rejection = projectImportFailure(data);
+  if (rejection !== null) {
+    statusMessage = rejection;
     render();
     return;
   }
