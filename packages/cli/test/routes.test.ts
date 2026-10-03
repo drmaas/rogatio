@@ -453,4 +453,96 @@ describe("API routes", () => {
       expect(res.end).toHaveBeenCalledWith(bundleContents);
     });
   });
+
+  describe("POST /api/dry-run", () => {
+    function dryRunResponse(body: unknown, token = "test-csrf-token") {
+      const req = createMockReq(
+        "POST",
+        "/api/dry-run",
+        { "x-csrf-token": token, "content-type": "application/json" },
+        JSON.stringify(body),
+      );
+      const res = createMockRes();
+      return handler(req, res).then(() => {
+        const status = vi.mocked(res.writeHead).mock.calls[0]?.[0];
+        const raw = vi.mocked(res.end).mock.calls[0]?.[0];
+        const payload =
+          typeof raw === "string" ? (JSON.parse(raw) as unknown) : undefined;
+        return { status, payload };
+      });
+    }
+
+    it("passes compiled operations and the test preview through", async () => {
+      const { status, payload } = await dryRunResponse({
+        project: validProject,
+        cases: [
+          {
+            url: "https://example.com/old/path",
+            method: "GET",
+            resourceType: "main_frame",
+          },
+        ],
+      });
+      expect(status).toBe(200);
+      const result = payload as {
+        results: Array<{
+          rules: Array<{
+            matched: boolean;
+            actionPreview: { kind: string; summary: string } | null;
+          }>;
+        }>;
+      };
+      expect(result.results[0]?.rules[0]).toMatchObject({
+        matched: true,
+        actionPreview: {
+          kind: "redirect",
+          summary: "https://example.com/new/",
+        },
+      });
+    });
+
+    it("does not match a POST-only rule for a page load", async () => {
+      const project = structuredClone(validProject);
+      project.groups[0].rules[0].method = "POST";
+      const { status, payload } = await dryRunResponse({
+        project,
+        cases: [
+          {
+            url: "https://example.com/old/path",
+            method: "GET",
+            resourceType: "main_frame",
+          },
+        ],
+      });
+      expect(status).toBe(200);
+      const result = payload as {
+        results: Array<{
+          matchedRuleCount: number;
+          rules: Array<{ matched: boolean; method: { state: string } }>;
+        }>;
+      };
+      expect(result.results[0]?.matchedRuleCount).toBe(0);
+      expect(result.results[0]?.rules[0]).toMatchObject({
+        matched: false,
+        method: { state: "unmatched" },
+      });
+    });
+
+    it("returns field diagnostics for an invalid draft", async () => {
+      const { status, payload } = await dryRunResponse({
+        project: { version: 2, name: "", groups: [] },
+        cases: [{ url: "https://example.com/" }],
+      });
+      expect(status).toBe(400);
+      const body = payload as {
+        code?: string;
+        diagnostics?: unknown[];
+        summary?: unknown;
+      };
+      expect(body.code).toBe("validation-failed");
+      expect(Array.isArray(body.diagnostics)).toBe(true);
+      expect((body.diagnostics ?? []).length).toBeGreaterThan(0);
+      expect(body.summary).toBeUndefined();
+    });
+  });
 });

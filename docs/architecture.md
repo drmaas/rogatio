@@ -225,7 +225,9 @@ Draft transitions are explicit:
 
 The view uses a semantic `main`, `nav`, `form`, headings, `fieldset`/`legend`, native inputs/selects/checkboxes, and a live status region. The desktop route rail contains Project, one route per group, and Test console. A synchronized native select is the compact mobile navigation. Routes are internal editor state, not browser history or host persistence. Removing the current group falls back to Project and announces the change.
 
-The contextual command bar keeps project actions together: AI Assist (when configured) and Validate lead, Cancel and Save trail, and the Test console route adds Run test. On a group page the heading keeps the name and rename control together, and groups Enable/Disable, Copy group, and Remove group in one toolbar, with Remove set apart as the destructive action. Add rule stays on the Rules heading. Add group stays on the Groups heading of the Project page. That page lists each group by name; choosing the name opens the group, and Copy group and Remove group stay on the row. Group and project actions repeat in a labeled ledger under the last rule (Rules, then Group, then Project) and under the test results on Test console. The Project page has no ledger. Rule reorder, copy, and remove stay on each rule. A group or rule name is authored in exactly one place, on its own heading, through an inline rename control: a pencil opens a text input, the save control or `Enter` commits, the cancel control or `Escape` reverts, and the value is written to the draft only on an explicit commit. The heading element stays in the document while the input is open — visually hidden — so a rule card keeps its accessible name through `aria-labelledby` and its shared action buttons keep their per-entity context. A commit is refused, leaving the input open and focused, when the trimmed value is empty, exceeds the label bound, or duplicates another name in the project; the message names the entity that holds the name. `Enter` inside that input never saves the project, and a name diagnostic at an entity's `/name` path (or at the entity itself) opens the input focused with the error associated. Because IDs are no longer editable, a diagnostic on one is repaired by the program through an explicit "Assign a new ID" action in the error summary, which keeps the documented in-place-repair guarantee without putting a field back on the page. Group reorder is not exposed because groups are selected as independent rail tabs. Remove actions use a cancellable accessible alert dialog and name the affected group or rule. Rule reorder commands operate on the item's absolute source position even when search is active; announcements include the resulting position so hidden neighboring items cannot make the operation ambiguous.
+The contextual command bar keeps project actions together: AI Assist (when configured) and Validate lead, and Cancel and Save trail. Run test is a single control on the Test console panel. On a group page the heading keeps the name and rename control together, and groups Enable/Disable, Copy group, and Remove group in one toolbar, with Remove set apart as the destructive action. Add rule stays on the Rules heading. Add group stays on the Groups heading of the Project page. That page lists each group by name; choosing the name opens the group, and Copy group and Remove group stay on the row. Group and project actions repeat in a labeled ledger under the last rule (Rules, then Group, then Project) and under the test results on Test console. The Project page has no ledger. The ledger does not repeat Run test.
+
+The Test console checks the current draft against a list of URLs. Its opening copy is “Check whether these URLs match your rules. Nothing is contacted, and nothing is saved.” A case defaults to GET and a page load (`main_frame`), and the form says “Checking these as page loads (GET).” Resource types use plain names (Page, Script, Fetch, and the rest); schema values stay on the option values. “Any method” and “Any resource type” are explicit choices, and a match under either choice says that constraint was not tested. The host supplies `dryRun`. The editor package does not import `@rogatio/dry-run` or Ajv. A result is one sentence per matching rule, naming the group and the rule, plus the same action preview `rogatio test` prints (`previewRuleAction`). The rule name opens that rule. Non-matching rules stay in a closed disclosure (“1 rule did not match” or “N rules did not match”), each with one reason: URL pattern, method, or resource type. When the host supplies `groupEnablement` and that group is off, the match still shows and adds “This group is off in Chrome, so the browser will not apply this rule.” The CLI editor omits that port. A failure with field diagnostics — including a non-2xx body from `POST /api/dry-run` — is listed and focused like Validate. It is not stored as the test result, so a later render still works. The 256-case cap is mentioned only when the list is too long (“Only 256 URLs can be checked at once.”). An exact URL source offers “Try a URL from this rule”, which fills the box. A project with no rules says “This project has no rules to test.” Rule reorder, copy, and remove stay on each rule. A group or rule name is authored in exactly one place, on its own heading, through an inline rename control: a pencil opens a text input, the save control or `Enter` commits, the cancel control or `Escape` reverts, and the value is written to the draft only on an explicit commit. The heading element stays in the document while the input is open — visually hidden — so a rule card keeps its accessible name through `aria-labelledby` and its shared action buttons keep their per-entity context. A commit is refused, leaving the input open and focused, when the trimmed value is empty, exceeds the label bound, or duplicates another name in the project; the message names the entity that holds the name. `Enter` inside that input never saves the project, and a name diagnostic at an entity's `/name` path (or at the entity itself) opens the input focused with the error associated. Because IDs are no longer editable, a diagnostic on one is repaired by the program through an explicit "Assign a new ID" action in the error summary, which keeps the documented in-place-repair guarantee without putting a field back on the page. Group reorder is not exposed because groups are selected as independent rail tabs. Remove actions use a cancellable accessible alert dialog and name the affected group or rule. Rule reorder commands operate on the item's absolute source position even when search is active; announcements include the resulting position so hidden neighboring items cannot make the operation ambiguous.
 
 When `EditorOptions.aiAssist` is provided, the command bar and the repeated-actions ledger show **AI Assist**. The shared panel builds an `AIAssistRequest` (`generate` or `fix` from current diagnostics), invokes the host handler (async iterable chunks or a complete response), streams tokens into the panel when the host yields them, and Apply maps each `RuleProposal.kind` onto draft `type` plus the matching payload fields (`redirect`, `action`, header siblings, `responseBody`, `requestBody`). For `fix` requests, proposal rules repair the offending rules in place: the rules referenced by `context.diagnostics` are replaced (keeping their rule ids and positions) instead of appended, and the hosts validate the repaired project before accepting the proposal (the extension service worker returns `extension.ai-invalid-proposal` when the repair leaves the project invalid). The editor does not call providers itself. Hosts wire `aiAssist`: CLI `rogatio edit` posts to `/api/ai/assist`; the extension Workspace sends the `ai-assist` command through the service worker to the native host (`ai.complete`).
 
@@ -543,7 +545,7 @@ rogatio edit [path]
 
 ### Overview
 
-The offline dry-run package adds a pure-offline, bounded URL-batch dry-run capability that evaluates matcher operations (from the compiler) against a list of test cases without contacting the network, requesting permissions, changing installed rules, connecting to runtime, or saving test data. It is usable from both the CLI (`rogatio test`) and the Editor (`Test console` route/panel).
+The offline dry-run package adds a pure-offline, bounded URL-batch dry-run capability that evaluates compiled operations against a list of test cases without contacting the network, requesting permissions, changing installed rules, connecting to runtime, or saving test data. It is usable from the CLI (`rogatio test`), the CLI editor (`POST /api/dry-run`), and the extension management page (service worker command `dry-run`). The editor package receives the result through `EditorDryRunHandler` and does not import this package.
 
 ### Components
 
@@ -576,52 +578,47 @@ The offline dry-run package adds a pure-offline, bounded URL-batch dry-run capab
 
 - CSRF protected (`x-csrf-token`).
 - Body: `{ project, cases, options? }`.
-- Server-side compile (validates project first).
-- Returns `DryRunResult` (200) or diagnostics (400) or CSRF error (403).
+- Server-side schema validation, then `compileProject`.
+- `dryRunProject` receives `compileResult.operations` and `{ previewAction: previewRuleAction }`. A client `options.previewAction` is ignored. A positive integer `options.maxCases` is honored.
+- Returns `DryRunResult` (200) or `{ code, message, diagnostics }` (400) or a CSRF error (403).
+- The editor page treats a non-2xx body as `{ ok: false, diagnostics }` and does not store it as the test result.
 
-**4. Editor Integration**
+**4. Extension command (`dry-run`)**
 
-- **`types.ts`**: Local DryRun type definitions (no `@rogatio/dry-run` import in browser bundle), `EditorDryRunHandler`, added to `EditorOptions`.
-- **`editor.ts`**: New `route.kind === "test"` with:
-  - Rail navigation button "Test console" (accessible, announced).
-  - Panel: URLs textarea (one per line), method/resource-type defaults, maxCases input, Run button.
-  - Results rendering: per-URL cards with matched/unmatched badges, 3-dimension badges (color-coded: green=matched, red=unmatched, gray=not-applicable), detail text, actionPreview when present.
-  - Keyboard complete, SR announcements, forced-colors/200% zoom compatible (uses CSS variables, native elements, live regions).
+- Protocol: `{ version: 1, command: "dry-run", project, cases, options? }`.
+- The service worker validates with `browser-schema`, compiles, and calls `dryRunProject` with `previewRuleAction`. It does not read storage or install rules.
+- Success: `{ ok: true, value: DryRunResult }`. Schema or compiler failure: `{ ok: false, diagnostics }` with the field shape Validate already returns, plus `extension.project-invalid` on the envelope.
+- The management page passes `dryRun` into `createEditor`. That page bundle does not import `@rogatio/dry-run` or Ajv. The service worker bundle aliases `@rogatio/dry-run` to its source so the schema alias stays `browser-schema`.
+
+**5. Editor Integration**
+
+- **`types.ts`**: Local DryRun type definitions (no `@rogatio/dry-run` import in the browser bundle), `EditorDryRunHandler` (result or `{ ok: false, diagnostics }`), on `EditorOptions`.
+- **`editor.ts`**: `route.kind === "test"` with:
+  - Rail navigation button "Test console".
+  - Panel: one URL per line, method default GET, resource type default Page (`main_frame`), one Run test control. The 256-case cap has no field.
+  - Results: one sentence per matching rule (group, rule, and the `previewRuleAction` summary). Misses stay in a closed disclosure. The rule name opens that rule. A disabled group, when `groupEnablement` is supplied, adds “This group is off in Chrome, so the browser will not apply this rule.”
+  - Keyboard complete, screen-reader announcements, forced-colors and 200% zoom compatible (CSS variables, native elements, live regions).
 
 ### Data Flow
 
 ```
-CLI / Editor
+rogatio test / POST /api/dry-run / extension dry-run
      │
      ▼
 ┌──────────────────────┐
-│ Read .rogatio.json   │
+│ validate + compile   │ → compiled operations
 └─────────┬────────────┘
           │
           ▼
 ┌──────────────────────┐
-│ validateProjectDetailed (schema) │
+│ dryRunProject        │
+│ previewRuleAction    │
 └─────────┬────────────┘
           │
           ▼
 ┌──────────────────────┐
-│ compileProject (compiler)  │ → MatcherOperation[]
-└─────────┬────────────┘
-          │
-          ▼
-┌──────────────────────┐
-│ dryRunProject (dry-run)  │
-│ - parse/validate cases
-│ - cache regex
-│ - 3-dim match per rule
-│ - summary
-└─────────┬────────────┘
-          │
-          ▼
-┌──────────────────────┐
-│ Render results       │
-│ (CLI JSON/human,    │
-│  Editor badges)     │
+│ CLI human or --json  │
+│ Editor sentences     │
 └──────────────────────┘
 ```
 
@@ -645,10 +642,13 @@ CLI / Editor
 
 ```
 @rogatio/schema ──► @rogatio/compiler ──► @rogatio/dry-run
-                                          │              │
-                                          ▼              ▼
-                                    @rogatio/editor @rogatio/cli
+                                               │
+                                               ▼
+                                    @rogatio/cli
+                                    @rogatio/extension (service worker)
 ```
+
+`@rogatio/editor` stays on `schema → compiler` and receives a `DryRunResult` through the host `dryRun` port.
 
 ### Acceptance Criteria Coverage
 
@@ -665,7 +665,7 @@ CLI / Editor
 
 ### Open Questions Resolved
 
-- **Option A approved** — matcher-level dry-run now + `previewAction` seam; redirect/query previews deferred to the redirect and query rules.
+- **Option A approved** — `previewAction` is `previewRuleAction` in `@rogatio/dry-run`. `rogatio test`, `POST /api/dry-run`, and the extension `dry-run` command all pass it. Redirect, query, header, and replace-mode body summaries are included. `rogatio test --json` is unchanged.
 - **maxCases default 256** — accepted per user gate.
 - **Editor dry-run via host adapter** — no Node import in browser bundle, consistent with the editor package.
 

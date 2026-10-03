@@ -44,6 +44,20 @@ describe("F7 message protocol", () => {
     });
   });
 
+  it("accepts the versioned dry-run request", () => {
+    expect(
+      parseRequest({
+        version: 1,
+        command: "dry-run",
+        project: { version: 2, name: "Preview", groups: [] },
+        cases: [{ url: "https://example.com/" }],
+      }),
+    ).toMatchObject({
+      ok: true,
+      value: { version: 1, command: "dry-run" },
+    });
+  });
+
   it("accepts the versioned ai-assist request", () => {
     expect(
       parseRequest({

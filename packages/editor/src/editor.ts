@@ -14,6 +14,7 @@ import {
   type AIAssistResponse,
   type AIProposal,
   type DryRunResult,
+  type DryRunRuleMatchResult,
   type DryRunTestCase,
   type EditorController,
   type EditorDiagnostic,
@@ -96,6 +97,36 @@ const HTTP_METHODS = [
   "CONNECT",
   "TRACE",
 ] as const satisfies readonly HttpMethod[];
+
+/** Plain names for the test console. Schema values stay on the option. */
+const RESOURCE_TYPE_LABELS: Readonly<Record<ResourceType, string>> = {
+  main_frame: "Page",
+  sub_frame: "Frame",
+  stylesheet: "Stylesheet",
+  script: "Script",
+  image: "Image",
+  font: "Font",
+  object: "Plugin",
+  media: "Media",
+  xmlhttprequest: "Fetch",
+  ping: "Ping",
+  csp_report: "CSP report",
+  websocket: "WebSocket",
+  webtransport: "WebTransport",
+  webbundle: "Web Bundle",
+  other: "Other",
+};
+
+/** Matches the dry-run engine default. Mentioned only when the list is longer. */
+const TEST_CASE_LIMIT = 256;
+
+const RULE_TYPE_LABELS: Readonly<Record<string, string>> = {
+  redirect: "Redirect",
+  query: "Query parameters",
+  header: "Header",
+  "response-body": "Response body",
+  "request-body": "Request body",
+};
 
 const COMMON_RULE_FIELDS = new Set([
   "id",
@@ -533,6 +564,105 @@ function displayName(value: unknown, fallback: string): string {
   return text.length > 0 ? text : fallback;
 }
 
+function checkingCopy(
+  method: HttpMethod | "",
+  resourceType: ResourceType | "",
+): string {
+  if (method === "GET" && resourceType === "main_frame") {
+    return "Checking these as page loads (GET).";
+  }
+  if (method === "" && resourceType === "") {
+    return "The method and the resource type are not tested.";
+  }
+  const resourceLabel =
+    resourceType === "" ? "" : RESOURCE_TYPE_LABELS[resourceType];
+  if (method === "") {
+    const subject =
+      resourceType === "main_frame"
+        ? "page loads"
+        : `${resourceLabel} requests`;
+    return `Checking these as ${subject}. The method is not tested.`;
+  }
+  if (resourceType === "") {
+    return `Checking these as ${method} requests. The resource type is not tested.`;
+  }
+  if (resourceType === "main_frame") {
+    return `Checking these as page loads (${method}).`;
+  }
+  return `Checking these as ${resourceLabel} requests (${method}).`;
+}
+
+/**
+ * An exact URL pattern is the `^` + escaped href + `$` produced by
+ * `urlToExactRegex`. Anything else (a capture, an unanchored regex) is not
+ * offered as a sample URL.
+ */
+function exactUrlFromSource(source: DraftSource | undefined): string | null {
+  if (source?.key !== "url" || source.operator !== "regex") {
+    return null;
+  }
+  if (typeof source.value !== "string") return null;
+  const value = source.value;
+  if (!value.startsWith("^") || !value.endsWith("$") || value.length < 2) {
+    return null;
+  }
+  let decoded = "";
+  for (let index = 1; index < value.length - 1; index += 1) {
+    const char = value[index];
+    if (char === "\\") {
+      index += 1;
+      const escaped = value[index];
+      if (escaped === undefined || index >= value.length - 1) return null;
+      decoded += escaped;
+      continue;
+    }
+    if ("^$\\.*+?()[]{}|".includes(char)) return null;
+    decoded += char;
+  }
+  const converted = urlToExactRegex(decoded);
+  if (!converted.ok || converted.source !== value) return null;
+  return decoded;
+}
+
+function isDryRunResult(value: unknown): value is DryRunResult {
+  if (!isRecord(value)) return false;
+  const summary = value.summary;
+  return (
+    Array.isArray(value.results) &&
+    Array.isArray(value.errors) &&
+    isRecord(summary) &&
+    typeof summary.matchedUrlCount === "number" &&
+    typeof summary.urlCount === "number"
+  );
+}
+
+function previewSentence(
+  preview: { readonly kind: string; readonly summary: string } | null,
+): string | null {
+  if (!preview || preview.summary.length === 0) return null;
+  switch (preview.kind) {
+    case "redirect":
+      return `The browser would go to ${preview.summary}.`;
+    case "query":
+      return `The query would be ${preview.summary}.`;
+    case "header":
+      return `The header would be ${preview.summary}.`;
+    case "request-body":
+      return `The request body would be ${preview.summary}.`;
+    case "response-body":
+      return `The response body would be ${preview.summary}.`;
+    default:
+      return null;
+  }
+}
+
+function missReason(rule: DryRunRuleMatchResult): string {
+  if (rule.source.state === "unmatched") return "URL pattern";
+  if (rule.method.state === "unmatched") return "method";
+  if (rule.resourceType.state === "unmatched") return "resource type";
+  return "URL pattern";
+}
+
 function isHTMLElement(value: unknown): value is HTMLElement {
   return (
     value !== null &&
@@ -712,9 +842,8 @@ class EditorControllerImpl implements EditorController {
   private controlNumber = 0;
   private previousFocus: FocusSnapshot | undefined;
   private testUrls = "";
-  private testMethod: HttpMethod | "" = "";
-  private testResourceType: ResourceType | "" = "";
-  private testMaxCases = "256";
+  private testMethod: HttpMethod | "" = "GET";
+  private testResourceType: ResourceType | "" = "main_frame";
   private testResult: DryRunResult | undefined = undefined;
   private testRunning = false;
   private testRequestId = 0;
@@ -928,10 +1057,6 @@ class EditorControllerImpl implements EditorController {
       this.testUrls = target.value;
       return;
     }
-    if (target.dataset.testMaxCases !== undefined) {
-      this.testMaxCases = target.value;
-      return;
-    }
     const path = target.dataset.path;
     if (!path || target.type === "checkbox" || this.extensionControls.has(path))
       return;
@@ -984,6 +1109,7 @@ class EditorControllerImpl implements EditorController {
       target.dataset.testMethod !== undefined
     ) {
       this.testMethod = (target.value || "") as HttpMethod | "";
+      this.render();
       return;
     }
     if (
@@ -991,6 +1117,7 @@ class EditorControllerImpl implements EditorController {
       target.dataset.testResourceType !== undefined
     ) {
       this.testResourceType = (target.value || "") as ResourceType | "";
+      this.render();
       return;
     }
     const path = target.dataset.path;
@@ -1199,6 +1326,17 @@ class EditorControllerImpl implements EditorController {
     if (command === "test:run") {
       void this.runTest();
       return;
+    }
+    if (command === "test:open-rule") {
+      this.navigateToRule(element.dataset.groupId, element.dataset.ruleId);
+      return;
+    }
+    if (command === "test:try-url") {
+      const url = element.dataset.url;
+      if (!url) return;
+      this.testUrls = url;
+      this.statusMessage = "";
+      this.render();
     }
   }
 
@@ -2037,6 +2175,41 @@ class EditorControllerImpl implements EditorController {
     this.render();
   }
 
+  private ruleCount(): number {
+    let count = 0;
+    for (const group of this.draft.groups) count += group.rules.length;
+    return count;
+  }
+
+  private testLines(): { readonly url: string; readonly line: number }[] {
+    const entries: { url: string; line: number }[] = [];
+    const rawLines = this.testUrls.split(/\r?\n/);
+    for (let index = 0; index < rawLines.length; index += 1) {
+      const url = rawLines[index]?.trim() ?? "";
+      if (url.length > 0) entries.push({ url, line: index + 1 });
+    }
+    return entries;
+  }
+
+  private showDryRunDiagnostics(
+    diagnostics: readonly EditorDiagnostic[],
+  ): void {
+    this.testResult = undefined;
+    this.testRunning = false;
+    this.errors = diagnostics;
+    const count = diagnostics.length;
+    this.statusMessage =
+      count === 0
+        ? "The project could not be tested."
+        : `${count} validation error${count === 1 ? "" : "s"} found.`;
+    const first = diagnostics[0];
+    if (first) {
+      this.navigateToPath(first.path);
+      return;
+    }
+    this.render();
+  }
+
   private async runTest(): Promise<void> {
     if (!this.options.dryRun) {
       this.statusMessage =
@@ -2044,74 +2217,91 @@ class EditorControllerImpl implements EditorController {
       this.render();
       return;
     }
-    const urlsText = this.testUrls.trim();
-    if (!urlsText) {
+    if (this.ruleCount() === 0) {
+      this.testResult = undefined;
+      this.testRunning = false;
+      this.statusMessage = "This project has no rules to test.";
+      this.render();
+      return;
+    }
+    const lines = this.testLines();
+    if (lines.length === 0) {
       this.statusMessage = "Please enter at least one URL to test.";
       this.render();
       return;
     }
+    if (lines.length > TEST_CASE_LIMIT) {
+      this.testResult = undefined;
+      this.testRunning = false;
+      this.statusMessage = "Only 256 URLs can be checked at once.";
+      this.render();
+      return;
+    }
 
-    const lines = urlsText
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0);
-    const cases: DryRunTestCase[] = lines.map((url) => ({
-      url,
-      method: this.testMethod === "" ? undefined : this.testMethod,
-      resourceType:
-        this.testResourceType === "" ? undefined : this.testResourceType,
-    }));
-    const maxCasesRaw = Number.parseInt(this.testMaxCases, 10);
-    const maxCases =
-      Number.isSafeInteger(maxCasesRaw) && maxCasesRaw > 0
-        ? maxCasesRaw
-        : undefined;
+    const cases: DryRunTestCase[] = lines.map((entry) => {
+      const testCase: {
+        url: string;
+        method?: HttpMethod;
+        resourceType?: ResourceType;
+      } = { url: entry.url };
+      if (this.testMethod !== "") testCase.method = this.testMethod;
+      if (this.testResourceType !== "") {
+        testCase.resourceType = this.testResourceType;
+      }
+      return testCase;
+    });
 
     const requestId = ++this.testRequestId;
     this.testRunning = true;
-    this.statusMessage = "Running dry-run...";
+    this.statusMessage = "Checking URLs...";
     this.render();
 
     try {
-      const result = await this.options.dryRun(
-        this.getDraft(),
-        cases,
-        maxCases === undefined ? undefined : { maxCases },
-      );
+      const outcome = await this.options.dryRun(this.getDraft(), cases);
       if (requestId !== this.testRequestId) return;
-      this.testResult = result;
       this.testRunning = false;
-      const matched = result.summary.matchedUrlCount;
-      const total = result.summary.urlCount;
-      this.statusMessage = `Test complete: ${matched}/${total} URLs matched at least one rule.`;
+      if (isDryRunResult(outcome)) {
+        this.testResult = outcome;
+        const checked = outcome.summary.urlCount;
+        this.statusMessage =
+          outcome.errors.length > 0
+            ? `Checked ${checked} URL${checked === 1 ? "" : "s"}. Some lines are not http(s) URLs.`
+            : `Checked ${checked} URL${checked === 1 ? "" : "s"}.`;
+        this.render();
+        return;
+      }
+      const diagnostics = normalizeDiagnostics(
+        isRecord(outcome) ? outcome.diagnostics : undefined,
+      );
+      this.showDryRunDiagnostics(diagnostics);
     } catch (e) {
       if (requestId !== this.testRequestId) return;
+      this.testResult = undefined;
       this.testRunning = false;
       const message = e instanceof Error ? e.message : "Test failed";
       this.statusMessage = `Test error: ${message}`;
+      this.render();
     }
-    this.render();
   }
 
   private renderTestResults(result: DryRunResult): void {
     const resultsSection = this.host.querySelector<HTMLElement>(
       "[data-test-results]",
     );
-    if (!resultsSection) return;
+    if (!resultsSection || !isDryRunResult(result)) return;
     resultsSection.replaceChildren();
 
     const heading = this.document.createElement("h3");
     heading.textContent = "Results";
     resultsSection.append(heading);
 
+    const lines = this.testLines();
     if (result.errors.length > 0) {
       const errorsList = this.document.createElement("ul");
       errorsList.dataset.testErrors = "true";
       for (const err of result.errors) {
         const item = this.document.createElement("li");
-        item.textContent = `${err.code}: ${err.message}${
-          err.index !== undefined ? ` (case ${err.index})` : ""
-        }`;
+        item.textContent = this.testErrorText(err, lines);
         errorsList.append(item);
       }
       resultsSection.append(errorsList);
@@ -2128,89 +2318,163 @@ class EditorControllerImpl implements EditorController {
     for (const urlResult of result.results) {
       const card = this.document.createElement("article");
       card.dataset.testResultCard = "true";
-      const matched = urlResult.matchedRuleCount > 0;
-      card.dataset.matched = matched ? "true" : "false";
+      const matches = urlResult.rules.filter((rule) => rule.matched);
+      const misses = urlResult.rules.filter((rule) => !rule.matched);
+      card.dataset.matched = matches.length > 0 ? "true" : "false";
 
-      const urlHeader = this.document.createElement("div");
-      urlHeader.dataset.testResultHeader = "true";
-      const urlText = this.document.createElement("strong");
-      urlText.textContent = urlResult.url;
-      const urlBadge = this.document.createElement("span");
-      urlBadge.dataset.testBadge = "true";
-      urlBadge.dataset.variant = matched ? "matched" : "unmatched";
-      urlBadge.textContent = matched ? "MATCHED" : "NO MATCH";
-      urlHeader.append(urlText, urlBadge);
-      card.append(urlHeader);
-
-      for (const rule of urlResult.rules) {
-        const ruleDiv = this.document.createElement("div");
-        ruleDiv.dataset.testRule = "true";
-        const ruleHeader = this.document.createElement("div");
-        ruleHeader.dataset.testRuleHeader = "true";
-        const ruleName = this.document.createElement("strong");
-        // Resolved from the draft the editor already handed to the dry-run host,
-        // so the dry-run contract keeps carrying ids only.
-        ruleName.textContent = this.testRuleLabel(rule.groupId, rule.ruleId);
-        const ruleBadge = this.document.createElement("span");
-        ruleBadge.dataset.testBadge = "true";
-        ruleBadge.dataset.variant = rule.matched ? "matched" : "unmatched";
-        ruleBadge.textContent = rule.matched ? "✓ MATCHED" : "✗ NOT MATCHED";
-        ruleHeader.append(ruleName, ruleBadge);
-        ruleDiv.append(ruleHeader);
-
-        const dims: Array<{ label: string; dim: typeof rule.source }> = [
-          { label: "source", dim: rule.source },
-          { label: "method", dim: rule.method },
-          { label: "resourceType", dim: rule.resourceType },
-        ];
-        for (const { label, dim } of dims) {
-          const dimDiv = this.document.createElement("div");
-          dimDiv.dataset.testDimension = "true";
-          const badge = this.document.createElement("span");
-          badge.dataset.testBadge = "true";
-          badge.dataset.variant =
-            dim.state === "matched"
-              ? "matched"
-              : dim.state === "unmatched"
-                ? "unmatched"
-                : "na";
-          badge.textContent = dim.state.toUpperCase();
-          dimDiv.append(
-            badge,
-            this.document.createTextNode(`${label}: ${dim.detail}`),
-          );
-          ruleDiv.append(dimDiv);
-        }
-
-        if (rule.actionPreview) {
-          const apDiv = this.document.createElement("div");
-          apDiv.dataset.testActionPreview = "true";
-          apDiv.textContent = `Action preview: ${rule.actionPreview.kind} - ${rule.actionPreview.summary}`;
-          ruleDiv.append(apDiv);
-        }
-
-        card.append(ruleDiv);
+      for (const rule of matches) {
+        card.append(this.renderTestOutcome(urlResult.url, rule));
       }
-
+      if (misses.length > 0) {
+        card.append(this.renderTestMisses(misses));
+      }
       resultsSection.append(card);
     }
+  }
+
+  private testErrorText(
+    err: DryRunResult["errors"][number],
+    lines: readonly { readonly url: string; readonly line: number }[],
+  ): string {
+    if (err.code === "dryrun.batch-limit") {
+      return "Only 256 URLs can be checked at once.";
+    }
+    const entry = err.index === undefined ? undefined : lines[err.index];
+    if (err.code === "dryrun.invalid-url" && entry) {
+      return `Line ${entry.line} is not an http(s) URL: ${entry.url}`;
+    }
+    if (entry) {
+      return `Line ${entry.line} could not be checked: ${entry.url}`;
+    }
+    return err.message;
+  }
+
+  private renderTestOutcome(
+    url: string,
+    rule: DryRunRuleMatchResult,
+  ): HTMLElement {
+    const names = this.testRuleNames(rule.groupId, rule.ruleId);
+    const typeLabel = this.testRuleTypeLabel(rule.groupId, rule.ruleId);
+    const outcome = this.document.createElement("p");
+    outcome.dataset.testOutcome = "true";
+    const lead = this.document.createElement("span");
+    lead.textContent = names.groupKnown
+      ? `${url} matches ${typeLabel} in ${names.groupName} / `
+      : `${url} matches ${typeLabel} in `;
+    const ruleButton = this.createCommandButton(
+      names.ruleLabel,
+      "test:open-rule",
+      false,
+      { groupId: rule.groupId, ruleId: rule.ruleId },
+    );
+    ruleButton.dataset.testRuleLink = "true";
+    ruleButton.removeAttribute("data-btn");
+    const tailParts = ["."];
+    const preview = previewSentence(rule.actionPreview);
+    if (preview) tailParts.push(` ${preview}`);
+    if (rule.method.state === "not-applicable") {
+      tailParts.push(" The method was not tested.");
+    }
+    if (rule.resourceType.state === "not-applicable") {
+      tailParts.push(" The resource type was not tested.");
+    }
+    if (this.groupIsOffInBrowser(rule.groupId)) {
+      tailParts.push(
+        " This group is off in Chrome, so the browser will not apply this rule.",
+      );
+    }
+    const tail = this.document.createElement("span");
+    tail.textContent = tailParts.join("");
+    outcome.append(lead, ruleButton, tail);
+    return outcome;
+  }
+
+  private renderTestMisses(
+    misses: readonly DryRunRuleMatchResult[],
+  ): HTMLElement {
+    const details = this.document.createElement("details");
+    details.dataset.testMisses = "true";
+    const summary = this.document.createElement("summary");
+    summary.textContent =
+      misses.length === 1
+        ? "1 rule did not match"
+        : `${misses.length} rules did not match`;
+    const list = this.document.createElement("ul");
+    for (const rule of misses) {
+      const names = this.testRuleNames(rule.groupId, rule.ruleId);
+      const item = this.document.createElement("li");
+      const ruleButton = this.createCommandButton(
+        names.ruleLabel,
+        "test:open-rule",
+        false,
+        { groupId: rule.groupId, ruleId: rule.ruleId },
+      );
+      ruleButton.dataset.testRuleLink = "true";
+      ruleButton.removeAttribute("data-btn");
+      const reason = this.document.createElement("span");
+      reason.dataset.testMissReason = "true";
+      reason.textContent = missReason(rule);
+      item.append(ruleButton, this.document.createTextNode(" — "), reason);
+      list.append(item);
+    }
+    details.append(summary, list);
+    return details;
   }
 
   /**
    * A test-result row is identified by the names the user actually sees. The dry
    * result carries ids only, and the draft the editor handed over is the source
-   * of truth for both, so no contract changes. A rule that is no longer in the
-   * draft falls back to its id rather than rendering a blank row.
+   * of truth for both. A rule that is no longer in the draft falls back to its id.
    */
-  private testRuleLabel(groupId: string, ruleId: string): string {
+  private testRuleNames(
+    groupId: string,
+    ruleId: string,
+  ): {
+    readonly groupKnown: boolean;
+    readonly ruleKnown: boolean;
+    readonly groupName: string;
+    readonly ruleLabel: string;
+  } {
     const group = this.groupById(groupId);
-    if (!group) return `${groupId}/${ruleId}`;
+    if (!group) {
+      return {
+        groupKnown: false,
+        ruleKnown: false,
+        groupName: groupId,
+        ruleLabel: `${groupId}/${ruleId}`,
+      };
+    }
     const groupName = displayName(group.name, "Unnamed group");
     const rule = this.ruleById(groupId, ruleId);
-    if (!rule) return `${groupName} / ${ruleId}`;
-    // The same `group / rule` shape the extension sidebar uses, so a rule is
-    // labelled identically wherever it appears.
-    return `${groupName} / ${displayName(rule.name, "Unnamed rule")}`;
+    if (!rule) {
+      return {
+        groupKnown: true,
+        ruleKnown: false,
+        groupName,
+        ruleLabel: ruleId,
+      };
+    }
+    return {
+      groupKnown: true,
+      ruleKnown: true,
+      groupName,
+      ruleLabel: displayName(rule.name, "Unnamed rule"),
+    };
+  }
+
+  private testRuleTypeLabel(groupId: string, ruleId: string): string {
+    const rule = this.ruleById(groupId, ruleId);
+    const type = rule && typeof rule.type === "string" ? rule.type : "";
+    return RULE_TYPE_LABELS[type] ?? "the rule";
+  }
+
+  private groupIsOffInBrowser(groupId: string): boolean {
+    const enablement = this.options.groupEnablement;
+    if (!enablement) return false;
+    const group = this.groupById(groupId);
+    const saved = group ? this.savedGroupId(group) : undefined;
+    const id = saved && saved.length > 0 ? saved : groupId;
+    return enablement.isEnabled(id) !== true;
   }
 
   private navigate(route: string, groupId: string | undefined): void {
@@ -2572,17 +2836,6 @@ class EditorControllerImpl implements EditorController {
       );
     }
     tools.append(this.createCommandButton("Validate", "validate", this.saving));
-    if (this.route.kind === "test") {
-      tools.append(
-        this.createCommandButton(
-          "Run test",
-          "test:run",
-          this.saving || this.testRunning,
-          {},
-          "primary",
-        ),
-      );
-    }
     const commit = this.document.createElement("div");
     commit.dataset.actionCluster = "commit";
     commit.append(
@@ -2745,19 +2998,6 @@ class EditorControllerImpl implements EditorController {
           this.createGroupActionClusters(groupId, groupName),
         );
       }
-    } else {
-      const run = this.document.createElement("div");
-      run.dataset.actionCluster = "safe";
-      run.append(
-        this.createCommandButton(
-          "Run test",
-          "test:run",
-          this.saving || this.testRunning,
-          {},
-          "primary",
-        ),
-      );
-      this.appendDockRow(dock, "Test", run);
     }
     this.appendDockRow(dock, "Project", this.createProjectActionRow());
     this.form.append(dock);
@@ -2918,7 +3158,7 @@ class EditorControllerImpl implements EditorController {
     const description = this.document.createElement("p");
     description.dataset.testDescription = "true";
     description.textContent =
-      "Run offline dry-run tests against the current project. Enter test cases (one URL per line) and optional method/resource type defaults. No network requests are made.";
+      "Check whether these URLs match your rules. Nothing is contacted, and nothing is saved.";
     this.form.append(description);
 
     const panel = this.document.createElement("div");
@@ -2939,16 +3179,18 @@ class EditorControllerImpl implements EditorController {
       "https://example.com/page\nhttps://example.com/script.js\nhttps://other.com/";
     urlsTextarea.value = this.testUrls;
     urlsTextarea.dataset.testUrls = "true";
+    urlsTextarea.dataset.editorKey = "test-urls";
     urlsLabel.append(urlsTextarea);
     urlsField.append(urlsLabel);
     urlsFieldset.append(urlsField);
+    const samples = this.renderSampleUrlButtons();
+    if (samples) urlsFieldset.append(samples);
     panel.append(urlsFieldset);
 
-    const defaultsFieldset = this.document.createElement("fieldset");
-    const defaultsLegend = this.document.createElement("legend");
-    defaultsLegend.textContent =
-      "Defaults (applied to all URLs without explicit values)";
-    defaultsFieldset.append(defaultsLegend);
+    const checking = this.document.createElement("p");
+    checking.dataset.testChecking = "true";
+    checking.textContent = checkingCopy(this.testMethod, this.testResourceType);
+    panel.append(checking);
 
     const defaultsGrid = this.document.createElement("div");
     defaultsGrid.dataset.testDefaults = "true";
@@ -2956,68 +3198,56 @@ class EditorControllerImpl implements EditorController {
     const methodField = this.document.createElement("div");
     methodField.dataset.editorField = "true";
     const methodLabel = this.document.createElement("label");
-    methodLabel.textContent = "Default HTTP method";
+    methodLabel.textContent = "Method";
     const methodSelect = this.document.createElement("select");
     methodSelect.dataset.testMethod = "true";
-    methodSelect.value = this.testMethod;
-    const methodEmpty = this.document.createElement("option");
-    methodEmpty.value = "";
-    methodEmpty.textContent = "(none — not-applicable)";
-    methodSelect.append(methodEmpty);
-    for (const m of HTTP_METHODS) {
-      const opt = this.document.createElement("option");
-      opt.value = m;
-      opt.textContent = m;
-      methodSelect.append(opt);
+    methodSelect.dataset.editorKey = "test-method";
+    for (const method of HTTP_METHODS) {
+      const option = this.document.createElement("option");
+      option.value = method;
+      option.textContent = method;
+      methodSelect.append(option);
     }
+    const methodAny = this.document.createElement("option");
+    methodAny.value = "";
+    methodAny.textContent = "Any method";
+    methodSelect.append(methodAny);
+    methodSelect.value = this.testMethod;
     methodLabel.append(methodSelect);
     methodField.append(methodLabel);
 
     const rtField = this.document.createElement("div");
     rtField.dataset.editorField = "true";
     const rtLabel = this.document.createElement("label");
-    rtLabel.textContent = "Default resource type";
+    rtLabel.textContent = "Resource type";
     const rtSelect = this.document.createElement("select");
     rtSelect.dataset.testResourceType = "true";
-    rtSelect.value = this.testResourceType;
-    const rtEmpty = this.document.createElement("option");
-    rtEmpty.value = "";
-    rtEmpty.textContent = "(none — not-applicable)";
-    rtSelect.append(rtEmpty);
-    for (const rt of RESOURCE_TYPES) {
-      const opt = this.document.createElement("option");
-      opt.value = rt;
-      opt.textContent = rt;
-      rtSelect.append(opt);
+    rtSelect.dataset.editorKey = "test-resource-type";
+    for (const resourceType of RESOURCE_TYPES) {
+      const option = this.document.createElement("option");
+      option.value = resourceType;
+      option.textContent = RESOURCE_TYPE_LABELS[resourceType];
+      rtSelect.append(option);
     }
+    const rtAny = this.document.createElement("option");
+    rtAny.value = "";
+    rtAny.textContent = "Any resource type";
+    rtSelect.append(rtAny);
+    rtSelect.value = this.testResourceType;
     rtLabel.append(rtSelect);
     rtField.append(rtLabel);
 
     defaultsGrid.append(methodField, rtField);
-    defaultsFieldset.append(defaultsGrid);
-    panel.append(defaultsFieldset);
+    panel.append(defaultsGrid);
 
-    const maxCasesField = this.document.createElement("div");
-    maxCasesField.dataset.editorField = "true";
-    const maxCasesLabel = this.document.createElement("label");
-    maxCasesLabel.textContent = "Max test cases";
-    const maxCasesInput = this.document.createElement("input");
-    maxCasesInput.type = "number";
-    maxCasesInput.min = "1";
-    maxCasesInput.max = "10000";
-    maxCasesInput.value = this.testMaxCases;
-    maxCasesInput.style.width = "8rem";
-    maxCasesInput.dataset.testMaxCases = "true";
-    maxCasesLabel.append(maxCasesInput);
-    maxCasesField.append(maxCasesLabel);
-    panel.append(maxCasesField);
-
-    const runBtn = this.createButton("Run test", "test:run");
-    runBtn.type = "button";
+    const runBtn = this.createCommandButton(
+      "Run test",
+      "test:run",
+      this.saving || this.testRunning,
+      {},
+      "primary",
+    );
     runBtn.dataset.testRun = "true";
-    runBtn.dataset.command = "test:run";
-    runBtn.dataset.btn = "primary";
-    runBtn.disabled = this.saving || this.testRunning;
     panel.append(runBtn);
 
     this.form.append(panel);
@@ -3025,14 +3255,65 @@ class EditorControllerImpl implements EditorController {
     const resultsSection = this.document.createElement("section");
     resultsSection.dataset.testResults = "true";
     this.form.append(resultsSection);
-    if (this.testResult) {
+    if (this.ruleCount() === 0) {
+      const empty = this.document.createElement("p");
+      empty.dataset.testEmpty = "true";
+      empty.textContent = "This project has no rules to test.";
+      resultsSection.append(empty);
+    } else if (this.testResult) {
       this.renderTestResults(this.testResult);
     } else if (this.testRunning) {
       const pending = this.document.createElement("p");
       pending.dataset.testPending = "true";
-      pending.textContent = "Running dry-run...";
+      pending.textContent = "Checking URLs...";
       resultsSection.append(pending);
+    } else if (this.statusMessage === "Only 256 URLs can be checked at once.") {
+      const limit = this.document.createElement("p");
+      limit.dataset.testLimit = "true";
+      limit.textContent = this.statusMessage;
+      resultsSection.append(limit);
     }
+  }
+
+  private renderSampleUrlButtons(): HTMLElement | undefined {
+    const samples: {
+      groupId: string;
+      ruleId: string;
+      url: string;
+      name: string;
+    }[] = [];
+    for (const group of this.draft.groups) {
+      const groupId = safeText(group.id);
+      for (const rule of group.rules) {
+        const url = exactUrlFromSource(rule.source);
+        if (!url) continue;
+        samples.push({
+          groupId,
+          ruleId: safeText(rule.id),
+          url,
+          name: displayName(rule.name, "Unnamed rule"),
+        });
+      }
+    }
+    if (samples.length === 0) return undefined;
+    const row = this.document.createElement("div");
+    row.dataset.testSamples = "true";
+    for (const sample of samples) {
+      const button = this.createCommandButton(
+        "Try a URL from this rule",
+        "test:try-url",
+        false,
+        { groupId: sample.groupId, ruleId: sample.ruleId, url: sample.url },
+      );
+      if (samples.length > 1) {
+        button.setAttribute(
+          "aria-label",
+          `Try a URL from this rule, ${sample.name}`,
+        );
+      }
+      row.append(button);
+    }
+    return row;
   }
 
   private renderRule(

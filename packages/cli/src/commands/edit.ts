@@ -430,7 +430,41 @@ function generateEditorHtml(
             },
             body: JSON.stringify({ project: currentProject, cases, options }),
           });
-          return res.json();
+          let payload = null;
+          try {
+            payload = await res.json();
+          } catch (error) {
+            payload = null;
+          }
+          if (!res.ok) {
+            const diagnostics = payload && Array.isArray(payload.diagnostics)
+              ? payload.diagnostics.map(function (diagnostic) {
+                  return {
+                    code: diagnostic && typeof diagnostic.code === 'string'
+                      ? diagnostic.code
+                      : 'editor.validation-failed',
+                    severity: 'error',
+                    path: diagnostic && typeof diagnostic.path === 'string'
+                      ? diagnostic.path
+                      : '',
+                    message: diagnostic && typeof diagnostic.message === 'string'
+                      ? diagnostic.message
+                      : 'The project could not be tested.',
+                  };
+                })
+              : [{
+                  code: payload && typeof payload.code === 'string'
+                    ? payload.code
+                    : 'editor.validation-failed',
+                  severity: 'error',
+                  path: '',
+                  message: payload && typeof payload.message === 'string'
+                    ? payload.message
+                    : 'The project could not be tested.',
+                }];
+            return { ok: false, diagnostics: diagnostics };
+          }
+          return payload;
         },
         onCancel: () => {
           cancel();

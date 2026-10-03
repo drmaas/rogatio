@@ -347,14 +347,15 @@ async function checkBoundaries(): Promise<void> {
   ) as { dependencies?: Record<string, string> };
   const extensionDependencies = extensionManifest.dependencies ?? {};
   if (
-    Object.keys(extensionDependencies).length !== 4 ||
+    Object.keys(extensionDependencies).length !== 5 ||
     extensionDependencies["@rogatio/browser-core"] !== "workspace:*" ||
     extensionDependencies["@rogatio/compiler"] !== "workspace:*" ||
+    extensionDependencies["@rogatio/dry-run"] !== "workspace:*" ||
     extensionDependencies["@rogatio/editor"] !== "workspace:*" ||
     extensionDependencies["@rogatio/schema"] !== "workspace:*"
   )
     throw new Error(
-      "Extension must declare its four upstream workspace dependencies",
+      "Extension must declare its five upstream workspace dependencies",
     );
 
   const browserCoreManifest = JSON.parse(
@@ -417,7 +418,9 @@ async function checkBoundaries(): Promise<void> {
   const editorSource = editorSources.join("\n");
   if (
     /node:|process\.|Buffer|from ["'](?:fs|path|url)["']/.test(editorSource) ||
-    /@rogatio\/(browser-core|extension|cli|runtime)/.test(editorSource)
+    /@rogatio\/(browser-core|extension|cli|runtime|dry-run)|ajv/i.test(
+      editorSource,
+    )
   )
     throw new Error(
       "Editor source contains a forbidden runtime or downstream import",
@@ -431,7 +434,9 @@ async function checkBoundaries(): Promise<void> {
     /node:|process\.|Buffer|from ["'](?:fs|path|url)["']/.test(
       editorArtifact,
     ) ||
-    /@rogatio\/(browser-core|extension|cli|runtime)/.test(editorArtifact)
+    /@rogatio\/(browser-core|extension|cli|runtime|dry-run)|ajv/i.test(
+      editorArtifact,
+    )
   )
     throw new Error(
       "Editor browser artifact contains a forbidden import or global",

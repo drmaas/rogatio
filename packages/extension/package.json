@@ -20,6 +20,7 @@
   "dependencies": {
     "@rogatio/browser-core": "workspace:*",
     "@rogatio/compiler": "workspace:*",
+    "@rogatio/dry-run": "workspace:*",
     "@rogatio/editor": "workspace:*",
     "@rogatio/schema": "workspace:*"
   }

@@ -88,11 +88,20 @@ export interface DryRunResult {
   readonly summary: DryRunSummary;
 }
 
+/** Field diagnostics from a host that could not run the test. */
+export interface EditorDryRunFailure {
+  readonly ok: false;
+  readonly diagnostics: readonly EditorDiagnostic[];
+}
+
 export type EditorDryRunHandler = (
   project: EditorProjectSnapshot,
   cases: readonly DryRunTestCase[],
   options?: { maxCases?: number },
-) => DryRunResult | Promise<DryRunResult>;
+) =>
+  | DryRunResult
+  | EditorDryRunFailure
+  | Promise<DryRunResult | EditorDryRunFailure>;
 
 export interface AIAssistRequest {
   readonly kind: "generate" | "fix" | "explain";

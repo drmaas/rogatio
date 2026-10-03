@@ -24,7 +24,8 @@ export type ExtensionCommand =
   | "diagnose-native-runtime"
   | "generate-project"
   | "check-ai-support"
-  | "ai-assist";
+  | "ai-assist"
+  | "dry-run";
 
 export interface ExtensionRequest {
   readonly version: 1;
@@ -61,6 +62,7 @@ const COMMANDS = new Set<ExtensionCommand>([
   "generate-project",
   "check-ai-support",
   "ai-assist",
+  "dry-run",
 ]);
 
 export function parseRequest(value: unknown): ParseRequestResult {

@@ -653,3 +653,108 @@ test("selects the Query parameters rule type and round-trips the action through 
     params: [{ name: "utm_source", operation: "set", value: "rogatio" }],
   });
 });
+
+test("runs one test, keeps misses collapsed, opens the named rule, and labels a disabled group", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const draft = window.editorController.getDraft();
+    window.editorController.destroy();
+    const root = document.querySelector("#editor-root");
+    if (!root) throw new Error("missing editor root");
+    const dimension = (state: string, detail: string) => ({ state, detail });
+    window.editorController = window.editorModule.createEditor({
+      root,
+      initialProject: draft,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      groupEnablement: {
+        isEnabled: (groupId: string) => groupId !== "group-two",
+        setEnabled: () => undefined,
+      },
+      dryRun: () => ({
+        summary: {
+          caseCount: 1,
+          urlCount: 1,
+          matchedUrlCount: 1,
+          matchedRuleTotal: 2,
+        },
+        errors: [],
+        results: [
+          {
+            url: "https://one.example/first",
+            rules: [
+              {
+                groupId: "group-one",
+                ruleId: "rule-one",
+                matched: true,
+                source: dimension("matched", "url"),
+                method: dimension("matched", "GET"),
+                resourceType: dimension("matched", "main_frame"),
+                actionPreview: null,
+              },
+              {
+                groupId: "group-one",
+                ruleId: "rule-two",
+                matched: false,
+                source: dimension("unmatched", "miss"),
+                method: dimension("matched", "GET"),
+                resourceType: dimension("unmatched", "script"),
+                actionPreview: null,
+              },
+              {
+                groupId: "group-two",
+                ruleId: "rule-three",
+                matched: true,
+                source: dimension("matched", "url"),
+                method: dimension("matched", "GET"),
+                resourceType: dimension("matched", "main_frame"),
+                actionPreview: {
+                  kind: "redirect",
+                  summary: "https://two.example/elsewhere",
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    }) as Window["editorController"];
+  });
+
+  await page
+    .locator("[data-desktop-route-rail]")
+    .getByRole("button", { name: "Test console", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Run test", exact: true }),
+  ).toHaveCount(1);
+
+  await page.locator("[data-test-urls]").fill("https://one.example/first");
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
+
+  const misses = page.locator("details[data-test-misses]");
+  await expect(misses).toHaveCount(1);
+  await expect(misses).not.toHaveAttribute("open");
+  await expect(misses.locator("summary")).toHaveText("1 rule did not match");
+  await expect(
+    misses.getByRole("button", { name: "Second rule", exact: true }),
+  ).toBeHidden();
+
+  await page
+    .locator("[data-test-outcome]")
+    .getByRole("button", { name: "First rule", exact: true })
+    .click();
+  await expect(
+    page.locator('[data-rule-card][data-rule-id="rule-one"]'),
+  ).toBeVisible();
+
+  await page
+    .locator("[data-desktop-route-rail]")
+    .getByRole("button", { name: "Test console", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "This group is off in Chrome, so the browser will not apply this rule.",
+    ),
+  ).toBeVisible();
+});

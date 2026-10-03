@@ -737,6 +737,10 @@
   .rogatio-editor :focus-visible {
     outline-color: Highlight;
   }
+  .rogatio-editor [data-test-rule-link] {
+    color: LinkText;
+    background: transparent;
+  }
   .rogatio-editor [data-desktop-route-rail] {
     border-bottom-color: ButtonText;
   }
@@ -749,9 +753,39 @@
     transition: none;
   }
 }
-.rogatio-editor [data-test-description] {
+.rogatio-editor [data-test-description],
+.rogatio-editor [data-test-checking] {
   color: var(--rogatio-muted);
   margin-block: 0 1rem;
+}
+.rogatio-editor [data-test-samples] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.rogatio-editor [data-test-outcome] {
+  margin: 0;
+}
+.rogatio-editor [data-test-rule-link] {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--rogatio-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.rogatio-editor [data-test-misses] {
+  margin-top: 0.5rem;
+}
+.rogatio-editor [data-test-misses] summary {
+  cursor: pointer;
+}
+.rogatio-editor [data-test-miss-reason] {
+  color: var(--rogatio-muted);
 }
 .rogatio-editor [data-test-panel] {
   display: grid;
