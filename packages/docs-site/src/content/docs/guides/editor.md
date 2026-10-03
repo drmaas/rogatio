@@ -10,24 +10,16 @@ editor.
 
 - Edit project metadata.
 - Rename a group or rule on its own heading: click the pencil, type, then save with the check mark or `Enter`. Cancel with the cross or `Escape`.
-- Create, copy, reorder, and remove rules; create, copy, and remove groups (groups are selected from the rail, not reordered).
+- Create, copy, reorder, and remove rules; create, copy, and remove groups (groups are selected from the group picker, not reordered).
 - Convert URLs to exact-match regular expressions.
 - Validate, save, or cancel unsaved changes.
 - Inspect field-level errors.
 
 ## Navigation and accessibility
 
-- In the CLI editor and extension Workspace: project destination, one destination per
-  group, **Test console**, and project-wide group/rule **search**. The CLI project page
-  still lists groups in place. The extension Workspace header shows the project name as
-  one breadcrumb, with the open group beside it, and puts the group menu on a bar under
-  that header.
+- In the CLI editor and extension Workspace: a breadcrumb with the project name and a group link. The group link opens a picker (name, rule count, and enabled state when the host supplies it). **Test console** is on the command bar. Project-wide group/rule **search** stays on the breadcrumb bar. The project page still lists groups in place.
 - The extension management shell also provides a **Dashboard** overview (including **Create using AI** when the native runtime is started and a provider is configured via `rogatio ai`) and a **Workspace** for rule editing. Workspace **AI Assist** uses the same native-host path when available; the CLI editor uses `rogatio edit`'s local `/api/ai/assist` route instead. When the draft has validation errors, AI Assist sends a **fix** request: the returned proposal repairs the offending rules in place (keeping their rule ids and positions) and the host validates the repaired project before accepting it — the extension rejects proposals that do not repair the project (`extension.ai-invalid-proposal`). Otherwise the proposal's rules are appended as new rules.
-- A contextual command bar (Validate / Save / Cancel) and a desktop route rail; a compact
-  mobile navigation. **Run test** is one control on **Test console**. Add group sits on the
-  Groups heading. Add/copy rule, rule reorder/remove, and Copy/Remove group sit next to
-  their section or entity. Project and group actions repeat in a labeled ledger under the
-  last rule and under the test results.
+- A contextual command bar (Test console, Validate, Save, Cancel). **Run test** is one control on **Test console**. Add group sits on the Groups heading. Add/copy rule, rule reorder/remove, and Copy/Remove group sit next to their section or entity. Project and group actions repeat in a labeled ledger under the last rule and under the test results. The ledger does not repeat Run test.
 - Group and rule **names are unique per project**: a group and a rule cannot share a name, and names that differ only by case or spacing count as the same. A duplicate is refused where you typed it, and the message names the entity that already holds the name.
 - **IDs are managed for you.** A group's and a rule's ID stay in your `.rogatio.json` file and are derived from the name at the moment the entity is created or copied, but you never see, type, or change one. Renaming a group or rule does not change its ID, so links, installed rules, and enablement survive a rename. If a hand-written file has a duplicate or malformed ID, the error list offers **Assign a new ID**.
 - Full keyboard use, screen-reader support, forced-colors support, and 200% zoom support.

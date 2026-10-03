@@ -576,11 +576,11 @@ if (AI_LIVE) {
         await importAndEnableSample(page, project);
         await openWithAISupport(page, extensionId, profile);
         // The editor renders rule cards per route; open the sample group first.
+        await page.locator("[data-command='open-group-picker']").click();
         await page
-          .locator("[data-desktop-route-rail]")
-          .getByRole("button", {
-            name: project.groups[0]?.name ?? "Unnamed group",
-            exact: true,
+          .locator("[data-group-picker] button")
+          .filter({
+            hasText: project.groups[0]?.name ?? "Unnamed group",
           })
           .click();
 

@@ -24,10 +24,10 @@ and **Import project** (a file picker that accepts any filename). The popup has 
 or rule-authoring controls.
 
 The management page uses a **Dashboard** overview and a **Workspace** editor shell. The
-Workspace header keeps the active project name as one breadcrumb, and shows the open
-group beside it. **Refresh**, **Export project**, and **Remove project** sit with the
-group menu on a bar under that header. The Dashboard keeps its project cards and does
-not use this breadcrumb.
+Workspace breadcrumb is the editor's project name and group link. The group link opens a
+picker. **Refresh**, **Export project**, and **Remove project** sit on Project details.
+The Active rules label sits on the Rules card. The Dashboard keeps its project cards and
+does not show this breadcrumb.
 
 The Workspace sidebar is a set of cards. **Runtime** holds Start/Stop, the runtime status, the
 extension ID, and a **Show diagnostics** control when the runtime has failed. When Chrome
@@ -35,7 +35,7 @@ rejects the native host because that ID is not in `allowed_origins`, the card na
 mismatch and shows the `rogatio runtime install` command that re-pins it. **AI** reports
 whether AI is configured: `Configured` with the provider URL and model the native host will
 use (the API key never reaches the extension), `Not configured`, `not reported` against an
-older runtime host, or `needs runtime` before the runtime starts. **Rules** lists every rule
+older runtime host, or `needs runtime` before the runtime starts. **Rules** starts with the Active rules label, then lists every rule
 with its install status; each rule is a
 link that opens that rule in the editor, and a rule that failed to install also selects a
 card showing the concrete install failure reason. **Match logging** sits in the **Rules**

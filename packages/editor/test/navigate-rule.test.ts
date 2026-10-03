@@ -51,7 +51,7 @@ function mount(initialProject: unknown = project) {
 function activeRoute(root: HTMLElement): string | undefined {
   return (
     root
-      .querySelector("[data-route='group'][aria-current='page']")
+      .querySelector("[data-command='open-group-picker'][aria-current='page']")
       ?.getAttribute("data-group-id") ?? undefined
   );
 }

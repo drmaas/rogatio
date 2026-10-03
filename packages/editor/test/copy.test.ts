@@ -18,12 +18,18 @@ function createTestEditor(initialProject: unknown) {
 
 function openGroup(root: HTMLElement, groupName = "One"): void {
   root
-    .querySelectorAll("[data-desktop-route-rail] button[data-route='group']")
-    .forEach((button) => {
-      if (button.textContent === groupName) {
-        button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      }
-    });
+    .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const match = [
+    ...root.querySelectorAll<HTMLButtonElement>(
+      "[data-group-picker] button[data-route='group']",
+    ),
+  ].find(
+    (button) =>
+      button.querySelector("[data-group-picker-name]")?.textContent ===
+      groupName,
+  );
+  match?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 }
 
 function openProject(root: HTMLElement): void {

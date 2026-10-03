@@ -1271,9 +1271,9 @@ test("activates the error link by keyboard and focuses the failing rule card", a
   await errorLink.focus();
   await expect(errorLink).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(
-    page.locator('[data-editor-key="route:group:group-b"]'),
-  ).toHaveAttribute("aria-current", "page");
+  const groupCrumb = page.locator('[data-editor-key="route:groups"]');
+  await expect(groupCrumb).toHaveAttribute("aria-current", "page");
+  await expect(groupCrumb).toHaveAttribute("data-group-id", "group-b");
   await expect(page.locator("#rogatio-rule-group-b\\:rule-two")).toBeFocused();
   await expect(page.locator("[data-rule-error-card]")).toContainText(
     "Group B / Rule two",

@@ -56,8 +56,9 @@ test("drives the real extension page lifecycle and mounts the editor", async ({
   await expect(page.getByText("Project imported.")).toBeVisible();
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
 
+  await page.locator("[data-command='open-group-picker']").click();
   await page
-    .locator('[data-desktop-route-rail] [data-group-id="group-real"]')
+    .locator('[data-group-picker] [data-group-id="group-real"]')
     .click();
   const enable = page.locator("[data-group-heading] [data-group-enable]");
   await expect(enable).toHaveText("Enable");

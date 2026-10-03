@@ -57,8 +57,11 @@ function mount() {
 
 function openGroup(root: HTMLElement, groupId: string): void {
   root
+    .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  root
     .querySelector<HTMLButtonElement>(
-      `[data-desktop-route-rail] button[data-group-id="${groupId}"]`,
+      `[data-group-picker] button[data-group-id="${groupId}"]`,
     )
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 }
@@ -623,9 +626,7 @@ describe("test console result rows", () => {
       dryRun: () => dryRunResult(rows),
     });
     root
-      .querySelector<HTMLButtonElement>(
-        '[data-desktop-route-rail] button[data-route="test"]',
-      )
+      .querySelector<HTMLButtonElement>('button[data-route="test"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const urls = root.querySelector<HTMLTextAreaElement>("[data-test-urls]");
     if (urls) {

@@ -193,6 +193,20 @@ function installChromeMock(seed: MockEnvelope): void {
               );
             }
             callback({ ok: true, value: project ?? state });
+          } else if (message.command === "export-project") {
+            const projectId = message.projectId;
+            const project =
+              typeof projectId === "string"
+                ? state.projects[projectId]
+                : undefined;
+            callback(
+              project
+                ? { ok: true, value: project }
+                : {
+                    ok: false,
+                    diagnostic: { code: "extension.missing-project" },
+                  },
+            );
           } else callback({ ok: true, value: state });
         },
       },
@@ -212,16 +226,6 @@ async function expectProjectActions(page: Page): Promise<void> {
 
 async function expectPickerAbsent(page: Page): Promise<void> {
   await expect(page.locator("[data-project-picker]")).toHaveCount(0);
-}
-
-async function selectOptionLabels(
-  select: ReturnType<Page["locator"]>,
-): Promise<string[]> {
-  return select.evaluate((element) =>
-    [...(element as HTMLSelectElement).options].map(
-      (option) => option.textContent ?? "",
-    ),
-  );
 }
 
 test("editor renders the dark design system with navigation at the top", async ({
@@ -259,8 +263,9 @@ test("editor renders the dark design system with navigation at the top", async (
   expect(railBox.width > railBox.height).toBe(true);
 
   await page.setViewportSize({ width: 360, height: 800 });
-  await expect(rail).toBeHidden();
-  await expect(page.locator("[data-mobile-route-nav] select")).toBeVisible();
+  await expect(rail).toBeVisible();
+  await expect(page.locator("[data-mobile-route-nav]")).toHaveCount(0);
+  await expect(page.locator("[data-route-breadcrumb] li")).toHaveCount(2);
   // The CLI editor keeps its project-page group list. Workspace chrome is
   // extension-only.
   await expect(page.locator("[data-group-list]")).toBeVisible();
@@ -381,60 +386,53 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
     page.getByRole("button", { name: "Import project" }),
   ).toHaveCount(0);
 
-  const breadcrumb = page.locator("[data-workspace-breadcrumb]");
+  const breadcrumb = page.locator("[data-route-breadcrumb]");
   await expect(breadcrumb).toBeVisible();
-  await expect(breadcrumb.locator("[data-workspace-project]")).toHaveCount(1);
-  await expect(breadcrumb.locator("[data-workspace-project]")).toHaveText(
+  await expect(breadcrumb.locator("[data-route='project']")).toHaveText(
     "Project A",
   );
-  await expect(breadcrumb.locator("li")).toHaveCount(1);
+  await expect(
+    breadcrumb.locator("[data-command='open-group-picker']"),
+  ).toHaveText("Groups");
+  await expect(page.locator("[data-workspace-breadcrumb]")).toHaveCount(0);
+  await expect(page.locator("[data-workspace-subheader]")).toHaveCount(0);
+  await expect(page.locator("[data-group-menu]")).toHaveCount(0);
   await expect(
     page.locator(".rogatio-topbar [data-command='export']"),
   ).toHaveCount(0);
 
-  const subheader = page.locator("[data-workspace-subheader]");
-  await expect(subheader).toBeVisible();
-  const headerBox = await page.locator(".rogatio-topbar").boundingBox();
-  const subheaderBox = await subheader.boundingBox();
-  expect(headerBox).not.toBeNull();
-  expect(subheaderBox).not.toBeNull();
-  if (!headerBox || !subheaderBox) throw new Error("missing header boxes");
-  expect(subheaderBox.y).toBeGreaterThanOrEqual(
-    headerBox.y + headerBox.height - 1,
-  );
-  await expect(subheader.locator("[data-project-settings]")).toBeVisible();
+  const projectActions = page.locator("[data-project-actions]");
   await expect(
-    subheader.getByRole("button", { name: "Refresh" }),
+    projectActions.getByRole("button", { name: "Refresh" }),
   ).toBeVisible();
   await expect(
-    subheader.getByRole("button", { name: "Export project" }),
+    projectActions.getByRole("button", { name: "Export project" }),
   ).toBeVisible();
   await expect(
-    subheader.getByRole("button", { name: "Remove project" }),
+    projectActions.getByRole("button", { name: "Remove project" }),
   ).toBeVisible();
-  const groupMenu = subheader.locator("[data-group-menu]");
-  await expect(groupMenu).toBeVisible();
-  await expect(groupMenu).toHaveAttribute("aria-label", "Group menu");
-  expect(await selectOptionLabels(groupMenu)).toEqual([
-    "Project",
-    "One",
-    "Test console",
-  ]);
+  await expect(
+    page.locator("[data-card='rules'] [data-badge-state]"),
+  ).toContainText("Active rules:");
+  await expect(
+    page.locator("[data-editor-command-bar] [data-route='test']"),
+  ).toBeVisible();
 
-  await groupMenu.selectOption("group:group-one");
-  await expect(breadcrumb.locator("[data-workspace-project]")).toHaveText(
+  await breadcrumb.locator("[data-command='open-group-picker']").click();
+  await page.locator("[data-group-picker] [data-group-id='group-one']").click();
+  await expect(breadcrumb.locator("[data-route='project']")).toHaveText(
     "Project A",
   );
-  await expect(breadcrumb.locator("li")).toHaveCount(2);
-  await expect(breadcrumb.locator("[data-workspace-section]")).toHaveText(
-    "One",
-  );
+  await expect(
+    breadcrumb.locator("[data-command='open-group-picker']"),
+  ).toHaveText("One");
   await expect(page.locator("[data-group-heading]")).toBeVisible();
 
-  await breadcrumb.locator("[data-workspace-project]").click();
-  await expect(breadcrumb.locator("li")).toHaveCount(1);
+  await breadcrumb.locator("[data-route='project']").click();
   await expect(page.locator('[data-path="/name"]')).toBeVisible();
-  await expect(groupMenu).toHaveValue("project");
+  await expect(
+    breadcrumb.locator("[data-command='open-group-picker']"),
+  ).toHaveText("Groups");
 
   await page.getByRole("button", { name: "Dashboard", exact: true }).click();
   await expect(page.locator("[data-workspace-breadcrumb]")).toHaveCount(0);
@@ -452,20 +450,19 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   await expect(
     page.locator("[data-editor-root] [data-rogatio-editor]"),
   ).toBeVisible();
-  await expect(page.locator("[data-workspace-project]")).toHaveCount(1);
-  await expect(page.locator("[data-workspace-project]")).toHaveText(
-    "Project B",
+  await expect(
+    page.locator("[data-route-breadcrumb] [data-route='project']"),
+  ).toHaveText("Project B");
+  await page.locator("[data-command='open-group-picker']").click();
+  await expect(page.locator("[data-group-picker]")).toContainText(
+    "No groups yet.",
   );
-  await expect(page.locator("[data-workspace-breadcrumb] li")).toHaveCount(1);
-  expect(await selectOptionLabels(page.locator("[data-group-menu]"))).toEqual([
-    "Project",
-    "Test console",
-  ]);
+  await page.locator("[data-command='close-group-picker']").click();
 
   await page.setViewportSize({ width: 360, height: 800 });
-  await expect(page.locator("[data-group-menu]")).toBeVisible();
-  await expect(page.locator("[data-workspace-project]")).toBeVisible();
-  await expect(page.locator("[data-mobile-route-nav]")).toBeHidden();
+  await expect(page.locator("[data-group-menu]")).toHaveCount(0);
+  await expect(page.locator("[data-route-breadcrumb]")).toBeVisible();
+  await expect(page.locator("[data-mobile-route-nav]")).toHaveCount(0);
 });
 
 test("popup renders the dark Rogatio card", async ({ page, request }) => {
@@ -753,6 +750,52 @@ test("exports with the default name and a custom name", async ({ page }) => {
   await expect(page.locator(".rogatio-status")).toHaveText("Project exported.");
 });
 
+test("workspace export follows the active project, not the dashboard selection", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, defaultEnvelope());
+  await page.goto("/extension/index.html");
+  await page.locator("[data-project-selector]").selectOption("project-b");
+  await expect(page.locator(".rogatio-status")).toContainText("Project B");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.evaluate(() => {
+    const view = window as unknown as {
+      __save: { written?: string } | null;
+      showSaveFilePicker: () => Promise<{
+        name: string;
+        createWritable: () => Promise<{
+          write: (data: string) => Promise<void>;
+          close: () => Promise<void>;
+        }>;
+      }>;
+    };
+    view.__save = null;
+    view.showSaveFilePicker = async () => {
+      let written = "";
+      return {
+        name: "checkout.json",
+        createWritable: async () => ({
+          write: async (data: string) => {
+            written = String(data);
+          },
+          close: async () => {
+            view.__save = { written };
+          },
+        }),
+      };
+    };
+  });
+  await page.getByRole("button", { name: "Export project" }).click();
+  await expect(page.locator(".rogatio-status")).toHaveText("Project exported.");
+  const written = await page.evaluate(
+    () =>
+      (window as unknown as { __save: { written?: string } | null }).__save
+        ?.written ?? "",
+  );
+  expect(written).toContain("Project A");
+  expect(written).not.toContain("Project B");
+});
+
 test("popup hides project picker when there are zero projects", async ({
   page,
 }) => {
@@ -856,14 +899,30 @@ test("workspace enable button sits on the group heading", async ({ page }) => {
   await expect(startRuntime).toBeVisible();
   await expect(page.locator("[data-group-activation]")).toHaveCount(0);
 
-  await page
-    .locator('[data-desktop-route-rail] [data-group-id="group-one"]')
-    .click();
+  await page.locator("[data-command='open-group-picker']").click();
+  await page.locator('[data-group-picker] [data-group-id="group-one"]').click();
   const enable = page.locator("[data-group-heading] [data-group-enable]");
   await expect(enable).toBeVisible();
   await expect(enable).toHaveText("Disable");
   await expect(enable).toHaveAttribute("aria-label", "Disable group One");
   await expect(page.locator("[data-group-toggle]")).toHaveCount(0);
+
+  await page.setViewportSize({ width: 1100, height: 280 });
+  await page.evaluate(() => {
+    document.querySelector("[data-editor-main]")?.scrollTo(0, 10_000);
+  });
+  const railClearsChrome = await page.evaluate(() => {
+    const chrome = document.querySelector(".rogatio-chrome");
+    const rail = document.querySelector("[data-desktop-route-rail]");
+    const editorMain = document.querySelector("[data-editor-main]");
+    if (!chrome || !rail || !editorMain || editorMain.scrollTop <= 0)
+      return false;
+    return (
+      rail.getBoundingClientRect().top >=
+      chrome.getBoundingClientRect().bottom - 1
+    );
+  });
+  expect(railClearsChrome).toBe(true);
 });
 
 test("workspace group toggle keeps dirty editor draft mounted", async ({
@@ -888,9 +947,8 @@ test("workspace group toggle keeps dirty editor draft mounted", async ({
     "Unsaved changes",
   );
 
-  await page
-    .locator('[data-desktop-route-rail] [data-group-id="group-one"]')
-    .click();
+  await page.locator("[data-command='open-group-picker']").click();
+  await page.locator('[data-group-picker] [data-group-id="group-one"]').click();
   const toggle = page.locator("[data-group-heading] [data-group-enable]");
   await expect(toggle).toHaveText("Disable");
   await toggle.click();

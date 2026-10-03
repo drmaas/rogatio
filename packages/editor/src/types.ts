@@ -218,6 +218,19 @@ export interface EditorGroupEnablement {
   ) => void | Promise<void>;
 }
 
+/**
+ * Host-owned action drawn on the project details page. The editor renders the
+ * button and leaves the command to the host. Omit the list on hosts that have
+ * no project lifecycle, such as the CLI. `command` must not be one the editor
+ * already handles (`save`, `validate`, `cancel`, `remove-group`, and the other
+ * editor `data-command` values); those clicks never reach the host.
+ */
+export interface EditorProjectAction {
+  readonly command: string;
+  readonly label: string;
+  readonly tone?: "danger";
+}
+
 export interface EditorOptions {
   readonly root: HTMLElement;
   readonly initialProject: unknown;
@@ -231,6 +244,8 @@ export interface EditorOptions {
   readonly onDismissMigrationNotices?: () => void | Promise<void>;
   /** Omit on hosts that have no browser group enablement, such as the CLI. */
   readonly groupEnablement?: EditorGroupEnablement;
+  /** Omit on hosts that have no project lifecycle actions, such as the CLI. */
+  readonly projectActions?: readonly EditorProjectAction[];
 }
 
 export interface EditorController {
