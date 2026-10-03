@@ -94,6 +94,17 @@ export interface EditorDryRunFailure {
   readonly diagnostics: readonly EditorDiagnostic[];
 }
 
+/**
+ * A host body that lists field diagnostics and is not a dry-run result.
+ * `POST /api/dry-run` returns this shape on a non-2xx response; the page maps
+ * it to `EditorDryRunFailure`. The editor also accepts it directly.
+ */
+export interface EditorDryRunDiagnosticBody {
+  readonly code?: string;
+  readonly message?: string;
+  readonly diagnostics: readonly EditorDiagnostic[];
+}
+
 export type EditorDryRunHandler = (
   project: EditorProjectSnapshot,
   cases: readonly DryRunTestCase[],
@@ -101,7 +112,8 @@ export type EditorDryRunHandler = (
 ) =>
   | DryRunResult
   | EditorDryRunFailure
-  | Promise<DryRunResult | EditorDryRunFailure>;
+  | EditorDryRunDiagnosticBody
+  | Promise<DryRunResult | EditorDryRunFailure | EditorDryRunDiagnosticBody>;
 
 export interface AIAssistRequest {
   readonly kind: "generate" | "fix" | "explain";

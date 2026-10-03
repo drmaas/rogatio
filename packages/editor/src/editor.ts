@@ -2196,7 +2196,7 @@ class EditorControllerImpl implements EditorController {
   ): void {
     this.testResult = undefined;
     this.testRunning = false;
-    this.errors = diagnostics;
+    this.errors = [...diagnostics];
     const count = diagnostics.length;
     this.statusMessage =
       count === 0

@@ -16,6 +16,7 @@ export type {
   EditorAIAssistHandler,
   EditorController,
   EditorDiagnostic,
+  EditorDryRunDiagnosticBody,
   EditorDryRunFailure,
   EditorGroupEnablement,
   EditorOptions,
