@@ -2367,8 +2367,8 @@ class EditorControllerImpl implements EditorController {
       const misses = urlResult.rules.filter((rule) => !rule.matched);
       card.dataset.matched = matches.length > 0 ? "true" : "false";
 
-      for (const rule of matches) {
-        card.append(this.renderTestOutcome(urlResult.url, rule));
+      if (matches.length > 0) {
+        card.append(this.renderTestMatches(urlResult.url, matches));
       }
       if (misses.length > 0) {
         card.append(this.renderTestMisses(misses));
@@ -2432,6 +2432,29 @@ class EditorControllerImpl implements EditorController {
     tail.textContent = tailParts.join("");
     outcome.append(lead, ruleButton, tail);
     return outcome;
+  }
+
+  /**
+   * Matching rules sit under an open disclosure headed by their count, mirroring
+   * the closed misses disclosure so both lists are labeled the same way.
+   */
+  private renderTestMatches(
+    url: string,
+    matches: readonly DryRunRuleMatchResult[],
+  ): HTMLElement {
+    const details = this.document.createElement("details");
+    details.dataset.testMatches = "true";
+    details.open = true;
+    const summary = this.document.createElement("summary");
+    summary.textContent =
+      matches.length === 1
+        ? "1 rule matched"
+        : `${matches.length} rules matched`;
+    details.append(summary);
+    for (const rule of matches) {
+      details.append(this.renderTestOutcome(url, rule));
+    }
+    return details;
   }
 
   private renderTestMisses(

@@ -254,6 +254,11 @@ describe("test console", () => {
     expect(root.textContent).toContain(
       "This group is off in Chrome, so the browser will not apply this rule.",
     );
+    const matches = root.querySelector("details[data-test-matches]");
+    expect(matches?.hasAttribute("open")).toBe(true);
+    expect(matches?.querySelector("summary")?.textContent).toBe(
+      "1 rule matched",
+    );
     const misses = root.querySelector("details[data-test-misses]");
     expect(misses?.hasAttribute("open")).toBe(false);
     expect(misses?.querySelector("summary")?.textContent).toBe(
@@ -267,6 +272,47 @@ describe("test console", () => {
     expect(
       root.querySelector('[data-rule-card][data-rule-id="old-path"]'),
     ).not.toBeNull();
+  });
+
+  it("heads matched rules with their count", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      dryRun: () =>
+        result([
+          {
+            groupId: "ads",
+            ruleId: "old-path",
+            matched: true,
+            source: dimension("matched", "url"),
+            method: dimension("matched", "GET"),
+            resourceType: dimension("matched", "page"),
+            actionPreview: null,
+          },
+          {
+            groupId: "ads",
+            ruleId: "post-only",
+            matched: true,
+            source: dimension("matched", "url"),
+            method: dimension("matched", "GET"),
+            resourceType: dimension("matched", "page"),
+            actionPreview: null,
+          },
+        ]),
+    });
+    openTest(root);
+    typeUrl(root, "https://example.com/old");
+    await clickRun(root);
+    const matches = root.querySelector("details[data-test-matches]");
+    expect(matches?.querySelector("summary")?.textContent).toBe(
+      "2 rules matched",
+    );
+    expect(matches?.querySelectorAll("[data-test-outcome]")).toHaveLength(2);
+    expect(root.querySelector("details[data-test-misses]")).toBeNull();
   });
 
   it("shows field diagnostics for an invalid draft and keeps rendering", async () => {

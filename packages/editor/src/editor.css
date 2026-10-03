@@ -838,6 +838,21 @@
 .rogatio-editor [data-test-misses] summary {
   cursor: pointer;
 }
+.rogatio-editor [data-test-matches] summary {
+  cursor: pointer;
+}
+.rogatio-editor [data-test-matches] summary::before {
+  content: "✓";
+  color: var(--rogatio-success);
+  font-weight: 700;
+  margin-right: 0.4em;
+}
+.rogatio-editor [data-test-misses] summary::before {
+  content: "×";
+  color: var(--rogatio-danger);
+  font-weight: 700;
+  margin-right: 0.4em;
+}
 .rogatio-editor [data-test-miss-reason] {
   color: var(--rogatio-muted);
 }
