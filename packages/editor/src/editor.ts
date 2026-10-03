@@ -20,6 +20,7 @@ import {
   type EditorDiagnostic,
   EditorInitializationError,
   type EditorOptions,
+  type EditorProjectAction,
   type EditorProjectSnapshot,
   type RuleProposal,
   type RuleTypeFieldContext,
@@ -203,6 +204,34 @@ type FocusSnapshot = {
   selectionEnd?: number | null;
 };
 type SnapshotResult = { valid: true; value: unknown } | { valid: false };
+
+function normalizeProjectActions(
+  value: unknown,
+): readonly EditorProjectAction[] {
+  if (!Array.isArray(value)) return [];
+  const actions: EditorProjectAction[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (!Object.hasOwn(value, index)) continue;
+    const item = value[index];
+    if (!isRecord(item)) continue;
+    const command = item.command;
+    const label = item.label;
+    if (typeof command !== "string" || command.length === 0) continue;
+    if (typeof label !== "string" || label.length === 0) continue;
+    if (item.tone === "danger") {
+      actions.push({ command, label, tone: "danger" });
+    } else {
+      actions.push({ command, label });
+    }
+  }
+  return actions;
+}
+
+function ruleCountLabel(count: number): string {
+  if (count === 0) return "No rules";
+  if (count === 1) return "1 rule";
+  return `${count} rules`;
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -834,6 +863,8 @@ class EditorControllerImpl implements EditorController {
   private readonly extensionControls = new Map<string, HTMLElement>();
   private extensionCleanups: Array<() => void> = [];
   private confirmation: Confirmation | undefined;
+  private groupPickerOpen = false;
+  private readonly projectActions: readonly EditorProjectAction[];
   private focusRequest: string | undefined;
   private saving = false;
   private destroyed = false;
@@ -868,6 +899,7 @@ class EditorControllerImpl implements EditorController {
     this.root = options.root;
     this.document = options.root.ownerDocument;
     this.options = options;
+    this.projectActions = normalizeProjectActions(options.projectActions);
     this.extensions = extensions;
     this.instanceId = `rogatio-editor-${++editorInstanceCount}`;
     this.draft = initial;
@@ -1006,6 +1038,15 @@ class EditorControllerImpl implements EditorController {
     if (this.destroyed) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
+    if (
+      this.groupPickerOpen &&
+      target instanceof HTMLElement &&
+      target.dataset.groupPicker !== undefined &&
+      event.target === target
+    ) {
+      this.closeGroupPicker();
+      return;
+    }
     const element = target.closest<HTMLElement>(
       "[data-command], [data-route], [data-search-result], [data-error-path]",
     );
@@ -1074,15 +1115,6 @@ class EditorControllerImpl implements EditorController {
         target instanceof HTMLSelectElement
       )
     ) {
-      return;
-    }
-    if (
-      target.dataset.mobileRoute !== undefined &&
-      target instanceof HTMLSelectElement
-    ) {
-      const selectedOption = target.options[target.selectedIndex];
-      const groupId = selectedOption?.dataset.groupId;
-      this.navigate(target.value, groupId);
       return;
     }
     if (
@@ -1169,6 +1201,11 @@ class EditorControllerImpl implements EditorController {
       this.confirmation = undefined;
       this.statusMessage = "No changes were discarded.";
       this.render();
+      return;
+    }
+    if (event.key === "Escape" && this.groupPickerOpen) {
+      event.preventDefault();
+      this.closeGroupPicker();
       return;
     }
     const target = event.target;
@@ -1337,6 +1374,14 @@ class EditorControllerImpl implements EditorController {
       this.testUrls = url;
       this.statusMessage = "";
       this.render();
+      return;
+    }
+    if (command === "open-group-picker") {
+      this.openGroupPicker();
+      return;
+    }
+    if (command === "close-group-picker") {
+      this.closeGroupPicker();
     }
   }
 
@@ -2478,6 +2523,7 @@ class EditorControllerImpl implements EditorController {
   }
 
   private navigate(route: string, groupId: string | undefined): void {
+    const returnFocusToGroups = this.groupPickerOpen;
     if (route === "project") {
       this.route = { kind: "project" };
     } else if (route === "test") {
@@ -2487,6 +2533,8 @@ class EditorControllerImpl implements EditorController {
     } else {
       return;
     }
+    this.groupPickerOpen = false;
+    if (returnFocusToGroups) this.focusRequest = "route:groups";
     this.closeRenameOnLeave();
     this.testRequestId += 1;
     this.statusMessage = "";
@@ -2516,6 +2564,7 @@ class EditorControllerImpl implements EditorController {
   }
 
   navigateToGroup(groupId: string | null | undefined): void {
+    this.groupPickerOpen = false;
     const groupIds = new Set(
       this.draft.groups
         .map((group) => (typeof group.id === "string" ? group.id : ""))
@@ -2606,6 +2655,7 @@ class EditorControllerImpl implements EditorController {
   }
 
   private navigateToSearchResult(path: string): void {
+    this.groupPickerOpen = false;
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
       this.route = { kind: "project" };
@@ -2718,7 +2768,9 @@ class EditorControllerImpl implements EditorController {
     this.renderSummary();
     this.renderMigrationNotices();
     this.renderSearchResults();
+    if (this.confirmation) this.groupPickerOpen = false;
     this.renderConfirmation();
+    this.renderGroupPicker();
     this.restoreFocus();
     this.focusRequest = undefined;
   }
@@ -2734,40 +2786,7 @@ class EditorControllerImpl implements EditorController {
       ? "Unsaved changes"
       : "All changes saved";
     titleBlock.append(title, dirty);
-
-    const mobileNav = this.document.createElement("label");
-    mobileNav.dataset.mobileRouteNav = "true";
-    mobileNav.textContent = "Project section";
-    const select = this.document.createElement("select");
-    select.dataset.mobileRoute = "true";
-    select.dataset.editorKey = "mobile-route";
-    const projectOption = this.document.createElement("option");
-    projectOption.value = "project";
-    projectOption.textContent = "Project";
-    select.append(projectOption);
-    for (const group of this.draft.groups) {
-      const option = this.document.createElement("option");
-      option.value = "group";
-      option.dataset.groupId = safeText(group.id);
-      option.textContent = displayName(group.name, "Unnamed group");
-      select.append(option);
-    }
-    const testOption = this.document.createElement("option");
-    testOption.value = "test";
-    testOption.textContent = "Test console";
-    select.append(testOption);
-    if (this.route.kind === "project") {
-      select.value = "project";
-    } else if (this.route.kind === "test") {
-      select.value = "test";
-    } else {
-      const groupId = this.route.groupId;
-      const options = Array.from(select.options);
-      const option = options.find((value) => value.dataset.groupId === groupId);
-      if (option) select.value = "group";
-    }
-    mobileNav.append(select);
-    this.header.append(titleBlock, mobileNav);
+    this.header.append(titleBlock);
     this.status.textContent = this.statusMessage;
     this.status.setAttribute("aria-busy", this.saving ? "true" : "false");
   }
@@ -2778,30 +2797,40 @@ class EditorControllerImpl implements EditorController {
     heading.dataset.editorVisuallyHidden = "true";
     heading.textContent = "Project sections";
     this.rail.append(heading);
-    const project = this.createButton("Project", "route:project");
+
+    const list = this.document.createElement("ol");
+    list.dataset.routeBreadcrumb = "true";
+
+    const projectItem = this.document.createElement("li");
+    const project = this.createButton(
+      displayName(this.draft.name, "Project"),
+      "route:project",
+    );
     project.dataset.route = "project";
     project.dataset.editorKey = "route:project";
-    if (this.route.kind === "project")
+    if (this.route.kind === "project") {
       project.setAttribute("aria-current", "page");
-    this.rail.append(project);
-    for (const group of this.draft.groups) {
-      const groupId = safeText(group.id);
-      const name = displayName(group.name, "Unnamed group");
-      const button = this.createButton(name, `route:group:${groupId}`);
-      button.dataset.route = "group";
-      button.dataset.groupId = groupId;
-      button.dataset.editorKey = `route:group:${groupId}`;
-      if (this.route.kind === "group" && this.route.groupId === groupId) {
-        button.setAttribute("aria-current", "page");
-      }
-      this.rail.append(button);
     }
-    const testBtn = this.createButton("Test console", "route:test");
-    testBtn.dataset.route = "test";
-    testBtn.dataset.editorKey = "route:test";
-    if (this.route.kind === "test")
-      testBtn.setAttribute("aria-current", "page");
-    this.rail.append(testBtn);
+    projectItem.append(project);
+
+    const groupItem = this.document.createElement("li");
+    const openGroup =
+      this.route.kind === "group"
+        ? this.groupById(this.route.groupId)
+        : undefined;
+    const groups = this.createButton(
+      openGroup ? displayName(openGroup.name, "Unnamed group") : "Groups",
+      "route:groups",
+    );
+    groups.dataset.command = "open-group-picker";
+    groups.dataset.editorKey = "route:groups";
+    if (openGroup) {
+      groups.dataset.groupId = safeText(openGroup.id);
+      groups.setAttribute("aria-current", "page");
+    }
+    groupItem.append(groups);
+    list.append(projectItem, groupItem);
+    this.rail.append(list);
 
     const searchWrap = this.document.createElement("div");
     searchWrap.dataset.searchWrap = "true";
@@ -2835,7 +2864,18 @@ class EditorControllerImpl implements EditorController {
         this.createCommandButton("AI Assist", "ai-assist", this.saving),
       );
     }
-    tools.append(this.createCommandButton("Validate", "validate", this.saving));
+    const testBtn = this.createButton("Test console", "route:test");
+    testBtn.dataset.route = "test";
+    testBtn.dataset.editorKey = "route:test";
+    testBtn.dataset.btn = "secondary";
+    testBtn.disabled = this.saving;
+    if (this.route.kind === "test") {
+      testBtn.setAttribute("aria-current", "page");
+    }
+    tools.append(
+      testBtn,
+      this.createCommandButton("Validate", "validate", this.saving),
+    );
     const commit = this.document.createElement("div");
     commit.dataset.actionCluster = "commit";
     commit.append(
@@ -3028,6 +3068,7 @@ class EditorControllerImpl implements EditorController {
       description,
     );
     fields.append(fieldGrid);
+    this.renderProjectActions(fields);
     this.form.append(fields);
 
     const groups = this.document.createElement("section");
@@ -4380,6 +4421,116 @@ class EditorControllerImpl implements EditorController {
       }
     }
     return results;
+  }
+
+  private renderProjectActions(fields: HTMLElement): void {
+    if (this.projectActions.length === 0) return;
+    const group = this.document.createElement("div");
+    group.dataset.projectActions = "true";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "Project settings");
+    for (const action of this.projectActions) {
+      group.append(
+        this.createCommandButton(
+          action.label,
+          action.command,
+          false,
+          {},
+          action.tone === "danger" ? "danger" : "secondary",
+        ),
+      );
+    }
+    fields.append(group);
+  }
+
+  private openGroupPicker(): void {
+    this.groupPickerOpen = true;
+    this.focusRequest =
+      this.draft.groups.length > 0
+        ? "group-picker-first"
+        : "group-picker-close";
+    this.render();
+  }
+
+  private closeGroupPicker(): void {
+    this.groupPickerOpen = false;
+    this.focusRequest = "route:groups";
+    this.render();
+  }
+
+  private renderGroupPicker(): void {
+    const existing = this.host.querySelector("[data-group-picker]");
+    existing?.remove();
+    if (!this.groupPickerOpen) return;
+
+    const overlay = this.document.createElement("div");
+    overlay.dataset.groupPicker = "true";
+    overlay.setAttribute("role", "presentation");
+    const dialog = this.document.createElement("section");
+    dialog.dataset.editorDialog = "true";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    const title = this.document.createElement("h2");
+    title.id = `${this.instanceId}-group-picker-title`;
+    title.textContent = "Groups";
+    dialog.setAttribute("aria-labelledby", title.id);
+    dialog.append(title);
+
+    if (this.draft.groups.length === 0) {
+      const empty = this.document.createElement("p");
+      empty.textContent = "No groups yet.";
+      dialog.append(empty);
+    } else {
+      const list = this.document.createElement("ul");
+      list.dataset.groupPickerList = "true";
+      for (let index = 0; index < this.draft.groups.length; index += 1) {
+        const group = this.draft.groups[index];
+        if (!group) continue;
+        const groupId = safeText(group.id);
+        const name = displayName(group.name, "Unnamed group");
+        const item = this.document.createElement("li");
+        const button = this.document.createElement("button");
+        button.type = "button";
+        button.dataset.route = "group";
+        button.dataset.groupId = groupId;
+        button.dataset.btn = "secondary";
+        button.dataset.editorKey =
+          index === 0 ? "group-picker-first" : `group-picker:${groupId}`;
+        if (this.route.kind === "group" && this.route.groupId === groupId) {
+          button.setAttribute("aria-current", "true");
+        }
+        const nameEl = this.document.createElement("span");
+        nameEl.dataset.groupPickerName = "true";
+        nameEl.textContent = name;
+        const rulesEl = this.document.createElement("span");
+        rulesEl.dataset.groupPickerRules = "true";
+        rulesEl.textContent = ruleCountLabel(group.rules.length);
+        button.append(nameEl, rulesEl);
+        const savedId = this.savedGroupId(group);
+        if (this.options.groupEnablement && savedId) {
+          const stateEl = this.document.createElement("span");
+          stateEl.dataset.groupPickerState = "true";
+          stateEl.textContent = this.options.groupEnablement.isEnabled(savedId)
+            ? "Enabled"
+            : "Disabled";
+          button.append(stateEl);
+        }
+        item.append(button);
+        list.append(item);
+      }
+      dialog.append(list);
+    }
+
+    const actions = this.document.createElement("div");
+    actions.dataset.editorDialogActions = "true";
+    const close = this.createButton("Close", "group-picker-close");
+    close.dataset.command = "close-group-picker";
+    close.dataset.editorKey = "group-picker-close";
+    close.dataset.btn = "secondary";
+    actions.append(close);
+    dialog.append(actions);
+    overlay.append(dialog);
+    this.host.append(overlay);
   }
 
   private renderConfirmation(): void {

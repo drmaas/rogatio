@@ -775,12 +775,15 @@ test("the sidebar stays usable at a 360px viewport", async ({ page }) => {
 
   const overflow = await page.evaluate(() => {
     const sidebar = document.querySelector(".rogatio-sidebar");
-    if (!sidebar) return null;
+    const layout = document.querySelector(".rogatio-layout");
+    if (!sidebar || !layout) return null;
     return {
       scrollWidth: sidebar.scrollWidth,
       clientWidth: sidebar.clientWidth,
       docScrollWidth: document.documentElement.scrollWidth,
       docClientWidth: document.documentElement.clientWidth,
+      layoutScrollWidth: layout.scrollWidth,
+      layoutClientWidth: layout.clientWidth,
     };
   });
   expect(overflow).not.toBeNull();
@@ -788,6 +791,9 @@ test("the sidebar stays usable at a 360px viewport", async ({ page }) => {
     expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
     expect(overflow.docScrollWidth).toBeLessThanOrEqual(
       overflow.docClientWidth + 1,
+    );
+    expect(overflow.layoutScrollWidth).toBeLessThanOrEqual(
+      overflow.layoutClientWidth + 1,
     );
   }
   await expect(page.locator("[data-rule-link]").first()).toBeVisible();

@@ -69,7 +69,7 @@
 html,
 body {
   margin: 0;
-  min-height: 100%;
+  height: 100%;
   background-color: var(--rogatio-bg);
   background-image: radial-gradient(
     rgba(255, 255, 255, 0.05) 1px,
@@ -80,6 +80,10 @@ body {
   font-family: var(--rogatio-font-body);
   font-size: 1rem;
   line-height: 1.5;
+}
+#rogatio-extension-root {
+  height: 100%;
+  min-height: 0;
 }
 .rogatio-shell,
 .rogatio-shell *,
@@ -135,11 +139,21 @@ body {
   color: var(--rogatio-faint);
 }
 
-/* Top app bar and the Workspace bar directly under it */
+/* Top app bar. Workspace content scrolls in .rogatio-layout beneath it. */
+.rogatio-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
 .rogatio-chrome {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 3;
+  flex: none;
+}
+.rogatio-shell .rogatio-editor [data-group-picker],
+.rogatio-shell .rogatio-editor [data-editor-confirmation] {
+  z-index: 4;
 }
 .rogatio-topbar {
   display: flex;
@@ -173,88 +187,6 @@ body {
   color: var(--rogatio-text);
   font-weight: 700;
 }
-.rogatio-breadcrumb {
-  min-width: 0;
-  margin-left: auto;
-}
-.rogatio-breadcrumb ol {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.rogatio-breadcrumb li {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  max-width: 100%;
-}
-.rogatio-breadcrumb li + li::before {
-  content: "/";
-  margin: 0 0.45rem;
-  color: var(--rogatio-muted);
-  font-weight: 500;
-}
-.rogatio-shell .rogatio-breadcrumb-project {
-  max-width: 18rem;
-  overflow: hidden;
-  border: 0;
-  background: transparent;
-  padding: 0.15rem 0.2rem;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.rogatio-shell .rogatio-breadcrumb-project:hover:not(:disabled) {
-  border-color: transparent;
-  background: transparent;
-  color: var(--rogatio-primary);
-}
-.rogatio-breadcrumb [data-workspace-section] {
-  max-width: 16rem;
-  overflow: hidden;
-  color: var(--rogatio-muted);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.rogatio-subheader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem 1rem;
-  border-bottom: 1px solid var(--rogatio-border);
-  background: var(--rogatio-surface);
-  padding: 0.55rem 1rem;
-}
-.rogatio-project-settings {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-.rogatio-group-menu {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-left: auto;
-  min-width: min(100%, 16rem);
-  color: var(--rogatio-muted);
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-.rogatio-group-menu select {
-  width: auto;
-  flex: 1;
-  min-width: 10rem;
-}
-/* The shell group menu is the Workspace group navigation. The editor's
-   compact select stays for the CLI host. */
-.rogatio-shell .rogatio-editor [data-mobile-route-nav] {
-  display: none;
-}
 .rogatio-badge-pill {
   display: inline-flex;
   align-items: center;
@@ -273,7 +205,9 @@ body {
   display: grid;
   grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
   gap: 0;
-  min-height: calc(100vh - 3.4rem);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 .rogatio-sidebar {
   display: grid;
@@ -568,6 +502,45 @@ body {
 .rogatio-main {
   min-width: 0;
   padding: 1rem clamp(1rem, 3vw, 2rem) 3rem;
+}
+.rogatio-layout[data-view="workspace"] {
+  overflow: hidden;
+}
+.rogatio-layout[data-view="workspace"] .rogatio-sidebar {
+  min-height: 0;
+  overflow: auto;
+}
+.rogatio-layout[data-view="workspace"] .rogatio-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.rogatio-layout[data-view="workspace"] [data-editor-root] {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.rogatio-shell .rogatio-editor {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.rogatio-shell .rogatio-editor [data-editor-layout] {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.rogatio-shell .rogatio-editor [data-desktop-route-rail] {
+  position: static;
+  flex: none;
+}
+.rogatio-shell .rogatio-editor [data-editor-main] {
+  min-height: 0;
+  overflow: auto;
 }
 .rogatio-status {
   margin: 0 0 1rem;
@@ -939,21 +912,28 @@ body {
   .rogatio-layout {
     display: block;
   }
+  .rogatio-layout[data-view="workspace"] {
+    overflow: auto;
+  }
+  .rogatio-layout[data-view="workspace"] .rogatio-main,
+  .rogatio-layout[data-view="workspace"] [data-editor-root],
+  .rogatio-shell .rogatio-editor,
+  .rogatio-shell .rogatio-editor [data-editor-layout] {
+    display: block;
+    flex: none;
+    height: auto;
+    overflow: visible;
+  }
+  .rogatio-shell .rogatio-editor [data-editor-main] {
+    overflow: visible;
+  }
+  .rogatio-shell .rogatio-editor [data-desktop-route-rail] {
+    position: sticky;
+    top: 0;
+  }
   .rogatio-sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--rogatio-border);
-  }
-  .rogatio-subheader > .rogatio-badge-pill,
-  .rogatio-project-settings,
-  .rogatio-group-menu {
-    margin-left: 0;
-    width: 100%;
-  }
-  .rogatio-group-menu select {
-    min-width: 0;
-  }
-  .rogatio-breadcrumb {
-    margin-left: 0;
   }
   .rogatio-sidebar-card-heading {
     min-width: 0;
@@ -980,7 +960,6 @@ body {
     background: Canvas;
   }
   .rogatio-topbar,
-  .rogatio-subheader,
   .rogatio-sidebar,
   .rogatio-project-card,
   .rogatio-project-stats {
@@ -1008,7 +987,6 @@ body {
     background: Canvas;
   }
   .rogatio-topbar,
-  .rogatio-subheader,
   .rogatio-sidebar,
   .rogatio-project-card,
   .rogatio-project-stats,

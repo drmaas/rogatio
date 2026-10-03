@@ -29,6 +29,18 @@ const emptyProject = {
   ],
 } as const;
 
+function openListedGroup(root: ParentNode, groupId?: string): void {
+  root
+    .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const selector = groupId
+    ? `[data-group-picker] button[data-group-id="${groupId}"]`
+    : "[data-group-picker] button[data-route='group']";
+  root
+    .querySelector<HTMLButtonElement>(selector)
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+}
+
 function createTestEditor(initialProject: unknown = emptyProject) {
   const root = document.createElement("div");
   document.body.append(root);
@@ -38,9 +50,7 @@ function createTestEditor(initialProject: unknown = emptyProject) {
     validate: () => [],
     save: () => ({ ok: true }),
   });
-  root
-    .querySelector('[data-desktop-route-rail] button[data-route="group"]')
-    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  openListedGroup(root);
   return { root, editor };
 }
 
@@ -484,9 +494,7 @@ describe("@rogatio/editor source controls", () => {
         dismissed = true;
       },
     });
-    root
-      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    openListedGroup(root);
     expect(root.querySelector("[data-migration-notices]")).not.toBeNull();
     root
       .querySelector('[data-command="dismiss-migration-notices"]')
@@ -551,9 +559,7 @@ describe("group enablement heading button", () => {
         },
       },
     });
-    root
-      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    openListedGroup(root);
     const button = root.querySelector<HTMLButtonElement>(
       "[data-group-heading] [data-group-enable]",
     );
@@ -593,9 +599,7 @@ describe("group enablement heading button", () => {
         },
       },
     });
-    root
-      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    openListedGroup(root);
     const button = root.querySelector<HTMLButtonElement>(
       "[data-group-heading] [data-group-enable]",
     );
@@ -629,22 +633,14 @@ describe("group enablement heading button", () => {
         setEnabled() {},
       },
     });
-    root
-      .querySelector(
-        '[data-desktop-route-rail] button[data-group-id="group-one"]',
-      )
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    openListedGroup(root, "group-one");
     root
       .querySelector('[data-group-heading] button[data-command="copy-group"]')
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(
       root.querySelector("[data-group-heading] [data-group-enable]"),
     ).toBeNull();
-    root
-      .querySelector(
-        '[data-desktop-route-rail] button[data-group-id="group-two"]',
-      )
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    openListedGroup(root, "group-two");
     expect(
       root.querySelector<HTMLButtonElement>(
         "[data-group-heading] [data-group-enable]",
@@ -656,9 +652,7 @@ describe("group enablement heading button", () => {
 
 describe("workspace action layout", () => {
   function openGroup(root: HTMLElement): void {
-    root
-      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    openListedGroup(root);
   }
 
   it("clusters group actions beside the name and repeats them under the rules", () => {
@@ -750,9 +744,7 @@ describe("workspace action layout", () => {
         },
       },
     });
-    root
-      .querySelector('[data-desktop-route-rail] button[data-route="group"]')
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    openListedGroup(root);
     const button = root.querySelector<HTMLButtonElement>(
       "[data-action-dock] [data-group-enable]",
     );
@@ -761,5 +753,283 @@ describe("workspace action layout", () => {
     button?.click();
     expect(calls).toEqual([{ groupId: "group-one", enabled: false }]);
     editor.destroy();
+  });
+});
+
+describe("workspace breadcrumb and group picker", () => {
+  it("shows the project name and Groups, and opens a group from the picker", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: emptyProject,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      groupEnablement: {
+        isEnabled: () => true,
+        setEnabled() {},
+      },
+    });
+    const project = root.querySelector<HTMLButtonElement>(
+      "[data-route-breadcrumb] [data-route='project']",
+    );
+    expect(project?.textContent).toBe("Editor project");
+    expect(project?.getAttribute("aria-current")).toBe("page");
+    const groups = root.querySelector<HTMLButtonElement>(
+      "[data-command='open-group-picker']",
+    );
+    expect(groups?.textContent).toBe("Groups");
+    expect(groups?.getAttribute("aria-current")).toBeNull();
+    expect(
+      root.querySelector("[data-editor-command-bar] [data-route='test']"),
+    ).not.toBeNull();
+    expect(
+      root.querySelector("[data-desktop-route-rail] [data-route='test']"),
+    ).toBeNull();
+
+    groups?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const dialog = root.querySelector("[data-group-picker] [role='dialog']");
+    expect(dialog?.textContent).toContain("One");
+    expect(dialog?.textContent).toContain("1 rule");
+    expect(dialog?.textContent).toContain("Enabled");
+    root
+      .querySelector<HTMLButtonElement>(
+        "[data-group-picker] button[data-group-id='group-one']",
+      )
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-group-picker]")).toBeNull();
+    expect(root.querySelector("[data-group-heading]")).not.toBeNull();
+    expect(
+      root.querySelector("[data-command='open-group-picker']")?.textContent,
+    ).toBe("One");
+    expect(
+      root
+        .querySelector("[data-command='open-group-picker']")
+        ?.getAttribute("aria-current"),
+    ).toBe("page");
+    expect(document.activeElement).toBe(
+      root.querySelector("[data-editor-key='route:groups']"),
+    );
+    expect(root.querySelector("[data-project-actions]")).toBeNull();
+    editor.destroy();
+  });
+
+  it("closes the picker without changing route", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: emptyProject,
+      validate: () => [],
+      save: () => ({ ok: true }),
+    });
+    root
+      .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(document.activeElement).toBe(
+      root.querySelector("[data-editor-key='group-picker-first']"),
+    );
+    root
+      .querySelector<HTMLButtonElement>("[data-command='close-group-picker']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-group-picker]")).toBeNull();
+    expect(root.querySelector("[data-group-heading]")).toBeNull();
+    expect(document.activeElement).toBe(
+      root.querySelector("[data-editor-key='route:groups']"),
+    );
+
+    root
+      .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root
+      .querySelector<HTMLElement>("[data-group-picker]")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-group-picker]")).toBeNull();
+    expect(root.querySelector("[data-group-heading]")).toBeNull();
+    expect(document.activeElement).toBe(
+      root.querySelector("[data-editor-key='route:groups']"),
+    );
+
+    root
+      .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    );
+    expect(root.querySelector("[data-group-picker]")).toBeNull();
+    expect(root.querySelector("[data-group-heading]")).toBeNull();
+    expect(document.activeElement).toBe(
+      root.querySelector("[data-editor-key='route:groups']"),
+    );
+    editor.destroy();
+  });
+
+  it("shows an empty picker and host project actions", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: { version: 2, name: "Empty", groups: [] },
+      validate: () => [],
+      save: () => ({ ok: true }),
+      projectActions: [
+        { command: "refresh", label: "Refresh" },
+        { command: "export", label: "Export project" },
+        { command: "remove", label: "Remove project", tone: "danger" },
+        { command: "", label: "Skip" },
+      ],
+    });
+    expect(root.querySelector("[data-project-actions]")?.textContent).toContain(
+      "Refresh",
+    );
+    expect(
+      root.querySelector("[data-command='remove']")?.getAttribute("data-btn"),
+    ).toBe("danger");
+    root
+      .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-group-picker]")?.textContent).toContain(
+      "No groups yet.",
+    );
+    const name = root.querySelector<HTMLInputElement>("[data-path='/name']");
+    if (name) {
+      name.value = "Renamed";
+      name.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    expect(
+      root.querySelector("[data-project-actions] [data-command='refresh']"),
+    ).not.toBeNull();
+    expect(
+      root.querySelector("[data-route-breadcrumb] [data-route='project']")
+        ?.textContent,
+    ).toBe("Renamed");
+    editor.destroy();
+  });
+
+  it("marks Test console current and describes picker rows", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: {
+        version: 2,
+        name: "Editor project",
+        groups: [
+          {
+            id: "group-one",
+            name: "One",
+            rules: [
+              {
+                id: "rule-new",
+                name: "New rule",
+                source: { key: "url", operator: "regex", value: "" },
+                resourceTypes: ["main_frame"],
+                priority: 100,
+              },
+            ],
+          },
+          {
+            id: "group-two",
+            name: "Two",
+            rules: [],
+          },
+        ],
+      },
+      validate: () => [],
+      save: () => ({ ok: true }),
+      groupEnablement: {
+        isEnabled: (groupId: string) => groupId !== "group-two",
+        setEnabled() {},
+      },
+    });
+    root
+      .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const one = root.querySelector(
+      "[data-group-picker] button[data-group-id='group-one']",
+    );
+    const two = root.querySelector(
+      "[data-group-picker] button[data-group-id='group-two']",
+    );
+    expect(one?.textContent).toContain("Enabled");
+    expect(one?.textContent).toContain("1 rule");
+    expect(two?.textContent).toContain("Disabled");
+    expect(two?.textContent).toContain("No rules");
+
+    root
+      .querySelector<HTMLButtonElement>(
+        "[data-editor-command-bar] [data-route='test']",
+      )
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(
+      root
+        .querySelector("[data-editor-command-bar] [data-route='test']")
+        ?.getAttribute("aria-current"),
+    ).toBe("page");
+    root
+      .querySelector<HTMLButtonElement>(
+        "[data-route-breadcrumb] [data-route='project']",
+      )
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root
+      .querySelector<HTMLButtonElement>("[data-command='add-group']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    root
+      .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const added = Array.from(
+      root.querySelectorAll("[data-group-picker] button[data-route='group']"),
+    ).find((button) => button.textContent?.includes("New group"));
+    expect(added?.querySelector("[data-group-picker-state]")).toBeNull();
+    editor.destroy();
+
+    const plain = document.createElement("div");
+    document.body.append(plain);
+    const plainEditor = createEditor({
+      root: plain,
+      initialProject: emptyProject,
+      validate: () => [],
+      save: () => ({ ok: true }),
+    });
+    plain
+      .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(plain.querySelector("[data-group-picker-state]")).toBeNull();
+    plainEditor.destroy();
+  });
+
+  it("drops malformed project actions", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const sparse: unknown[] = [];
+    sparse[1] = { command: "refresh", label: "Refresh" };
+    sparse[2] = null;
+    sparse[3] = "nope";
+    sparse[4] = { command: "export", label: "" };
+    sparse[5] = { command: "remove", label: "Remove project", tone: "danger" };
+    const editor = createEditor({
+      root,
+      initialProject: { version: 2, name: "Empty", groups: [] },
+      validate: () => [],
+      save: () => ({ ok: true }),
+      projectActions: sparse as never,
+    });
+    const commands = Array.from(
+      root.querySelectorAll("[data-project-actions] button"),
+    ).map((button) => button.getAttribute("data-command"));
+    expect(commands).toEqual(["refresh", "remove"]);
+    editor.destroy();
+
+    const ignored = document.createElement("div");
+    document.body.append(ignored);
+    const ignoredEditor = createEditor({
+      root: ignored,
+      initialProject: { version: 2, name: "Empty", groups: [] },
+      validate: () => [],
+      save: () => ({ ok: true }),
+      projectActions: { command: "refresh", label: "Refresh" } as never,
+    });
+    expect(ignored.querySelector("[data-project-actions]")).toBeNull();
+    ignoredEditor.destroy();
   });
 });

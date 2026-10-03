@@ -78,7 +78,7 @@ function dimension(
 function openTest(root: HTMLElement): void {
   root
     .querySelector<HTMLButtonElement>(
-      '[data-desktop-route-rail] button[data-route="test"]',
+      '[data-editor-command-bar] button[data-route="test"]',
     )
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 }

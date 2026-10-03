@@ -20,6 +20,7 @@ export type {
   EditorDryRunFailure,
   EditorGroupEnablement,
   EditorOptions,
+  EditorProjectAction,
   EditorProjectSnapshot,
   EditorSaveHandler,
   EditorSaveResult,

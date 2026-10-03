@@ -1,4 +1,11 @@
-import { expect, test } from "./fixtures.js";
+import { expect, type Page, test } from "./fixtures.js";
+
+async function openEditorGroup(page: Page, groupId: string): Promise<void> {
+  await page.locator("[data-command='open-group-picker']").click();
+  await page
+    .locator(`[data-group-picker] [data-group-id="${groupId}"]`)
+    .click();
+}
 
 declare global {
   interface Window {
@@ -52,10 +59,7 @@ test("mounts an accessible editor and edits detached project metadata", async ({
 test("supports search, routes, CRUD, source-order reordering, and confirmation", async ({
   page,
 }) => {
-  await page
-    .locator("[data-desktop-route-rail]")
-    .getByRole("button", { name: "One", exact: true })
-    .click();
+  await openEditorGroup(page, "group-one");
   await page
     .locator('[data-rule-card][data-rule-id="rule-one"]')
     .getByRole("button", { name: "Move rule down", exact: true })
@@ -102,14 +106,8 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
   await result.click();
   await expect(page.getByRole("heading", { name: "One" })).toBeVisible();
 
-  await page
-    .locator("[data-desktop-route-rail]")
-    .getByRole("button", { name: "Project", exact: true })
-    .click();
-  await page
-    .locator("[data-desktop-route-rail]")
-    .getByRole("button", { name: "Two", exact: true })
-    .click();
+  await page.locator("[data-route-breadcrumb] [data-route='project']").click();
+  await openEditorGroup(page, "group-two");
   await expect(
     page.locator('[data-editor-command-bar] [data-command="move-group-up"]'),
   ).toHaveCount(0);
@@ -155,10 +153,7 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
     "Two (copy)",
   );
 
-  await page
-    .locator("[data-desktop-route-rail]")
-    .getByRole("button", { name: "Two", exact: true })
-    .click();
+  await openEditorGroup(page, "group-two");
   await page
     .locator("[data-group-heading]")
     .locator('[data-command="remove-group"]')
@@ -178,10 +173,16 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
     .getByRole("button", { name: "Remove group" })
     .click();
   await expect(
-    page.getByRole("button", { name: "Two", exact: true }),
+    page.locator("[data-group-list]").getByRole("button", {
+      name: "Open group Two",
+      exact: true,
+    }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Two (copy)", exact: true }),
+    page.locator("[data-group-list]").getByRole("button", {
+      name: "Open group Two (copy)",
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Project", exact: true }),
@@ -276,10 +277,7 @@ test("supports keyboard commands and exposes screen-reader error associations", 
 test("converts URLs without executing or mutating on invalid input", async ({
   page,
 }) => {
-  await page
-    .locator("[data-desktop-route-rail]")
-    .getByRole("button", { name: "One", exact: true })
-    .click();
+  await openEditorGroup(page, "group-one");
   await page.evaluate(() => {
     window.__promptValue = "https://example.com/a.b?x=1";
     Object.defineProperty(window, "prompt", {
@@ -312,10 +310,7 @@ test("converts URLs without executing or mutating on invalid input", async ({
 });
 
 test("aborts URL conversion when prompt is cancelled", async ({ page }) => {
-  await page
-    .locator("[data-desktop-route-rail]")
-    .getByRole("button", { name: "One", exact: true })
-    .click();
+  await openEditorGroup(page, "group-one");
   await page.evaluate(() => {
     Object.defineProperty(window, "prompt", {
       value: () => null,
@@ -371,14 +366,12 @@ test("keeps route and mobile navigation accessible at narrow width and zoom", as
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 800 });
-  await expect(page.locator("[data-desktop-route-rail]")).toBeHidden();
-  const mobileNavigation = page.locator("[data-mobile-route-nav] select");
-  await expect(mobileNavigation).toBeVisible();
-  await mobileNavigation.selectOption({ label: "One" });
+  await expect(page.locator("[data-desktop-route-rail]")).toBeVisible();
+  await expect(page.locator("[data-mobile-route-nav]")).toHaveCount(0);
+  await openEditorGroup(page, "group-one");
   await expect(page.getByRole("heading", { name: "One" })).toBeVisible();
 
-  // Navigate back to project to test project-level fields
-  await mobileNavigation.selectOption({ label: "Project" });
+  await page.locator("[data-route-breadcrumb] [data-route='project']").click();
   await expect(
     page.getByRole("heading", { name: "Project", exact: true }),
   ).toBeVisible();
@@ -558,11 +551,18 @@ test("isolates controlled rule-type extensions and rejects duplicate registratio
       };
     };
     // Navigate to the group to render the rule card with extension
+    const picker = root.querySelector<HTMLButtonElement>(
+      "[data-command='open-group-picker']",
+    );
+    picker?.click();
     const routeButtons = root.querySelectorAll<HTMLButtonElement>(
-      '[data-desktop-route-rail] button[data-route="group"]',
+      "[data-group-picker] button[data-route='group']",
     );
     for (const btn of routeButtons) {
-      if (btn.textContent === "Extension group") {
+      if (
+        btn.querySelector("[data-group-picker-name]")?.textContent ===
+        "Extension group"
+      ) {
         btn.click();
         break;
       }
@@ -614,10 +614,7 @@ test("ships a browser artifact without Node runtime leakage", async ({
 test("selects the Query parameters rule type and round-trips the action through save", async ({
   page,
 }) => {
-  await page
-    .locator("[data-desktop-route-rail]")
-    .getByRole("button", { name: "One", exact: true })
-    .click();
+  await openEditorGroup(page, "group-one");
   const card = page
     .locator("[data-rule-card]")
     .filter({ hasText: "First rule" })
@@ -722,7 +719,7 @@ test("runs one test, keeps misses collapsed, opens the named rule, and labels a 
   });
 
   await page
-    .locator("[data-desktop-route-rail]")
+    .locator("[data-editor-command-bar]")
     .getByRole("button", { name: "Test console", exact: true })
     .click();
   await expect(
@@ -749,7 +746,7 @@ test("runs one test, keeps misses collapsed, opens the named rule, and labels a 
   ).toBeVisible();
 
   await page
-    .locator("[data-desktop-route-rail]")
+    .locator("[data-editor-command-bar]")
     .getByRole("button", { name: "Test console", exact: true })
     .click();
   await expect(

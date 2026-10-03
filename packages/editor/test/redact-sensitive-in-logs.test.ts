@@ -17,7 +17,10 @@ function createTestEditor(initialProject: unknown) {
     },
   });
   root
-    .querySelector('[data-desktop-route-rail] button[data-route="group"]')
+    .querySelector<HTMLButtonElement>("[data-command='open-group-picker']")
+    ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  root
+    .querySelector("[data-group-picker] button[data-route='group']")
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   return { root, editor, saved };
 }
