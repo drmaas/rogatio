@@ -262,6 +262,28 @@ test("editor renders the dark design system with navigation at the top", async (
   expect(railBox.y < mainBox.y).toBe(true);
   expect(railBox.width > railBox.height).toBe(true);
 
+  const placed = await page.evaluate(() => {
+    const railEl = document.querySelector("[data-desktop-route-rail]");
+    const searchEl = document.querySelector("[data-search-wrap]");
+    const crumbEl = document.querySelector("[data-route-breadcrumb]");
+    if (!railEl || !searchEl || !crumbEl) return null;
+    const railRect = railEl.getBoundingClientRect();
+    const searchRect = searchEl.getBoundingClientRect();
+    const crumbRect = crumbEl.getBoundingClientRect();
+    const padRight = Number.parseFloat(getComputedStyle(railEl).paddingRight);
+    return {
+      gapToRail: railRect.right - padRight - searchRect.right,
+      afterCrumb: searchRect.left - crumbRect.right,
+      searchWidth: searchRect.width,
+      railWidth: railRect.width,
+    };
+  });
+  expect(placed).not.toBeNull();
+  if (!placed) throw new Error("missing search placement");
+  expect(Math.abs(placed.gapToRail)).toBeLessThanOrEqual(1);
+  expect(placed.afterCrumb).toBeGreaterThan(16);
+  expect(placed.searchWidth).toBeLessThan(placed.railWidth / 2);
+
   await page.setViewportSize({ width: 360, height: 800 });
   await expect(rail).toBeVisible();
   await expect(page.locator("[data-mobile-route-nav]")).toHaveCount(0);
