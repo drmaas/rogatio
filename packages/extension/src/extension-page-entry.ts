@@ -353,6 +353,7 @@ function navigateToRuleDeepLink(
   // then let the editor move and reveal it.
   patchWorkspaceEnablementChrome();
   editor?.navigateToRule(groupId, ruleId);
+  syncWorkspaceLocation();
 }
 
 let ruleStatusSerial = 0;
@@ -566,6 +567,24 @@ function badgeLabelText(): string {
     : `Active rules: 0${attentionText}${attentionReason}`;
 }
 
+function activeProjectLabel(): string | null {
+  if (!state.activeProjectId) return null;
+  return text(state.projects[state.activeProjectId]?.name, "Project");
+}
+
+/**
+ * Workspace header chrome: the project stays one breadcrumb, and the open
+ * group (or Test console) is the next crumb. Project settings and the group
+ * menu live on the bar under the header so they do not share that row.
+ */
+function renderChrome(shell: HTMLElement): void {
+  const chrome = document.createElement("div");
+  chrome.className = "rogatio-chrome";
+  renderTopbar(chrome);
+  if (activeTab === "workspace") renderWorkspaceSubheader(chrome);
+  shell.append(chrome);
+}
+
 function renderTopbar(shell: HTMLElement): void {
   const topbar = document.createElement("header");
   topbar.className = "rogatio-topbar";
@@ -586,22 +605,190 @@ function renderTopbar(shell: HTMLElement): void {
   }
   topbar.append(tabs);
 
-  const actions = document.createElement("div");
-  actions.className = "rogatio-topbar-actions";
   if (activeTab === "workspace") {
-    actions.append(
-      button("Refresh", "refresh"),
-      button("Export project", "export"),
-      button("Remove project", "remove"),
-    );
-    const badge = document.createElement("span");
-    badge.dataset.badgeState = "true";
-    badge.className = "rogatio-badge-pill";
-    badge.textContent = badgeLabelText();
-    actions.append(badge);
-    topbar.append(actions);
+    const breadcrumb = document.createElement("nav");
+    breadcrumb.className = "rogatio-breadcrumb";
+    breadcrumb.dataset.workspaceBreadcrumb = "true";
+    breadcrumb.setAttribute("aria-label", "Workspace");
+    topbar.append(breadcrumb);
   }
   shell.append(topbar);
+}
+
+function renderWorkspaceSubheader(shell: HTMLElement): void {
+  const bar = document.createElement("div");
+  bar.className = "rogatio-subheader";
+  bar.dataset.workspaceSubheader = "true";
+
+  const settings = document.createElement("div");
+  settings.className = "rogatio-project-settings";
+  settings.dataset.projectSettings = "true";
+  settings.setAttribute("role", "group");
+  settings.setAttribute("aria-label", "Project settings");
+  settings.append(
+    button("Refresh", "refresh"),
+    button("Export project", "export"),
+    button("Remove project", "remove"),
+  );
+
+  const badge = document.createElement("span");
+  badge.dataset.badgeState = "true";
+  badge.className = "rogatio-badge-pill";
+  badge.textContent = badgeLabelText();
+
+  const menuLabel = document.createElement("label");
+  menuLabel.className = "rogatio-group-menu";
+  const menuCaption = document.createElement("span");
+  menuCaption.textContent = "Group menu";
+  const menu = document.createElement("select");
+  menu.dataset.groupMenu = "true";
+  menuLabel.append(menuCaption, menu);
+
+  bar.append(settings, badge, menuLabel);
+  shell.append(bar);
+}
+
+function workspaceRailButtons(): HTMLButtonElement[] {
+  return [
+    ...root.querySelectorAll<HTMLButtonElement>(
+      "[data-desktop-route-rail] button",
+    ),
+  ];
+}
+
+function activateWorkspaceSection(value: string): void {
+  const buttons = workspaceRailButtons();
+  if (value.startsWith("group:")) {
+    const groupId = value.slice("group:".length);
+    const match = buttons.find(
+      (candidate) =>
+        candidate.dataset.route === "group" &&
+        candidate.dataset.groupId === groupId,
+    );
+    match?.click();
+    return;
+  }
+  buttons.find((candidate) => candidate.dataset.route === value)?.click();
+}
+
+function syncWorkspaceProjectName(): void {
+  const projectButton = root.querySelector<HTMLButtonElement>(
+    "[data-workspace-project]",
+  );
+  if (!projectButton) return;
+  const drafted =
+    root.querySelector("[data-editor-header] h1")?.textContent?.trim() ?? "";
+  if (drafted.length > 0) projectButton.textContent = drafted;
+}
+
+/** Keep the header breadcrumb and the group menu aligned with the editor route. */
+function syncWorkspaceLocation(): void {
+  const breadcrumb = root.querySelector<HTMLElement>(
+    "[data-workspace-breadcrumb]",
+  );
+  const menu = root.querySelector<HTMLSelectElement>("[data-group-menu]");
+  if (!breadcrumb && !menu) return;
+
+  const drafted =
+    root.querySelector("[data-editor-header] h1")?.textContent?.trim() ?? "";
+  const projectName = drafted.length > 0 ? drafted : activeProjectLabel();
+  const buttons = workspaceRailButtons();
+  const current = buttons.find(
+    (button) => button.getAttribute("aria-current") === "page",
+  );
+  const route = current?.dataset.route ?? "project";
+  const groupId = current?.dataset.groupId;
+
+  if (breadcrumb) {
+    breadcrumb.replaceChildren();
+    if (projectName !== null) {
+      const list = document.createElement("ol");
+      const projectItem = document.createElement("li");
+      const projectButton = document.createElement("button");
+      projectButton.type = "button";
+      projectButton.className = "rogatio-breadcrumb-project";
+      projectButton.dataset.workspaceProject = "true";
+      projectButton.textContent = projectName;
+      if (route === "project") {
+        projectButton.setAttribute("aria-current", "page");
+      }
+      projectItem.append(projectButton);
+      list.append(projectItem);
+      if ((route === "group" || route === "test") && current) {
+        const sectionItem = document.createElement("li");
+        sectionItem.dataset.workspaceSection = "true";
+        if (route === "group" && typeof groupId === "string") {
+          sectionItem.dataset.groupId = groupId;
+        }
+        sectionItem.textContent = current.textContent ?? "";
+        sectionItem.setAttribute("aria-current", "page");
+        list.append(sectionItem);
+      }
+      breadcrumb.append(list);
+    }
+  }
+
+  if (!menu) return;
+  menu.replaceChildren();
+  if (buttons.length === 0) {
+    menu.disabled = true;
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = "No groups";
+    menu.append(empty);
+    return;
+  }
+  menu.disabled = false;
+  for (const button of buttons) {
+    const option = document.createElement("option");
+    const buttonRoute = button.dataset.route ?? "";
+    option.value =
+      buttonRoute === "group"
+        ? `group:${button.dataset.groupId ?? ""}`
+        : buttonRoute;
+    option.textContent = button.textContent ?? "";
+    menu.append(option);
+  }
+  const selected = route === "group" ? `group:${groupId ?? ""}` : route;
+  if ([...menu.options].some((option) => option.value === selected)) {
+    menu.value = selected;
+  }
+}
+
+function bindWorkspaceLocation(shell: HTMLElement): void {
+  const menu = shell.querySelector<HTMLSelectElement>("[data-group-menu]");
+  menu?.addEventListener("change", () => {
+    activateWorkspaceSection(menu.value);
+    syncWorkspaceLocation();
+  });
+  const editorRoot = shell.querySelector<HTMLElement>("[data-editor-root]");
+  if (!editorRoot) return;
+  editorRoot.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (
+      target.closest(
+        "[data-route], [data-command], [data-search-result], [data-error-path]",
+      )
+    ) {
+      queueMicrotask(syncWorkspaceLocation);
+    }
+  });
+  editorRoot.addEventListener("change", (event) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLSelectElement &&
+      target.dataset.mobileRoute !== undefined
+    ) {
+      queueMicrotask(syncWorkspaceLocation);
+    }
+  });
+  editorRoot.addEventListener("input", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.dataset.path === "/name") {
+      queueMicrotask(syncWorkspaceProjectName);
+    }
+  });
 }
 
 function createSidebar(): HTMLElement {
@@ -1180,7 +1367,7 @@ function renderShell(): void {
   shell.className = "rogatio-shell";
   shell.setAttribute("aria-labelledby", "rogatio-title");
 
-  renderTopbar(shell);
+  renderChrome(shell);
 
   const layout = document.createElement("div");
   layout.className = "rogatio-layout";
@@ -1280,6 +1467,11 @@ function renderShell(): void {
           ? { groupId, ruleId }
           : null;
       navigateToRuleDeepLink(groupId, ruleId, { push: true });
+      return;
+    }
+    if (target.closest("[data-workspace-project]")) {
+      activateWorkspaceSection("project");
+      syncWorkspaceLocation();
       return;
     }
     const tab = target.dataset.tab;
@@ -1462,6 +1654,11 @@ function renderShell(): void {
         editorHasMounted = true;
       }
     }
+  }
+
+  if (activeTab === "workspace") {
+    bindWorkspaceLocation(shell);
+    syncWorkspaceLocation();
   }
 
   restoreSidebarFocus(capturedFocus);
@@ -2028,6 +2225,7 @@ window.addEventListener("popstate", () => {
     if (activeTab !== "workspace") return;
     editor?.navigateToGroup(null);
     patchWorkspaceEnablementChrome();
+    syncWorkspaceLocation();
     return;
   }
   navigateToRuleDeepLink(link.groupId, link.ruleId, { push: false });

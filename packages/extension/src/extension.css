@@ -135,11 +135,13 @@ body {
   color: var(--rogatio-faint);
 }
 
-/* Top app bar */
-.rogatio-topbar {
+/* Top app bar and the Workspace bar directly under it */
+.rogatio-chrome {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 3;
+}
+.rogatio-topbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -171,12 +173,87 @@ body {
   color: var(--rogatio-text);
   font-weight: 700;
 }
-.rogatio-topbar-actions {
+.rogatio-breadcrumb {
+  min-width: 0;
+  margin-left: auto;
+}
+.rogatio-breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rogatio-breadcrumb li {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+.rogatio-breadcrumb li + li::before {
+  content: "/";
+  margin: 0 0.45rem;
+  color: var(--rogatio-muted);
+  font-weight: 500;
+}
+.rogatio-shell .rogatio-breadcrumb-project {
+  max-width: 18rem;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  padding: 0.15rem 0.2rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rogatio-shell .rogatio-breadcrumb-project:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--rogatio-primary);
+}
+.rogatio-breadcrumb [data-workspace-section] {
+  max-width: 16rem;
+  overflow: hidden;
+  color: var(--rogatio-muted);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rogatio-subheader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  border-bottom: 1px solid var(--rogatio-border);
+  background: var(--rogatio-surface);
+  padding: 0.55rem 1rem;
+}
+.rogatio-project-settings {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+}
+.rogatio-group-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   margin-left: auto;
+  min-width: min(100%, 16rem);
+  color: var(--rogatio-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.rogatio-group-menu select {
+  width: auto;
+  flex: 1;
+  min-width: 10rem;
+}
+/* The shell group menu is the Workspace group navigation. The editor's
+   compact select stays for the CLI host. */
+.rogatio-shell .rogatio-editor [data-mobile-route-nav] {
+  display: none;
 }
 .rogatio-badge-pill {
   display: inline-flex;
@@ -866,9 +943,17 @@ body {
     border-right: 0;
     border-bottom: 1px solid var(--rogatio-border);
   }
-  .rogatio-topbar-actions {
+  .rogatio-subheader > .rogatio-badge-pill,
+  .rogatio-project-settings,
+  .rogatio-group-menu {
     margin-left: 0;
     width: 100%;
+  }
+  .rogatio-group-menu select {
+    min-width: 0;
+  }
+  .rogatio-breadcrumb {
+    margin-left: 0;
   }
   .rogatio-sidebar-card-heading {
     min-width: 0;
@@ -895,6 +980,7 @@ body {
     background: Canvas;
   }
   .rogatio-topbar,
+  .rogatio-subheader,
   .rogatio-sidebar,
   .rogatio-project-card,
   .rogatio-project-stats {
@@ -922,6 +1008,7 @@ body {
     background: Canvas;
   }
   .rogatio-topbar,
+  .rogatio-subheader,
   .rogatio-sidebar,
   .rogatio-project-card,
   .rogatio-project-stats,
