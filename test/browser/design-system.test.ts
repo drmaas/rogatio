@@ -214,6 +214,16 @@ async function expectPickerAbsent(page: Page): Promise<void> {
   await expect(page.locator("[data-project-picker]")).toHaveCount(0);
 }
 
+async function selectOptionLabels(
+  select: ReturnType<Page["locator"]>,
+): Promise<string[]> {
+  return select.evaluate((element) =>
+    [...(element as HTMLSelectElement).options].map(
+      (option) => option.textContent ?? "",
+    ),
+  );
+}
+
 test("editor renders the dark design system with navigation at the top", async ({
   page,
 }) => {
@@ -402,9 +412,10 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   await expect(
     subheader.getByRole("button", { name: "Remove project" }),
   ).toBeVisible();
-  const groupMenu = subheader.getByRole("combobox", { name: "Group menu" });
+  const groupMenu = subheader.locator("[data-group-menu]");
   await expect(groupMenu).toBeVisible();
-  await expect(groupMenu.locator("option")).toHaveText([
+  await expect(groupMenu).toHaveAttribute("aria-label", "Group menu");
+  expect(await selectOptionLabels(groupMenu)).toEqual([
     "Project",
     "One",
     "Test console",
@@ -446,7 +457,7 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
     "Project B",
   );
   await expect(page.locator("[data-workspace-breadcrumb] li")).toHaveCount(1);
-  await expect(page.locator("[data-group-menu] option")).toHaveText([
+  expect(await selectOptionLabels(page.locator("[data-group-menu]"))).toEqual([
     "Project",
     "Test console",
   ]);

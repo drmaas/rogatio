@@ -642,6 +642,7 @@ function renderWorkspaceSubheader(shell: HTMLElement): void {
   menuCaption.textContent = "Group menu";
   const menu = document.createElement("select");
   menu.dataset.groupMenu = "true";
+  menu.setAttribute("aria-label", "Group menu");
   menuLabel.append(menuCaption, menu);
 
   bar.append(settings, badge, menuLabel);
