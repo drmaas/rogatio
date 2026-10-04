@@ -633,6 +633,45 @@ body {
 .rogatio-projects-section {
   margin-top: 1.25rem;
 }
+/* System status (Dashboard): runtime + AI readiness above Start a project.
+   Outer card reuses the F22 dashboard-card tokens; inner blocks reuse the
+   shared tone-dot classes from the status lines. Two columns collapse to one
+   with the same 48rem breakpoint as the creation grid. */
+.rogatio-system-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+.rogatio-system-status-block {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  min-width: 0;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius-sm);
+  background: var(--rogatio-surface-raised);
+  padding: 0.8rem 0.9rem;
+}
+.rogatio-system-status-block p {
+  margin: 0;
+}
+.rogatio-system-status-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.rogatio-system-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.rogatio-system-status-recovery {
+  margin: 0;
+  color: var(--rogatio-muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
 .rogatio-project-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -971,7 +1010,8 @@ body {
     grid-column: auto;
   }
   .rogatio-project-grid,
-  .rogatio-creation-grid {
+  .rogatio-creation-grid,
+  .rogatio-system-status-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1066,7 +1106,9 @@ body {
   .rogatio-sidebar,
   .rogatio-project-card,
   .rogatio-project-stats,
-  .rogatio-attention-note {
+  .rogatio-attention-note,
+  .rogatio-dashboard-card,
+  .rogatio-system-status-block {
     border-color: ButtonText;
     background: Canvas;
   }
@@ -1080,7 +1122,8 @@ body {
     border-bottom-color: ButtonText;
   }
   .rogatio-runtime-guidance,
-  .rogatio-runtime-error {
+  .rogatio-runtime-error,
+  .rogatio-system-status-recovery {
     border-color: ButtonText;
     background: Canvas;
     color: CanvasText;
