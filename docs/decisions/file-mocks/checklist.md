@@ -116,12 +116,12 @@ the operation union stays exhaustive.
 
 ## Phase 5 — Dry run: mock preview
 
-- [ ] Add a `kind === "mock"` branch to `previewRuleAction` in
+- [x] Add a `kind === "mock"` branch to `previewRuleAction` in
       `packages/dry-run/src/preview.ts`.
-- [ ] Return `{ kind: "mock", summary }` where the summary states the status, the
+- [x] Return `{ kind: "mock", summary }` where the summary states the status, the
       delay when set, the header count when non-zero, and the body source as
       either inline or file-backed.
-- [ ] Do not read the file, do not stat it, do not contact the runtime, and do
+- [x] Do not read the file, do not stat it, do not contact the runtime, and do
       not report file existence or its path.
 
 **Acceptance:** a matched mock case returns a deterministic summary; the
@@ -132,7 +132,7 @@ import.
 mocks, delay present and absent, zero and many headers, unmatched case returns
 `null`, no path disclosure, and an import check proving no filesystem access.
 
-- [ ] Phase 5 acceptance verified.
+- [x] Phase 5 acceptance verified.
 
 ## Phase 6 — Editor: mock rule type
 

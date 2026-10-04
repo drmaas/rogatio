@@ -1,6 +1,20 @@
 import type { NormalizedMatcher, RogatioOperation } from "@rogatio/compiler";
+import type { MockAction } from "@rogatio/schema";
 import { matchUrlCaptures, substituteUrlCaptures } from "@rogatio/schema";
 import type { ActionPreview } from "./types.js";
+
+function mockPreviewSummary(mock: MockAction): string {
+  const parts: string[] = [];
+  parts.push(mock.body !== undefined ? "inline body" : "file-backed body");
+  const headerCount = mock.headers?.length ?? 0;
+  if (headerCount > 0) {
+    parts.push(headerCount === 1 ? "1 header" : `${headerCount} headers`);
+  }
+  if (mock.delayMs !== undefined) {
+    parts.push(`${mock.delayMs} ms delay`);
+  }
+  return `Mock ${mock.status} (${parts.join(", ")})`;
+}
 
 function captureSubject(
   matcher: NormalizedMatcher,
@@ -71,6 +85,12 @@ export function previewRuleAction(
     return {
       kind: operation.kind,
       summary: expand(operation.responseBody.body),
+    };
+  }
+  if (operation.kind === "mock") {
+    return {
+      kind: "mock",
+      summary: mockPreviewSummary(operation.mock),
     };
   }
   return null;
