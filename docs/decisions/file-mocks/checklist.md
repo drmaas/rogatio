@@ -136,18 +136,18 @@ mocks, delay present and absent, zero and many headers, unmatched case returns
 
 ## Phase 6 — Editor: mock rule type
 
-- [ ] Add `packages/editor/src/rule-types/mock.ts` exporting
+- [x] Add `packages/editor/src/rule-types/mock.ts` exporting
       `createMockRuleType()` with `id: "mock"`, a label, `matches`, `mount`, and
       `validate`.
-- [ ] Set `actionField: "mock"` and `defaultAction` so type switching initializes
+- [x] Set `actionField: "mock"` and `defaultAction` so type switching initializes
       and clears the payload through the existing path.
-- [ ] Register it in `packages/editor/src/rule-types/index.ts` beside the five
+- [x] Register it in `packages/editor/src/rule-types/index.ts` beside the five
       built-ins.
-- [ ] Mount fields for status, delay, a repeatable header list, a body-source
+- [x] Mount fields for status, delay, a repeatable header list, a body-source
       selector, an inline body textarea, and a relative file path input.
-- [ ] Author the file path as a logical relative path. Do not add a file upload
+- [x] Author the file path as a logical relative path. Do not add a file upload
       or a directory picker.
-- [ ] Route validation through the host-supplied `validate` adapter; add no
+- [x] Route validation through the host-supplied `validate` adapter; add no
       editor-local schema.
 
 **Acceptance:** a user can add, edit, copy, remove, save, and reload a mock rule;
@@ -159,7 +159,7 @@ directions, draft stays detached until save, each field maps to the right
 `/mock/...` path, and the browser-bundle check still finds no `node:` import,
 Ajv, or `@rogatio/dry-run`.
 
-- [ ] Phase 6 acceptance verified.
+- [x] Phase 6 acceptance verified.
 
 ## Phase 7A — Runtime: confined binary file reads
 

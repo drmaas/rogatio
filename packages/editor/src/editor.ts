@@ -127,6 +127,7 @@ const RULE_TYPE_LABELS: Readonly<Record<string, string>> = {
   header: "Header",
   "response-body": "Response body",
   "request-body": "Request body",
+  mock: "Mock response",
 };
 
 const COMMON_RULE_FIELDS = new Set([
@@ -399,6 +400,7 @@ const MATCHER_CREATABLE_FIELDS = ["description", "method", "type"] as const;
 const ACTION_PAYLOAD_FIELDS = [
   "redirect",
   "action",
+  "mock",
   "requestBody",
   "responseBody",
   "headerDirection",
@@ -680,6 +682,8 @@ function previewSentence(
       return `The request body would be ${preview.summary}.`;
     case "response-body":
       return `The response body would be ${preview.summary}.`;
+    case "mock":
+      return preview.summary;
     default:
       return null;
   }

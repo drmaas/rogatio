@@ -162,13 +162,14 @@ describe("@rogatio/editor URL conversion", () => {
 });
 
 describe("@rogatio/editor built-in rule types", () => {
-  it("registers header, redirect, query, request-body, and response-body", () => {
+  it("registers header, redirect, query, request-body, response-body, and mock", () => {
     expect(builtInRuleTypes.map((extension) => extension.id)).toEqual([
       "header",
       "redirect",
       "query",
       "response-body",
       "request-body",
+      "mock",
     ]);
   });
 });
@@ -189,6 +190,7 @@ describe("@rogatio/editor rule type selection", () => {
       "query",
       "response-body",
       "request-body",
+      "mock",
     ]);
   });
 
@@ -237,6 +239,17 @@ describe("@rogatio/editor rule type selection", () => {
     >;
     expect(rule.type).toBe("response-body");
     expect(rule.responseBody).toEqual({ mode: "replace", body: "" });
+  });
+
+  it("writes mock when Mock response is selected on a new rule", () => {
+    const { root, editor } = createTestEditor();
+    selectRuleType(root, "mock");
+    const rule = editor.getDraft().groups[0]?.rules[0] as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(rule.type).toBe("mock");
+    expect(rule.mock).toEqual({ status: 200, body: "" });
   });
 
   it("clears stale header fields when switching to query", () => {
