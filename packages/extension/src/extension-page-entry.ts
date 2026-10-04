@@ -5,6 +5,7 @@ import {
   type DryRunResult,
   type EditorController,
 } from "@rogatio/editor";
+import { type AiPreviewSummary, summarizeAiPreview } from "./ai-preview.js";
 import { attentionFromRuleStatuses } from "./attention.js";
 import { PROJECT_VERSION, validateProjectDetailed } from "./browser-schema.js";
 import {
@@ -622,6 +623,124 @@ function countRules(value: unknown): number {
   return total;
 }
 
+function createAiPreviewDetails(summary: AiPreviewSummary): HTMLElement {
+  const container = document.createElement("div");
+  container.className = "rogatio-ai-preview-details";
+  container.dataset.aiPreviewDetails = "true";
+
+  if (summary.description !== null) {
+    const description = document.createElement("p");
+    description.dataset.aiPreviewDescription = "true";
+    description.className = "rogatio-ai-preview-description";
+    description.textContent = summary.description;
+    container.append(description);
+  }
+
+  if (summary.groups.length === 0) {
+    const empty = document.createElement("p");
+    empty.dataset.aiPreviewEmpty = "true";
+    empty.textContent = "This preview contains no groups.";
+    container.append(empty);
+    return container;
+  }
+
+  const groupList = document.createElement("ul");
+  groupList.dataset.aiPreviewGroups = "true";
+  groupList.className = "rogatio-ai-preview-list";
+  summary.groups.forEach((group, groupIndex) => {
+    const groupItem = document.createElement("li");
+    groupItem.dataset.aiPreviewGroup = "true";
+    groupItem.className = "rogatio-ai-preview-group";
+    const details = document.createElement("details");
+    if (groupIndex === 0) details.open = true;
+    const summaryEl = document.createElement("summary");
+    summaryEl.className = "rogatio-ai-preview-group-summary";
+    const head = document.createElement("span");
+    head.className = "rogatio-ai-preview-group-head";
+    const groupName = document.createElement("span");
+    groupName.textContent = group.name;
+    const totalRules = group.rules.length + group.omittedRules;
+    const groupCount = document.createElement("span");
+    groupCount.className = "rogatio-ai-preview-count";
+    groupCount.textContent =
+      totalRules === 1 ? "1 rule" : `${totalRules} rules`;
+    head.append(groupName, groupCount);
+    summaryEl.append(head);
+    details.append(summaryEl);
+
+    if (group.rules.length === 0) {
+      const empty = document.createElement("p");
+      empty.dataset.aiPreviewGroupEmpty = "true";
+      empty.textContent = "No rules in this group.";
+      details.append(empty);
+    } else {
+      const ruleList = document.createElement("ul");
+      ruleList.dataset.aiPreviewRules = "true";
+      ruleList.className = "rogatio-ai-preview-rules";
+      for (const rule of group.rules) {
+        const ruleItem = document.createElement("li");
+        ruleItem.dataset.aiPreviewRule = "true";
+        ruleItem.className = "rogatio-ai-preview-rule";
+
+        const title = document.createElement("p");
+        title.className = "rogatio-ai-preview-rule-title";
+        const ruleName = document.createElement("strong");
+        ruleName.textContent = rule.name;
+        const ruleType = document.createElement("span");
+        ruleType.className = "rogatio-ai-preview-type";
+        ruleType.textContent = rule.type;
+        title.append(ruleName, " ", ruleType);
+        ruleItem.append(title);
+
+        const source = document.createElement("p");
+        source.className = "rogatio-ai-preview-source";
+        const sourceLabel = document.createElement("span");
+        sourceLabel.textContent = "Source: ";
+        const sourceCode = document.createElement("code");
+        sourceCode.dataset.aiPreviewSource = "true";
+        sourceCode.textContent = rule.source;
+        source.append(sourceLabel, sourceCode);
+        ruleItem.append(source);
+
+        const metaParts = [rule.resourceTypes, rule.priority];
+        if (rule.method !== null) metaParts.push(`method ${rule.method}`);
+        const meta = document.createElement("p");
+        meta.className = "rogatio-ai-preview-meta";
+        meta.textContent = metaParts.join(" • ");
+        ruleItem.append(meta);
+
+        const action = document.createElement("p");
+        action.className = "rogatio-ai-preview-action";
+        action.dataset.aiPreviewAction = "true";
+        action.textContent = rule.action;
+        ruleItem.append(action);
+
+        ruleList.append(ruleItem);
+      }
+      details.append(ruleList);
+    }
+
+    if (group.omittedRules > 0) {
+      const omitted = document.createElement("p");
+      omitted.className = "rogatio-ai-preview-omitted";
+      omitted.textContent = `+${group.omittedRules} more rules not shown.`;
+      details.append(omitted);
+    }
+
+    groupItem.append(details);
+    groupList.append(groupItem);
+  });
+  container.append(groupList);
+
+  if (summary.omittedGroups > 0) {
+    const omitted = document.createElement("p");
+    omitted.className = "rogatio-ai-preview-omitted";
+    omitted.textContent = `+${summary.omittedGroups} more groups not shown.`;
+    container.append(omitted);
+  }
+  return container;
+}
+
 function badgeLabelText(): string {
   const attention = attentionFromStatuses();
   const attentionText = state.badge?.attention ? " (attention needed)" : "";
@@ -1168,14 +1287,13 @@ function renderOverview(shell: HTMLElement): void {
     } else {
       const preview = document.createElement("div");
       preview.className = "rogatio-ai-preview";
+      const summaryData = summarizeAiPreview(aiPreview);
       const name = document.createElement("strong");
-      name.textContent = text(
-        isProjectRecord(aiPreview) ? aiPreview.name : undefined,
-        "Generated project",
-      );
+      name.textContent = summaryData.name;
       const summary = document.createElement("p");
       summary.textContent = `${countGroups(aiPreview)} groups, ${countRules(aiPreview)} rules. This preview has not been saved.`;
       preview.append(name, summary);
+      preview.append(createAiPreviewDetails(summaryData));
       const create = button("Create project", "ai-create");
       const cancel = button("Cancel", "ai-cancel");
       composer.append(preview, create, cancel);
