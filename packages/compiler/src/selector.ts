@@ -49,16 +49,18 @@ function isCandidate(
     return false;
 
   if (context.phase === "request") {
-    if (
-      op.kind === "response-body" ||
-      op.kind === "redirect" ||
-      op.kind === "query" ||
-      op.kind === "header" ||
-      op.kind === "request-body"
-    ) {
-      return true;
+    // Exhaustive on purpose: a new operation kind must be classified here, not
+    // fall through to a default that silently excludes it.
+    switch (op.kind) {
+      case "matcher":
+      case "redirect":
+      case "query":
+      case "header":
+      case "request-body":
+      case "response-body":
+      case "mock":
+        return true;
     }
-    return op.kind === "matcher";
   }
   return op.kind === "response-body";
 }

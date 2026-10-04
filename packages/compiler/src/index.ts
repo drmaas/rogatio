@@ -36,6 +36,7 @@ export type {
   CompilerDiagnosticCode,
   HeaderOperation,
   MatcherOperation,
+  MockOperation,
   NormalizedMatcher,
   QueryOperation,
   RedirectOperation,

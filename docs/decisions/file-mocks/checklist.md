@@ -92,16 +92,16 @@ lists; the existing browser-bundle import check still passes.
 
 ## Phase 4 — Compiler: `MockOperation`
 
-- [ ] Add `MockOperation { kind: "mock"; matcher; mock }` to
+- [x] Add `MockOperation { kind: "mock"; matcher; mock }` to
       `packages/compiler/src/types.ts` and to the `RogatioOperation` union.
-- [ ] Add mock-specific codes to `CompilerDiagnosticCode` for forbidden headers
+- [x] Add mock-specific codes to `CompilerDiagnosticCode` for forbidden headers
       and body-source violations.
-- [ ] Add an explicit `type === "mock"` branch in
+- [x] Add an explicit `type === "mock"` branch in
       `packages/compiler/src/compile.ts` before the fallback matcher branch, so
       a mock rule never compiles to a bare `MatcherOperation`.
-- [ ] Carry `groupId`, `ruleId`, `name`, `redactSensitiveInLogs`, and the
+- [x] Carry `groupId`, `ruleId`, `name`, `redactSensitiveInLogs`, and the
       normalized matcher unchanged.
-- [ ] Confirm no existing consumer breaks on the widened union; fix exhaustive
+- [x] Confirm no existing consumer breaks on the widened union; fix exhaustive
       switches rather than adding default cases.
 
 **Acceptance:** a mock rule compiles to exactly one `MockOperation` with the
@@ -112,7 +112,7 @@ operation.
 assertion, diagnostic codes and paths, adversarial rule input, and a test that
 the operation union stays exhaustive.
 
-- [ ] Phase 4 acceptance verified.
+- [x] Phase 4 acceptance verified.
 
 ## Phase 5 — Dry run: mock preview
 

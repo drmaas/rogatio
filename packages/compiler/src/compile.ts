@@ -12,6 +12,7 @@ import type {
   CompileResult,
   HeaderOperation,
   MatcherOperation,
+  MockOperation,
   NormalizedMatcher,
   QueryOperation,
   RedirectOperation,
@@ -236,6 +237,21 @@ function compileOperations(project: RogatioProject): RogatioOperation[] {
           redactSensitiveInLogs,
           matcher,
           requestBody: rule.requestBody ?? { mode: "replace", body: "" },
+        };
+        operations.push(operation);
+      } else if (rule.type === "mock") {
+        const mock = rule.mock;
+        if (mock === undefined) {
+          throw new Error("validated mock rule missing mock payload");
+        }
+        const operation: MockOperation = {
+          kind: "mock",
+          groupId: group.id,
+          ruleId: rule.id,
+          name: rule.name,
+          redactSensitiveInLogs,
+          matcher,
+          mock,
         };
         operations.push(operation);
       } else {
