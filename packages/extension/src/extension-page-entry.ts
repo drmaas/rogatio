@@ -8,6 +8,7 @@ import {
 import { type AiPreviewSummary, summarizeAiPreview } from "./ai-preview.js";
 import { attentionFromRuleStatuses } from "./attention.js";
 import { PROJECT_VERSION, validateProjectDetailed } from "./browser-schema.js";
+import { createDashboardSystemStatus } from "./dashboard-status.js";
 import {
   nativeHostOriginMismatchMessage,
   runtimeInstallCommand,
@@ -24,6 +25,15 @@ import {
   saveExportedProject,
 } from "./project-file.js";
 import { runtimeControlDisabled } from "./runtime-controls.js";
+import {
+  resolveAiCard,
+  resolveAiTone,
+  resolveRuntimeRecoveryText,
+  resolveRuntimeStatusClass,
+  resolveRuntimeStatusText,
+  resolveRuntimeTone,
+  shouldShowRuntimeDiagnostics,
+} from "./status-cards.js";
 import { shouldRemountEditorAfterGroupEnablement } from "./workspace-enablement-refresh.js";
 
 interface StoredProject {
@@ -332,11 +342,12 @@ function extensionId(): string {
 
 /** Tone class for the runtime status dot: running, failed, or neutral. */
 function runtimeStatusTone(): string {
-  const phase = state.nativeRuntimeState?.phase ?? "stopped";
-  if (phase === "started") return "rogatio-runtime-running";
-  if (phase === "failed" || phase === "error") return "rogatio-runtime-failed";
-  if (phase === "starting") return "rogatio-runtime-starting";
-  return "rogatio-runtime-idle";
+  return resolveRuntimeStatusClass(state.nativeRuntimeState?.phase);
+}
+
+/** Card-heading tone for a runtime phase, shared by sidebar + dashboard. */
+function runtimeCardTone(phase: string | undefined): string {
+  return resolveRuntimeTone(phase);
 }
 
 type SidebarCardName = "runtime" | "ai" | "rules";
@@ -362,6 +373,111 @@ function createSidebarCard(
   body.className = "rogatio-sidebar-card-body";
   card.append(heading, body);
   return { card, body };
+}
+
+/**
+ * Sidebar runtime card body (dashboard-runtime-ai §1). Buttons carry the
+ * existing shell `data-command` hooks so the sidebar shares
+ * `nativeRuntimeCommand`, `showDiagnostics`, and `runtimeControlDisabled`
+ * with the Dashboard system-status surface; status text/tone share
+ * `runtimeStatusText`/`runtimeStatusTone` via `status-cards.ts`. The Dashboard
+ * builds its own block in `dashboard-status.ts` (live regions + recovery
+ * line), so this stays sidebar-only and sidebar markup is byte-identical.
+ */
+function appendRuntimeCardBody(body: HTMLElement): void {
+  const runtimePhase = state.nativeRuntimeState?.phase ?? "stopped";
+  const actions = document.createElement("div");
+  actions.className = "rogatio-sidebar-actions";
+  const controlsDisabled = runtimeControlDisabled(runtimePhase);
+  const startRuntime = button("Start runtime", "start-native-runtime");
+  startRuntime.disabled = controlsDisabled.start;
+  const stopRuntime = button("Stop runtime", "stop-native-runtime");
+  stopRuntime.disabled = controlsDisabled.stop;
+  actions.append(startRuntime, stopRuntime);
+  body.append(actions);
+
+  // Runtime status sits directly under the Start/Stop controls so the current
+  // phase is always visible next to the actions that change it.
+  const nativeRuntime = document.createElement("p");
+  nativeRuntime.dataset.nativeRuntimeState = "true";
+  nativeRuntime.className = `rogatio-runtime-status ${runtimeStatusTone()}`;
+  nativeRuntime.textContent = `Runtime status: ${runtimeStatusText()}`;
+  body.append(nativeRuntime);
+
+  // The browser-assigned extension ID is what `rogatio runtime install` pins
+  // in the native-messaging manifest; always show it so the install step
+  // never requires hunting through chrome://extensions.
+  const extensionIdRow = document.createElement("div");
+  extensionIdRow.className = "rogatio-extension-id-row";
+  const extensionIdLine = document.createElement("p");
+  extensionIdLine.dataset.extensionId = "true";
+  extensionIdLine.className = "rogatio-extension-id";
+  extensionIdLine.textContent = `Extension ID: ${extensionId() || "unknown"}`;
+  const copyId = button("⧉", "copy-extension-id");
+  copyId.className = "rogatio-copy-icon";
+  copyId.setAttribute("aria-label", "Copy extension ID");
+  copyId.title = "Copy extension ID";
+  extensionIdRow.append(extensionIdLine, copyId);
+  body.append(extensionIdRow);
+
+  // Show diagnostics when the runtime failed or is unsupported, and keep the
+  // concrete error next to it.
+  if (shouldShowRuntimeDiagnostics(runtimePhase)) {
+    body.append(button("Show diagnostics", "show-diagnostics"));
+    const runtimeError = state.nativeRuntimeError;
+    if (runtimeError) {
+      const runtimeErrorLine = document.createElement("p");
+      runtimeErrorLine.dataset.runtimeError = "true";
+      runtimeErrorLine.className = "rogatio-runtime-error";
+      runtimeErrorLine.textContent = `Runtime error: ${runtimeError}`;
+      body.append(runtimeErrorLine);
+      if (runtimeError.includes("allowed_origins")) {
+        const mismatchCommand = document.createElement("p");
+        mismatchCommand.dataset.runtimeOriginMismatch = "true";
+        mismatchCommand.className = "rogatio-runtime-error";
+        mismatchCommand.textContent = `Re-pin the host: ${runtimeInstallCommand(extensionId())}`;
+        body.append(mismatchCommand);
+      }
+    }
+  }
+}
+
+/**
+ * Sidebar AI card body (dashboard-runtime-ai §1). Status precedence is
+ * needs-runtime > Configured > not-reported > Not-configured via
+ * `resolveAiCard`; provider/model lines render only when supported with
+ * metadata. The host never sends the key, so the card never renders it.
+ * The Dashboard builds its own block in `dashboard-status.ts` with live
+ * regions; this stays a plain `<p>` so sidebar markup is byte-identical.
+ */
+function appendAiCardBody(body: HTMLElement): void {
+  const view = resolveAiCard({
+    phase: state.nativeRuntimeState?.phase,
+    aiSupported,
+    aiStatusChecked,
+    aiReported,
+    aiProvider,
+  });
+  const aiStatus = document.createElement("p");
+  aiStatus.dataset.aiStatus = "true";
+  aiStatus.className = `rogatio-ai-status ${view.statusClass}`;
+  aiStatus.textContent = view.statusText;
+  body.append(aiStatus);
+  if (
+    view.showProviderLines &&
+    view.providerUrl !== null &&
+    view.model !== null
+  ) {
+    const aiProviderLine = document.createElement("p");
+    aiProviderLine.dataset.aiProvider = "true";
+    aiProviderLine.className = "rogatio-ai-provider";
+    aiProviderLine.textContent = `Provider: ${view.providerUrl}`;
+    const aiModelLine = document.createElement("p");
+    aiModelLine.dataset.aiModel = "true";
+    aiModelLine.className = "rogatio-ai-model";
+    aiModelLine.textContent = `Model: ${view.model}`;
+    body.append(aiProviderLine, aiModelLine);
+  }
 }
 
 /** Deep link for one rule, using the same `?group=&rule=` shape as `groupUrl`. */
@@ -551,45 +667,14 @@ function ruleStatusTone(statusValue: string): string {
 
 /** Human-readable runtime phase for the sidebar status line. */
 function runtimeStatusText(): string {
-  const phase = state.nativeRuntimeState?.phase ?? "stopped";
-  switch (phase) {
-    case "starting":
-      return "starting";
-    case "started":
-      return "running";
-    case "failed":
-      return "failed to start";
-    case "unsupported":
-      return "unavailable on this platform";
-    case "error":
-      return "error";
-    default:
-      return "stopped";
-  }
+  return resolveRuntimeStatusText(state.nativeRuntimeState?.phase);
 }
 
 function runtimeRecoveryText(): string {
-  const error = state.nativeRuntimeError?.toLowerCase() ?? "";
-  if (error.includes("allowed_origins") || error.includes("origin-forbidden")) {
-    return "This extension ID is not in the host manifest allowed_origins. Re-pin the host with the command below, reload Rogatio from chrome://extensions, then click Start runtime again.";
-  }
-  if (error.includes("native-host-missing")) {
-    return "Install the host using the command below once, reload Rogatio from chrome://extensions, then click Start runtime again.";
-  }
-  if (error.includes("host")) {
-    return "Re-run the install command below once, reload Rogatio from chrome://extensions, then click Start runtime again.";
-  }
-  if (
-    error.includes("trust") ||
-    error.includes("certificate") ||
-    error.includes("ca")
-  ) {
-    return "Run the install command below to register the host and trust the device-local CA, then restart Chrome and click Start runtime again.";
-  }
-  if ((state.nativeRuntimeState?.phase ?? "stopped") === "unsupported") {
-    return "This device cannot provide the capabilities required by the selected runtime rules. You can still edit and verify the project.";
-  }
-  return "Open Show diagnostics for the concrete host error. After correcting it, click Start runtime again.";
+  return resolveRuntimeRecoveryText(
+    state.nativeRuntimeState?.phase,
+    state.nativeRuntimeError ?? null,
+  );
 }
 
 /**
@@ -806,111 +891,31 @@ function createSidebar(): HTMLElement {
   }
 
   const runtimePhase = state.nativeRuntimeState?.phase ?? "stopped";
-  const runtimeTone =
-    runtimePhase === "started"
-      ? "ok"
-      : runtimePhase === "failed" || runtimePhase === "error"
-        ? "error"
-        : runtimePhase === "starting"
-          ? "warn"
-          : "muted";
 
   // Runtime card: the session controls, the phase they change, and the
   // extension ID that `rogatio runtime install` needs.
-  const runtime = createSidebarCard("runtime", "Runtime", runtimeTone);
-  const actions = document.createElement("div");
-  actions.className = "rogatio-sidebar-actions";
-  const controlsDisabled = runtimeControlDisabled(runtimePhase);
-  const startRuntime = button("Start runtime", "start-native-runtime");
-  startRuntime.disabled = controlsDisabled.start;
-  const stopRuntime = button("Stop runtime", "stop-native-runtime");
-  stopRuntime.disabled = controlsDisabled.stop;
-  actions.append(startRuntime, stopRuntime);
-  runtime.body.append(actions);
-
-  // Runtime status sits directly under the Start/Stop controls so the current
-  // phase is always visible next to the actions that change it.
-  const nativeRuntime = document.createElement("p");
-  nativeRuntime.dataset.nativeRuntimeState = "true";
-  nativeRuntime.className = `rogatio-runtime-status ${runtimeStatusTone()}`;
-  nativeRuntime.textContent = `Runtime status: ${runtimeStatusText()}`;
-  runtime.body.append(nativeRuntime);
-
-  // The browser-assigned extension ID is what `rogatio runtime install` pins
-  // in the native-messaging manifest; always show it so the install step
-  // never requires hunting through chrome://extensions.
-  const extensionIdRow = document.createElement("div");
-  extensionIdRow.className = "rogatio-extension-id-row";
-  const extensionIdLine = document.createElement("p");
-  extensionIdLine.dataset.extensionId = "true";
-  extensionIdLine.className = "rogatio-extension-id";
-  extensionIdLine.textContent = `Extension ID: ${extensionId() || "unknown"}`;
-  const copyId = button("⧉", "copy-extension-id");
-  copyId.className = "rogatio-copy-icon";
-  copyId.setAttribute("aria-label", "Copy extension ID");
-  copyId.title = "Copy extension ID";
-  extensionIdRow.append(extensionIdLine, copyId);
-  runtime.body.append(extensionIdRow);
-
-  // Show diagnostics when the runtime failed or is unsupported, and keep the
-  // concrete error next to it.
-  if (runtimePhase === "failed" || runtimePhase === "unsupported") {
-    runtime.body.append(button("Show diagnostics", "show-diagnostics"));
-    const runtimeError = state.nativeRuntimeError;
-    if (runtimeError) {
-      const runtimeErrorLine = document.createElement("p");
-      runtimeErrorLine.dataset.runtimeError = "true";
-      runtimeErrorLine.className = "rogatio-runtime-error";
-      runtimeErrorLine.textContent = `Runtime error: ${runtimeError}`;
-      runtime.body.append(runtimeErrorLine);
-      if (runtimeError.includes("allowed_origins")) {
-        const mismatchCommand = document.createElement("p");
-        mismatchCommand.dataset.runtimeOriginMismatch = "true";
-        mismatchCommand.className = "rogatio-runtime-error";
-        mismatchCommand.textContent = `Re-pin the host: ${runtimeInstallCommand(extensionId())}`;
-        runtime.body.append(mismatchCommand);
-      }
-    }
-  }
+  const runtime = createSidebarCard(
+    "runtime",
+    "Runtime",
+    runtimeCardTone(runtimePhase),
+  );
+  appendRuntimeCardBody(runtime.body);
   sidebar.append(runtime.card);
 
   // AI card: status plus host-reported provider metadata (issue #241). The
   // host never sends the API key, so the card never renders it (spec REQ-010).
-  const aiTone = aiSupported
-    ? "ok"
-    : aiStatusChecked && aiReported
-      ? "warn"
-      : "muted";
-  const ai = createSidebarCard("ai", "AI", aiTone);
-  const aiStatus = document.createElement("p");
-  aiStatus.dataset.aiStatus = "true";
-  aiStatus.className = "rogatio-ai-status";
-  const aiProviderInfo = aiSupported ? aiProvider : null;
-  if (state.nativeRuntimeState?.phase !== "started") {
-    aiStatus.textContent = "AI: needs runtime";
-    aiStatus.className += " rogatio-ai-needs-runtime";
-  } else if (aiProviderInfo !== null) {
-    aiStatus.textContent = "AI: Configured";
-    aiStatus.className += " rogatio-ai-ready";
-  } else if (aiStatusChecked && !aiReported) {
-    aiStatus.textContent = "AI: not reported";
-    aiStatus.className += " rogatio-ai-not-reported";
-  } else {
-    aiStatus.textContent = "AI: Not configured";
-    aiStatus.className += " rogatio-ai-not-configured";
-  }
-  ai.body.append(aiStatus);
-  if (aiProviderInfo !== null) {
-    const aiProviderLine = document.createElement("p");
-    aiProviderLine.dataset.aiProvider = "true";
-    aiProviderLine.className = "rogatio-ai-provider";
-    aiProviderLine.textContent = `Provider: ${aiProviderInfo.url}`;
-    const aiModelLine = document.createElement("p");
-    aiModelLine.dataset.aiModel = "true";
-    aiModelLine.className = "rogatio-ai-model";
-    aiModelLine.textContent = `Model: ${aiProviderInfo.model}`;
-    ai.body.append(aiProviderLine, aiModelLine);
-  }
+  const ai = createSidebarCard(
+    "ai",
+    "AI",
+    resolveAiTone({
+      phase: state.nativeRuntimeState?.phase,
+      aiSupported,
+      aiStatusChecked,
+      aiReported,
+      aiProvider,
+    }),
+  );
+  appendAiCardBody(ai.body);
   sidebar.append(ai.card);
 
   // Project switching and import are dashboard actions. Workspace controls
@@ -1343,7 +1348,22 @@ function renderOverview(shell: HTMLElement): void {
   projectsHeading.append(projectsCopy, projectActions);
   projectsSection.append(projectsHeading, grid);
 
-  overview.append(creationSection, projectsSection);
+  // System status sits above Start a project so the Create using AI gate
+  // explanation precedes the gated button. Controls carry the existing shell
+  // `data-command` hooks and stay inside the shell delegated-handler subtree;
+  // the AI block reads the same `aiSupported` truth as the Create using AI
+  // gate. Never `data-card`: that hook is sidebar-only.
+  const systemStatus = createDashboardSystemStatus({
+    phase: state.nativeRuntimeState?.phase,
+    runtimeError: state.nativeRuntimeError ?? null,
+    extensionId: extensionId(),
+    aiSupported,
+    aiStatusChecked,
+    aiReported,
+    aiProvider,
+  });
+
+  overview.append(systemStatus, creationSection, projectsSection);
   shell.append(overview);
 }
 
