@@ -8,6 +8,7 @@ import {
   containsUrlCaptureReference,
   validateCaptureTemplate,
 } from "../../schema/src/captures.js";
+import { hasControl } from "../../schema/src/control.js";
 import { normalizeNameKey } from "../../schema/src/identity.js";
 import { hasLoneSurrogate } from "../../schema/src/utf16.js";
 
@@ -136,6 +137,14 @@ export const LIMITS = Object.freeze({
   maxHeaderNameLength: 256,
   maxHeaderValueLength: 4096,
   maxHeadersPerRule: 1,
+  minMockStatus: 200,
+  maxMockStatus: 599,
+  maxMockHeadersPerRule: 32,
+  maxMockHeaderNameLength: 256,
+  maxMockHeaderValueLength: 4096,
+  maxMockInlineBodyLength: 65536,
+  maxMockDelayMs: 30000,
+  maxMockFilePathLength: 2048,
   maxResponseBodyReplacements: 64,
   maxResponseBodyBytes: 4 * 1024 * 1024,
   maxResponseBodyPatternLength: 2048,
@@ -444,8 +453,18 @@ const RULE_KEYS = [
   "headerValue",
   "responseBody",
   "requestBody",
+  "mock",
   "redactSensitiveInLogs",
 ] as const;
+
+const MOCK_ACTION_KEYS = [
+  "status",
+  "headers",
+  "delayMs",
+  "body",
+  "file",
+] as const;
+const MOCK_HEADER_KEYS = ["name", "value"] as const;
 
 const QUERY_ACTION_KEYS = ["type", "params"] as const;
 const QUERY_PARAM_KEYS = ["name", "operation", "value"] as const;
@@ -543,6 +562,349 @@ function addCaptureIssues(
   }
 }
 
+function isValidMockLogicalPath(value: string): boolean {
+  if (value.length === 0) return false;
+  if (value.includes("\\") || value.includes("%") || hasControl(value)) {
+    return false;
+  }
+  if (value.startsWith("/") || value.endsWith("/") || value.includes("//")) {
+    return false;
+  }
+
+  const parts = value.split("/");
+  if (
+    parts.some(
+      (part) =>
+        part.length === 0 ||
+        part === "." ||
+        part === ".." ||
+        part.includes(":") ||
+        /[*?[\]]/.test(part),
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function pushSchemaIssue(
+  errors: ValidationIssue[],
+  instancePath: string,
+  keyword: string,
+  message: string,
+  params: Record<string, unknown> = {},
+): void {
+  errors.push({ instancePath, keyword, message, params });
+}
+
+function validateMockHeaderStructure(
+  errors: ValidationIssue[],
+  value: unknown,
+  path: string,
+): void {
+  if (!isRecord(value)) {
+    pushSchemaIssue(errors, path, "type", "must be object", { type: "object" });
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!MOCK_HEADER_KEYS.includes(key as (typeof MOCK_HEADER_KEYS)[number])) {
+      pushSchemaIssue(
+        errors,
+        path,
+        "additionalProperties",
+        "must NOT have additional properties",
+        { additionalProperty: key },
+      );
+    }
+  }
+  if (typeof value.name !== "string") {
+    pushSchemaIssue(
+      errors,
+      `${path}/name`,
+      "required",
+      "must have required property 'name'",
+      { missingProperty: "name" },
+    );
+  } else if (value.name.length === 0) {
+    pushSchemaIssue(
+      errors,
+      `${path}/name`,
+      "minLength",
+      "must NOT have fewer than 1 characters",
+      { limit: 1 },
+    );
+  } else if (value.name.length > LIMITS.maxMockHeaderNameLength) {
+    pushSchemaIssue(
+      errors,
+      `${path}/name`,
+      "maxLength",
+      `must NOT have more than ${LIMITS.maxMockHeaderNameLength} characters`,
+      { limit: LIMITS.maxMockHeaderNameLength },
+    );
+  }
+  if (typeof value.value !== "string") {
+    pushSchemaIssue(
+      errors,
+      `${path}/value`,
+      "required",
+      "must have required property 'value'",
+      { missingProperty: "value" },
+    );
+  } else if (value.value.length > LIMITS.maxMockHeaderValueLength) {
+    pushSchemaIssue(
+      errors,
+      `${path}/value`,
+      "maxLength",
+      `must NOT have more than ${LIMITS.maxMockHeaderValueLength} characters`,
+      { limit: LIMITS.maxMockHeaderValueLength },
+    );
+  }
+}
+
+function validateMockStructure(
+  errors: ValidationIssue[],
+  value: unknown,
+  mockPath: string,
+): void {
+  if (!isRecord(value)) {
+    pushSchemaIssue(errors, mockPath, "type", "must be object", {
+      type: "object",
+    });
+    return;
+  }
+  for (const key of Object.keys(value)) {
+    if (!MOCK_ACTION_KEYS.includes(key as (typeof MOCK_ACTION_KEYS)[number])) {
+      pushSchemaIssue(
+        errors,
+        mockPath,
+        "additionalProperties",
+        "must NOT have additional properties",
+        { additionalProperty: key },
+      );
+    }
+  }
+  if (!("status" in value) || value.status === undefined) {
+    pushSchemaIssue(
+      errors,
+      `${mockPath}/status`,
+      "required",
+      "must have required property 'status'",
+      { missingProperty: "status" },
+    );
+  } else if (
+    typeof value.status !== "number" ||
+    !Number.isInteger(value.status)
+  ) {
+    pushSchemaIssue(errors, `${mockPath}/status`, "type", "must be integer", {
+      type: "integer",
+    });
+  } else if (value.status < LIMITS.minMockStatus) {
+    pushSchemaIssue(
+      errors,
+      `${mockPath}/status`,
+      "minimum",
+      `must be >= ${LIMITS.minMockStatus}`,
+      { comparison: ">=", limit: LIMITS.minMockStatus },
+    );
+  } else if (value.status > LIMITS.maxMockStatus) {
+    pushSchemaIssue(
+      errors,
+      `${mockPath}/status`,
+      "maximum",
+      `must be <= ${LIMITS.maxMockStatus}`,
+      { comparison: "<=", limit: LIMITS.maxMockStatus },
+    );
+  }
+
+  if (value.headers !== undefined) {
+    const headersPath = `${mockPath}/headers`;
+    if (!Array.isArray(value.headers)) {
+      pushSchemaIssue(errors, headersPath, "type", "must be array", {
+        type: "array",
+      });
+    } else {
+      if (value.headers.length > LIMITS.maxMockHeadersPerRule) {
+        pushSchemaIssue(
+          errors,
+          headersPath,
+          "maxItems",
+          `must NOT have more than ${LIMITS.maxMockHeadersPerRule} items`,
+          { limit: LIMITS.maxMockHeadersPerRule },
+        );
+      }
+      for (let index = 0; index < value.headers.length; index += 1) {
+        validateMockHeaderStructure(
+          errors,
+          value.headers[index],
+          `${headersPath}/${index}`,
+        );
+      }
+    }
+  }
+
+  if (value.delayMs !== undefined) {
+    const delayPath = `${mockPath}/delayMs`;
+    if (typeof value.delayMs !== "number" || !Number.isInteger(value.delayMs)) {
+      pushSchemaIssue(errors, delayPath, "type", "must be integer", {
+        type: "integer",
+      });
+    } else if (value.delayMs < 0) {
+      pushSchemaIssue(errors, delayPath, "minimum", "must be >= 0", {
+        comparison: ">=",
+        limit: 0,
+      });
+    } else if (value.delayMs > LIMITS.maxMockDelayMs) {
+      pushSchemaIssue(
+        errors,
+        delayPath,
+        "maximum",
+        `must be <= ${LIMITS.maxMockDelayMs}`,
+        { comparison: "<=", limit: LIMITS.maxMockDelayMs },
+      );
+    }
+  }
+
+  if (value.body !== undefined && typeof value.body !== "string") {
+    pushSchemaIssue(errors, `${mockPath}/body`, "type", "must be string", {
+      type: "string",
+    });
+  } else if (
+    typeof value.body === "string" &&
+    value.body.length > LIMITS.maxMockInlineBodyLength
+  ) {
+    pushSchemaIssue(
+      errors,
+      `${mockPath}/body`,
+      "maxLength",
+      `must NOT have more than ${LIMITS.maxMockInlineBodyLength} characters`,
+      { limit: LIMITS.maxMockInlineBodyLength },
+    );
+  }
+
+  if (value.file !== undefined && typeof value.file !== "string") {
+    pushSchemaIssue(errors, `${mockPath}/file`, "type", "must be string", {
+      type: "string",
+    });
+  } else if (typeof value.file === "string") {
+    if (value.file.length === 0) {
+      pushSchemaIssue(
+        errors,
+        `${mockPath}/file`,
+        "minLength",
+        "must NOT have fewer than 1 characters",
+        { limit: 1 },
+      );
+    } else if (value.file.length > LIMITS.maxMockFilePathLength) {
+      pushSchemaIssue(
+        errors,
+        `${mockPath}/file`,
+        "maxLength",
+        `must NOT have more than ${LIMITS.maxMockFilePathLength} characters`,
+        { limit: LIMITS.maxMockFilePathLength },
+      );
+    }
+  }
+}
+
+function validateMockSemantic(
+  errors: ValidationIssue[],
+  mock: {
+    status: number;
+    body?: unknown;
+    file?: unknown;
+    headers?: { name: string; value: string }[];
+  },
+  mockPath: string,
+): void {
+  const forbiddenMockStatuses = new Set([204, 205, 304]);
+  if (forbiddenMockStatuses.has(mock.status)) {
+    pushSchemaIssue(
+      errors,
+      `${mockPath}/status`,
+      "mock-status",
+      "Mock status must not be 204, 205, or 304 because those responses require special body handling.",
+      { status: mock.status },
+    );
+  }
+
+  const bodySet = mock.body !== undefined;
+  const fileSet = mock.file !== undefined;
+  if (bodySet === fileSet) {
+    pushSchemaIssue(
+      errors,
+      mockPath,
+      "mock-body-source",
+      "Mock rules require exactly one of body or file.",
+      {},
+    );
+  } else if (
+    fileSet &&
+    typeof mock.file === "string" &&
+    !isValidMockLogicalPath(mock.file)
+  ) {
+    pushSchemaIssue(
+      errors,
+      `${mockPath}/file`,
+      "mock-file-path",
+      "Mock file must be a relative logical path without absolute segments, backslashes, percent escapes, control characters, dot segments, colons, or glob characters.",
+      {},
+    );
+  }
+
+  if (mock.headers !== undefined) {
+    const seenHeaderNames = new Set<string>();
+    for (let index = 0; index < mock.headers.length; index += 1) {
+      const header = mock.headers[index];
+      if (header === undefined) continue;
+      const namePath = `${mockPath}/headers/${index}/name`;
+      const valuePath = `${mockPath}/headers/${index}/value`;
+      if (hasControl(header.name)) {
+        pushSchemaIssue(
+          errors,
+          namePath,
+          "mock-header-control",
+          "Mock header names must not contain control characters.",
+          {},
+        );
+      }
+      if (hasControl(header.value)) {
+        pushSchemaIssue(
+          errors,
+          valuePath,
+          "mock-header-control",
+          "Mock header values must not contain control characters.",
+          {},
+        );
+      }
+      const comparableName = header.name.trim();
+      if (isForbiddenHeader(comparableName, "response")) {
+        pushSchemaIssue(
+          errors,
+          namePath,
+          "forbiddenHeader",
+          `Header "${header.name}" is forbidden for response headers.`,
+          {
+            headerName: header.name,
+            headerDirection: "response",
+          },
+        );
+      }
+      const normalizedName = comparableName.toLowerCase();
+      if (seenHeaderNames.has(normalizedName)) {
+        pushSchemaIssue(
+          errors,
+          namePath,
+          "uniqueMockHeaderName",
+          `mock header name must be unique; duplicate "${header.name}"`,
+          { name: header.name },
+        );
+      } else {
+        seenHeaderNames.add(normalizedName);
+      }
+    }
+  }
+}
+
 function validateQueryAction(
   errors: ValidationIssue[],
   value: unknown,
@@ -596,7 +958,17 @@ export function validateProjectDetailed(
 ): ProjectValidationResult {
   const snapshot = snapshotOwnData(value);
   if (!snapshot.valid || !isRecord(snapshot.value))
-    return { valid: false, errors: [issue("", "ownProperties")] };
+    return {
+      valid: false,
+      errors: [
+        {
+          instancePath: "",
+          keyword: "ownProperties",
+          message: "must contain only own array entries",
+          params: {},
+        },
+      ],
+    };
   const project = snapshot.value;
   const errors: ValidationIssue[] = [];
   if (!hasOnlyKeys(project, PROJECT_KEYS))
@@ -688,8 +1060,26 @@ export function validateProjectDetailed(
         errors.push(issue(rulePath, "invalid-structure"));
         continue;
       }
-      if (!hasOnlyKeys(rule, RULE_KEYS))
-        errors.push(issue(rulePath, "unknown-property"));
+      if (!hasOnlyKeys(rule, RULE_KEYS)) {
+        // Mock rules mirror Ajv's per-key `additionalProperties` diagnostics
+        // for parity. Every other rule keeps the established
+        // `unknown-property` diagnostic so existing output stays stable.
+        if (rule.type === "mock" || Object.hasOwn(rule, "mock")) {
+          for (const key of Object.keys(rule)) {
+            if (!RULE_KEYS.includes(key as (typeof RULE_KEYS)[number])) {
+              pushSchemaIssue(
+                errors,
+                rulePath,
+                "additionalProperties",
+                "must NOT have additional properties",
+                { additionalProperty: key },
+              );
+            }
+          }
+        } else {
+          errors.push(issue(rulePath, "unknown-property"));
+        }
+      }
       if (
         typeof rule.id !== "string" ||
         rule.id.length === 0 ||
@@ -744,7 +1134,8 @@ export function validateProjectDetailed(
         rule.type !== "query" &&
         rule.type !== "header" &&
         rule.type !== "response-body" &&
-        rule.type !== "request-body"
+        rule.type !== "request-body" &&
+        rule.type !== "mock"
       )
         errors.push(issue(`${rulePath}/type`, "invalid-value"));
       if (rule.type === "redirect") {
@@ -1030,6 +1421,42 @@ export function validateProjectDetailed(
           errors.push(
             issue(`${rulePath}/resourceTypes`, "request-body-resource-types"),
           );
+        }
+      }
+      if (rule.type === "mock") {
+        const mock = (rule as Record<string, unknown>).mock;
+        const mockPath = `${rulePath}/mock`;
+        if (mock === undefined) {
+          pushSchemaIssue(
+            errors,
+            mockPath,
+            "required",
+            "must have required property 'mock'",
+            { missingProperty: "mock" },
+          );
+          pushSchemaIssue(errors, rulePath, "if", 'must match "then" schema', {
+            failingKeyword: "then",
+          });
+        } else {
+          const beforeMock = errors.length;
+          validateMockStructure(errors, mock, mockPath);
+          if (
+            errors.length === beforeMock &&
+            isRecord(mock) &&
+            typeof mock.status === "number" &&
+            Number.isInteger(mock.status)
+          ) {
+            validateMockSemantic(
+              errors,
+              mock as {
+                status: number;
+                body?: unknown;
+                file?: unknown;
+                headers?: { name: string; value: string }[];
+              },
+              mockPath,
+            );
+          }
         }
       }
     }

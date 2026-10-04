@@ -74,12 +74,12 @@ rejected path form, boundary status and delay values, and adversarial input
 
 ## Phase 3 — Browser schema: mirror mock validation
 
-- [ ] Add `"mock"` to the rule-type list in
+- [x] Add `"mock"` to the rule-type list in
       `packages/extension/src/browser-schema.ts`.
-- [ ] Mirror every phase 1 and phase 2 rule with identical instance paths,
+- [x] Mirror every phase 1 and phase 2 rule with identical instance paths,
       codes, and messages.
-- [ ] Mirror the forbidden-header and logical-path checks.
-- [ ] Keep the mirror free of Ajv, `node:` imports, and `@rogatio/dry-run`.
+- [x] Mirror the forbidden-header and logical-path checks.
+- [x] Keep the mirror free of Ajv, `node:` imports, and `@rogatio/dry-run`.
 
 **Acceptance:** for every fixture in the phase 1 and 2 suites, the mirror
 returns the same ordered diagnostics as `@rogatio/schema`.
@@ -88,7 +88,7 @@ returns the same ordered diagnostics as `@rogatio/schema`.
 mock fixtures to both validators and asserts deep equality of the diagnostic
 lists; the existing browser-bundle import check still passes.
 
-- [ ] Phase 3 acceptance verified.
+- [x] Phase 3 acceptance verified.
 
 ## Phase 4 — Compiler: `MockOperation`
 
