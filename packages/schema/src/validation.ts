@@ -257,13 +257,14 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
         rule.type !== "query" &&
         rule.type !== "header" &&
         rule.type !== "response-body" &&
-        rule.type !== "request-body"
+        rule.type !== "request-body" &&
+        rule.type !== "mock"
       ) {
         issues.push({
           instancePath: `${rulePath}/type`,
           keyword: "enum",
           message:
-            'must be "redirect", "query", "header", "response-body", or "request-body"',
+            'must be "redirect", "query", "header", "response-body", "request-body", or "mock"',
           params: {
             allowedValues: [
               "redirect",
@@ -271,6 +272,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
               "header",
               "response-body",
               "request-body",
+              "mock",
             ],
           },
         });
