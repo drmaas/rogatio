@@ -10,8 +10,6 @@ export type CoreDiagnosticCode =
   | "core.duplicate-name"
   | "core.duplicate-id"
   | "core.not-found"
-  | "core.permission-undeclared"
-  | "core.invalid-origin"
   | "core.install-failed"
   | "core.recovery-failed"
   | "core.rule-not-installed"
@@ -32,14 +30,10 @@ const CORE_MESSAGES: Record<
   "core.duplicate-name": "A project with this name already exists.",
   "core.duplicate-id": "A project with this id already exists.",
   "core.not-found": "The requested project or group does not exist.",
-  "core.permission-undeclared":
-    "Site access can only be granted for origins the project declares.",
-  "core.invalid-origin": "The value is not a valid explicit site origin.",
   "core.install-failed": "The rule installation could not be completed.",
   "core.recovery-failed":
     "The previous rule set could not be restored after a failed installation.",
-  "core.rule-not-installed":
-    "The rule is enabled with granted site access but is not installed.",
+  "core.rule-not-installed": "The rule is enabled but is not installed.",
   "core.runtime-transition": "The runtime state transition is not allowed.",
   "core.invariant": "An internal invariant could not be maintained.",
 };
