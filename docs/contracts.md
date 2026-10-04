@@ -29,6 +29,11 @@ names stay the source of truth.
 - **Invariants:**
   - A mock carries exactly one body source: inline `body` or local `file`.
     Never both, never neither.
+  - Mock status is 200-599 except `204`, `205`, and `304`. Mock response
+    headers reject control characters, response-framing and other forbidden
+    response headers, and duplicate names (case-insensitive, trimmed). `file`
+    is a relative logical path: no absolute, backslash, percent-escape,
+    control, dot-segment, colon, or glob (`* ? [ ]`) forms.
   - A mock never contacts the original upstream destination.
   - File bodies may be arbitrary bytes. UTF-8 is not required and is never
     assumed.
@@ -57,6 +62,10 @@ names stay the source of truth.
 - **Tooling:**
   - Shape of truth: `packages/schema/src/schema.ts` and
     `packages/schema/src/limits.ts`.
+  - Mock semantic diagnostics (`mock-status`, `mock-body-source`,
+    `mock-file-path`, `mock-header-control`, `uniqueMockHeaderName`, plus
+    `forbiddenHeader` on mock response headers) are verified in
+    `packages/schema/test/mock.test.ts`.
   - Contract test: `packages/schema/test/mock-contract.test.ts` pins the public
     mock shape.
   - Dry-run contract test pins the mock preview summary rules.

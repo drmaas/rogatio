@@ -45,21 +45,21 @@ and a v1 migration no-op test.
 
 ## Phase 2 — Schema: mock semantic validation
 
-- [ ] Add `"mock"` to the rule-type enum check in
+- [x] Add `"mock"` to the rule-type enum check in
       `packages/schema/src/validation.ts` and update its `allowedValues` and
       message.
-- [ ] Add semantic validation with stable instance paths: `/mock/status`,
+- [x] Add semantic validation with stable instance paths: `/mock/status`,
       `/mock/delayMs`, `/mock/body`, `/mock/file`, `/mock/headers/<i>/name`,
       `/mock/headers/<i>/value`.
-- [ ] Reject exactly-one-of violations: both `body` and `file`, or neither.
-- [ ] Reject control characters in header names and header values, and reject
+- [x] Reject exactly-one-of violations: both `body` and `file`, or neither.
+- [x] Reject control characters in header names and header values, and reject
       response-framing and forbidden headers using the existing forbidden-header
       list.
-- [ ] Reject duplicate header names case-insensitively.
-- [ ] Validate `file` as a relative logical path: reject absolute paths,
+- [x] Reject duplicate header names case-insensitively.
+- [x] Validate `file` as a relative logical path: reject absolute paths,
       backslashes, percent escapes, control characters, dot segments, colons,
       and glob characters.
-- [ ] Replace the negative assertions in `packages/schema/test/mock.test.ts` with
+- [x] Replace the negative assertions in `packages/schema/test/mock.test.ts` with
       positive coverage.
 
 **Acceptance:** every invalid case above fails with its own stable path and
@@ -70,7 +70,7 @@ control characters in name and value, forbidden and duplicate headers, each
 rejected path form, boundary status and delay values, and adversarial input
 (inherited properties, accessors that throw, proxies, cycles, sparse arrays).
 
-- [ ] Phase 2 acceptance verified.
+- [x] Phase 2 acceptance verified.
 
 ## Phase 3 — Browser schema: mirror mock validation
 
