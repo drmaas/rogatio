@@ -883,6 +883,8 @@ body {
 .rogatio-ai-preview-group summary {
   cursor: pointer;
   font-weight: 600;
+}
+.rogatio-ai-preview-group-head {
   display: flex;
   gap: 0.5rem;
   align-items: baseline;

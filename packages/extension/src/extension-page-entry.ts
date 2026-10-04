@@ -654,13 +654,18 @@ function createAiPreviewDetails(summary: AiPreviewSummary): HTMLElement {
     const details = document.createElement("details");
     if (groupIndex === 0) details.open = true;
     const summaryEl = document.createElement("summary");
+    summaryEl.className = "rogatio-ai-preview-group-summary";
+    const head = document.createElement("span");
+    head.className = "rogatio-ai-preview-group-head";
     const groupName = document.createElement("span");
     groupName.textContent = group.name;
+    const totalRules = group.rules.length + group.omittedRules;
     const groupCount = document.createElement("span");
     groupCount.className = "rogatio-ai-preview-count";
     groupCount.textContent =
-      group.rules.length === 1 ? "1 rule" : `${group.rules.length} rules`;
-    summaryEl.append(groupName, " — ", groupCount);
+      totalRules === 1 ? "1 rule" : `${totalRules} rules`;
+    head.append(groupName, groupCount);
+    summaryEl.append(head);
     details.append(summaryEl);
 
     if (group.rules.length === 0) {

@@ -232,4 +232,98 @@ describe("ai-preview summary", () => {
       summarizeAiPreview({ version: 2, name: "P", groups: sparse }),
     ).not.toThrow();
   });
+
+  it("truncates long names, descriptions, sources, and destinations", () => {
+    const longName = "n".repeat(500);
+    const longDescription = "d".repeat(2000);
+    const longPattern = `^https://a\\.com/${"p".repeat(2000)}`;
+    const longDestination = `https://example.com/${"q".repeat(2000)}`;
+    const summary = summarizeAiPreview({
+      version: 2,
+      name: longName,
+      description: longDescription,
+      groups: [
+        {
+          id: "g",
+          name: longName,
+          rules: [
+            {
+              id: "r",
+              name: longName,
+              source: { key: "url", operator: "regex", value: longPattern },
+              resourceTypes: ["main_frame"],
+              priority: 100,
+              type: "redirect",
+              redirect: { destination: longDestination },
+            },
+          ],
+        },
+      ],
+    });
+    expect(summary.name.length).toBeLessThan(longName.length);
+    expect(summary.name).toContain("chars");
+    expect(summary.description?.length).toBeLessThan(longDescription.length);
+    const rule = summary.groups[0]?.rules[0];
+    expect(rule?.name.length).toBeLessThan(longName.length);
+    expect(rule?.source.length).toBeLessThan(longPattern.length + 20);
+    expect(rule?.action.length).toBeLessThan(longDestination.length + 20);
+  });
+
+  it("never throws on throwing-length arrays", () => {
+    const throwingGroups = new Proxy([], {
+      get(target, prop, receiver) {
+        if (prop === "length") throw new Error("length");
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    expect(() =>
+      summarizeAiPreview({ version: 2, name: "P", groups: throwingGroups }),
+    ).not.toThrow();
+    const throwingRules = new Proxy([], {
+      get(target, prop, receiver) {
+        if (prop === "length") throw new Error("length");
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    expect(() =>
+      summarizeAiPreview({
+        version: 2,
+        name: "P",
+        groups: [{ id: "g", name: "G", rules: throwingRules }],
+      }),
+    ).not.toThrow();
+  });
+
+  it("labels empty or invalid response-body objects as generic rules", () => {
+    for (const responseBody of [{}, { mode: "oops" }, { mode: "replace" }]) {
+      const summary = summarizeAiPreview({
+        version: 2,
+        name: "P",
+        groups: [
+          {
+            id: "g",
+            name: "G",
+            rules: [
+              {
+                id: "r",
+                name: "R",
+                source: {
+                  key: "url",
+                  operator: "regex",
+                  value: "^https://a\\.com/",
+                },
+                resourceTypes: ["main_frame"],
+                priority: 100,
+                type: "response-body",
+                responseBody,
+              },
+            ],
+          },
+        ],
+      });
+      const action = summary.groups[0]?.rules[0]?.action ?? "";
+      expect(action).not.toContain("regex (");
+      expect(action).toMatch(/Response body (rule|replace)/);
+    }
+  });
 });
