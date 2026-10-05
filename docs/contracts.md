@@ -38,8 +38,11 @@ names stay the source of truth.
   - File bodies may be arbitrary bytes. UTF-8 is not required and is never
     assumed.
   - Every file read is confined to the project's saved root, re-read per
-    request, descriptor-based, and size-bounded. Deny the read when confinement
-    cannot be proved. Never use the process working directory.
+    request, descriptor-based, and size-bounded. Linux proves that with
+    directory handles. macOS proves it with `openat` and `fcntl(F_GETPATH)`
+    through the `koffi` library. Deny the read when confinement cannot be
+    proved, including when that library cannot load. Never fall back to a
+    path-only open. Never use the process working directory.
   - No diagnostic, status, log line, or HTTP failure body contains a logical or
     absolute path.
   - A mock serves the methods its rule filter allows. No filter means all

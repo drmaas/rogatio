@@ -163,15 +163,18 @@ Ajv, or `@rogatio/dry-run`.
 
 ## Phase 7A — Runtime: confined binary file reads
 
-- [ ] Harden the shared confined reader so the opened descriptor is proven
+- [x] Harden the shared confined reader so the opened descriptor is proven
       beneath the canonical root even during intermediate symlink replacement.
       Report `runtime.platform-unsupported` where the platform cannot prove it.
-- [ ] Replace `packages/runtime/src/mock-file.ts` with a descriptor-based read
+- [x] Replace `packages/runtime/src/mock-file.ts` with a descriptor-based read
       that reuses the hardened reader: no-follow open, bounded chunk reads,
       hard-link rejection, post-read `fstat`, abort handling, raw `Uint8Array`.
-- [ ] Remove the fatal UTF-8 decode so binary bodies pass through unchanged.
-- [ ] Do not weaken grant authorization for the existing `readConfinedFile`
+- [x] Remove the fatal UTF-8 decode so binary bodies pass through unchanged.
+- [x] Do not weaken grant authorization for the existing `readConfinedFile`
       callers.
+- [x] On macOS, prove confinement with `openat` and `fcntl(F_GETPATH)` through
+      `koffi`. If that library cannot load, report `runtime.platform-unsupported`.
+      Do not fall back to a path-only open.
 
 **Acceptance:** the reader returns exact binary bytes only when descriptor
 confinement is proved. Every denial has a stable, redacted error.
@@ -181,7 +184,7 @@ intermediate symlink races, hard link, replacement race, missing file, file at
 and over `maxFileBytes`, out-of-root path, unsupported platform, and no path in
 any error.
 
-- [ ] Phase 7A acceptance verified.
+- [x] Phase 7A acceptance verified.
 
 ## Phase 7B — Runtime: render a mock response
 
