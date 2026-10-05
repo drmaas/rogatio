@@ -473,9 +473,12 @@ same fixture and assert the exact same summary.
       band amendment, the loopback mock route, and the confined root contract.
 - [x] Update `README.md`, the affected `packages/*/README.md`, and
       `packages/docs-site/` for the new rule type.
-- [ ] Run `pnpm validate` and record the evidence against the plan's acceptance
-      criteria.
-- [ ] Audit staged, unstaged, tracked, and untracked files for generated output,
+- [x] Run `pnpm validate` and record the evidence against the plan's acceptance
+      criteria. 2026-10-04 on `feature/file-mocks`: format, lint, typecheck, and
+      build passed; unit 162 files / 1581 tests passed; negative fixtures failed
+      as intended; browser 85 passed and 9 skipped. Validation completed
+      successfully.
+- [x] Audit staged, unstaged, tracked, and untracked files for generated output,
       local settings, and secrets.
 
 **Acceptance:** `pnpm validate` passes; the schema and dry-run contract tests
@@ -484,4 +487,4 @@ fail if their surfaces change; the orientation docs describe shipped behavior.
 **Tests:** `packages/schema/test/mock-contract.test.ts`, the dry-run contract
 test, plus the full `pnpm validate` sequence.
 
-- [ ] Phase 13 acceptance verified.
+- [x] Phase 13 acceptance verified.

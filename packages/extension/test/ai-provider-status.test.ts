@@ -324,6 +324,16 @@ describe("not-reported fallback against an old host (REQ-007, AC-005)", () => {
           metadata: { mocks: [] },
         };
       }
+      // Start refreshes the file-error overlay through runtime.status.
+      // Only ai.status stays unanswered, like an older host dropping it.
+      if (envelope.type === "runtime.status") {
+        return {
+          protocol: "v1",
+          type: "runtime.status",
+          timestamp: Date.now(),
+          metadata: {},
+        };
+      }
       return new Promise<NativeEnvelope>(() => {});
     });
     await start(app);

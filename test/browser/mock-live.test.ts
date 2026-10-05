@@ -2,9 +2,10 @@ import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { expect } from "vitest";
 import { openPageCdpSession } from "./cdp-session.js";
 import { extensionContext } from "./extension-context.js";
-import { expect, testStandalone as test } from "./fixtures.js";
+import { testStandalone as test } from "./fixtures.js";
 import { extensionSend, withNewTab } from "./sample-basic-helpers.js";
 
 const HOST_NAME = "com.rogatio.runtime";
@@ -240,7 +241,11 @@ test("serves inline and file mocks, preserves POST, and removes session rules", 
     });
     expect(stopped.ok).toBe(true);
     const remaining = await context.page.evaluate(async () => {
-      const rules = await chrome.declarativeNetRequest.getSessionRules();
+      const sessionRules = chrome.declarativeNetRequest?.getSessionRules;
+      if (sessionRules === undefined) {
+        throw new Error("session rules unavailable");
+      }
+      const rules = await sessionRules();
       return rules
         .map((rule) => rule.id)
         .filter((id) => id >= 5_000_001 && id <= 6_000_000);
