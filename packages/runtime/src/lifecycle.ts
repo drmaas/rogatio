@@ -121,7 +121,13 @@ export interface NativeRuntimeController {
   /** Immutable active policy retained from `runtime.project.set`. */
   getActivePolicy(): ActiveRuntimePolicy | null;
   /** Resolve a stored mock token to rendered response bytes (loopback faucet). */
-  serveMock(token: string): Promise<RuntimeResult<RenderedMock>>;
+  serveMock(
+    token: string,
+    options?: {
+      readonly method?: string;
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<RuntimeResult<RenderedMock>>;
   /**
    * The single-use bootstrap capability token the extension presents in
    * `pair.request` (spec REQ-005). Returns undefined before start, after the
@@ -350,14 +356,36 @@ export function createNativeRuntimeController(
       return activePolicy;
     },
 
-    async serveMock(token: string): Promise<RuntimeResult<RenderedMock>> {
+    async serveMock(
+      token: string,
+      options?: {
+        readonly method?: string;
+        readonly signal?: AbortSignal;
+      },
+    ): Promise<RuntimeResult<RenderedMock>> {
       const mock = mockTokens.get(token);
-      if (mock === undefined) return failure("runtime.mock-unknown");
-      if (!preset) throw new Error("runtime not started");
+      if (mock === undefined || state !== "running" || preset === undefined) {
+        return failure("runtime.mock-unknown");
+      }
+      const method = options?.method?.toUpperCase();
+      const matcher = preset.matchers.find(
+        (candidate) => candidate.ruleId === mock.ruleId,
+      );
+      if (method !== undefined) {
+        if (matcher === undefined) return failure("runtime.mock-unknown");
+        if (
+          matcher.matcher.method !== undefined &&
+          matcher.matcher.method !== method
+        ) {
+          return failure("runtime.unsupported-method");
+        }
+      }
       return renderMockResponse({
         mock,
         fileRoot,
         presetDigest: preset.digest,
+        ...(method !== undefined ? { method } : {}),
+        ...(options?.signal !== undefined ? { signal: options.signal } : {}),
       });
     },
 

@@ -269,17 +269,17 @@ native framing and proves rendered bytes do not enter a native envelope.
 
 ## Phase 9A — Runtime: serve mocks on the loopback listener
 
-- [ ] Add a `/.rogatio/mock/<token>/<digest>` route to the loopback listener in
+- [x] Add a `/.rogatio/mock/<token>/<digest>` route to the loopback listener in
       `packages/runtime/src/intercept-proxy.ts`, beside `/.rogatio/body/`.
-- [ ] Add a parser next to `parseResponseBodyRedirect` and export the prefix so
+- [x] Add a parser next to `parseResponseBodyRedirect` and export the prefix so
       the extension can stay in sync.
-- [ ] Authorize every request by resolving the fresh session token to one active
+- [x] Authorize every request by resolving the fresh session token to one active
       mock and matching the active preset digest. Rule ids and digests alone are
       insufficient. Reject stale, unknown, or stopped-session requests with a
       stable status and empty body.
-- [ ] Serve the rendered mock for any method the rule allows; handle `HEAD` per
+- [x] Serve the rendered mock for any method the rule allows; handle `HEAD` per
       phase 7B. Never expose a general file route.
-- [ ] Never inspect or buffer an incoming request body. Drain it with
+- [x] Never inspect or buffer an incoming request body. Drain it with
       backpressure, reuse the existing concurrent-operation bound, and abort
       delay/read work on disconnect.
 
@@ -293,7 +293,7 @@ disallowed methods, `HEAD`, binary body over the 64 KiB envelope cap, client
 disconnect mid-delay, bounded concurrent delayed requests, a large discarded
 request body, generic empty HTTP failures, and no path in any reply.
 
-- [ ] Phase 9A acceptance verified.
+- [x] Phase 9A acceptance verified.
 
 ## Phase 9B — Runtime: protocol retirement and redacted file errors
 

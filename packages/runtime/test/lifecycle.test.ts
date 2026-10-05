@@ -349,6 +349,24 @@ describe("mock faucet port and serveMock", () => {
     if (result.ok) throw new Error("expected failure");
     expect(result.error.code).toBe("runtime.mock-unknown");
   });
+
+  it("rejects a method when the issued mock has no matcher", async () => {
+    const controller = createNativeRuntimeController({
+      preset: buildPreset(faucetMocks),
+      mockPort: 9123,
+    });
+    await controller.start();
+    const connect = await controller.handleEnvelope({
+      type: "mock.connect",
+      metadata: {},
+    });
+    const token = (connect.metadata as { mocks: readonly { token: string }[] })
+      .mocks[0]?.token;
+    const result = await controller.serveMock(token ?? "", { method: "GET" });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected failure");
+    expect(result.error.code).toBe("runtime.mock-unknown");
+  });
 });
 
 describe("runtime.start / runtime.stop envelopes and policy retention", () => {

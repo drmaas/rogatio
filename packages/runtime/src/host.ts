@@ -268,6 +268,11 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
               presetDigest: policy.presetDigest,
             }
           : null,
+        serveMock: (request) =>
+          controller.serveMock(request.token, {
+            method: request.method,
+            signal: request.signal,
+          }),
       });
       return interceptProxy.endpoint;
     },
