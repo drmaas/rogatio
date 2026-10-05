@@ -40,17 +40,8 @@ describe("envelope body exclusion", () => {
   });
 });
 
-describe("mockBody confinement (spec REQ-006)", () => {
-  it("allows mockBody only on the mock.response envelope", () => {
-    expect(() =>
-      serializeEnvelope({
-        type: "mock.response",
-        metadata: { status: 200, mockBody: "eA==" },
-      }),
-    ).not.toThrow();
-  });
-
-  it("rejects mockBody on any other envelope type", () => {
+describe("mock body confinement", () => {
+  it("rejects mockBody on every envelope", () => {
     expect(() =>
       serializeEnvelope({
         type: "runtime.status",
@@ -59,15 +50,18 @@ describe("mockBody confinement (spec REQ-006)", () => {
     ).toThrow(EnvelopeError);
   });
 
-  it("round-trips a mock.response with base64 mockBody", () => {
-    const json = serializeEnvelope({
-      type: "mock.response",
-      requestId: "r1",
-      metadata: { status: 201, mockBody: "aGVsbG8=" },
-    });
-    const parsed = parseEnvelope(json);
-    expect(parsed.type).toBe("mock.response");
-    expect((parsed.metadata as { mockBody: string }).mockBody).toBe("aGVsbG8=");
+  it("rejects retired mock.request and mock.response types", () => {
+    for (const type of ["mock.request", "mock.response"]) {
+      expect(() =>
+        parseEnvelope(
+          JSON.stringify({
+            protocol: "v1",
+            type,
+            metadata: { mockBody: "eA==" },
+          }),
+        ),
+      ).toThrow(/type invalid/);
+    }
   });
 });
 

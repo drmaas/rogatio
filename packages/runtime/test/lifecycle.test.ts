@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseEnvelope } from "../src/envelope.js";
 import { RUNTIME_LIMITS } from "../src/index.js";
 import { createNativeRuntimeController } from "../src/lifecycle.js";
 import type {
@@ -18,10 +19,6 @@ function buildPreset(mocks: RuntimeMockConfig[] = []): NormalizedRuntimePreset {
       "sha256:0000000000000000000000000000000000000000000000000000000000000000" as PresetDigest,
     ...(mocks.length > 0 ? { mocks } : {}),
   };
-}
-
-function decodeMockBody(mockBody: string): string {
-  return Buffer.from(mockBody, "base64").toString("utf8");
 }
 
 describe("createNativeRuntimeController", () => {
@@ -93,45 +90,16 @@ describe("mock delivery over the envelope", () => {
     expect(typeof meta.mocks[0]?.token).toBe("string");
   });
 
-  it("mock.request delivers the rendered body as base64 mockBody", async () => {
-    const controller = createNativeRuntimeController({
-      preset: buildPreset(mocks),
-    });
-    await controller.start();
-    const connect = await controller.handleEnvelope({
-      type: "mock.connect",
-      metadata: {
-        presetDigest:
-          "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      },
-    });
-    const token = (connect.metadata as { mocks: readonly { token: string }[] })
-      .mocks[0]?.token;
-    const response = await controller.handleEnvelope({
-      type: "mock.request",
-      metadata: { token },
-    });
-    expect(response.type).toBe("mock.response");
-    const meta = response.metadata as {
-      status: number;
-      headers: readonly (readonly [string, string])[];
-      mockBody: string;
-    };
-    expect(meta.status).toBe(200);
-    expect(decodeMockBody(meta.mockBody)).toBe('{"ok":true}');
-  });
-
-  it("mock.request for an unknown token returns 404", async () => {
-    const controller = createNativeRuntimeController({
-      preset: buildPreset(mocks),
-    });
-    await controller.start();
-    const response = await controller.handleEnvelope({
-      type: "mock.request",
-      metadata: { token: "deadbeef" },
-    });
-    const meta = response.metadata as { status: number };
-    expect(meta.status).toBe(404);
+  it("rejects a retired mock.request envelope", () => {
+    expect(() =>
+      parseEnvelope(
+        JSON.stringify({
+          protocol: "v1",
+          type: "mock.request",
+          metadata: { token: "abc" },
+        }),
+      ),
+    ).toThrow(/type invalid/);
   });
 });
 
@@ -314,7 +282,7 @@ describe("pairing and authorization success (spec REQ-005)", () => {
   });
 });
 
-describe("mock faucet port and serveMock", () => {
+describe("mock connect and serveMock", () => {
   const faucetMocks: RuntimeMockConfig[] = [
     {
       ruleId: "m1",
@@ -324,24 +292,26 @@ describe("mock faucet port and serveMock", () => {
     },
   ];
 
-  it("mock.connect reports the configured loopback faucet port (REQ-003)", async () => {
+  it("mock.connect returns tokens and no faucet port", async () => {
     const controller = createNativeRuntimeController({
       preset: buildPreset(faucetMocks),
-      mockPort: 9123,
     });
     await controller.start();
     const connect = await controller.handleEnvelope({
       type: "mock.connect",
       metadata: { presetDigest: DIGEST },
     });
-    const meta = connect.metadata as { port?: number };
-    expect(meta.port).toBe(9123);
+    const meta = connect.metadata as {
+      port?: number;
+      mocks: readonly { ruleId: string }[];
+    };
+    expect(meta.port).toBeUndefined();
+    expect(meta.mocks[0]?.ruleId).toBe("m1");
   });
 
   it("serveMock returns runtime.mock-unknown for an unknown token", async () => {
     const controller = createNativeRuntimeController({
       preset: buildPreset(faucetMocks),
-      mockPort: 9123,
     });
     await controller.start();
     const result = await controller.serveMock("nope");
@@ -353,7 +323,6 @@ describe("mock faucet port and serveMock", () => {
   it("rejects a method when the issued mock has no matcher", async () => {
     const controller = createNativeRuntimeController({
       preset: buildPreset(faucetMocks),
-      mockPort: 9123,
     });
     await controller.start();
     const connect = await controller.handleEnvelope({

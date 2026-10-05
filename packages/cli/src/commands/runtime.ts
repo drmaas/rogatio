@@ -274,7 +274,6 @@ async function runtimeHostCommand(
   options: RuntimeCommandOptions = {},
 ): Promise<number> {
   let root: string | undefined;
-  let mockPort: number | undefined;
   const positional: string[] = [];
   let argumentError: string | undefined;
 
@@ -284,15 +283,6 @@ async function runtimeHostCommand(
       root = resolve(args[++index]);
     } else if (arg === "--root") {
       argumentError = "--root requires a value";
-    } else if (arg === "--mock-port" && index + 1 < args.length) {
-      const parsed = Number(args[++index]);
-      if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 65535) {
-        argumentError = "--mock-port must be an integer port in 1..65535";
-      } else {
-        mockPort = parsed;
-      }
-    } else if (arg === "--mock-port") {
-      argumentError = "--mock-port requires a value";
     } else if (arg === "-" || !arg.startsWith("-")) {
       positional.push(arg);
     } else {
@@ -312,7 +302,6 @@ async function runtimeHostCommand(
     const aiProviderConfig = await readProviderConfig();
     await runNativeHost({
       fileRoot: root,
-      ...(mockPort !== undefined ? { mockPort } : {}),
       ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
       aiConfigReader: readProviderConfig,
       onReady: () =>
@@ -398,7 +387,6 @@ async function runtimeHostCommand(
   await runNativeHost({
     preset: normalized.value,
     ...(rootDir !== undefined ? { fileRoot: rootDir } : {}),
-    ...(mockPort !== undefined ? { mockPort } : {}),
     ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
     aiConfigReader: readProviderConfig,
     onReady: () => console.error("rogatio runtime-host active"),

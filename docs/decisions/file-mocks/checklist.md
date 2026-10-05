@@ -297,21 +297,21 @@ request body, generic empty HTTP failures, and no path in any reply.
 
 ## Phase 9B — Runtime: protocol retirement and redacted file errors
 
-- [ ] Delete `startMockFaucet` from `packages/runtime/src/host.ts`, drop
+- [x] Delete `startMockFaucet` from `packages/runtime/src/host.ts`, drop
       `mockPort` from `NativeHostOptions` and the controller, and remove
       `--mock-port` from `rogatio runtime host`.
-- [ ] Keep token minting and the internal `mock.connect` exchange. Remove
+- [x] Keep token minting and the internal `mock.connect` exchange. Remove
       `mock.request`, `mock.response`, `mockBody`, and their body-envelope
       exception after proving no caller remains.
-- [ ] Add a bounded, redacted per-rule last-error map on the controller. Record a
+- [x] Add a bounded, redacted per-rule last-error map on the controller. Record a
       request-time file failure, clear the entry on the next successful read,
       and clear the whole map on project replacement, start, and stop.
-- [ ] Expose the map through the existing `runtime.status` reply. Never include a
+- [x] Expose the map through the existing `runtime.status` reply. Never include a
       path.
-- [ ] Return a generic HTTP failure status with an empty body for render and file
+- [x] Return a generic HTTP failure status with an empty body for render and file
       failures. Keep the distinct stable code on `runtime.status`, not in the
       page-visible response.
-- [ ] Clean up on client disconnect: abort the delay and the read.
+- [x] Clean up on client disconnect: abort the delay and the read.
 
 **Acceptance:** a file error appears as a stable code and clears exactly as
 locked decision 3 specifies. No retired protocol path remains callable.
@@ -321,7 +321,7 @@ successful read, error cleared by project replacement and restart, bounded-map
 eviction, no retired envelope accepted, generic empty HTTP failures, and no path
 in any reply.
 
-- [ ] Phase 9B acceptance verified.
+- [x] Phase 9B acceptance verified.
 
 ## Phase 10A — Extension: session DNR mock redirects
 

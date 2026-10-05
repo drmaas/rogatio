@@ -313,8 +313,6 @@ export type EnvelopeMessageType =
   | "authorize.request"
   | "authorize.response"
   | "mock.connect"
-  | "mock.request"
-  | "mock.response"
   | "ai.complete"
   | "ai.stream.chunk"
   | "ai.error"
@@ -376,21 +374,7 @@ export interface MockConnectResponse {
     readonly ruleId: string;
     readonly token: string;
   }[];
-  /** Loopback faucet port the browser redirects mock requests to (spec REQ-003). */
-  readonly port?: number;
   readonly error?: string;
-  readonly [key: string]: unknown;
-}
-
-export interface MockRequest {
-  readonly token: string;
-  readonly method?: string;
-}
-
-export interface MockResponse {
-  readonly status: number;
-  readonly headers?: readonly (readonly [string, string])[];
-  readonly mockBody: string;
   readonly [key: string]: unknown;
 }
 

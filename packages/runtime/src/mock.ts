@@ -14,7 +14,9 @@ export interface RenderedMock {
   readonly bodyBytes: Uint8Array;
 }
 
-/** Mint a fresh unguessable per-rule mock token (32 random bytes, hex). */
+/** Mint a fresh unguessable per-rule mock token (32 random bytes, hex).
+ * Rendered bytes stay on the loopback listener. They never enter an envelope.
+ */
 export function mintToken(): string {
   return randomBytes(32).toString("hex");
 }

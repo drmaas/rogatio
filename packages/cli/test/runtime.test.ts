@@ -122,7 +122,7 @@ describe("rogatio runtime command ()", () => {
     error.mockRestore();
   });
 
-  it("serves a mock end-to-end through the native host envelope loop", async () => {
+  it("mints mock tokens and rejects a retired mock.request frame", async () => {
     const preset = normalizeMockPreset();
     const host = createNativeHost({ preset });
     await host.start();
@@ -149,15 +149,7 @@ describe("rogatio runtime command ()", () => {
       }),
     );
     await host.stop();
-
-    if (!served) throw new Error("Expected served frame");
-    const meta = parseFrame(served).metadata as {
-      status: number;
-      headers: Array<[string, string]>;
-      mockBody: string;
-    };
-    expect(meta.status).toBe(200);
-    const body = Buffer.from(meta.mockBody, "base64").toString("utf8");
-    expect(body).toBe("hello");
+    expect(served).toBeNull();
+    expect(token).toBeTypeOf("string");
   });
 });

@@ -26,6 +26,11 @@ import {
 } from "./interception.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { mintToken, type RenderedMock, renderMockResponse } from "./mock.js";
+import {
+  clearMockFileError,
+  listMockFileErrors,
+  recordMockFileError,
+} from "./mock-errors.js";
 import { normalizeRuntimePreset, parseEnabledGroupIds } from "./preset.js";
 import {
   matchersFromOperations,
@@ -37,8 +42,6 @@ import type {
   Envelope,
   EnvelopeInput,
   MockConnectResponse,
-  MockRequest,
-  MockResponse,
   NativeRuntimeState,
   NormalizedRuntimePreset,
   PairRequest,
@@ -75,8 +78,6 @@ export interface SessionConfig {
 export interface NativeRuntimeControllerOptions {
   readonly preset?: NormalizedRuntimePreset;
   readonly fileRoot?: string;
-  /** Loopback faucet port the native host binds to serve mock bodies (REQ-003). */
-  readonly mockPort?: number;
   readonly onStart?: (
     activation: RuntimeActivation,
     session: SessionProvider | null,
@@ -141,10 +142,6 @@ export interface NativeRuntimeController {
   handleEnvelope(input: EnvelopeInput): Promise<Envelope>;
 }
 
-function base64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("base64");
-}
-
 /**
  * Consolidated native runtime control plane. A single native-messaging host
  * serves pairing, authorization, and mock delivery (spec REQ-001). Activation is
@@ -160,8 +157,8 @@ export function createNativeRuntimeController(
 ): NativeRuntimeController {
   let preset: NormalizedRuntimePreset | undefined = options.preset;
   let fileRoot = options.fileRoot;
-  const mockPort = options.mockPort;
   const clock = options.clock ?? (() => Date.now());
+  const mockFileErrors = new Map<string, string>();
 
   let state: NativeRuntimeState = "idle";
   let activation: RuntimeActivation | undefined;
@@ -302,6 +299,7 @@ export function createNativeRuntimeController(
 
       const startedAt = clock();
       capability = createCapabilityState(preset, startedAt);
+      mockFileErrors.clear();
       mockTokens.clear();
       for (const mock of preset.mocks ?? []) {
         mockTokens.set(mintToken(), mock);
@@ -334,6 +332,7 @@ export function createNativeRuntimeController(
         return { state: "stopped" };
       }
       state = "stopping";
+      mockFileErrors.clear();
       if (options.onStop) await options.onStop();
       await stopInterception();
       if (capability) closeCapabilityState(capability);
@@ -380,13 +379,20 @@ export function createNativeRuntimeController(
           return failure("runtime.unsupported-method");
         }
       }
-      return renderMockResponse({
+      const rendered = await renderMockResponse({
         mock,
         fileRoot,
         presetDigest: preset.digest,
         ...(method !== undefined ? { method } : {}),
         ...(options?.signal !== undefined ? { signal: options.signal } : {}),
       });
+      if (!rendered.ok) {
+        recordMockFileError(mockFileErrors, mock.ruleId, rendered.error.code);
+        return rendered;
+      }
+      if (mock.file !== undefined)
+        clearMockFileError(mockFileErrors, mock.ruleId);
+      return rendered;
     },
 
     getBootstrapCapability() {
@@ -739,7 +745,6 @@ export function createNativeRuntimeController(
             protocol: "v1",
             presetDigest: preset.digest,
             mocks,
-            ...(mockPort !== undefined ? { port: mockPort } : {}),
           };
           return {
             protocol: "v1",
@@ -749,29 +754,6 @@ export function createNativeRuntimeController(
             metadata,
           };
         }
-        case "mock.request": {
-          const meta = input.metadata as unknown as MockRequest;
-          const mock = mockTokens.get(meta.token);
-          if (mock === undefined) {
-            const body = JSON.stringify({
-              ok: false,
-              error: { code: "runtime.mock-unknown" },
-            });
-            const metadata: MockResponse = {
-              status: 404,
-              headers: [["Content-Type", "application/json"]],
-              mockBody: base64(new TextEncoder().encode(body)),
-            };
-            return {
-              protocol: "v1",
-              type: "mock.response",
-              ...(requestId !== undefined ? { requestId } : {}),
-              timestamp,
-              metadata,
-            };
-          }
-          return renderMock(mock, requestId, timestamp);
-        }
         case "runtime.status": {
           if (!preset) throw new Error("runtime not started");
           return {
@@ -779,7 +761,11 @@ export function createNativeRuntimeController(
             type: "runtime.status",
             ...(requestId !== undefined ? { requestId } : {}),
             timestamp,
-            metadata: { state, presetDigest: preset.digest },
+            metadata: {
+              state,
+              presetDigest: preset.digest,
+              mockFileErrors: listMockFileErrors(mockFileErrors),
+            },
           };
         }
         case "ai.status": {
@@ -937,51 +923,4 @@ export function createNativeRuntimeController(
       }
     },
   };
-
-  async function renderMock(
-    mock: RuntimeMockConfig,
-    requestId: string | undefined,
-    timestamp: number,
-  ): Promise<Envelope> {
-    if (!preset) throw new Error("runtime not started");
-    const rendered = await renderMockResponse({
-      mock,
-      fileRoot,
-      presetDigest: preset.digest,
-    });
-    if (!rendered.ok) {
-      const body = JSON.stringify({
-        ok: false,
-        error: { code: rendered.error.code },
-      });
-      const metadata: MockResponse = {
-        status: 500,
-        headers: [["Content-Type", "application/json"]],
-        mockBody: base64(new TextEncoder().encode(body)),
-      };
-      return {
-        protocol: "v1",
-        type: "mock.response",
-        ...(requestId !== undefined ? { requestId } : {}),
-        timestamp,
-        metadata,
-      };
-    }
-    const headers: Array<readonly [string, string]> = [];
-    for (const header of rendered.value.headers) {
-      headers.push([header[0], header[1]]);
-    }
-    const metadata: MockResponse = {
-      status: rendered.value.status,
-      headers,
-      mockBody: base64(rendered.value.bodyBytes),
-    };
-    return {
-      protocol: "v1",
-      type: "mock.response",
-      ...(requestId !== undefined ? { requestId } : {}),
-      timestamp,
-      metadata,
-    };
-  }
 }

@@ -1,6 +1,5 @@
 import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
-import { createServer, type Server } from "node:http";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import type { AIProviderConfig } from "./ai-client.js";
@@ -39,8 +38,6 @@ import type {
 export interface NativeHostOptions {
   readonly preset?: NormalizedRuntimePreset;
   readonly fileRoot?: string;
-  /** Loopback port for the mock-body faucet (browser DNR redirect target). */
-  readonly mockPort?: number;
   readonly aiProviderConfig?: AIProviderConfig;
   /**
    * Reader used to re-read the AI provider config while the host runs, so
@@ -56,8 +53,6 @@ export interface NativeHostHandle {
   readonly controller: ReturnType<typeof createNativeRuntimeController>;
   /** Process one length-prefixed stdio frame and return the response frame. */
   readonly processFrame: (frame: Uint8Array) => Promise<Uint8Array | null>;
-  /** Bound mock-body faucet port, or null when no faucet is configured. */
-  readonly mockPort: number | null;
   start(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -101,50 +96,6 @@ function decodeEnvelopeFrame(buffer: Uint8Array): Envelope {
   return parseEnvelope(json);
 }
 
-/**
- * Loopback faucet that serves rendered mock bodies for browser DNR redirects
- * (spec REQ-003). The control plane stays on stdio; this is purely a bytes
- * faucet keyed by the per-rule mock token returned from `mock.connect`.
- */
-function startMockFaucet(
-  port: number,
-  controller: ReturnType<typeof createNativeRuntimeController>,
-): Promise<Server> {
-  const server = createServer((req, res) => {
-    void (async () => {
-      try {
-        const url = new URL(req.url ?? "", "http://localhost");
-        const match = /^\/mock\/([a-f0-9]+)$/.exec(url.pathname);
-        if (!match || req.method !== "GET") {
-          res.writeHead(404);
-          res.end();
-          return;
-        }
-        const result = await controller.serveMock(match[1]);
-        if (!result.ok) {
-          res.writeHead(404);
-          res.end();
-          return;
-        }
-        const { status, headers, bodyBytes } = result.value;
-        res.writeHead(
-          status,
-          Object.fromEntries(
-            headers.map((h: readonly [string, string]) => [h[0], h[1]]),
-          ),
-        );
-        res.end(Buffer.from(bodyBytes));
-      } catch {
-        if (!res.headersSent) res.writeHead(500);
-        res.end();
-      }
-    })();
-  });
-  return new Promise<Server>((resolve) =>
-    server.listen(port, () => resolve(server)),
-  );
-}
-
 function defaultTrustRoot(): string {
   return defaultTrustInstallRoot(process.platform);
 }
@@ -158,7 +109,6 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
   const controller = createNativeRuntimeController({
     preset: options.preset,
     fileRoot: options.fileRoot,
-    ...(options.mockPort !== undefined ? { mockPort: options.mockPort } : {}),
     ...(options.aiProviderConfig !== undefined
       ? { aiProviderConfig: options.aiProviderConfig }
       : {}),
@@ -168,7 +118,6 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
     ...(options.clock ? { clock: options.clock } : {}),
   });
 
-  let faucet: Server | null = null;
   let interceptProxy: InterceptProxyHandle | null = null;
   let outboundWrite: ((frame: Uint8Array) => void) | null = null;
   let hostRequestCounter = 0;
@@ -408,19 +357,11 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
 
   const handle: NativeHostHandle = {
     controller,
-    mockPort: options.mockPort ?? null,
     async start() {
       await controller.start();
-      if (options.mockPort !== undefined) {
-        faucet = await startMockFaucet(options.mockPort, controller);
-      }
     },
     async stop() {
       projectStage = undefined;
-      if (faucet) {
-        await new Promise<void>((resolve) => faucet?.close(() => resolve()));
-        faucet = null;
-      }
       await controller.stop();
       clearSession();
       if (interceptProxy) {
