@@ -383,21 +383,21 @@ Chrome DNR method preservation remains a release risk until this passes.
 
 ## Phase 11A — Extension: mock status and file errors
 
-- [ ] Add a `kind === "mock"` branch to `operationStatuses` in
+- [x] Add a `kind === "mock"` branch to `operationStatuses` in
       `packages/extension/src/service-worker.ts`, following the existing
       body-rule pattern.
-- [ ] Map the branch: `disabled` for a disabled group; `unsupported` when the
+- [x] Map the branch: `disabled` for a disabled group; `unsupported` when the
       native phase is `unsupported` or the source is unprojectable;
       `needs runtime` before the host reaches `started`; `active` only after the
       mock redirect is installed; `error` on projection or install failure.
-- [ ] Read the runtime per-rule file-error signal on the existing state refresh
+- [x] Read the runtime per-rule file-error signal on the existing state refresh
       and override the rule to `error` with a redacted stable diagnostic.
-- [ ] Clear the extension's cached file-error overlay immediately after a
+- [x] Clear the extension's cached file-error overlay immediately after a
       successful project save. A running session is stopped or replaced through
       the existing project-change lifecycle before it can serve stale policy.
-- [ ] Add extension diagnostic codes for the mock file-error classes. Do not
+- [x] Add extension diagnostic codes for the mock file-error classes. Do not
       forward the runtime's raw message if it could carry a path.
-- [ ] Confirm `computeBadge` counts a mock in error as attention and a mock in
+- [x] Confirm `computeBadge` counts a mock in error as attention and a mock in
       `needs runtime` as not active.
 
 **Acceptance:** each of the five statuses is reachable and observable from
@@ -408,7 +408,7 @@ success flips it back; no status or diagnostic contains a path.
 through `get-state`, the error override and its clearing, badge math, and
 redacted diagnostics.
 
-- [ ] Phase 11A acceptance verified.
+- [x] Phase 11A acceptance verified.
 
 ## Phase 11B — Extension and core: confined-root storage
 

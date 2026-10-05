@@ -189,12 +189,20 @@ const AI_GENERATION_SYSTEM_PROMPT = [
   `Example: ${JSON.stringify(AI_GENERATION_EXAMPLE)}`,
 ].join(" ");
 
+const MOCK_FILE_DIAGNOSTICS = {
+  "runtime.file-denied": "extension.mock-file-denied",
+  "runtime.file-race-rejected": "extension.mock-file-race",
+  "runtime.size-limit": "extension.mock-size-limit",
+  "runtime.platform-unsupported": "extension.mock-platform-unsupported",
+} as const;
+
 function operationStatuses(
   operations: readonly RogatioOperation[],
   installedRuleIds: readonly string[],
   enabledGroupIds: readonly string[],
   nativePhase: NativeRuntimePhase | "unsupported",
   dnrInstallErrors: readonly DnrInstallError[] = [],
+  mockFileErrors: ReadonlyMap<string, string> = new Map(),
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -288,6 +296,55 @@ function operationStatuses(
         status: "active",
       };
     }
+    if (operation.kind === "mock") {
+      if (status.status === "disabled") return { ...status };
+      if (
+        nativePhase === "unsupported" ||
+        !projectSourceCondition(operation.matcher).projectable
+      ) {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "unsupported",
+          diagnostics: [extensionDiagnostic("extension.unsupported")],
+        };
+      }
+      const fileCode = mockFileErrors.get(operation.ruleId);
+      const fileDiagnostic =
+        fileCode !== undefined
+          ? MOCK_FILE_DIAGNOSTICS[
+              fileCode as keyof typeof MOCK_FILE_DIAGNOSTICS
+            ]
+          : undefined;
+      if (fileDiagnostic !== undefined) {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "error",
+          diagnostics: [extensionDiagnostic(fileDiagnostic)],
+        };
+      }
+      if (nativePhase === "failed") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "error",
+          diagnostics: [extensionDiagnostic("extension.install-failed")],
+        };
+      }
+      if (nativePhase !== "started") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "needs runtime",
+        };
+      }
+      return {
+        groupId: status.groupId,
+        ruleId: status.ruleId,
+        status: "active",
+      };
+    }
     if (operation.kind === "header" && status.status === "active") {
       return {
         groupId: status.groupId,
@@ -316,6 +373,55 @@ export function createExtensionApplication(
     : "unsupported";
   let nativeRuntimeError: string | null = null;
   let pendingProjectId: string | null = null;
+  const mockFileErrors = new Map<string, string>();
+  /** Save clears the overlay until the next host start or stop. */
+  let ignoreHostMockFileErrors = false;
+
+  async function refreshMockFileErrors(): Promise<void> {
+    if (
+      ignoreHostMockFileErrors ||
+      nativePhase !== "started" ||
+      options.nativeRuntime?.send === undefined
+    ) {
+      if (nativePhase !== "started") mockFileErrors.clear();
+      return;
+    }
+    try {
+      const reply = await options.nativeRuntime.send({
+        protocol: "v1",
+        type: "runtime.status",
+        timestamp: options.now?.() ?? Date.now(),
+        metadata: {},
+      });
+      const listed = reply.metadata.mockFileErrors;
+      mockFileErrors.clear();
+      if (!Array.isArray(listed)) return;
+      for (const entry of listed) {
+        if (
+          typeof entry !== "object" ||
+          entry === null ||
+          Array.isArray(entry)
+        ) {
+          continue;
+        }
+        const record = entry as {
+          ruleId?: unknown;
+          code?: unknown;
+          message?: unknown;
+        };
+        if (
+          typeof record.ruleId !== "string" ||
+          typeof record.code !== "string"
+        ) {
+          continue;
+        }
+        if (!(record.code in MOCK_FILE_DIAGNOSTICS)) continue;
+        mockFileErrors.set(record.ruleId, record.code);
+      }
+    } catch {
+      // Keep the last overlay when the host cannot answer.
+    }
+  }
 
   /**
    * The DNR-managed operation set for the active project. Browser-side
@@ -422,12 +528,14 @@ export function createExtensionApplication(
       // Install failure surfaces as rule-not-installed / error statuses below.
       dnrInstallErrors = takeDnrInstallErrors(options.installer);
     }
+    await refreshMockFileErrors();
     const statuses = operationStatuses(
       compiled.operations,
       installedRuleIds,
       project.enabledGroupIds,
       nativePhase,
       dnrInstallErrors,
+      mockFileErrors,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),
@@ -719,6 +827,8 @@ export function createExtensionApplication(
           ? conflict(result.current)
           : failure("extension.storage-failed");
       }
+      ignoreHostMockFileErrors = true;
+      mockFileErrors.clear();
       await state();
       return { ok: true, value: result.value };
     }
@@ -877,6 +987,7 @@ export function createExtensionApplication(
 
         nativePhase = "started";
         nativeRuntimeError = null;
+        ignoreHostMockFileErrors = false;
         // DNR reconcile runs inside state() → projectState (full desired set).
         return state();
       }
@@ -907,6 +1018,8 @@ export function createExtensionApplication(
         });
         nativePhase = "stopped";
         nativeRuntimeError = null;
+        ignoreHostMockFileErrors = false;
+        mockFileErrors.clear();
         // DNR reconcile runs inside state() → projectState (full desired set).
         return state();
       }
