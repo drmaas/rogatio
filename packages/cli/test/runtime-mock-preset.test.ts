@@ -150,4 +150,53 @@ describe("runtime host preset mocks", () => {
       vi.mocked(runNativeHost).mock.calls.at(-1)?.[0].fileRoot,
     ).toBeUndefined();
   });
+
+  it("uses a saved device-local root instead of the project directory", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "rogatio-cli-saved-root-"));
+    directories.push(directory);
+    const projectPath = join(directory, "project.rogatio.json");
+    await writeFile(
+      projectPath,
+      JSON.stringify({
+        version: 2,
+        name: "mocks",
+        groups: [
+          {
+            id: "g1",
+            name: "G",
+            rules: [
+              {
+                id: "r1",
+                name: "Mock",
+                source: {
+                  key: "url",
+                  operator: "regex",
+                  value: "^https://example\\.com/",
+                },
+                resourceTypes: ["main_frame"],
+                priority: 1,
+                type: "mock",
+                mock: { status: 200, body: "hello" },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const previous = process.env.ROGATIO_CONFIG_DIR;
+    process.env.ROGATIO_CONFIG_DIR = join(directory, "config");
+    try {
+      const { writeSavedMockRoot } = await import("../src/mock-root-config.js");
+      const saved = join(directory, "mocks");
+      await writeSavedMockRoot(projectPath, saved);
+      const code = await runtimeCommand(["host", projectPath]);
+      expect(code).toBe(0);
+      expect(vi.mocked(runNativeHost).mock.calls.at(-1)?.[0].fileRoot).toBe(
+        saved,
+      );
+    } finally {
+      if (previous === undefined) delete process.env.ROGATIO_CONFIG_DIR;
+      else process.env.ROGATIO_CONFIG_DIR = previous;
+    }
+  });
 });

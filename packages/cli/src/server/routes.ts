@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject, previewRuleAction } from "@rogatio/dry-run";
@@ -12,6 +12,7 @@ import type {
 } from "@rogatio/runtime";
 import { runAIAssist } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
+import { readSavedMockRoot, writeSavedMockRoot } from "../mock-root-config.js";
 import type { ProjectStorage } from "../utils/file.js";
 export interface RouteContext {
   project: unknown;
@@ -354,6 +355,65 @@ export function createRoutes(context: RouteContext) {
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ diagnostics }));
+      return;
+    }
+
+    if (pathname === "/api/mock-root" && method === "GET") {
+      const saved = await readSavedMockRoot(context.filePath);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          root: saved ?? dirname(context.filePath),
+          saved: saved !== undefined,
+        }),
+      );
+      return;
+    }
+
+    if (pathname === "/api/mock-root" && method === "POST") {
+      if (!validateCsrf(req, context.csrfToken)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "csrf-invalid",
+            message: "Invalid CSRF token",
+          }),
+        );
+        return;
+      }
+      let body: unknown;
+      try {
+        body = JSON.parse(await getRequestBody(req));
+      } catch (error) {
+        const failure = bodyErrorResponse(error);
+        res.writeHead(failure.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(failure.body));
+        return;
+      }
+      const root =
+        typeof body === "object" && body !== null && "root" in body
+          ? (body as { root?: unknown }).root
+          : undefined;
+      if (root !== null && typeof root !== "string") {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "invalid-root",
+            message: "Mock file root must be a string or null",
+          }),
+        );
+        return;
+      }
+      await writeSavedMockRoot(context.filePath, root);
+      const saved = await readSavedMockRoot(context.filePath);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          root: saved ?? dirname(context.filePath),
+          saved: saved !== undefined,
+        }),
+      );
       return;
     }
 

@@ -149,6 +149,35 @@ describe("verify command", () => {
     expect(output).toContain("unique");
   });
 
+  it("reports a mock rule that sets both body sources", async () => {
+    const invalidProject = {
+      ...validProject,
+      groups: [
+        {
+          ...validProject.groups[0],
+          rules: [
+            {
+              id: "rule-mock",
+              name: "Mock",
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://example\\.com/",
+              },
+              resourceTypes: ["main_frame"],
+              priority: 1,
+              type: "mock",
+              mock: { status: 200, body: "ok", file: "payload.bin" },
+            },
+          ],
+        },
+      ],
+    };
+    await writeProject(testFile, invalidProject);
+    const output = await verifyCommand([testFile], undefined, true);
+    expect(output).toContain("/groups/0/rules/0/mock");
+  });
+
   it("uses cwd/.rogatio.json by default", async () => {
     const originalCwd = process.cwd();
     try {

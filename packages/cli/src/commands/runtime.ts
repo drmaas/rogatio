@@ -17,6 +17,7 @@ import {
 } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { showRuntimeHelp } from "../help.js";
+import { readSavedMockRoot } from "../mock-root-config.js";
 import {
   createJsonFileProjectStorage,
   type ProjectStorage,
@@ -368,7 +369,12 @@ async function runtimeHostCommand(
     return 2;
   }
 
-  const rootDir = root ?? (inputPath === "-" ? undefined : dirname(filePath));
+  const savedRoot =
+    root === undefined && inputPath !== "-"
+      ? await readSavedMockRoot(filePath)
+      : undefined;
+  const rootDir =
+    root ?? savedRoot ?? (inputPath === "-" ? undefined : dirname(filePath));
   const mocks = mocksFromOperations(compileResult.operations, undefined);
 
   const normalized = normalizeRuntimePreset({

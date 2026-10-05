@@ -528,6 +528,52 @@ describe("API routes", () => {
       });
     });
 
+    it("returns the shared mock preview summary", async () => {
+      const { status, payload } = await dryRunResponse({
+        project: {
+          version: 2,
+          name: "Mock preview",
+          groups: [
+            {
+              id: "group-mock",
+              name: "Mocks",
+              rules: [
+                {
+                  id: "rule-mock",
+                  name: "Inline mock",
+                  source: {
+                    key: "url",
+                    operator: "regex",
+                    value: "^https://example\\.com/",
+                  },
+                  resourceTypes: ["main_frame"],
+                  priority: 1,
+                  type: "mock",
+                  mock: { status: 201, body: "ok" },
+                },
+              ],
+            },
+          ],
+        },
+        cases: [
+          {
+            url: "https://example.com/",
+            method: "GET",
+            resourceType: "main_frame",
+          },
+        ],
+      });
+      expect(status).toBe(200);
+      const result = payload as {
+        results: Array<{
+          rules: Array<{ actionPreview: { summary: string } | null }>;
+        }>;
+      };
+      expect(result.results[0]?.rules[0]?.actionPreview?.summary).toBe(
+        "Mock 201 (inline body)",
+      );
+    });
+
     it("returns field diagnostics for an invalid draft", async () => {
       const { status, payload } = await dryRunResponse({
         project: { version: 2, name: "", groups: [] },
