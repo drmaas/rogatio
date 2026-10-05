@@ -233,7 +233,7 @@ Search is project-wide, literal, case-insensitive, and NFKC-normalized for match
 
 The host validation adapter returns compiler-compatible stable diagnostics with an error code, JSON-pointer path, and safe message. The editor sorts them deterministically, maps current paths to stable entity identities and controls, renders a summary with links, sets `aria-invalid`, and associates each error with its field. The editor never exposes raw Ajv wording or rejected input values. Extension diagnostics use the same path contract. A validator throw becomes a generic editor validation error and never permits saving.
 
-The rule-type extension point ships built-in registrations in `packages/editor/src/rule-types/index.ts` (`builtInRuleTypes`): **Header** (`createHeaderRuleType`, sibling `headerDirection`/`headerOperation`/`headerName`/`headerValue` fields via optional `defaultFields`), **Redirect** (`createRedirectRuleType`, nested `redirect.destination` via `defaultAction` + `actionField: "redirect"`), **Query parameters**, **Response body**, and **Request body**. Mock authoring was removed from the schema and editor; response-body replace supersedes the former mock rule type. Hosts may pass `ruleTypes` to replace a built-in by id; duplicates within the host list fail closed. Each extension has a stable ID and label, a pure matcher, synchronous mount/cleanup, controlled field access, control registration, and synchronous validation. Selecting a type initializes payload through `defaultAction` (single nested field) or `defaultFields` (sibling keys); `setRuleType` requires one of those hooks. Type switches clear stale payload keys listed in `ACTION_FIELDS` (redirect/action/body/header siblings). It receives defensive snapshots and can set only extension-owned fields through a controlled store; it never receives the live project or common-field mutators. Duplicate registrations, multiple matches, callback throws, cyclic values, malformed values, and unregistered controls fail closed with stable editor diagnostics. Unknown action data is not silently discarded or passed through: it is saveable only when a future extension and its host validator explicitly own it.
+The rule-type extension point ships built-in registrations in `packages/editor/src/rule-types/index.ts` (`builtInRuleTypes`): **Header** (`createHeaderRuleType`, sibling `headerDirection`/`headerOperation`/`headerName`/`headerValue` fields via optional `defaultFields`), **Redirect** (`createRedirectRuleType`, nested `redirect.destination` via `defaultAction` + `actionField: "redirect"`), **Query parameters**, **Response body**, **Request body**, and **Mock response** (`createMockRuleType`, nested `mock` via `defaultAction` + `actionField: "mock"`). Hosts may pass `ruleTypes` to replace a built-in by id; duplicates within the host list fail closed. Each extension has a stable ID and label, a pure matcher, synchronous mount/cleanup, controlled field access, control registration, and synchronous validation. Selecting a type initializes payload through `defaultAction` (single nested field) or `defaultFields` (sibling keys); `setRuleType` requires one of those hooks. Type switches clear stale payload keys listed in `ACTION_FIELDS` (redirect/action/body/header siblings). It receives defensive snapshots and can set only extension-owned fields through a controlled store; it never receives the live project or common-field mutators. Duplicate registrations, multiple matches, callback throws, cyclic values, malformed values, and unregistered controls fail closed with stable editor diagnostics. Unknown action data is not silently discarded or passed through: it is saveable only when a future extension and its host validator explicitly own it.
 
 ### URL Conversion
 
@@ -414,7 +414,7 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 - `install [--extension-id <id>]`: register native-messaging host manifest and provision/trust the device-local CA in one transactional call (rolls back and exits 1 when a required capability is missing). Uses the release extension ID pinned by the manifest public key. `--extension-id` is only for development (a local unpacked build without the release key) and for forks. Release users never need it.
 - `uninstall`: remove host manifest, CA files, and trust (idempotent)
 - `verify [--extension-id <id>]`: report whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all present and valid, and whether `allowed_origins` includes the release ID. Release users never pass `--extension-id`. That flag is only for development (a local unpacked build without the release key) and for forks.
-- `host [path] [--root <dir>] [--mock-port <n>]`: stdio native-messaging host entry (browser-launched; manual use for debugging)
+- `host [path] [--root <dir>]`: stdio native-messaging host entry (browser-launched; manual use for debugging). `--root` sets the confined mock file root. When omitted, a saved device-local root for that project file wins, otherwise the project directory. Stdin projects that contain a file mock require `--root`.
 
 **6. Import Command (`src/commands/import.ts`)**
 - `import requestly <export.json> [--out <path>] [--merge] [--json]`
@@ -785,143 +785,13 @@ The version-1 schema keeps `action` optional to preserve backward compatibility 
 
 ## Mock Rules
 
-> **Fully superseded.** The `mock` rule type and F13 standalone mock-server design are **removed** from the product schema and UI. Historical text below is decision archaeology only — do not treat rule payloads, editor surfaces, dry-run previews, or statuses described here as current behavior. Under F23, response-body and request-body rules share the unified native host (`rogatio runtime host`) with Start/Stop lifecycle; there is no `mock` discriminant, no `/v1/connection` endpoint, and no Check-and-connect flow.
+A `mock` rule returns a configured HTTP response without contacting upstream. It is a separate rule type from response-body replace. The schema owns `MockAction` (`status`, optional `headers` and `delayMs`, and exactly one of `body` or `file`). The compiler emits `MockOperation`. The editor ships `createMockRuleType`. Dry-run previews the action through the shared `previewRuleAction` (`Mock {status} (inline body|file-backed body, …)`).
 
-The historical F13 mock-rules package added a `mock` rule type as a vertical slice: a configured HTTP status, optional
-response headers, an optional delay, and either an inline body or a live UTF-8 snapshot
-of one approved local file, served to matched browser requests without ever contacting
-upstream. It integrated the rule slice with the runtime server, the editor, the CLI,
-and the extension, including the extension's native-host `mock.connect` handshake during runtime activation.
+Mocks are served only while the unified native host is running. The extension installs a session declarativeNetRequest redirect in the band `5_000_001..6_000_000` to `http://127.0.0.1:<port>/.rogatio/mock/<token>/<digest>` on the existing intercept listener, plus one allow guard at id `6_000_000` and priority `1001` so a broad user regex cannot recurse. Stop and host disconnect remove those session rules. Enabled mocks report `needs runtime` until that redirect is installed, then `active`. An unprojectable source or a missing native adapter is `unsupported`. A failed install or a request-time file error is `error`, with a redacted extension diagnostic. File errors clear on a later successful read, project save, or host restart.
 
-### Rule payload and compiler
+File bodies are arbitrary bytes, re-read per request from one confined root. Linux proves confinement with directory handles. macOS proves it with `openat` and `fcntl(F_GETPATH)` through `koffi`, and fails closed when that library cannot load. The root does not travel in exported `.rogatio.json`. The extension stores an optional root on the project record. The CLI stores an override in device-local config keyed by the canonical project path (`ROGATIO_CONFIG_DIR`, otherwise `~/.config/rogatio/mock-roots.json`). `rogatio edit` can set or clear that override. When no override is saved, a file-opened project uses that file's directory. Stdin projects that contain a file mock require `--root`. The process working directory is never used.
 
-- `schema/src/types.ts`: `RuleType` gains `"mock"`; new `MockHeader { name; value }` and
-  `MockAction { status: number; headers?: MockHeader[]; delayMs?: number; body?: string;
-  file?: string }`; `RogatioRule.mock?: MockAction` required iff `type === "mock"`.
-  Exactly one of `body`/`file` is set. The `mock` sub-object follows the redirect-rules
-  `redirect` pattern (a type-specific payload field), not the query-rules `action` field.
-- `schema/src/limits.ts`: `maxMockStatus 599`/`minMockStatus 200`, `maxMockHeadersPerRule
-  32`, `maxMockHeaderNameLength 256`, `maxMockHeaderValueLength 4096`,
-  `maxMockInlineBodyLength 65536`, `maxMockDelayMs 30000`, `maxMockFilePathLength 2048`.
-- `schema/src/schema.ts`: rule `$def` gains `mock` and an `if/then` requiring it when
-  `type === "mock"`; header/body/file sub-schemas with bounds; `additionalProperties:
-  false` preserved.
-- `schema/src/validation.ts`: semantic checks — status integer in `[200, 599]`; exactly
-  one of `body`/`file`; header name non-empty/bounded and value bounded; `delayMs`
-  integer `0..maxMockDelayMs`; body length bound; file path non-empty, length bound, and
-  no NUL/control characters. Diagnostics use stable codes at stable JSON-pointer paths.
-- `compiler/src/types.ts`: `MockOperation { kind: "mock"; groupId; ruleId; matcher;
-  mock: MockAction }`; `RogatioOperation` union widened.
-- `compiler/src/compile.ts`: emits `MockOperation` when `rule.type === "mock"`.
-
-### Runtime mock serving (runtime-foundation boundary change, same `@rogatio/runtime` package)
-
-The runtime foundation remains the mock/response server process; the mock-rules package extends it with mock response
-semantics. The runtime foundation's control protocol (`POST /v1/pair`, `POST /v1/authorize`) is unchanged
-and still returns authorization decisions only.
-
-- **Preset extension:** the internal runtime preset gains an optional `mocks` array
-  (`{ ruleId, status, headers, delayMs, body?, file? }` where `file` is a relative
-  logical path). Presets without `mocks` behave exactly as before. Canonical bytes and
-  the SHA-256 digest cover the mock *config*; per-rule mock *tokens* are capability-like
-  and excluded (digest stays stable per project). Deterministic ordering and the closed
-  canonical profile are preserved.
-- **Per-rule mock tokens:** server startup mints a fresh 32-byte cryptographically
-  random token per mock rule, stored only in memory and bound to the ruleId and server
-  instance. Tokens are designed to appear in browser redirect URLs (unlike the runtime-foundation
-  bootstrap/session capabilities, which never do); they are never logged or echoed in
-  error responses.
-- **Mock route:** `GET /mock/<token>` serves the configured response: optional bounded
-  delay (cancelled on client disconnect and server stop), configured status and headers
-  (default `Content-Type: text/plain; charset=UTF-8` when the user configures none), and
-  a body from the inline string or a live confined-file read of the approved file.
-  Permissive CORS headers are emitted **only on this route** (needed for cross-origin
-  XHR/fetch from web pages to the loopback mock server); the runtime-foundation control protocol never
-  emits CORS. `GET`/`HEAD`/`OPTIONS` are accepted; other methods return a stable `405`.
-  The route never uses the outbound connector (mocks never contact upstream).
-- **File snapshots:** a file-based mock is served through the existing confined-file
-  reader (`readConfinedFile`) under the trusted startup root, re-read on every request
-  (live). The bytes must be valid UTF-8 (fatal `TextDecoder`); invalid UTF-8, missing,
-  or unreadable files return a stable redacted error status (never the path).
-- **Connection endpoint:** `GET /v1/connection` returns `{ protocol: "f13-v1", port,
-  presetDigest, mocks: [{ ruleId, token }] }` for the extension's Check-and-connect.
-  Loopback-only. The endpoint's authorization is a gate decision (open loopback with a
-  documented threat model is the recommendation; see OQ-2).
-- **Port:** `createRuntimeServer` gains an optional `port` (default `0` ephemeral). The
-  CLI `rogatio runtime` uses the fixed default `127.0.0.1:8890` (overridable with
-  `--port`) so the extension has a stable address; a port conflict fails with a clear
-  error.
-
-### CLI (`rogatio runtime`)
-
-- `packages/cli/src/commands/runtime.ts` becomes real: reads `.rogatio.json` (path arg,
-  default cwd, `-` for stdin), validates + compiles via the schema and compiler packages, builds the runtime preset
-  with the project's mock rules (resolving file rules against the configured root,
-  default the project directory; paths outside the root are rejected), starts
-  `createRuntimeServer` on the fixed default port, prints connection info and
-  instructions, and stops cleanly on SIGINT/SIGTERM. `--root` configures the confined-
-  file root; `--port` overrides the default. Invalid projects exit `1` with the same
-  diagnostics style as `verify`; port/startup failures exit `2`.
-- `rogatio test` and the `edit` server gain a mock `previewAction` (via the existing dry-run
-  `previewAction` seam) producing e.g. `{ kind: "mock", summary: "Mock 200 (inline
-  body, 42 bytes)" }` or `"Mock 200 (file snapshot: <basename>)"`. The dry-run engine
-  itself is unchanged.
-
-### Extension (Chrome MV3)
-
-- **Manifest:** add `"declarativeNetRequest"` to `permissions` (required for DNR
-  dynamic rules; grants implicit redirect access without host permissions). This also
-  unblocks redirect and header DNR installs in real browsers.
-- **Projection:** `projectMatchers` handles `MockOperation` (installable, matcher
-  preserved). The final DNR redirect URL depends on the runtime connection info, so the
-  service worker builds mock DNR rules after Check-and-connect, translating each mock
-  op to a `redirect` rule targeting `http://127.0.0.1:<port>/mock/<token>`.
-- **Loop protection:** when any mock rule is installed, the extension also installs one
-  high-priority `allow` rule matching the mock URL substring
-  (`127.0.0.1:<port>/mock/`) so the extension's own redirect rules never apply to the
-  mock server (Chrome DNR re-evaluates redirected requests; a broad `regexFilter` would
-  otherwise loop).
-- **Check-and-connect:** a new `check-mock-runtime` command fetches
-  `http://127.0.0.1:<port>/v1/connection` (default port `8890`), verifies every enabled
-  mock rule has a token, stores the connection info in memory, transitions the mock
-  runtime state through `RuntimeStateController` (`disconnected → checking →
-  connected/failed` with `lastCheck`), installs the mock DNR rules, and recomputes
-The user experience is: register the native-messaging host once with
-`rogatio runtime install`. Release users never pass `--extension-id`. That flag is only for development (a local unpacked build without the release key) and for forks: `rogatio runtime install --extension-id <extension ID>`. Then use the extension's
-**Start runtime** control. When the loaded ID is not in `allowed_origins`, the
-runtime card names that mismatch and shows the re-pin command. The separate
-Check-and-connect command and mock-connection state are superseded. The sidebar runtime
-status line sits directly beneath the Start/Stop controls.
-- **Statuses:** mock ops were historically reported as `needs proxy` while the runtime was not connected; `active` when connected and installed. Mock rules have been removed — mock behavior is covered by response-body and request-body rules under the native host.
-
-### Editor (editor package)
-
-A `mock` `RuleTypeFieldExtension` renders status (number), optional delay (number),
-header name/value rows (add/remove), and a body-source selector (inline textarea vs.
-file path input — the browser-safe editor cannot pick files, so the path is a validated
-string; existence is validated by the CLI at runtime start). Validation enforces the
-schema bounds and the exactly-one-body-source invariant with stable field diagnostics.
-`createMockRuleType` is added to `builtInRuleTypes` and exported.
-
-### browser-core (browser-core package)
-
-No core status change: `computeRuleStatuses` already operates on `operation.matcher`.
-The `needs proxy` / `error` rewrites for mock ops are service-worker logic (like the
-matcher `unsupported` rewrite). `RuntimeStateController` already models the mock runtime
-state and is wired in the extension service worker.
-
-### Rejected alternatives
-
-- Ephemeral port + connection file for runtime discovery: rejected (MV3 cannot read
-  arbitrary local files without native messaging, which is provided by the macOS runtime).
-- Extension pairing via the runtime-foundation control protocol for the connect UX: rejected (requires
-  conveying the bootstrap capability into the extension; contradicts the one-click
-  Check-and-connect).
-- A generic mock proxy or arbitrary file route: rejected (would break the runtime-foundation confined-
-  file and exact-grant model; mocks serve exactly the one approved file per rule).
-- Mock path-based routing (serve different content per request URL): rejected; a mock
-  rule returns one configured response regardless of the matched URL, matching the
-  product description.
+The F13 standalone mock server, `/v1/connection`, Check-and-connect, the `--mock-port` faucet, and envelope `mock.request` / `mock.response` / `mockBody` are not part of this design. Tokens are minted only for mocks in enabled groups and are excluded from the preset digest. Rendered bytes stay on the loopback listener.
 
 ## Request-Body Rules
 
@@ -1374,6 +1244,8 @@ Building the real journeys exposed defects that the mocked unit tests could not:
   and Chrome-version-specific, and it would carry browser state into the repository.
 
 ## Native runtime consolidation (feature/consolidated-native-runtime)
+
+> The faucet, `--mock-port`, envelope `mockBody`, and `needs proxy` status in this section were later removed. Current mock serving is the loopback route in [Mock Rules](#mock-rules).
 
 All F6 runtime behavior (pairing, authorization, mock delivery) now runs inside the F14
 native-messaging host instead of a separate CLI HTTP server. One process serves every

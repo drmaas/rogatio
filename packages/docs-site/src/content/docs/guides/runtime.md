@@ -42,8 +42,9 @@ native-messaging envelope (spec REQ-001..REQ-005).
   `rogatio runtime install` again so the host manifest matches the pinned ID.
 - `rogatio runtime host <path>` launches the consolidated native-messaging host for a
   project on stdio. The browser extension connects to it for pairing, authorization, and
-  body transforms. `--root <dir>` overrides the confined file root; `--mock-port <n>`
-  binds the loopback mock-response faucet.
+  body transforms and mock responses. `--root <dir>` overrides the confined mock file
+  root. When omitted, a saved device-local root for that project file is used, otherwise
+  the project directory. A stdin project that contains a file mock requires `--root`.
 
 ## Activation is unconditional for the host
 

@@ -431,19 +431,19 @@ root, and management-page setting and clearing.
 
 ## Phase 12 — CLI: root and preview surfaces
 
-- [ ] Resolve the confined root for `rogatio edit` from the opened project file's
+- [x] Resolve the confined root for `rogatio edit` from the opened project file's
       directory, and let the user set and clear a saved root through the editor's
       `projectActions`.
-- [ ] Persist an override in device-local CLI config keyed by the canonical
+- [x] Persist an override in device-local CLI config keyed by the canonical
       project path. Do not create a project sidecar or place the root inside
       `.rogatio.json`.
-- [ ] Confirm `rogatio test` prints the mock preview summary through the shared
+- [x] Confirm `rogatio test` prints the mock preview summary through the shared
       `previewRuleAction` with no CLI-local formatting.
-- [ ] Confirm `POST /api/dry-run` returns the same summary for the same case.
-- [ ] Confirm `rogatio verify` reports mock diagnostics with their schema paths.
-- [ ] Update `rogatio runtime host` help text for the removed `--mock-port` and
+- [x] Confirm `POST /api/dry-run` returns the same summary for the same case.
+- [x] Confirm `rogatio verify` reports mock diagnostics with their schema paths.
+- [x] Update `rogatio runtime host` help text for the removed `--mock-port` and
       the stdin `--root` requirement.
-- [ ] Confirm the bundled CLI still has no workspace dependencies.
+- [x] Confirm the bundled CLI still has no workspace dependencies.
 
 **Acceptance:** the three preview surfaces agree byte for byte; the saved root
 round-trips; help text matches the real flags.
@@ -455,23 +455,23 @@ for a matched mock, help snapshot, saved-root round-trip;
 `packages/extension/test/` — invoke the extension `dry-run` command with the
 same fixture and assert the exact same summary.
 
-- [ ] Phase 12 acceptance verified.
+- [x] Phase 12 acceptance verified.
 
 ## Phase 13 — Contracts, docs, and validation
 
-- [ ] Add `packages/schema/test/mock-contract.test.ts` pinning the public mock
+- [x] Add `packages/schema/test/mock-contract.test.ts` pinning the public mock
       shape: the exact `rule.type` enum, the exact `mockAction` property set,
       `additionalProperties: false`, and every bound read from `LIMITS`.
-- [ ] Keep the test a pin, not a second schema. Assert against
+- [x] Keep the test a pin, not a second schema. Assert against
       `packages/schema/src/schema.ts`; do not restate it.
-- [ ] Add a dry-run contract test that pins the mock preview summary from
+- [x] Add a dry-run contract test that pins the mock preview summary from
       `previewRuleAction`. Keep downstream imports out of schema tests.
-- [ ] Verify every tooling pointer in `docs/contracts.md` names an existing
+- [x] Verify every tooling pointer in `docs/contracts.md` names an existing
       test or canonical command and passes in its owning phase.
-- [ ] Confirm `docs/contracts.md` matches the shipped surface and fix any drift.
-- [ ] Update `docs/architecture.md` with the mock package boundaries, the DNR
+- [x] Confirm `docs/contracts.md` matches the shipped surface and fix any drift.
+- [x] Update `docs/architecture.md` with the mock package boundaries, the DNR
       band amendment, the loopback mock route, and the confined root contract.
-- [ ] Update `README.md`, the affected `packages/*/README.md`, and
+- [x] Update `README.md`, the affected `packages/*/README.md`, and
       `packages/docs-site/` for the new rule type.
 - [ ] Run `pnpm validate` and record the evidence against the plan's acceptance
       criteria.

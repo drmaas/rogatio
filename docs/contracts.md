@@ -71,7 +71,8 @@ names stay the source of truth.
     `packages/schema/test/mock.test.ts`.
   - Contract test: `packages/schema/test/mock-contract.test.ts` pins the public
     mock shape.
-  - Dry-run contract test pins the mock preview summary rules.
+  - Dry-run contract test: `packages/dry-run/test/mock-preview-contract.test.ts`
+    pins the mock preview summary rules.
   - Mirror parity test in `packages/extension/test/` compares the browser-safe
     validator against `@rogatio/schema`.
   - Real Chrome journey in `test/browser/` proves method-preserving DNR
