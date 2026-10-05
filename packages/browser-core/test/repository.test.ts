@@ -648,4 +648,39 @@ describe("ProjectRepository", () => {
     expect(Object.keys(raw.projects)).toEqual(["p1", "p2"]);
     expect(raw.activeProjectId).toBe("p2");
   });
+
+  it("stores a mock file root outside exported project data", async () => {
+    const storage = new MemoryStorage();
+    const { repo } = makeRepository(storage);
+    await repo.createProject(makeProject());
+    const saved = await repo.setMockFileRoot("p1", "/var/mocks");
+    expect(saved.ok).toBe(true);
+    if (saved.ok) expect(saved.value.mockFileRoot).toBe("/var/mocks");
+
+    const exported = await repo.exportProject("p1");
+    expect(exported.ok).toBe(true);
+    if (exported.ok) {
+      expect(exported.value).not.toHaveProperty("mockFileRoot");
+      expect(JSON.stringify(exported.value)).not.toContain("/var/mocks");
+    }
+
+    const kept = await repo.saveProject("p1", makeProject(), 2);
+    expect(kept.ok).toBe(true);
+    if (kept.ok) expect(kept.value.mockFileRoot).toBe("/var/mocks");
+
+    const cleared = await repo.setMockFileRoot("p1", null);
+    expect(cleared.ok).toBe(true);
+    if (cleared.ok) expect(cleared.value).not.toHaveProperty("mockFileRoot");
+
+    const rejected = await repo.setMockFileRoot("p1", { path: "/tmp" });
+    expect(rejected.ok).toBe(false);
+  });
+
+  it("does not default a mock file root when importing a project", async () => {
+    const storage = new MemoryStorage();
+    const { repo } = makeRepository(storage);
+    const imported = await repo.importProject(makeProject("Imported"));
+    expect(imported.ok).toBe(true);
+    if (imported.ok) expect(imported.value).not.toHaveProperty("mockFileRoot");
+  });
 });

@@ -412,11 +412,11 @@ redacted diagnostics.
 
 ## Phase 11B — Extension and core: confined-root storage
 
-- [ ] Add the saved confined root as an optional field on the stored project
+- [x] Add the saved confined root as an optional field on the stored project
       record in `packages/browser-core/src/types.ts`, beside `data`, and read it
       defensively. Exports serialize `data` only. Bump `ENVELOPE_VERSION` only
       if a migration proves unavoidable.
-- [ ] Add a management-page control to set and clear the project's mock file
+- [x] Add a management-page control to set and clear the project's mock file
       root, and show it on Project details. Imported browser files do not default
       a root because Chrome does not expose their absolute path.
 
@@ -427,7 +427,7 @@ exports, and can be set or cleared from the management page.
 round-trip and export exclusion, defensive read of a corrupt or hostile stored
 root, and management-page setting and clearing.
 
-- [ ] Phase 11B acceptance verified.
+- [x] Phase 11B acceptance verified.
 
 ## Phase 12 — CLI: root and preview surfaces
 

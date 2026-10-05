@@ -6,7 +6,7 @@ import {
 } from "@rogatio/schema";
 import type { CoreDiagnostic } from "./diagnostics.js";
 import { coreDiagnostic } from "./diagnostics.js";
-import { migrateEnvelope } from "./migrate.js";
+import { migrateEnvelope, normalizeMockFileRoot } from "./migrate.js";
 import type {
   CoreResult,
   StorageAdapter,
@@ -247,6 +247,43 @@ export class ProjectRepository {
       return failed([coreDiagnostic("core.not-found", { projectId })]);
     }
     return { ok: true, value: structuredClone(project) };
+  }
+
+  async setMockFileRoot(
+    projectId: string,
+    root: unknown,
+  ): Promise<CoreResult<StoredProject>> {
+    const normalized = normalizeMockFileRoot(root);
+    if (!normalized.ok) {
+      return failed([coreDiagnostic("core.invariant")]);
+    }
+    return this.mutate(
+      (current) => {
+        const existing = current.projects[projectId];
+        if (existing === undefined) {
+          return {
+            kind: "failure",
+            diagnostics: [coreDiagnostic("core.not-found", { projectId })],
+          };
+        }
+        const { mockFileRoot: _ignored, ...withoutRoot } = existing;
+        void _ignored;
+        const project: StoredProject = {
+          ...withoutRoot,
+          revision: existing.revision + 1,
+          updatedAt: this.now(),
+          ...(normalized.root !== undefined
+            ? { mockFileRoot: normalized.root }
+            : {}),
+        };
+        return {
+          kind: "commit",
+          next: replaceProject(current, project),
+          value: structuredClone(project),
+        };
+      },
+      { retry: true },
+    );
   }
 
   async exportProject(projectId: string): Promise<CoreResult<RogatioProject>> {

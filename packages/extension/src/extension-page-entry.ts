@@ -18,6 +18,10 @@ import {
 } from "./match-logging-enabled.js";
 import { createMatchLoggingToggle } from "./match-logging-toggle.js";
 import {
+  mockFileRootCommandValue,
+  renderMockFileRootControl,
+} from "./mock-file-root-control.js";
+import {
   projectImportFailure,
   type SaveFilePickerOptions,
   type ShowSaveFilePicker,
@@ -32,6 +36,7 @@ interface StoredProject {
   readonly data: unknown;
   readonly revision: number;
   readonly enabledGroupIds: readonly string[];
+  readonly mockFileRoot?: string;
 }
 
 interface Envelope {
@@ -1415,6 +1420,12 @@ function renderShell(): void {
   if (activeTab === "dashboard") {
     renderOverview(main);
   } else {
+    const active = state.activeProjectId
+      ? state.projects[state.activeProjectId]
+      : undefined;
+    if (active) {
+      main.append(renderMockFileRootControl(document, active.mockFileRoot));
+    }
     const editorRoot = document.createElement("div");
     editorRoot.dataset.editorRoot = "true";
     main.append(editorRoot);
@@ -1483,6 +1494,15 @@ function renderShell(): void {
     if (command === "stop-native-runtime")
       void nativeRuntimeCommand("stop-native-runtime");
     if (command === "show-diagnostics") void showDiagnostics();
+    if (
+      command === "set-mock-file-root" ||
+      command === "clear-mock-file-root"
+    ) {
+      const projectId = state.activeProjectId;
+      const root = mockFileRootCommandValue(shell, command);
+      if (projectId && root !== undefined)
+        void setMockFileRoot(projectId, root);
+    }
     if (command === "export" || command === "remove") {
       // Project details actions belong to the open project. A dashboard
       // selection that has not been switched must not redirect them.
@@ -2170,6 +2190,29 @@ async function switchProject(): Promise<void> {
     return;
   }
   statusMessage = "Project switched.";
+  await refresh();
+}
+
+async function setMockFileRoot(
+  projectId: string,
+  root: string | null,
+): Promise<void> {
+  const response = await client.send({
+    version: 1,
+    command: "set-mock-file-root",
+    projectId,
+    root,
+  });
+  if (response?.ok !== true) {
+    statusMessage =
+      response?.diagnostic?.code === "extension.invalid-message"
+        ? "Enter a mock file root without control characters."
+        : "The mock file root could not be saved.";
+    renderShell();
+    return;
+  }
+  statusMessage =
+    root === null ? "Mock file root cleared." : "Mock file root saved.";
   await refresh();
 }
 

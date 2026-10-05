@@ -832,6 +832,23 @@ export function createExtensionApplication(
       await state();
       return { ok: true, value: result.value };
     }
+    if (request.command === "set-mock-file-root") {
+      const projectId = stringValue(data.projectId);
+      if (!projectId || !Object.hasOwn(data, "root")) {
+        return failure("extension.invalid-message");
+      }
+      const result = await repository.setMockFileRoot(projectId, data.root);
+      if (!result.ok) {
+        if (result.kind === "conflict") return conflict(result.current);
+        return result.diagnostics.some(
+          (diagnostic) => diagnostic.code === "core.not-found",
+        )
+          ? failure("extension.not-found")
+          : failure("extension.invalid-message");
+      }
+      await state();
+      return { ok: true, value: result.value };
+    }
     if (request.command === "remove-project") {
       const projectId = stringValue(data.projectId);
       if (!projectId || data.confirm !== true) {
@@ -923,7 +940,13 @@ export function createExtensionApplication(
           sessionResult = await startNativeSession({
             extensionId: options.extensionId,
             nativeRuntime: options.nativeRuntime,
-            getProject: async () => ({ data: projectData, enabledGroupIds }),
+            getProject: async () => ({
+              data: projectData,
+              enabledGroupIds,
+              ...(typeof project?.mockFileRoot === "string"
+                ? { fileRoot: project.mockFileRoot }
+                : {}),
+            }),
             bodyMarkers:
               options.chromeApi === undefined
                 ? undefined
@@ -1005,6 +1028,9 @@ export function createExtensionApplication(
             return {
               data: project.data,
               enabledGroupIds: project.enabledGroupIds,
+              ...(typeof project.mockFileRoot === "string"
+                ? { fileRoot: project.mockFileRoot }
+                : {}),
             };
           },
           bodyMarkers:

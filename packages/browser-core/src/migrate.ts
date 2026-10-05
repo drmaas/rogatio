@@ -1,5 +1,5 @@
 import type { MigrationNotice } from "@rogatio/schema";
-import { LIMITS, migrateV1Project } from "@rogatio/schema";
+import { hasControl, LIMITS, migrateV1Project } from "@rogatio/schema";
 import { coreDiagnostic } from "./diagnostics.js";
 import type {
   EnvelopeMigrationResult,
@@ -142,6 +142,20 @@ function migrateProjectData(
   };
 }
 
+/** Accept a user-typed root, or clear it. Hostile values fail closed. */
+export function normalizeMockFileRoot(
+  value: unknown,
+): { readonly ok: true; readonly root?: string } | { readonly ok: false } {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true };
+  }
+  if (typeof value !== "string") return { ok: false };
+  if (value.length > LIMITS.maxMockFilePathLength || hasControl(value)) {
+    return { ok: false };
+  }
+  return { ok: true, root: value };
+}
+
 function validateStoredProject(
   id: string,
   value: unknown,
@@ -165,6 +179,13 @@ function validateStoredProject(
   ) {
     return null;
   }
+  const storedRoot = Object.hasOwn(value, "mockFileRoot")
+    ? normalizeMockFileRoot(value.mockFileRoot)
+    : { ok: true as const };
+  const mockFileRoot =
+    storedRoot.ok && storedRoot.root !== undefined
+      ? storedRoot.root
+      : undefined;
   return {
     project: {
       id,
@@ -174,6 +195,7 @@ function validateStoredProject(
       createdAt: createdAt as number,
       updatedAt: updatedAt as number,
       enabledGroupIds: [...value.enabledGroupIds],
+      ...(mockFileRoot !== undefined ? { mockFileRoot } : {}),
     },
     notices: migratedData.notices,
   };

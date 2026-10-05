@@ -149,6 +149,7 @@ export interface NativeSessionOptions {
   readonly getProject: () => Promise<{
     data: unknown;
     enabledGroupIds: readonly string[];
+    fileRoot?: string;
   } | null>;
   /**
    * Session body URL-match markers for match logging. Install only when
@@ -324,6 +325,9 @@ export async function startNativeSession(
         metadata: {
           project: project.data,
           enabledGroupIds: project.enabledGroupIds,
+          ...(typeof project.fileRoot === "string"
+            ? { fileRoot: project.fileRoot }
+            : {}),
         },
       });
       console.log(
