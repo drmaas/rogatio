@@ -325,29 +325,29 @@ in any reply.
 
 ## Phase 10A — Extension: session DNR mock redirects
 
-- [ ] Bound the response-body band: change `isResponseBodyRedirectId` to an
+- [x] Bound the response-body band: change `isResponseBodyRedirectId` to an
       inclusive range starting at `4_000_001` and ending below the mock band.
-- [ ] Add `packages/extension/src/mock-redirect.ts` with `MOCK_REDIRECT_ID_MIN`,
+- [x] Add `packages/extension/src/mock-redirect.ts` with `MOCK_REDIRECT_ID_MIN`,
       an `isMockRedirectId` range check, a rule builder, and install and remove
       functions that mirror `response-body-redirect.ts`.
-- [ ] Build the redirect target as
+- [x] Build the redirect target as
       `http://127.0.0.1:<port>/.rogatio/mock/<token>/<digest>` using the
       existing `projectSourceCondition` projection.
-- [ ] After runtime start, call the internal `mock.connect` exchange and require
+- [x] After runtime start, call the internal `mock.connect` exchange and require
       exactly one token for each enabled mock before installing redirects.
-- [ ] Omit `requestMethods` when the rule has no method filter; set exactly the
+- [x] Omit `requestMethods` when the rule has no method filter; set exactly the
       filtered method when it has one.
-- [ ] Add a higher-priority session `allow` rule that excludes the loopback
+- [x] Add a higher-priority session `allow` rule that excludes the loopback
       mock route, so a broad user regex cannot redirect the mock response back
       into itself. Set its priority above `LIMITS.maxPriority` and keep its
       condition limited to `127.0.0.1`, the active port, and mock prefix.
-- [ ] Retain `kind === "mock"` in the native policy operation filter in
+- [x] Retain `kind === "mock"` in the native policy operation filter in
       `packages/extension/src/native-session.ts`.
-- [ ] Set `contentListener` true when the project has enabled mock rules, so the
+- [x] Set `contentListener` true when the project has enabled mock rules, so the
       loopback listener starts without PAC routes.
-- [ ] Install mock redirects only after the host reports `started` and a `proxy`
+- [x] Install mock redirects only after the host reports `started` and a `proxy`
       endpoint; roll back the whole start on install failure.
-- [ ] Remove mock redirects and the loop guard on stop and on disconnect.
+- [x] Remove mock redirects and the loop guard on stop and on disconnect.
 
 **Acceptance:** enabling a mock installs exactly one session rule per enabled
 mock plus one guard; stopping removes exactly those ids and nothing else;
@@ -358,7 +358,7 @@ response-body band, builder output for filtered and unfiltered methods, `.*`
 regex does not loop, install rollback on failure, stop and disconnect cleanup,
 and foreign DNR ids untouched.
 
-- [ ] Phase 10A acceptance verified.
+- [x] Phase 10A acceptance verified.
 
 ## Phase 10B — Real Chrome mock journey
 

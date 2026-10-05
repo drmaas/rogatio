@@ -3,6 +3,7 @@ import {
   encodePacSteer,
   isPacSafeSource,
   literalHostname,
+  type MockOperation,
   type RogatioOperation,
   steeredRequestOrigin,
 } from "@rogatio/compiler";
@@ -15,6 +16,7 @@ import {
 } from "./body-marker-lifecycle.js";
 import type { ChromeApi } from "./chrome.js";
 import { isNativeHostOriginForbiddenMessage } from "./extension-id.js";
+import { installMockRedirects, removeMockRedirects } from "./mock-redirect.js";
 import {
   installResponseBodyRedirects,
   removeResponseBodyRedirects,
@@ -164,7 +166,7 @@ export interface NativeRuntimeConfig {
   readonly policyDigest: string;
   readonly extensionId: string;
   readonly pacRoutes: readonly string[];
-  /** Response-body rules need the loopback listener even when PAC is empty. */
+  /** Response-body and mock rules need the loopback listener even when PAC is empty. */
   readonly contentListener: boolean;
   readonly targetPolicy: {
     publicAllowed: boolean;
@@ -190,6 +192,7 @@ export async function buildNativePolicy(
     (op) =>
       op.kind === "request-body" ||
       op.kind === "response-body" ||
+      op.kind === "mock" ||
       op.kind === "redirect" ||
       op.kind === "query" ||
       op.kind === "header",
@@ -318,7 +321,10 @@ export async function startNativeSession(
         protocol: "v1",
         type: "runtime.project.set",
         timestamp: Date.now(),
-        metadata: { project: project.data },
+        metadata: {
+          project: project.data,
+          enabledGroupIds: project.enabledGroupIds,
+        },
       });
       console.log(
         "[rogatio] project.set response:",
@@ -364,7 +370,12 @@ export async function startNativeSession(
     ? (policyOps as RogatioOperation[])
     : [];
   const pacRoutes = pacRoutesFromBodyOperations(operations);
-  const contentListener = operations.some((op) => op.kind === "response-body");
+  const enabledGroups = new Set(project.enabledGroupIds);
+  const contentListener =
+    operations.some((op) => op.kind === "response-body") ||
+    operations.some(
+      (op) => op.kind === "mock" && enabledGroups.has(op.groupId),
+    );
 
   const config: NativeRuntimeConfig = {
     sessionId,
@@ -414,6 +425,80 @@ export async function startNativeSession(
     }
   }
 
+  const mockOps = operations.filter(
+    (op): op is MockOperation =>
+      op.kind === "mock" && enabledGroups.has(op.groupId),
+  );
+  if (mockOps.length > 0) {
+    if (
+      redirectApi === undefined ||
+      proxy === undefined ||
+      typeof proxy.port !== "number" ||
+      presetDigest === undefined ||
+      send === undefined
+    ) {
+      if (redirectApi !== undefined) await removeMockRedirects(redirectApi);
+      await rollbackBodyMarkers(options.bodyMarkers);
+      await options.nativeRuntime.stop();
+      return { ok: false, reason: "mock-listener-unavailable" };
+    }
+    let issued: readonly { ruleId?: unknown; token?: unknown }[] = [];
+    try {
+      const connect = await send({
+        protocol: "v1",
+        type: "mock.connect",
+        timestamp: Date.now(),
+        metadata: {},
+      });
+      const mocks = connect.metadata.mocks;
+      issued = Array.isArray(mocks)
+        ? (mocks as readonly { ruleId?: unknown; token?: unknown }[])
+        : [];
+    } catch {
+      await removeMockRedirects(redirectApi);
+      await removeResponseBodyRedirects(redirectApi);
+      await rollbackBodyMarkers(options.bodyMarkers);
+      await options.nativeRuntime.stop();
+      return { ok: false, reason: "mock-connect-failed" };
+    }
+    const tokens = new Map<string, string>();
+    for (const entry of issued) {
+      if (typeof entry.ruleId !== "string" || typeof entry.token !== "string") {
+        tokens.clear();
+        break;
+      }
+      if (tokens.has(entry.ruleId)) {
+        tokens.clear();
+        break;
+      }
+      tokens.set(entry.ruleId, entry.token);
+    }
+    const paired = mockOps.flatMap((operation) => {
+      const token = tokens.get(operation.ruleId);
+      return token === undefined ? [] : [{ operation, token }];
+    });
+    if (paired.length !== mockOps.length) {
+      await removeMockRedirects(redirectApi);
+      await removeResponseBodyRedirects(redirectApi);
+      await rollbackBodyMarkers(options.bodyMarkers);
+      await options.nativeRuntime.stop();
+      return { ok: false, reason: "mock-token-mismatch" };
+    }
+    const mockInstalled = await installMockRedirects({
+      api: redirectApi,
+      rules: paired,
+      port: proxy.port,
+      digest: presetDigest,
+    });
+    if (!mockInstalled.ok) {
+      await removeMockRedirects(redirectApi);
+      await removeResponseBodyRedirects(redirectApi);
+      await rollbackBodyMarkers(options.bodyMarkers);
+      await options.nativeRuntime.stop();
+      return { ok: false, reason: mockInstalled.reason };
+    }
+  }
+
   return { ok: true, sessionId, policyDigest: config.policyDigest };
 }
 
@@ -421,6 +506,7 @@ export async function stopNativeSession(
   options: NativeSessionOptions,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (options.bodyMarkers !== undefined) {
+    await removeMockRedirects(options.bodyMarkers.api);
     await removeResponseBodyRedirects(options.bodyMarkers.api);
   }
   await rollbackBodyMarkers(options.bodyMarkers);

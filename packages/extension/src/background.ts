@@ -8,6 +8,7 @@ import {
 import { createDnrInstaller } from "./dnr.js";
 import { isNativeHostOriginForbiddenMessage } from "./extension-id.js";
 import { registerMatchLogListener } from "./match-listener.js";
+import { removeMockRedirects } from "./mock-redirect.js";
 import type {
   NativeEnvelope,
   NativeEnvelopeInput,
@@ -203,6 +204,7 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
         void proxy.clearPac().catch(() => undefined);
         pacInstalled = false;
       }
+      void removeMockRedirects(api);
       for (const reject of rejected.values()) reject(disconnectError);
       pending.clear();
       rejected.clear();

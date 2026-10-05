@@ -70,6 +70,8 @@ describe("body-marker id band (session store)", () => {
     expect(isBodyMarkerBandId(FOREIGN_ID)).toBe(false);
     expect(isBodyMarkerBandId(2_000_000)).toBe(false);
     expect(isBodyMarkerBandId(3_000_000)).toBe(false);
+    expect(isBodyMarkerBandId(4_000_000)).toBe(true);
+    expect(isBodyMarkerBandId(4_000_001)).toBe(false);
     expect(isBodyMarkerBandId(3.5)).toBe(false);
   });
 });
