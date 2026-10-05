@@ -250,10 +250,10 @@ directory and prove it is not read.
 
 ## Phase 8B — Runtime and CLI: native framing and startup
 
-- [ ] Make `--root` required when `rogatio runtime host` reads a stdin project
+- [x] Make `--root` required when `rogatio runtime host` reads a stdin project
       containing file mocks. Keep `dirname(projectPath)` as the default for an
       explicit project path.
-- [ ] Exercise the largest valid inline mock through native framing. If
+- [x] Exercise the largest valid inline mock through native framing. If
       `runtime.project.set` exceeds 64 KiB, reuse bounded multipart staging for
       project config. Do not raise the envelope limit or use `mock.response`.
 
@@ -265,7 +265,7 @@ stable message only for file mocks, and an explicit path defaults to its
 directory. Host-bridge coverage sends the largest valid inline mock through
 native framing and proves rendered bytes do not enter a native envelope.
 
-- [ ] Phase 8B acceptance verified.
+- [x] Phase 8B acceptance verified.
 
 ## Phase 9A — Runtime: serve mocks on the loopback listener
 

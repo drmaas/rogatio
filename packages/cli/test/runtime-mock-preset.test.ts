@@ -69,4 +69,85 @@ describe("runtime host preset mocks", () => {
       expect.objectContaining({ ruleId: "r1", status: 200, body: "hello" }),
     ]);
   });
+
+  it("requires --root for a stdin project that contains a file mock", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const project = JSON.stringify({
+      version: 2,
+      name: "mocks",
+      groups: [
+        {
+          id: "g1",
+          name: "G",
+          rules: [
+            {
+              id: "r1",
+              name: "Mock",
+              source: {
+                key: "url",
+                operator: "regex",
+                value: "^https://example\\.com/",
+              },
+              resourceTypes: ["main_frame"],
+              priority: 1,
+              type: "mock",
+              mock: { status: 200, file: "payload.bin" },
+            },
+          ],
+        },
+      ],
+    });
+
+    const missing = await runtimeCommand(["host", "-"], {
+      stdinInput: project,
+    });
+    expect(missing).toBe(2);
+    expect(error.mock.calls.join("\n")).toContain("runtime.root-required");
+    expect(runNativeHost).not.toHaveBeenCalled();
+
+    const directory = await mkdtemp(join(tmpdir(), "rogatio-cli-root-"));
+    directories.push(directory);
+    const present = await runtimeCommand(["host", "--root", directory, "-"], {
+      stdinInput: project,
+    });
+    expect(present).toBe(0);
+    expect(vi.mocked(runNativeHost).mock.calls.at(-1)?.[0].fileRoot).toBe(
+      directory,
+    );
+    error.mockRestore();
+  });
+
+  it("starts a stdin inline mock without a root", async () => {
+    const code = await runtimeCommand(["host", "-"], {
+      stdinInput: JSON.stringify({
+        version: 2,
+        name: "mocks",
+        groups: [
+          {
+            id: "g1",
+            name: "G",
+            rules: [
+              {
+                id: "r1",
+                name: "Mock",
+                source: {
+                  key: "url",
+                  operator: "regex",
+                  value: "^https://example\\.com/",
+                },
+                resourceTypes: ["main_frame"],
+                priority: 1,
+                type: "mock",
+                mock: { status: 200, body: "hello" },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    expect(code).toBe(0);
+    expect(
+      vi.mocked(runNativeHost).mock.calls.at(-1)?.[0].fileRoot,
+    ).toBeUndefined();
+  });
 });

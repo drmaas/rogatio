@@ -161,6 +161,7 @@ export type RuntimeErrorCode =
   | "runtime.address-denied"
   | "runtime.dns-failed"
   | "runtime.redirect-rejected"
+  | "runtime.project-stage-invalid"
   | "runtime.root-invalid"
   | "runtime.groups-invalid"
   | "runtime.file-denied"

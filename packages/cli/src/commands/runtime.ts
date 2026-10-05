@@ -329,12 +329,18 @@ async function runtimeHostCommand(
   const storage = options.storage ?? createJsonFileProjectStorage();
   try {
     if (inputPath === "-") {
-      const chunks: string[] = [];
-      for await (const chunk of process.stdin) {
-        chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
-      }
       filePath = "<stdin>";
-      projectData = JSON.parse(chunks.join(""));
+      if (options.stdinInput !== undefined) {
+        projectData = JSON.parse(options.stdinInput);
+      } else {
+        const chunks: string[] = [];
+        for await (const chunk of process.stdin) {
+          chunks.push(
+            typeof chunk === "string" ? chunk : chunk.toString("utf8"),
+          );
+        }
+        projectData = JSON.parse(chunks.join(""));
+      }
     } else {
       filePath = resolve(inputPath);
       projectData = await storage.get(filePath);
@@ -362,6 +368,15 @@ async function runtimeHostCommand(
       );
     }
     return 1;
+  }
+
+  const fileMock = compileResult.operations.some(
+    (operation) =>
+      operation.kind === "mock" && operation.mock.file !== undefined,
+  );
+  if (inputPath === "-" && fileMock && root === undefined) {
+    console.error("Error: runtime.root-required");
+    return 2;
   }
 
   const rootDir = root ?? (inputPath === "-" ? undefined : dirname(filePath));
