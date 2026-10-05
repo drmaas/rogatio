@@ -1,12 +1,13 @@
 import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import {
   createRequestBodyTrustController,
   defaultTrustInstallRoot,
   describeExtensionIdMismatch,
   extensionOriginListed,
+  matchersFromOperations,
+  mocksFromOperations,
   normalizeRuntimePreset,
   RELEASE_EXTENSION_ID,
   RUNTIME_LIMITS,
@@ -29,21 +30,6 @@ export interface RuntimeCommandOptions {
 export interface RuntimeCommandResult {
   exitCode: Promise<number>;
   shutdown: () => void;
-}
-
-function toMatcherOperations(
-  operations: readonly RogatioOperation[],
-): MatcherOperation[] {
-  return operations.map(
-    ({ groupId, ruleId, name, matcher, redactSensitiveInLogs }) => ({
-      kind: "matcher",
-      groupId,
-      ruleId,
-      name,
-      matcher,
-      redactSensitiveInLogs,
-    }),
-  );
 }
 
 /**
@@ -378,14 +364,15 @@ async function runtimeHostCommand(
     return 1;
   }
 
-  const rootDir =
-    root ?? (inputPath === "-" ? process.cwd() : dirname(filePath));
+  const rootDir = root ?? (inputPath === "-" ? undefined : dirname(filePath));
+  const mocks = mocksFromOperations(compileResult.operations, undefined);
 
   const normalized = normalizeRuntimePreset({
     version: 1,
     limits: RUNTIME_LIMITS,
-    matchers: toMatcherOperations(compileResult.operations),
+    matchers: matchersFromOperations(compileResult.operations),
     grants: [],
+    ...(mocks.length > 0 ? { mocks } : {}),
   });
   if (!normalized.ok) {
     console.error("Error: Failed to build runtime preset");
@@ -395,7 +382,7 @@ async function runtimeHostCommand(
   const aiProviderConfig = await readProviderConfig();
   await runNativeHost({
     preset: normalized.value,
-    fileRoot: rootDir,
+    ...(rootDir !== undefined ? { fileRoot: rootDir } : {}),
     ...(mockPort !== undefined ? { mockPort } : {}),
     ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
     aiConfigReader: readProviderConfig,

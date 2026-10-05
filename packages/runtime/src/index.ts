@@ -7,6 +7,7 @@ export { authorizeExact } from "./authorization.js";
 export { isConfinedFileSupported, readConfinedFile } from "./confined-file.js";
 export * from "./envelope.js";
 export * from "./extension-id.js";
+export { resolveConfinedRoot } from "./file-root.js";
 export * from "./host.js";
 export {
   type InterceptProxyHandle,
@@ -21,7 +22,11 @@ export * from "./native-framing.js";
 export { fetchAuthorized } from "./outbound.js";
 export * from "./pac.js";
 export * from "./policy.js";
-export { normalizeRuntimePreset } from "./preset.js";
+export { normalizeRuntimePreset, parseEnabledGroupIds } from "./preset.js";
+export {
+  matchersFromOperations,
+  mocksFromOperations,
+} from "./project-preset.js";
 export * from "./proxy.js";
 export { rewriteRequestBody } from "./request-body.js";
 export {

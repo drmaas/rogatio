@@ -259,4 +259,51 @@ describe("F6 runtime preset", () => {
     expect(RUNTIME_LIMITS.maxPresetBytes).toBe(262_144);
     expect(RUNTIME_LIMITS.maxRedirects).toBe(0);
   });
+
+  it("rejects a control character in a mock header value", () => {
+    expectInvalid(
+      makePresetInput({
+        mocks: [
+          {
+            ruleId: "rule-main",
+            status: 200,
+            headers: [{ name: "X-Test", value: "a\nb" }],
+            body: "hello",
+          },
+        ],
+      }),
+    );
+  });
+
+  it("ties a mock to its matcher and changes the digest when the mock changes", () => {
+    const base = normalizeRuntimePreset(
+      makePresetInput({
+        mocks: [{ ruleId: "rule-main", status: 200, body: "hello" }],
+      }),
+    );
+    const again = normalizeRuntimePreset(
+      makePresetInput({
+        mocks: [{ ruleId: "rule-main", status: 200, body: "hello" }],
+      }),
+    );
+    const changed = normalizeRuntimePreset(
+      makePresetInput({
+        mocks: [{ ruleId: "rule-main", status: 201, body: "hello" }],
+      }),
+    );
+    expectInvalid(
+      makePresetInput({
+        mocks: [{ ruleId: "missing-rule", status: 200, body: "hello" }],
+      }),
+    );
+    expect(base.ok && again.ok && changed.ok).toBe(true);
+    if (base.ok && again.ok && changed.ok) {
+      expect(again.value.digest).toBe(base.value.digest);
+      expect(changed.value.digest).not.toBe(base.value.digest);
+      expect(base.value.mocks?.[0]?.ruleId).toBe("rule-main");
+      const canonical = new TextDecoder().decode(base.value.canonicalBytes);
+      expect(canonical).toContain("hello");
+      expect(canonical).not.toContain("token");
+    }
+  });
 });

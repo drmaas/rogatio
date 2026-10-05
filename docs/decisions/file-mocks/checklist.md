@@ -214,24 +214,24 @@ path in any error.
 
 ## Phase 8A — Runtime: preset mocks and confined root
 
-- [ ] Populate `preset.mocks` from compiled `MockOperation`s in the deferred
+- [x] Populate `preset.mocks` from compiled `MockOperation`s in the deferred
       `runtime.project.set` path in `packages/runtime/src/lifecycle.ts`.
-- [ ] Populate `preset.mocks` the same way in the explicit CLI path in
+- [x] Populate `preset.mocks` the same way in the explicit CLI path in
       `packages/cli/src/commands/runtime.ts`.
-- [ ] Confirm `normalizeRuntimePreset` accepts the mocks and ties each to its
+- [x] Confirm `normalizeRuntimePreset` accepts the mocks and ties each to its
       matcher; extend it only where a real gap exists.
-- [ ] Tighten preset header validation to reject control characters in header
+- [x] Tighten preset header validation to reject control characters in header
       values, not only names.
-- [ ] Accept optional `fileRoot` and bounded `enabledGroupIds` in
+- [x] Accept optional `fileRoot` and bounded `enabledGroupIds` in
       `runtime.project.set` metadata. Reject unknown, duplicate, or malformed
       group ids. Build mocks only for enabled groups.
-- [ ] Validate `fileRoot` as an absolute path to an existing directory and
+- [x] Validate `fileRoot` as an absolute path to an existing directory and
       resolve its real path.
-- [ ] Reject a relative, missing, non-directory, or unreadable root with a stable
+- [x] Reject a relative, missing, non-directory, or unreadable root with a stable
       error, and report it on the `runtime.project.set` reply.
-- [ ] Use the resolved root for the session; never fall back to the process
+- [x] Use the resolved root for the session; never fall back to the process
       working directory.
-- [ ] Confirm the canonical preset digest covers mock config and still excludes
+- [x] Confirm the canonical preset digest covers mock config and still excludes
       minted per-rule values.
 
 **Acceptance:** a project with mock rules yields a preset whose mocks match the
@@ -246,7 +246,7 @@ change, disabled-group mocks receive no token, and malformed group ids fail.
 For the missing-root case, place a matching file in the process working
 directory and prove it is not read.
 
-- [ ] Phase 8A acceptance verified.
+- [x] Phase 8A acceptance verified.
 
 ## Phase 8B — Runtime and CLI: native framing and startup
 

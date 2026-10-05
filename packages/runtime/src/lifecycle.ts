@@ -16,6 +16,7 @@ import {
   pairCapability,
 } from "./capability.js";
 import { failure } from "./errors.js";
+import { resolveConfinedRoot } from "./file-root.js";
 import {
   getCurrentSession,
   hasActiveSession,
@@ -25,7 +26,11 @@ import {
 } from "./interception.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { mintToken, type RenderedMock, renderMockResponse } from "./mock.js";
-import { normalizeRuntimePreset } from "./preset.js";
+import { normalizeRuntimePreset, parseEnabledGroupIds } from "./preset.js";
+import {
+  matchersFromOperations,
+  mocksFromOperations,
+} from "./project-preset.js";
 import type {
   AIStatusMetadata,
   AuthorizeRequest,
@@ -148,7 +153,7 @@ export function createNativeRuntimeController(
   options: NativeRuntimeControllerOptions,
 ): NativeRuntimeController {
   let preset: NormalizedRuntimePreset | undefined = options.preset;
-  const fileRoot = options.fileRoot;
+  let fileRoot = options.fileRoot;
   const mockPort = options.mockPort;
   const clock = options.clock ?? (() => Date.now());
 
@@ -411,24 +416,56 @@ export function createNativeRuntimeController(
           };
         }
 
-        const matcherOps: RogatioOperation[] = [];
-        for (const op of compileResult.operations) {
-          if ("matcher" in op) {
-            matcherOps.push({
-              kind: "matcher",
-              groupId: op.groupId,
-              ruleId: op.ruleId,
-              redactSensitiveInLogs: op.redactSensitiveInLogs,
-              matcher: (op as { matcher: unknown }).matcher,
-            } as RogatioOperation);
+        const metadata = input.metadata;
+        if (metadata === null || typeof metadata !== "object") {
+          return {
+            protocol: "v1",
+            type: "runtime.project.set",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: "runtime.project-missing" },
+          };
+        }
+        const enabledGroups = parseEnabledGroupIds(
+          metadata,
+          schemaResult.data.groups.map((group) => group.id),
+        );
+        if (!enabledGroups.ok) {
+          return {
+            protocol: "v1",
+            type: "runtime.project.set",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: enabledGroups.error.code },
+          };
+        }
+        if (Object.hasOwn(metadata, "fileRoot")) {
+          const resolvedRoot = await resolveConfinedRoot(
+            (metadata as Record<string, unknown>).fileRoot,
+          );
+          if (!resolvedRoot.ok) {
+            return {
+              protocol: "v1",
+              type: "runtime.project.set",
+              ...(requestId !== undefined ? { requestId } : {}),
+              timestamp,
+              metadata: { ok: false, error: resolvedRoot.error.code },
+            };
           }
+          fileRoot = resolvedRoot.value;
         }
 
+        const matcherOps = matchersFromOperations(compileResult.operations);
+        const mocks = mocksFromOperations(
+          compileResult.operations,
+          enabledGroups.value,
+        );
         const presetInput = {
           version: 1,
           limits: RUNTIME_LIMITS,
           matchers: matcherOps,
           grants: [],
+          ...(mocks.length > 0 ? { mocks } : {}),
         };
         console.error(
           "[rogatio-host] normalizeRuntimePreset input: matchers=",
