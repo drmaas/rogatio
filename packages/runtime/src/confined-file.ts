@@ -72,10 +72,10 @@ export async function readConfinedPathBytes(
   logicalPath: string,
   signal?: AbortSignal,
 ): Promise<RuntimeResult<Uint8Array>> {
-  if (!isConfinedFileSupported())
-    return failure("runtime.platform-unsupported");
   const normalized = normalizeLogicalPath(logicalPath);
   if (normalized === null) return failure("runtime.file-denied");
+  if (!isConfinedFileSupported())
+    return failure("runtime.platform-unsupported");
   if (signal?.aborted) return failure("runtime.timeout");
 
   const opened = await openConfinedFile(root, normalized);
