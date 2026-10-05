@@ -1,6 +1,6 @@
 import { mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 /** Device-local map of canonical project path to mock file root. */
 export function mockRootConfigPath(
@@ -48,7 +48,8 @@ async function readMap(
   const map: Record<string, string> = {};
   for (const key of Object.keys(projects)) {
     const value = (projects as Record<string, unknown>)[key];
-    if (typeof value === "string" && value.length > 0) map[key] = value;
+    // A relative root would resolve against the process working directory.
+    if (typeof value === "string" && isAbsolute(value)) map[key] = value;
   }
   return map;
 }

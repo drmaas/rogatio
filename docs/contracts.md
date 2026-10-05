@@ -34,6 +34,9 @@ names stay the source of truth.
     response headers, and duplicate names (case-insensitive, trimmed). `file`
     is a relative logical path: no absolute, backslash, percent-escape,
     control, dot-segment, colon, or glob (`* ? [ ]`) forms.
+  - A saved root must be an absolute path. The host and the CLI reject or
+    ignore a relative root rather than resolve it against the working
+    directory.
   - A mock never contacts the original upstream destination.
   - File bodies may be arbitrary bytes. UTF-8 is not required and is never
     assumed.

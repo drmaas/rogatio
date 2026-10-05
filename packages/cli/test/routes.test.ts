@@ -454,6 +454,28 @@ describe("API routes", () => {
     });
   });
 
+  describe("POST /api/mock-root", () => {
+    it.each(["relative/dir", "./mocks", "~/mocks", 7])(
+      "rejects a non-absolute root %j without saving",
+      async (root) => {
+        const req = createMockReq(
+          "POST",
+          "/api/mock-root",
+          {
+            "x-csrf-token": "test-csrf-token",
+            "content-type": "application/json",
+          },
+          JSON.stringify({ root }),
+        );
+        const res = createMockRes();
+        await handler(req, res);
+        expect(vi.mocked(res.writeHead).mock.calls[0]?.[0]).toBe(400);
+        const raw = vi.mocked(res.end).mock.calls[0]?.[0];
+        expect(JSON.parse(String(raw)).code).toBe("invalid-root");
+      },
+    );
+  });
+
   describe("POST /api/dry-run", () => {
     function dryRunResponse(body: unknown, token = "test-csrf-token") {
       const req = createMockReq(

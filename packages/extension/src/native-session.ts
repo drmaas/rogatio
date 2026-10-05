@@ -441,7 +441,10 @@ export async function startNativeSession(
       presetDigest === undefined ||
       send === undefined
     ) {
-      if (redirectApi !== undefined) await removeMockRedirects(redirectApi);
+      if (redirectApi !== undefined) {
+        await removeMockRedirects(redirectApi);
+        await removeResponseBodyRedirects(redirectApi);
+      }
       await rollbackBodyMarkers(options.bodyMarkers);
       await options.nativeRuntime.stop();
       return { ok: false, reason: "mock-listener-unavailable" };

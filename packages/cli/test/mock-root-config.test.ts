@@ -35,6 +35,24 @@ describe("device-local mock file root", () => {
     expect(await readSavedMockRoot(projectPath, env)).toBeUndefined();
   });
 
+  it("ignores a hand-edited relative root", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "rogatio-mock-root-"));
+    directories.push(directory);
+    const projectPath = join(directory, "app.rogatio.json");
+    await writeFile(projectPath, "{}\n");
+    const configDir = join(directory, "config");
+    await import("node:fs/promises").then(async (fs) => {
+      await fs.mkdir(configDir);
+      await fs.writeFile(
+        join(configDir, "mock-roots.json"),
+        JSON.stringify({ projects: { [projectPath]: "relative/mocks" } }),
+      );
+    });
+    expect(
+      await readSavedMockRoot(projectPath, { ROGATIO_CONFIG_DIR: configDir }),
+    ).toBeUndefined();
+  });
+
   it("ignores a hostile config file", async () => {
     const directory = await mkdtemp(join(tmpdir(), "rogatio-mock-root-"));
     directories.push(directory);

@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject, previewRuleAction } from "@rogatio/dry-run";
@@ -394,12 +394,15 @@ export function createRoutes(context: RouteContext) {
         typeof body === "object" && body !== null && "root" in body
           ? (body as { root?: unknown }).root
           : undefined;
-      if (root !== null && typeof root !== "string") {
+      if (
+        root !== null &&
+        (typeof root !== "string" || (root !== "" && !isAbsolute(root)))
+      ) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
             code: "invalid-root",
-            message: "Mock file root must be a string or null",
+            message: "Mock file root must be an absolute path or null",
           }),
         );
         return;
