@@ -362,15 +362,15 @@ and foreign DNR ids untouched.
 
 ## Phase 10B — Real Chrome mock journey
 
-- [ ] Add a Chrome for Testing journey in `test/browser/` covering a served
+- [x] Add a Chrome for Testing journey in `test/browser/` covering a served
       inline mock, a served file mock, and a `POST` mock.
-- [ ] Assert the listener receives `POST`. A unit projection test is not a
+- [x] Assert the listener receives `POST`. A unit projection test is not a
       substitute for this method-preservation journey.
-- [ ] Use an upstream request trap to prove no matched mock request reaches the
+- [x] Use an upstream request trap to prove no matched mock request reaches the
       original upstream host.
-- [ ] Use a broad authored regex that matches the loopback URL. Prove the
+- [x] Use a broad authored regex that matches the loopback URL. Prove the
       response serves once without recursion.
-- [ ] Stop and disconnect the host, then prove mock session rules and the guard
+- [x] Stop and disconnect the host, then prove mock session rules and the guard
       are gone.
 
 **Acceptance:** Chrome preserves `POST`, serves both body sources without
@@ -379,7 +379,7 @@ upstream traffic or recursion, and removes session rules at lifecycle end.
 **Tests:** required Selenium Chrome for Testing journey in `test/browser/`.
 Chrome DNR method preservation remains a release risk until this passes.
 
-- [ ] Phase 10B acceptance verified.
+- [x] Phase 10B acceptance verified.
 
 ## Phase 11A — Extension: mock status and file errors
 
