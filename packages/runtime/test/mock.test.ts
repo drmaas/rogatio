@@ -447,6 +447,15 @@ describe("mock response rendering (phase 7B)", () => {
       fileRoot: root,
     });
 
+    if (!isConfinedFileSupported()) {
+      expect(result).toEqual({
+        ok: false,
+        error: { code: "runtime.platform-unsupported" },
+      });
+      assertRedacted(result, [root]);
+      return;
+    }
+
     expect(result).toEqual({
       ok: true,
       value: {
@@ -511,17 +520,26 @@ describe("mock response rendering (phase 7B)", () => {
     const noRoot = await render(mockConfig({ file: "primary.bin" }));
     const neither = await render({ ruleId: "rule-1", status: 200 });
 
+    const readable = isConfinedFileSupported();
     expect(missing).toEqual({
       ok: false,
-      error: { code: "runtime.file-denied" },
+      error: {
+        code: readable ? "runtime.file-denied" : "runtime.platform-unsupported",
+      },
     });
     expect(linked).toEqual({
       ok: false,
-      error: { code: "runtime.file-race-rejected" },
+      error: {
+        code: readable
+          ? "runtime.file-race-rejected"
+          : "runtime.platform-unsupported",
+      },
     });
     expect(oversized).toEqual({
       ok: false,
-      error: { code: "runtime.size-limit" },
+      error: {
+        code: readable ? "runtime.size-limit" : "runtime.platform-unsupported",
+      },
     });
     expect(noRoot).toEqual({
       ok: false,
@@ -618,6 +636,14 @@ describe("mock response rendering (phase 7B)", () => {
       },
     );
 
+    if (!isConfinedFileSupported()) {
+      expect(result).toEqual({
+        ok: false,
+        error: { code: "runtime.platform-unsupported" },
+      });
+      return;
+    }
+
     expect(result).toEqual({
       ok: true,
       value: {
@@ -648,7 +674,11 @@ describe("mock response rendering (phase 7B)", () => {
     await vi.advanceTimersByTimeAsync(1);
     await expect(pending).resolves.toEqual({
       ok: false,
-      error: { code: "runtime.file-denied" },
+      error: {
+        code: isConfinedFileSupported()
+          ? "runtime.file-denied"
+          : "runtime.platform-unsupported",
+      },
     });
     assertRedacted(await pending, [root, "missing.bin"]);
   });

@@ -8,6 +8,7 @@ import {
   MAX_MOCK_FILE_ERRORS,
   recordMockFileError,
 } from "../src/mock-errors.js";
+import { isConfinedFileSupported } from "../src/platform-file.js";
 
 const directories: string[] = [];
 
@@ -91,27 +92,32 @@ describe("runtime.status file errors", () => {
       metadata: {},
     });
     const text = JSON.stringify(status.metadata);
-    expect(text).toContain("runtime.file-denied");
+    const denied = isConfinedFileSupported()
+      ? "runtime.file-denied"
+      : "runtime.platform-unsupported";
+    expect(text).toContain(denied);
     expect(text).toContain("r1");
     expect(text).not.toContain(root);
     expect(text).not.toContain("missing.bin");
 
-    await writeFile(join(root, "missing.bin"), Uint8Array.of(1, 2, 3));
-    const ok = await controller.serveMock(token ?? "");
-    expect(ok.ok).toBe(true);
-    const cleared = await controller.handleEnvelope({
-      type: "runtime.status",
-      metadata: {},
-    });
-    expect(cleared.metadata.mockFileErrors).toEqual([]);
+    if (isConfinedFileSupported()) {
+      await writeFile(join(root, "missing.bin"), Uint8Array.of(1, 2, 3));
+      const ok = await controller.serveMock(token ?? "");
+      expect(ok.ok).toBe(true);
+      const cleared = await controller.handleEnvelope({
+        type: "runtime.status",
+        metadata: {},
+      });
+      expect(cleared.metadata.mockFileErrors).toEqual([]);
 
-    await rm(join(root, "missing.bin"));
-    await controller.serveMock(token ?? "");
-    const again = await controller.handleEnvelope({
-      type: "runtime.status",
-      metadata: {},
-    });
-    expect(JSON.stringify(again.metadata)).toContain("runtime.file-denied");
+      await rm(join(root, "missing.bin"));
+      await controller.serveMock(token ?? "");
+      const again = await controller.handleEnvelope({
+        type: "runtime.status",
+        metadata: {},
+      });
+      expect(JSON.stringify(again.metadata)).toContain("runtime.file-denied");
+    }
     await controller.stop();
     await controller.start();
     const restarted = await controller.handleEnvelope({

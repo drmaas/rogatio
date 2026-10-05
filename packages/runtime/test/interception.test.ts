@@ -3,6 +3,9 @@ import {
   createPlatformInterceptionProvider,
   createUnsupportedPlatformProvider,
   type PlatformInterceptionAdapter,
+  registerInterceptionProvider,
+  startInterception,
+  stopInterception,
 } from "../src/interception.js";
 
 function adapter(overrides: Partial<PlatformInterceptionAdapter> = {}) {
@@ -152,6 +155,47 @@ describe(" interception provider", () => {
     expect(platform.provisionOrVerifyCa).not.toHaveBeenCalled();
     expect(platform.installPac).not.toHaveBeenCalled();
     expect(provider.status()).toBe("unsupported");
+  });
+
+  it("starts a listener when the CA is untrusted and there are no PAC routes", async () => {
+    const start = vi.fn(async () => ({ host: "127.0.0.1", port: 9 }));
+    registerInterceptionProvider({
+      platform: "test",
+      detect: () => ({
+        supported: false,
+        reasons: ["device-local-ca-untrusted"],
+      }),
+      start,
+      stop: vi.fn(async () => undefined),
+    });
+    try {
+      const listener = await startInterception(
+        activation,
+        "sha256:example",
+        "extension",
+        [],
+        { public: true, localOrigins: [] },
+      );
+      expect(listener.kind).toBe("active");
+      expect(start).toHaveBeenCalledOnce();
+
+      await stopInterception();
+
+      const routed = await startInterception(
+        activation,
+        "sha256:example",
+        "extension",
+        ["example.com"],
+        { public: true, localOrigins: [] },
+      );
+      expect(routed).toEqual({
+        kind: "unsupported",
+        reasons: ["device-local-ca-untrusted"],
+      });
+      expect(start).toHaveBeenCalledOnce();
+    } finally {
+      await stopInterception();
+    }
   });
 
   it("provides an unsupported default provider", () => {

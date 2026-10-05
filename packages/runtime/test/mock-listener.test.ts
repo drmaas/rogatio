@@ -13,6 +13,7 @@ import {
   MOCK_LISTENER_PREFIX,
   parseMockRedirect,
 } from "../src/mock-listener.js";
+import { isConfinedFileSupported } from "../src/platform-file.js";
 import { ENVELOPE_MAX_BYTES, type RuntimeResult } from "../src/types.js";
 
 const directories: string[] = [];
@@ -229,6 +230,7 @@ describe("loopback mock route", () => {
   });
 
   it("serves a binary body larger than one native envelope", async () => {
+    if (!isConfinedFileSupported()) return;
     const root = await mkdtemp(join(tmpdir(), "rogatio-mock-route-"));
     directories.push(root);
     const bytes = new Uint8Array(ENVELOPE_MAX_BYTES + 4096);

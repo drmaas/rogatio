@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createNativeRuntimeController } from "../src/lifecycle.js";
+import { isConfinedFileSupported } from "../src/platform-file.js";
 
 const source = {
   key: "url" as const,
@@ -169,6 +170,7 @@ describe("runtime.project.set mock presets", () => {
   });
 
   it("serves a file from the resolved root and not the working directory", async () => {
+    if (!isConfinedFileSupported()) return;
     const previous = process.cwd();
     const work = await makeDirectory();
     const root = await makeDirectory();
@@ -195,6 +197,7 @@ describe("runtime.project.set mock presets", () => {
   });
 
   it("rejects an unreadable root", async () => {
+    if (process.platform === "win32") return;
     if (typeof process.getuid === "function" && process.getuid() === 0) return;
     const directory = await makeDirectory();
     await chmod(directory, 0o000);

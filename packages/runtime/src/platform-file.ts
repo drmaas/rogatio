@@ -200,6 +200,11 @@ export async function openConfinedFile(
   root: string,
   logicalPath: string,
 ): Promise<RuntimeResult<ConfinedHandle>> {
+  // A path that is illegal on every platform is a denial, not an unsupported
+  // reader. The platform check comes after that.
+  if (normalizeLogicalPath(logicalPath) === null) {
+    return failure("runtime.file-denied");
+  }
   const ops = platformOps();
   if (ops === undefined) return failure("runtime.platform-unsupported");
   return openConfinedUsing(root, logicalPath, ops);
