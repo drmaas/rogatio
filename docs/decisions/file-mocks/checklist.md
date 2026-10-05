@@ -188,17 +188,17 @@ any error.
 
 ## Phase 7B — Runtime: render a mock response
 
-- [ ] Propagate distinct stable errors from `renderMockResponse`:
+- [x] Propagate distinct stable errors from `renderMockResponse`:
       `runtime.file-denied`, `runtime.file-race-rejected`,
       `runtime.platform-unsupported`, `runtime.timeout`, `runtime.size-limit`.
       Stop collapsing them to `runtime.file-denied`.
-- [ ] Make header handling deterministic: keep configured headers in order, set
+- [x] Make header handling deterministic: keep configured headers in order, set
       `Content-Length` from the real byte length, apply `Cache-Control: no-store`
       unless the user set it, and default `Content-Type` to
       `application/octet-stream` when absent.
-- [ ] Apply `delayMs` inside rendering, honoring an `AbortSignal` so a client
+- [x] Apply `delayMs` inside rendering, honoring an `AbortSignal` so a client
       disconnect cancels the wait.
-- [ ] Add a method parameter so `HEAD` returns the same status and headers with
+- [x] Add a method parameter so `HEAD` returns the same status and headers with
       no body, and `Content-Length` still reports the full size. Apply the delay
       and file read to `HEAD`.
 
@@ -210,7 +210,7 @@ stable render error, zero delay, delay at `maxMockDelayMs`, aborted delay,
 duplicate and reserved headers, configured and default headers, `HEAD`, and no
 path in any error.
 
-- [ ] Phase 7B acceptance verified.
+- [x] Phase 7B acceptance verified.
 
 ## Phase 8A — Runtime: preset mocks and confined root
 

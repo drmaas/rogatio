@@ -134,11 +134,6 @@ function base64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64");
 }
 
-async function delay(ms: number): Promise<void> {
-  if (ms <= 0) return;
-  await new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
 /**
  * Consolidated native runtime control plane. A single native-messaging host
  * serves pairing, authorization, and mock delivery (spec REQ-001). Activation is
@@ -883,7 +878,6 @@ export function createNativeRuntimeController(
     requestId: string | undefined,
     timestamp: number,
   ): Promise<Envelope> {
-    if (mock.delayMs !== undefined) await delay(mock.delayMs);
     if (!preset) throw new Error("runtime not started");
     const rendered = await renderMockResponse({
       mock,
