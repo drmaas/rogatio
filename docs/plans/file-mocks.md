@@ -1,3 +1,5 @@
+> Status: frozen 2026-10-05
+
 # File mocks — plan
 
 Audience: hybrid. Humans approve the strategy. Agents implement the phases
@@ -69,15 +71,15 @@ it is purely additive.
 
 ### Architecture decisions
 
-1. **Dedicated mock semantics** — ADR 0012 adds `type: "mock"` and locks method,
+1. **Dedicated mock semantics** — ADR 0013 adds `type: "mock"` and locks method,
    delay, and `HEAD` behavior without inheriting an upstream fetch.
-2. **Capability-guarded loopback serving** — ADR 0013 reuses the existing
+2. **Capability-guarded loopback serving** — ADR 0014 reuses the existing
    listener and per-rule tokens, keeps rendered bytes off native messaging, and
    retires the faucet, `--mock-port`, and native mock body replies.
-3. **Project-local confined root** — ADR 0014 stores one root outside project
+3. **Project-local confined root** — ADR 0015 stores one root outside project
    exports, sends it over `runtime.project.set`, and denies reads unless
    descriptor confinement can be proved.
-4. **Redacted request-time errors** — ADR 0015 uses a bounded in-memory error
+4. **Redacted request-time errors** — ADR 0016 uses a bounded in-memory error
    map on existing status refreshes and defines its clearing rules.
 5. **Kind-scoped session DNR bands** — ADR 0009 is amended to bound the
    response-body band and add a mock band containing redirects and one

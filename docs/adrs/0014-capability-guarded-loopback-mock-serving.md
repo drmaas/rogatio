@@ -1,4 +1,4 @@
-# 0013. Capability-guarded loopback mock serving
+# 0014. Capability-guarded loopback mock serving
 
 ## Context
 

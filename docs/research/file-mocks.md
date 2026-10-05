@@ -1,3 +1,5 @@
+> Status: frozen 2026-10-05
+
 # File mocks — research
 
 Audience: hybrid. Source was checked at the cited worktree locations.
