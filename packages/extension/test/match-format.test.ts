@@ -630,4 +630,41 @@ describe("formatMatchRecord", () => {
     expect(line).toContain("live-secret");
     expect(line).not.toContain("[redacted]");
   });
+
+  it("formats file and inline mock intents without absolute paths or body bytes", () => {
+    const fileLine = formatMatchRecord(
+      {
+        url: "https://example.com/mock-file",
+        method: "GET",
+        resourceType: "main_frame",
+      },
+      {
+        ruleId: "rule-mock-file",
+        name: "Serve a local file",
+        kind: "mock",
+        redactSensitiveInLogs: false,
+        intent: { source: "file", file: "fixture.txt" },
+      },
+    );
+    expect(fileLine).toContain("url=https://example.com/mock-file");
+    expect(fileLine).toContain("name=Serve a local file");
+    expect(fileLine).toContain("kind=mock");
+    expect(fileLine).toContain("file=fixture.txt");
+    expect(fileLine).not.toContain("/absolute/");
+    expect(fileLine).not.toContain("samples/basic");
+
+    const inlineLine = formatMatchRecord(
+      { url: "https://example.com/mock-inline" },
+      {
+        ruleId: "rule-mock-inline",
+        name: "Inline mock",
+        kind: "mock",
+        redactSensitiveInLogs: false,
+        intent: { source: "inline" },
+      },
+    );
+    expect(inlineLine).toContain("url=https://example.com/mock-inline");
+    expect(inlineLine).toContain("body=inline");
+    expect(inlineLine).not.toContain("file=");
+  });
 });

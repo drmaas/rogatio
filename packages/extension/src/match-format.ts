@@ -114,6 +114,14 @@ function formatBodyAction(intent: unknown, redactSensitive: boolean): string {
   return [mode, rewrite].filter(nonEmpty).join(" ");
 }
 
+function formatMockAction(intent: unknown): string {
+  const source = readString(intent, "source");
+  if (source === "inline") return "body=inline";
+  if (source !== "file") return "";
+  const file = logString(readString(intent, "file"));
+  return keyed("file", file);
+}
+
 function formatIntendedAction(
   entry: MatchIndexEntry,
   redactSensitive: boolean,
@@ -126,6 +134,7 @@ function formatIntendedAction(
   if (kind === "request-body" || kind === "response-body") {
     return formatBodyAction(intent, redactSensitive);
   }
+  if (kind === "mock") return formatMockAction(intent);
   return "";
 }
 

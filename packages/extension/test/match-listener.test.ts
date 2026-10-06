@@ -16,10 +16,15 @@ import {
   registerMatchAppendConsumer,
   registerMatchLogListener,
 } from "../src/match-listener.js";
+import {
+  MOCK_GUARD_ID,
+  MOCK_REDIRECT_ID_MIN,
+} from "../src/mock-redirect-ids.js";
 import { BODY_MARKER_ID_MIN } from "../src/session-body-markers.js";
 
 const HEADER_DNR_ID = 2_000_001;
 const BODY_MARKER_DNR_ID = BODY_MARKER_ID_MIN;
+const MOCK_REDIRECT_DNR_ID = MOCK_REDIRECT_ID_MIN;
 
 function redirectEntry(
   overrides: Partial<MatchIndexEntry> = {},
@@ -90,6 +95,32 @@ function responseBodyEntry(
     kind: "response-body",
     redactSensitiveInLogs: false,
     intent: { mode: "regex", rewrite: "password=secret" },
+    ...overrides,
+  };
+}
+
+function fileMockEntry(
+  overrides: Partial<MatchIndexEntry> = {},
+): MatchIndexEntry {
+  return {
+    ruleId: "rule-mock-file",
+    name: "Serve a local file",
+    kind: "mock",
+    redactSensitiveInLogs: false,
+    intent: { source: "file", file: "fixture.txt" },
+    ...overrides,
+  };
+}
+
+function inlineMockEntry(
+  overrides: Partial<MatchIndexEntry> = {},
+): MatchIndexEntry {
+  return {
+    ruleId: "rule-mock-inline",
+    name: "Inline mock",
+    kind: "mock",
+    redactSensitiveInLogs: false,
+    intent: { source: "inline" },
     ...overrides,
   };
 }
@@ -1003,6 +1034,161 @@ describe("match log listener", () => {
       expect(store[MATCH_LOGGING_INDEX_KEY]).toEqual(indexSnapshot);
     } finally {
       unregister();
+    }
+  });
+
+  it("logs one file-mock line with the original URL, rule name, and logical path", async () => {
+    const { executeScript, fireMatch } = createHarness({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(MOCK_REDIRECT_DNR_ID)]: fileMockEntry(),
+      },
+    });
+
+    await fireMatch({
+      rule: { ruleId: MOCK_REDIRECT_DNR_ID },
+      request: {
+        tabId: 21,
+        url: "https://example.com/mock-file",
+        method: "GET",
+        type: "main_frame",
+      },
+    });
+
+    expect(executeScript).toHaveBeenCalledTimes(1);
+    const line = executeScript.mock.calls[0]?.[0]?.args?.[0] as string;
+    expect(line).toContain("[rogatio]");
+    expect(line).toContain("url=https://example.com/mock-file");
+    expect(line).toContain("name=Serve a local file");
+    expect(line).toContain("kind=mock");
+    expect(line).toContain("file=fixture.txt");
+    expect(line).not.toContain("127.0.0.1");
+    expect(line).not.toContain("/.rogatio/mock/");
+    expect(line).not.toContain("samples/basic");
+    expect(line).not.toMatch(/rogatio file mock/i);
+  });
+
+  it("logs an inline mock with the original URL and body=inline", async () => {
+    const { executeScript, fireMatch } = createHarness({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(MOCK_REDIRECT_DNR_ID)]: inlineMockEntry(),
+      },
+    });
+
+    await fireMatch({
+      rule: { ruleId: MOCK_REDIRECT_DNR_ID },
+      request: {
+        tabId: 22,
+        url: "https://example.com/mock-inline",
+        method: "GET",
+        type: "xmlhttprequest",
+      },
+    });
+
+    expect(executeScript).toHaveBeenCalledTimes(1);
+    const line = executeScript.mock.calls[0]?.[0]?.args?.[0] as string;
+    expect(line).toContain("url=https://example.com/mock-inline");
+    expect(line).toContain("name=Inline mock");
+    expect(line).toContain("kind=mock");
+    expect(line).toContain("body=inline");
+    expect(line).not.toContain("file=");
+    expect(line).not.toContain("hello");
+  });
+
+  it("redacts the original mock request URL when redactSensitiveInLogs is true", async () => {
+    const { executeScript, fireMatch } = createHarness({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(MOCK_REDIRECT_DNR_ID)]: fileMockEntry({
+          redactSensitiveInLogs: true,
+        }),
+      },
+    });
+
+    await fireMatch({
+      rule: { ruleId: MOCK_REDIRECT_DNR_ID },
+      request: {
+        tabId: 23,
+        url: "https://example.com/mock-file?access_token=live-secret",
+        type: "main_frame",
+      },
+    });
+
+    const line = executeScript.mock.calls[0]?.[0]?.args?.[0] as string;
+    expect(line).toContain("access_token=[redacted]");
+    expect(line).not.toContain("live-secret");
+    expect(line).toContain("file=fixture.txt");
+  });
+
+  it("ignores the mock allow-guard id 6_000_000", async () => {
+    const { executeScript, fireMatch } = createHarness({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(MOCK_REDIRECT_DNR_ID)]: fileMockEntry(),
+        [String(MOCK_GUARD_ID)]: fileMockEntry({
+          ruleId: "guard-should-not-log",
+          name: "Guard",
+        }),
+      },
+    });
+
+    await fireMatch({
+      rule: { ruleId: MOCK_GUARD_ID },
+      request: {
+        tabId: 24,
+        url: "http://127.0.0.1:4545/.rogatio/mock/token/digest",
+        type: "main_frame",
+      },
+    });
+
+    expect(executeScript).not.toHaveBeenCalled();
+  });
+
+  it("stays silent for mock matches when logging is off", async () => {
+    const { executeScript, fireMatch } = createHarness({
+      [MATCH_LOGGING_ENABLED_KEY]: false,
+      [MATCH_LOGGING_INDEX_KEY]: {
+        [String(MOCK_REDIRECT_DNR_ID)]: fileMockEntry(),
+      },
+    });
+
+    await fireMatch({
+      rule: { ruleId: MOCK_REDIRECT_DNR_ID },
+      request: {
+        tabId: 25,
+        url: "https://example.com/mock-file",
+        type: "main_frame",
+      },
+    });
+
+    expect(executeScript).not.toHaveBeenCalled();
+  });
+
+  it("retries main_frame mock inject after navigation rejection", async () => {
+    vi.useFakeTimers();
+    try {
+      const { executeScript, fireMatch } = createHarness({
+        [MATCH_LOGGING_INDEX_KEY]: {
+          [String(MOCK_REDIRECT_DNR_ID)]: fileMockEntry(),
+        },
+      });
+      executeScript
+        .mockRejectedValueOnce(new Error("Frame with ID 0 was removed"))
+        .mockResolvedValueOnce(undefined);
+
+      const pending = fireMatch({
+        rule: { ruleId: MOCK_REDIRECT_DNR_ID },
+        request: {
+          tabId: 26,
+          url: "https://example.com/mock-file",
+          type: "main_frame",
+        },
+      });
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toBeUndefined();
+      expect(executeScript).toHaveBeenCalledTimes(2);
+      expect(executeScript.mock.calls[1]?.[0]?.args?.[0]).toContain(
+        "file=fixture.txt",
+      );
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

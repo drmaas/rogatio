@@ -16,11 +16,21 @@ import {
 } from "./body-marker-lifecycle.js";
 import type { ChromeApi } from "./chrome.js";
 import { isNativeHostOriginForbiddenMessage } from "./extension-id.js";
+import {
+  dropMockRedirectBandFromMatchIndex,
+  mergeMockRedirectIndexEntries,
+} from "./match-index.js";
 import { installMockRedirects, removeMockRedirects } from "./mock-redirect.js";
 import {
   installResponseBodyRedirects,
   removeResponseBodyRedirects,
 } from "./response-body-redirect.js";
+
+/** Remove mock session redirects and drop their match-index entries. */
+async function clearMockRedirects(api: ChromeApi): Promise<void> {
+  await removeMockRedirects(api);
+  await dropMockRedirectBandFromMatchIndex(api);
+}
 
 /**
  * Local structural copy of the native host envelope wire shape. The extension
@@ -442,7 +452,7 @@ export async function startNativeSession(
       send === undefined
     ) {
       if (redirectApi !== undefined) {
-        await removeMockRedirects(redirectApi);
+        await clearMockRedirects(redirectApi);
         await removeResponseBodyRedirects(redirectApi);
       }
       await rollbackBodyMarkers(options.bodyMarkers);
@@ -462,7 +472,7 @@ export async function startNativeSession(
         ? (mocks as readonly { ruleId?: unknown; token?: unknown }[])
         : [];
     } catch {
-      await removeMockRedirects(redirectApi);
+      await clearMockRedirects(redirectApi);
       await removeResponseBodyRedirects(redirectApi);
       await rollbackBodyMarkers(options.bodyMarkers);
       await options.nativeRuntime.stop();
@@ -485,7 +495,7 @@ export async function startNativeSession(
       return token === undefined ? [] : [{ operation, token }];
     });
     if (paired.length !== mockOps.length) {
-      await removeMockRedirects(redirectApi);
+      await clearMockRedirects(redirectApi);
       await removeResponseBodyRedirects(redirectApi);
       await rollbackBodyMarkers(options.bodyMarkers);
       await options.nativeRuntime.stop();
@@ -498,12 +508,16 @@ export async function startNativeSession(
       digest: presetDigest,
     });
     if (!mockInstalled.ok) {
-      await removeMockRedirects(redirectApi);
+      await clearMockRedirects(redirectApi);
       await removeResponseBodyRedirects(redirectApi);
       await rollbackBodyMarkers(options.bodyMarkers);
       await options.nativeRuntime.stop();
       return { ok: false, reason: mockInstalled.reason };
     }
+    await mergeMockRedirectIndexEntries(
+      redirectApi,
+      paired.map((rule) => rule.operation),
+    );
   }
 
   return { ok: true, sessionId, policyDigest: config.policyDigest };
@@ -513,7 +527,7 @@ export async function stopNativeSession(
   options: NativeSessionOptions,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (options.bodyMarkers !== undefined) {
-    await removeMockRedirects(options.bodyMarkers.api);
+    await clearMockRedirects(options.bodyMarkers.api);
     await removeResponseBodyRedirects(options.bodyMarkers.api);
   }
   await rollbackBodyMarkers(options.bodyMarkers);
