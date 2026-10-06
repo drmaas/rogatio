@@ -4,157 +4,56 @@ import type {
   ResourceType,
   RogatioProject,
 } from "@rogatio/schema";
+import { validateRedirectDestination } from "../../schema/src/browser-validation.js";
 import {
   containsUrlCaptureReference,
   validateCaptureTemplate,
 } from "../../schema/src/captures.js";
 import { hasControl } from "../../schema/src/control.js";
+import { isForbiddenHeader } from "../../schema/src/headers.js";
 import { normalizeNameKey } from "../../schema/src/identity.js";
+import { LIMITS } from "../../schema/src/limits.js";
+import { normalizeSiteOrigin } from "../../schema/src/origins.js";
+import { isValidUrlRegex } from "../../schema/src/regex.js";
+import {
+  HTTP_METHODS,
+  PROJECT_VERSION,
+  RESOURCE_TYPES,
+} from "../../schema/src/types.js";
 import { hasLoneSurrogate } from "../../schema/src/utf16.js";
 
-// These helpers live canonically in @rogatio/schema (clone.ts/control.ts/digest.ts).
-// The extension build aliases the bare "@rogatio/schema" specifier to this file, so we
-// re-export the real implementations via relative imports (which bypass the alias).
+// These helpers live canonically in @rogatio/schema. The extension build aliases the
+// bare "@rogatio/schema" specifier to this file, so we re-export the real
+// implementations via relative imports (which bypass the alias).
+export type { RedirectDestinationIssue } from "../../schema/src/browser-validation.js";
+export {
+  countCapturingGroups,
+  validateRedirectDestination,
+} from "../../schema/src/browser-validation.js";
 export { safeClone } from "../../schema/src/clone.js";
 export { hasControl } from "../../schema/src/control.js";
 export { formatSha256, isSha256Digest } from "../../schema/src/digest.js";
+export {
+  FORBIDDEN_REQUEST_HEADERS,
+  FORBIDDEN_RESPONSE_HEADERS,
+  isForbiddenHeader,
+} from "../../schema/src/headers.js";
 export {
   deriveEntityId,
   type EntityKind,
   normalizeNameKey,
   uniqueName,
 } from "../../schema/src/identity.js";
+export { LIMITS } from "../../schema/src/limits.js";
 export { migrateV1Project } from "../../schema/src/migrate-v1.js";
+export { isSiteOrigin, normalizeSiteOrigin } from "../../schema/src/origins.js";
+export { compileUrlRegex, isValidUrlRegex } from "../../schema/src/regex.js";
+export {
+  HTTP_METHODS,
+  PROJECT_VERSION,
+  RESOURCE_TYPES,
+} from "../../schema/src/types.js";
 export { containsUrlCaptureReference, hasLoneSurrogate };
-
-const FORBIDDEN_REQUEST_HEADERS = Object.freeze([
-  "accept-charset",
-  "accept-encoding",
-  "access-control-request-headers",
-  "access-control-request-method",
-  "connection",
-  "content-length",
-  "cookie",
-  "cookie2",
-  "date",
-  "dnt",
-  "expect",
-  "host",
-  "keep-alive",
-  "origin",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-  "via",
-] as const);
-
-const FORBIDDEN_RESPONSE_HEADERS = Object.freeze([
-  "connection",
-  "content-encoding",
-  "content-length",
-  "date",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "set-cookie",
-  "set-cookie2",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-  "via",
-] as const);
-
-const FORBIDDEN_REQUEST_PREFIXES = Object.freeze(["proxy-", "sec-"]);
-
-export function isForbiddenHeader(
-  name: string,
-  direction: HeaderDirection,
-): boolean {
-  const normalized = name.toLowerCase();
-  const forbidden =
-    direction === "request"
-      ? FORBIDDEN_REQUEST_HEADERS
-      : FORBIDDEN_RESPONSE_HEADERS;
-
-  return (
-    forbidden.includes(normalized as never) ||
-    (direction === "request" &&
-      FORBIDDEN_REQUEST_PREFIXES.some((prefix) =>
-        normalized.startsWith(prefix),
-      ))
-  );
-}
-
-export const PROJECT_VERSION = 2 as const;
-export const RESOURCE_TYPES = Object.freeze([
-  "main_frame",
-  "sub_frame",
-  "stylesheet",
-  "script",
-  "image",
-  "font",
-  "object",
-  "media",
-  "xmlhttprequest",
-  "ping",
-  "csp_report",
-  "websocket",
-  "webtransport",
-  "webbundle",
-  "other",
-] as const);
-export const HTTP_METHODS = Object.freeze([
-  "GET",
-  "POST",
-  "PUT",
-  "PATCH",
-  "DELETE",
-  "HEAD",
-  "OPTIONS",
-  "CONNECT",
-  "TRACE",
-] as const);
-export const LIMITS = Object.freeze({
-  maxGroups: 64,
-  maxRulesPerGroup: 256,
-  maxRulesPerProject: 4096,
-  maxIdLength: 64,
-  maxLabelLength: 100,
-  maxDescriptionLength: 1000,
-  maxUrlRegexLength: 2048,
-  maxResourceTypesPerRule: 16,
-  minPriority: 1,
-  maxPriority: 1000,
-  maxRedirectDestinationLength: 2048,
-  maxCaptureGroups: 9,
-  maxQueryParamsPerRule: 64,
-  maxQueryNameLength: 256,
-  maxQueryValueLength: 2048,
-  maxHeaderNameLength: 256,
-  maxHeaderValueLength: 4096,
-  maxHeadersPerRule: 1,
-  minMockStatus: 200,
-  maxMockStatus: 599,
-  maxMockHeadersPerRule: 32,
-  maxMockHeaderNameLength: 256,
-  maxMockHeaderValueLength: 4096,
-  maxMockInlineBodyLength: 65536,
-  maxMockDelayMs: 30000,
-  maxMockFilePathLength: 2048,
-  maxResponseBodyReplacements: 64,
-  maxResponseBodyBytes: 4 * 1024 * 1024,
-  maxResponseBodyPatternLength: 2048,
-  maxResponseBodyReplacementLength: 4096,
-  maxRequestBodyBytes: 4 * 1024 * 1024,
-  maxRequestBodyPatternLength: 2048,
-  maxRequestBodyReplacementLength: 4096,
-  maxRequestBodyOperations: 32,
-  maxLocalOrigins: 32,
-});
 
 type JsonRecord = Record<string, unknown>;
 
@@ -231,177 +130,6 @@ function snapshotOwnData(
   } finally {
     ancestors.delete(value);
   }
-}
-
-function origin(value: unknown): string | null {
-  if (typeof value !== "string" || value.length === 0 || value.trim() !== value)
-    return null;
-  const match = /^(https?):\/\/([^/?#\\\s]+)(\/)?$/i.exec(value);
-  if (!match || match[2].includes("@")) return null;
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return null;
-  }
-  if (
-    (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
-    parsed.origin === "null" ||
-    parsed.hostname.length === 0 ||
-    parsed.username ||
-    parsed.password ||
-    parsed.hostname.includes("*") ||
-    parsed.hostname.endsWith(".") ||
-    parsed.pathname !== "/"
-  )
-    return null;
-  return parsed.origin;
-}
-
-export function normalizeSiteOrigin(value: string): string | null {
-  return origin(value);
-}
-
-export function isSiteOrigin(value: unknown): value is string {
-  return origin(value) !== null;
-}
-
-export function compileUrlRegex(value: string): RegExp | null {
-  if (
-    typeof value !== "string" ||
-    value.length === 0 ||
-    value.length > LIMITS.maxUrlRegexLength
-  )
-    return null;
-  try {
-    return new RegExp(value);
-  } catch {
-    return null;
-  }
-}
-
-export function isValidUrlRegex(value: unknown): value is string {
-  return typeof value === "string" && compileUrlRegex(value) !== null;
-}
-
-export interface RedirectDestinationIssue {
-  readonly code: string;
-  readonly message: string;
-}
-
-function skipBalancedGroup(source: string, start: number): number {
-  let depth = 0;
-  let index = start;
-  const length = source.length;
-  while (index < length) {
-    const char = source[index];
-    if (char === "\\") {
-      index += 2;
-      continue;
-    }
-    if (char === "(") {
-      depth += 1;
-    } else if (char === ")") {
-      depth -= 1;
-      if (depth === 0) return index;
-    }
-    index += 1;
-  }
-  return length;
-}
-
-function countCapturingGroups(urlRegex: string): number {
-  let count = 0;
-  let index = 0;
-  const length = urlRegex.length;
-  while (index < length) {
-    const char = urlRegex[index];
-    if (char === "\\") {
-      index += 2;
-      continue;
-    }
-    if (char === "(") {
-      if (urlRegex[index + 1] === "?") {
-        index = skipBalancedGroup(urlRegex, index);
-        continue;
-      }
-      count += 1;
-    }
-    index += 1;
-  }
-  return count;
-}
-
-export function validateRedirectDestination(
-  destination: string,
-  urlRegex: string,
-): readonly RedirectDestinationIssue[] {
-  const issues: RedirectDestinationIssue[] = [];
-  if (typeof destination !== "string" || destination.length === 0) {
-    return [
-      {
-        code: "schema.required",
-        message: "Redirect destination must be a non-empty string.",
-      },
-    ];
-  }
-  if (destination.length > LIMITS.maxRedirectDestinationLength) {
-    return [
-      {
-        code: "schema.out-of-range",
-        message: `Redirect destination must be at most ${LIMITS.maxRedirectDestinationLength} characters.`,
-      },
-    ];
-  }
-  let url: URL;
-  try {
-    url = new URL(destination);
-  } catch {
-    return [
-      {
-        code: "schema.invalid-format",
-        message: "Redirect destination must be an absolute URL.",
-      },
-    ];
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    return [
-      {
-        code: "schema.invalid-value",
-        message: "Redirect destination must use the http or https scheme.",
-      },
-    ];
-  }
-  if (url.username.length > 0 || url.password.length > 0) {
-    return [
-      {
-        code: "schema.invalid-value",
-        message: "Redirect destination must not contain credentials.",
-      },
-    ];
-  }
-  if (url.hostname.length === 0 || url.hostname.includes("*")) {
-    return [
-      {
-        code: "schema.invalid-format",
-        message: "Redirect destination must have a valid host.",
-      },
-    ];
-  }
-  const groups = countCapturingGroups(urlRegex);
-  const backreference = /\\([1-9])/g;
-  let match = backreference.exec(destination);
-  while (match !== null) {
-    const referenced = Number(match[1]);
-    if (referenced > groups) {
-      issues.push({
-        code: "schema.invalid-value",
-        message: `Redirect destination references capture group ${referenced} but the URL pattern defines ${groups}.`,
-      });
-    }
-    match = backreference.exec(destination);
-  }
-  return issues;
 }
 
 export interface ValidationIssue {
@@ -1484,7 +1212,7 @@ export function validateProjectDetailed(
             );
             continue;
           }
-          const normalized = origin(originValue);
+          const normalized = normalizeSiteOrigin(originValue);
           if (normalized === null) {
             errors.push(
               issue(

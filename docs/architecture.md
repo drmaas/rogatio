@@ -714,10 +714,11 @@ discriminant `type: "redirect"`, the redirect payload, and translates it to Chro
 - `extension/src/service-worker.ts`: `operationStatuses` maps installed redirect ops to
   `active`; actionless matchers are always `unsupported` regardless of install state.
   `projectState` hydrates cold installer memory from Chrome live ids ∩ `rogatio.matchLogging.index` ∩ compiled ops (ADR 0008), then fetches `installedRuleIds` from `installer.current()`.
-- `extension/src/browser-schema.ts`: mirrors redirect validation with local
-  `validateRedirectDestination` + `countCapturingGroups` to avoid circular alias; exports
-  `validateRedirectDestination` so the browser build's `@rogatio/schema` alias supplies it
-  to the bundled editor redirect extension.
+- `extension/src/browser-schema.ts`: re-exports `validateRedirectDestination` and
+  `countCapturingGroups` from `schema/src/browser-validation.ts` via relative imports
+  (bypassing the `@rogatio/schema` → `browser-schema` esbuild alias) so the browser
+  build's alias still supplies redirect validation to the bundled editor redirect
+  extension without forking the helpers.
 
 ### browser-core
 
