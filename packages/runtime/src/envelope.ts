@@ -37,6 +37,7 @@ const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "ai.status",
   "runtime.pick-directory",
   "runtime.check-directory",
+  "runtime.set-file-root",
 ]);
 
 export class EnvelopeError extends Error {

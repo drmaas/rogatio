@@ -46,8 +46,10 @@ function chromeApi() {
 function harness(options?: {
   readonly native?: boolean;
   readonly installThrows?: boolean;
+  readonly rejectSetFileRoot?: boolean;
 }) {
   let stored: unknown;
+  const sent: string[] = [];
   let fileErrors: readonly {
     ruleId: string;
     code: string;
@@ -68,6 +70,18 @@ function harness(options?: {
     status: vi.fn(async () => ({ state: "stopped" as const })),
     sendPolicy: vi.fn(async () => undefined),
     send: vi.fn(async (envelope: { type: string }) => {
+      sent.push(envelope.type);
+      if (
+        envelope.type === "runtime.set-file-root" &&
+        options?.rejectSetFileRoot
+      ) {
+        return {
+          protocol: "v1" as const,
+          type: envelope.type,
+          timestamp: 1,
+          metadata: { ok: false, error: "runtime.root-invalid" },
+        };
+      }
       if (envelope.type === "mock.connect") {
         return {
           protocol: "v1" as const,
@@ -119,6 +133,7 @@ function harness(options?: {
   });
   return {
     app,
+    sent,
     setFileErrors(next: typeof fileErrors) {
       fileErrors = next;
     },
@@ -209,7 +224,7 @@ describe("mock extension status", () => {
   });
 
   it("reports needs root directory for a file mock until a folder is saved", async () => {
-    const { app } = harness();
+    const { app, sent } = harness();
     const project = structuredClone(mockProject);
     const rule = project.groups[0]?.rules[0];
     if (rule?.type !== "mock") throw new Error("missing mock");
@@ -249,6 +264,7 @@ describe("mock extension status", () => {
       root: "/var/mocks",
     });
     expect(saved.ok).toBe(true);
+    expect(sent).toContain("runtime.set-file-root");
     const ready = await app.handle({ version: 1, command: "get-state" });
     expect(ready).toMatchObject({
       ok: true,
@@ -256,8 +272,48 @@ describe("mock extension status", () => {
     });
   });
 
+  it("does not save a folder the running host rejects", async () => {
+    const { app, sent } = harness({ rejectSetFileRoot: true });
+    const project = structuredClone(mockProject);
+    const rule = project.groups[0]?.rules[0];
+    if (rule?.type !== "mock") throw new Error("missing mock");
+    rule.mock = { status: 200, file: "fixture.txt" };
+    await app.handle({
+      version: 1,
+      command: "create-project",
+      data: project,
+    });
+    await app.handle({
+      version: 1,
+      command: "set-group-enabled",
+      projectId: "mock-project",
+      groupId: "group-mock",
+      enabled: true,
+    });
+    await app.handle({ version: 1, command: "start-native-runtime" });
+    const saved = await app.handle({
+      version: 1,
+      command: "set-mock-file-root",
+      projectId: "mock-project",
+      root: "/var/mocks",
+    });
+    expect(saved).toMatchObject({
+      ok: false,
+      diagnostic: {
+        code: "extension.invalid-message",
+        params: { reason: "runtime.root-invalid" },
+      },
+    });
+    expect(sent).toContain("runtime.set-file-root");
+    const state = await app.handle({ version: 1, command: "get-state" });
+    expect(state).toMatchObject({
+      ok: true,
+      value: { ruleStatuses: [{ status: "needs root directory" }] },
+    });
+  });
+
   it("reports needs runtime for a file mock once the folder is saved", async () => {
-    const { app } = harness();
+    const { app, sent } = harness();
     const project = structuredClone(mockProject);
     const rule = project.groups[0]?.rules[0];
     if (rule?.type !== "mock") throw new Error("missing mock");
@@ -280,6 +336,7 @@ describe("mock extension status", () => {
       projectId: "mock-project",
       root: "/var/mocks",
     });
+    expect(sent).not.toContain("runtime.set-file-root");
     const state = await app.handle({ version: 1, command: "get-state" });
     expect(state).toMatchObject({
       ok: true,

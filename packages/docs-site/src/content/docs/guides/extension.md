@@ -53,7 +53,7 @@ card.
 ## Rule status and badge
 
 Rules report `active`, `disabled`, `needs runtime`, `needs root directory`, `unsupported`, or `error`. Response-body rules match their URL regex in the browser and report `needs runtime` until the native runtime
-is started, then `active`. A file mock reports `needs root directory` until a mock files folder is saved, then `needs runtime` until the runtime is started, then `active`. An inline mock body does not need a folder. Request-body rules report `active` after start when the regex names one literal host (`^https://api.example.com/`, escaped dots, a slash after the host, no top-level `|`). A request-body regex that does not name one literal host stays `needs runtime`. The toolbar badge reflects the successfully installed active rules. Actionless
+is started, then `active`. A file mock reports `needs root directory` until a mock files folder is saved, then `needs runtime` until the runtime is started, then `active`. Saving or clearing that folder while the runtime is already running updates the live host; a restart is not required. An inline mock body does not need a folder. Request-body rules report `active` after start when the regex names one literal host (`^https://api.example.com/`, escaped dots, a slash after the host, no top-level `|`). A request-body regex that does not name one literal host stays `needs runtime`. The toolbar badge reflects the successfully installed active rules. Actionless
 matcher operations are reported as `unsupported` and are not installed until a later
 action slice defines their DNR action.
 

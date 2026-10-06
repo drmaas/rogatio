@@ -289,7 +289,7 @@ It is not stored in the project file.
 
 1. In **Workspace**, set the mock file root to the `samples/basic` directory
    (the folder that contains `fixture.txt`).
-2. Start the runtime (step 5).
+2. Start the runtime (step 5). Saving the folder after the runtime is already running applies immediately. A restart is not required.
 3. Visit `https://example.com/mock-file`.
 
 The page shows `rogatio file mock`. The browser does not contact example.com.

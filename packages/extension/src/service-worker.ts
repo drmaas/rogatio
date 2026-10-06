@@ -900,6 +900,35 @@ export function createExtensionApplication(
           }
         }
       }
+      if (nativePhase === "started" && options.nativeRuntime?.send) {
+        try {
+          const pushed = await options.nativeRuntime.send({
+            protocol: "v1",
+            type: "runtime.set-file-root",
+            timestamp: Date.now(),
+            metadata: {
+              path: typeof root === "string" && root !== "" ? root : null,
+            },
+          });
+          if (pushed.metadata.ok !== true) {
+            const reason =
+              typeof pushed.metadata.error === "string"
+                ? pushed.metadata.error
+                : "runtime.root-invalid";
+            return failure("extension.invalid-message", { reason });
+          }
+          if (typeof pushed.metadata.path === "string") {
+            root = pushed.metadata.path;
+          }
+        } catch (error) {
+          if (nativeHostMissingMessage(error)) {
+            return failure("extension.native-host-missing");
+          }
+          return failure("extension.invalid-message", {
+            reason: "runtime.root-invalid",
+          });
+        }
+      }
       const result = await repository.setMockFileRoot(projectId, root);
       if (!result.ok) {
         if (result.kind === "conflict") return conflict(result.current);

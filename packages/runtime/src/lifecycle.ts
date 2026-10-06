@@ -670,6 +670,49 @@ export function createNativeRuntimeController(
         };
       }
 
+      if (input.type === "runtime.set-file-root") {
+        if (state !== "running") {
+          return {
+            protocol: "v1",
+            type: "runtime.set-file-root",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: "runtime.not-started" },
+          };
+        }
+        const candidate = input.metadata.path;
+        if (candidate === undefined || candidate === null || candidate === "") {
+          fileRoot = undefined;
+          mockFileErrors.clear();
+          return {
+            protocol: "v1",
+            type: "runtime.set-file-root",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: true, cleared: true },
+          };
+        }
+        const resolved = await resolveConfinedRoot(candidate);
+        if (!resolved.ok) {
+          return {
+            protocol: "v1",
+            type: "runtime.set-file-root",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: resolved.error.code },
+          };
+        }
+        fileRoot = resolved.value;
+        mockFileErrors.clear();
+        return {
+          protocol: "v1",
+          type: "runtime.set-file-root",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: { ok: true, path: resolved.value },
+        };
+      }
+
       if (input.type === "runtime.check-directory") {
         const candidate = input.metadata.path;
         const resolved = await resolveConfinedRoot(candidate);
