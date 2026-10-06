@@ -316,7 +316,9 @@ export type EnvelopeMessageType =
   | "ai.complete"
   | "ai.stream.chunk"
   | "ai.error"
-  | "ai.status";
+  | "ai.status"
+  | "runtime.pick-directory"
+  | "runtime.check-directory";
 
 /**
  * Provider metadata reported by `ai.status` (spec REQ-001). This is a pick-type:

@@ -78,6 +78,31 @@ describe("P3b attentionFromRuleStatuses", () => {
     expect(JSON.stringify(attention)).not.toContain("Start runtime");
   });
 
+  it("explains a file mock that has no folder", () => {
+    expect(
+      attentionFromRuleStatuses({
+        attention: true,
+        statuses: [{ status: "needs root directory" }],
+      }),
+    ).toEqual({
+      blocking: "needs root directory",
+      explanation: "a file mock has no folder.",
+      fix: "Set the mock files folder under Project details.",
+    });
+  });
+
+  it("prefers start-runtime guidance when another rule still needs the host", () => {
+    expect(
+      attentionFromRuleStatuses({
+        attention: true,
+        statuses: [
+          { status: "needs root directory" },
+          { status: "needs runtime" },
+        ],
+      })?.blocking,
+    ).toBe("needs runtime: start the native runtime");
+  });
+
   it("still explains needs runtime with start guidance", () => {
     const attention = attentionFromRuleStatuses({
       attention: true,

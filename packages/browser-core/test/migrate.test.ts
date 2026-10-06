@@ -158,6 +158,18 @@ describe("migrateEnvelope", () => {
     const control = structuredClone(makeEnvelope(2)) as EnvelopeFixture & {
       projects: Record<string, ProjectFixture & { mockFileRoot?: unknown }>;
     };
+    const relative = structuredClone(makeEnvelope(2)) as EnvelopeFixture & {
+      projects: Record<string, ProjectFixture & { mockFileRoot?: unknown }>;
+    };
+    relative.projects.p1.mockFileRoot = "samples/basic";
+    const droppedRelative = migrateEnvelope(relative);
+    expect(droppedRelative.ok).toBe(true);
+    if (droppedRelative.ok) {
+      expect(droppedRelative.envelope.projects.p1).not.toHaveProperty(
+        "mockFileRoot",
+      );
+    }
+
     control.projects.p1.mockFileRoot = "/tmp/root\n";
     const controlResult = migrateEnvelope(control);
     expect(controlResult.ok).toBe(true);

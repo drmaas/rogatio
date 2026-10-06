@@ -6,7 +6,11 @@ import {
 } from "@rogatio/schema";
 import type { CoreDiagnostic } from "./diagnostics.js";
 import { coreDiagnostic } from "./diagnostics.js";
-import { migrateEnvelope, normalizeMockFileRoot } from "./migrate.js";
+import {
+  isAbsoluteMockFileRoot,
+  migrateEnvelope,
+  normalizeMockFileRoot,
+} from "./migrate.js";
 import type {
   CoreResult,
   StorageAdapter,
@@ -253,6 +257,13 @@ export class ProjectRepository {
     projectId: string,
     root: unknown,
   ): Promise<CoreResult<StoredProject>> {
+    if (
+      typeof root === "string" &&
+      root !== "" &&
+      !isAbsoluteMockFileRoot(root)
+    ) {
+      return failed([coreDiagnostic("core.invariant")]);
+    }
     const normalized = normalizeMockFileRoot(root);
     if (!normalized.ok) {
       return failed([coreDiagnostic("core.invariant")]);

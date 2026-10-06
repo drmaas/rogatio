@@ -674,6 +674,8 @@ describe("ProjectRepository", () => {
 
     const rejected = await repo.setMockFileRoot("p1", { path: "/tmp" });
     expect(rejected.ok).toBe(false);
+    const relative = await repo.setMockFileRoot("p1", "samples/basic");
+    expect(relative.ok).toBe(false);
   });
 
   it("does not default a mock file root when importing a project", async () => {

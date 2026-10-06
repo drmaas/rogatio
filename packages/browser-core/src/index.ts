@@ -3,6 +3,7 @@ export { coreDiagnostic } from "./diagnostics.js";
 export { InstallService } from "./install.js";
 export {
   createEmptyEnvelope,
+  isAbsoluteMockFileRoot,
   migrateEnvelope,
   normalizeMockFileRoot,
 } from "./migrate.js";

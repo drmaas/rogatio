@@ -19,6 +19,7 @@ export type ExtensionCommand =
   | "revoke-permission"
   | "set-group-enabled"
   | "set-mock-file-root"
+  | "pick-mock-file-root"
   | "start-native-runtime"
   | "stop-native-runtime"
   | "get-native-runtime-status"
@@ -57,6 +58,7 @@ const COMMANDS = new Set<ExtensionCommand>([
   "revoke-permission",
   "set-group-enabled",
   "set-mock-file-root",
+  "pick-mock-file-root",
   "start-native-runtime",
   "stop-native-runtime",
   "get-native-runtime-status",

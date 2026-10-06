@@ -1,6 +1,7 @@
 import {
   computeBadge,
   computeRuleStatuses,
+  isAbsoluteMockFileRoot,
   type NativeRuntimePhase,
   ProjectRepository,
   type RuleInstallerAdapter,
@@ -96,7 +97,10 @@ export interface ExtensionApplicationOptions {
     status(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
     sendPolicy(frames: Uint8Array[]): Promise<void>;
     /** Envelope protocol to the consolidated native host (spec REQ-001). */
-    send?(envelope: NativeEnvelopeInput): Promise<NativeEnvelope>;
+    send?(
+      envelope: NativeEnvelopeInput,
+      timeoutMs?: number,
+    ): Promise<NativeEnvelope>;
     /** Chrome's last connectNative error message, if any. */
     lastConnectError?(): string | null;
   };
@@ -140,6 +144,14 @@ function conflict(current: unknown): Failure {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function nativeHostMissingMessage(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return (
+    message.includes("extension.native-host-missing") ||
+    message.includes("Specified native messaging host not found")
+  );
 }
 
 const MAX_AI_PROMPT_LENGTH = 4000;
@@ -203,6 +215,7 @@ function operationStatuses(
   nativePhase: NativeRuntimePhase | "unsupported",
   dnrInstallErrors: readonly DnrInstallError[] = [],
   mockFileErrors: ReadonlyMap<string, string> = new Map(),
+  hasMockFileRoot = false,
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -307,6 +320,17 @@ function operationStatuses(
           ruleId: status.ruleId,
           status: "unsupported",
           diagnostics: [extensionDiagnostic("extension.unsupported")],
+        };
+      }
+      if (
+        typeof operation.mock.file === "string" &&
+        operation.mock.file.length > 0 &&
+        !hasMockFileRoot
+      ) {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "needs root directory",
         };
       }
       const fileCode = mockFileErrors.get(operation.ruleId);
@@ -455,6 +479,7 @@ export function createExtensionApplication(
         {
           readonly data: unknown;
           readonly enabledGroupIds: readonly string[];
+          readonly mockFileRoot?: string;
         }
       >
     >;
@@ -536,6 +561,8 @@ export function createExtensionApplication(
       nativePhase,
       dnrInstallErrors,
       mockFileErrors,
+      typeof project.mockFileRoot === "string" &&
+        project.mockFileRoot.length > 0,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),
@@ -544,6 +571,7 @@ export function createExtensionApplication(
         | "active"
         | "disabled"
         | "needs runtime"
+        | "needs root directory"
         | "unsupported"
         | "error",
     }));
@@ -837,7 +865,42 @@ export function createExtensionApplication(
       if (!projectId || !Object.hasOwn(data, "root")) {
         return failure("extension.invalid-message");
       }
-      const result = await repository.setMockFileRoot(projectId, data.root);
+      let root = data.root;
+      if (typeof root === "string" && root !== "") {
+        const trimmed = root.trim();
+        if (!isAbsoluteMockFileRoot(trimmed)) {
+          return failure("extension.invalid-message", { reason: "relative" });
+        }
+        root = trimmed;
+        const send = options.nativeRuntime?.send;
+        if (send) {
+          try {
+            const checked = await send({
+              protocol: "v1",
+              type: "runtime.check-directory",
+              timestamp: Date.now(),
+              metadata: { path: trimmed },
+            });
+            if (checked.metadata.ok !== true) {
+              const reason =
+                typeof checked.metadata.error === "string"
+                  ? checked.metadata.error
+                  : "runtime.root-invalid";
+              return failure("extension.invalid-message", { reason });
+            }
+            if (typeof checked.metadata.path === "string") {
+              root = checked.metadata.path;
+            }
+          } catch (error) {
+            if (!nativeHostMissingMessage(error)) {
+              return failure("extension.invalid-message", {
+                reason: "runtime.root-invalid",
+              });
+            }
+          }
+        }
+      }
+      const result = await repository.setMockFileRoot(projectId, root);
       if (!result.ok) {
         if (result.kind === "conflict") return conflict(result.current);
         return result.diagnostics.some(
@@ -848,6 +911,44 @@ export function createExtensionApplication(
       }
       await state();
       return { ok: true, value: result.value };
+    }
+    if (request.command === "pick-mock-file-root") {
+      const send = options.nativeRuntime?.send;
+      if (!send) return failure("extension.native-runtime-unavailable");
+      try {
+        const response = await send(
+          {
+            protocol: "v1",
+            type: "runtime.pick-directory",
+            timestamp: Date.now(),
+            metadata: {},
+          },
+          180_000,
+        );
+        if (response.metadata.ok !== true) {
+          const error =
+            typeof response.metadata.error === "string"
+              ? response.metadata.error
+              : "runtime.picker-unavailable";
+          if (error === "runtime.picker-unavailable") {
+            return failure("extension.picker-unavailable");
+          }
+          return failure("extension.invalid-message", { reason: error });
+        }
+        if (response.metadata.cancelled === true) {
+          return { ok: true, value: { cancelled: true } };
+        }
+        const path = response.metadata.path;
+        if (typeof path !== "string" || path.length === 0) {
+          return failure("extension.invalid-message");
+        }
+        return { ok: true, value: { path } };
+      } catch (error) {
+        if (nativeHostMissingMessage(error)) {
+          return failure("extension.native-host-missing");
+        }
+        return failure("extension.picker-unavailable");
+      }
     }
     if (request.command === "remove-project") {
       const projectId = stringValue(data.projectId);

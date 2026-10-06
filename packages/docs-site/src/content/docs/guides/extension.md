@@ -26,6 +26,7 @@ or rule-authoring controls.
 The management page uses a **Dashboard** overview and a **Workspace** editor shell. The
 Workspace breadcrumb is the editor's project name and group link. The group link opens a
 picker. **Refresh**, **Export project**, and **Remove project** sit on Project details.
+**Mock files** sits there too. **Choose folder** opens a system directory dialog through the runtime host, and a pasted path must be a full path to an existing folder. A relative path is rejected next to the field.
 The Active rules label sits on the Rules card. The Dashboard keeps its project cards and
 does not show this breadcrumb.
 
@@ -51,8 +52,8 @@ card.
 
 ## Rule status and badge
 
-Rules report `active`, `disabled`, `needs runtime`, `unsupported`, or `error`. Response-body rules match their URL regex in the browser and report `needs runtime` until the native runtime
-is started, then `active`. Request-body rules report `active` after start when the regex names one literal host (`^https://api.example.com/`, escaped dots, a slash after the host, no top-level `|`). A request-body regex that does not name one literal host stays `needs runtime`. The toolbar badge reflects the successfully installed active rules. Actionless
+Rules report `active`, `disabled`, `needs runtime`, `needs root directory`, `unsupported`, or `error`. Response-body rules match their URL regex in the browser and report `needs runtime` until the native runtime
+is started, then `active`. A file mock reports `needs root directory` until a mock files folder is saved, then `needs runtime` until the runtime is started, then `active`. An inline mock body does not need a folder. Request-body rules report `active` after start when the regex names one literal host (`^https://api.example.com/`, escaped dots, a slash after the host, no top-level `|`). A request-body regex that does not name one literal host stays `needs runtime`. The toolbar badge reflects the successfully installed active rules. Actionless
 matcher operations are reported as `unsupported` and are not installed until a later
 action slice defines their DNR action.
 

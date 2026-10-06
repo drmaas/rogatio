@@ -45,7 +45,10 @@ interface NativeRuntimeAdapter {
   stop(): Promise<{ state: NativeRuntimePhase | "unsupported" }>;
   status(): Promise<{ state: NativeRuntimePhase | "unsupported" }>;
   sendPolicy(frames: Uint8Array[]): Promise<void>;
-  send(envelope: NativeEnvelopeInput): Promise<NativeEnvelope>;
+  send(
+    envelope: NativeEnvelopeInput,
+    timeoutMs?: number,
+  ): Promise<NativeEnvelope>;
   lastConnectError(): string | null;
 }
 
@@ -214,7 +217,10 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
     return next;
   }
 
-  function send(envelope: NativeEnvelopeInput): Promise<NativeEnvelope> {
+  function send(
+    envelope: NativeEnvelopeInput,
+    timeoutMs = 10_000,
+  ): Promise<NativeEnvelope> {
     console.log(
       "[rogatio] send:",
       envelope.type,
@@ -249,7 +255,7 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
             ),
           );
         }
-      }, 10000);
+      }, timeoutMs);
     });
   }
 

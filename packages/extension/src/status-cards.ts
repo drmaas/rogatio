@@ -87,6 +87,9 @@ export function resolveRuntimeRecoveryText(
   runtimeError: string | null,
 ): string {
   const error = (runtimeError ?? "").toLowerCase();
+  if (error.includes("runtime.root-invalid")) {
+    return "The mock files folder must be a full path to a folder that exists. Set it under Project details.";
+  }
   if (error.includes("allowed_origins") || error.includes("origin-forbidden")) {
     return "This extension ID is not in the host manifest allowed_origins. Re-pin the host with the command below, reload Rogatio from chrome://extensions, then click Start runtime again.";
   }

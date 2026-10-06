@@ -3094,6 +3094,7 @@ class EditorControllerImpl implements EditorController {
       "/description",
       description,
     );
+    this.options.mountProjectDetails?.(fieldGrid);
     fields.append(fieldGrid);
     this.renderProjectActions(fields);
     this.form.append(fields);

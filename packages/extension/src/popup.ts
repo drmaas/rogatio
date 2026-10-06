@@ -58,6 +58,8 @@ function statusLabel(status: string): string {
       return "Disabled";
     case "needs runtime":
       return "Needs runtime";
+    case "needs root directory":
+      return "Needs root directory";
     case "unsupported":
       return "Unsupported";
     case "error":

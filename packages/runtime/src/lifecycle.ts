@@ -15,6 +15,7 @@ import {
   findSession,
   pairCapability,
 } from "./capability.js";
+import { type DirectoryPick, pickDirectory } from "./directory-picker.js";
 import { failure } from "./errors.js";
 import { resolveConfinedRoot } from "./file-root.js";
 import {
@@ -94,6 +95,11 @@ export interface NativeRuntimeControllerOptions {
    * force unchanged.
    */
   readonly aiConfigReader?: () => Promise<AIProviderConfig | null>;
+  /**
+   * Opens the system folder dialog. Tests inject this so a host envelope
+   * never waits on a real dialog.
+   */
+  readonly directoryPicker?: () => Promise<DirectoryPick>;
 }
 
 export interface RuntimeStartResult {
@@ -158,6 +164,7 @@ export function createNativeRuntimeController(
   let preset: NormalizedRuntimePreset | undefined = options.preset;
   let fileRoot = options.fileRoot;
   const clock = options.clock ?? (() => Date.now());
+  const directoryPicker = options.directoryPicker ?? pickDirectory;
   const mockFileErrors = new Map<string, string>();
 
   let state: NativeRuntimeState = "idle";
@@ -628,6 +635,52 @@ export function createNativeRuntimeController(
           ...(requestId !== undefined ? { requestId } : {}),
           timestamp,
           metadata: { ok: true, state: "stopped" },
+        };
+      }
+
+      if (input.type === "runtime.pick-directory") {
+        const picked = await directoryPicker();
+        if (!picked.ok) {
+          return {
+            protocol: "v1",
+            type: "runtime.pick-directory",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: picked.code },
+          };
+        }
+        if (picked.path === null) {
+          return {
+            protocol: "v1",
+            type: "runtime.pick-directory",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: true, cancelled: true },
+          };
+        }
+        const resolved = await resolveConfinedRoot(picked.path);
+        return {
+          protocol: "v1",
+          type: "runtime.pick-directory",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: resolved.ok
+            ? { ok: true, path: resolved.value }
+            : { ok: false, error: resolved.error.code },
+        };
+      }
+
+      if (input.type === "runtime.check-directory") {
+        const candidate = input.metadata.path;
+        const resolved = await resolveConfinedRoot(candidate);
+        return {
+          protocol: "v1",
+          type: "runtime.check-directory",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: resolved.ok
+            ? { ok: true, path: resolved.value }
+            : { ok: false, error: resolved.error.code },
         };
       }
 

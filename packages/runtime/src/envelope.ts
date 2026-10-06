@@ -35,6 +35,8 @@ const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "ai.stream.chunk",
   "ai.error",
   "ai.status",
+  "runtime.pick-directory",
+  "runtime.check-directory",
 ]);
 
 export class EnvelopeError extends Error {

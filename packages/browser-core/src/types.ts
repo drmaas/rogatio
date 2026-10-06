@@ -67,6 +67,7 @@ export type RuleStatusKind =
   | "active"
   | "disabled"
   | "needs runtime"
+  | "needs root directory"
   | "unsupported"
   | "error";
 

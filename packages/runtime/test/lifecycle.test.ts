@@ -49,6 +49,38 @@ describe("createNativeRuntimeController", () => {
     expect(second.state).toBe("running");
   });
 
+  it("picks a mock folder before the runtime is started", async () => {
+    const controller = createNativeRuntimeController({
+      preset: buildPreset(),
+      directoryPicker: async () => ({
+        ok: true,
+        path: "/tmp/rogatio-missing-mock-folder",
+      }),
+    });
+    const response = await controller.handleEnvelope({
+      type: "runtime.pick-directory",
+      metadata: {},
+    });
+    expect(response.metadata).toMatchObject({
+      ok: false,
+      error: "runtime.root-invalid",
+    });
+    expect(controller.status().state).toBe("idle");
+  });
+
+  it("reports a cancelled folder dialog without starting", async () => {
+    const controller = createNativeRuntimeController({
+      preset: buildPreset(),
+      directoryPicker: async () => ({ ok: true, path: null }),
+    });
+    const response = await controller.handleEnvelope({
+      type: "runtime.pick-directory",
+      metadata: {},
+    });
+    expect(response.metadata).toEqual({ ok: true, cancelled: true });
+    expect(controller.status().state).toBe("idle");
+  });
+
   it("rejects envelopes before start", async () => {
     const controller = createNativeRuntimeController({ preset: buildPreset() });
     await expect(
