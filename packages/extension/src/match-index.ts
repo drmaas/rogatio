@@ -1,4 +1,4 @@
-import type { RogatioOperation } from "@rogatio/compiler";
+import type { MockOperation, RogatioOperation } from "@rogatio/compiler";
 import type { ChromeApi } from "./chrome.js";
 import {
   sanitizeBodyRewriteForLog,
@@ -7,6 +7,11 @@ import {
   sanitizeQueryTransformValue,
   truncateLogString,
 } from "./match-log-redaction.js";
+import {
+  isMockRedirectId,
+  MOCK_GUARD_ID,
+  MOCK_REDIRECT_ID_MIN,
+} from "./mock-redirect-ids.js";
 import {
   type BodyMarkerOperation,
   bodyMarkerIdForIndex,
@@ -42,11 +47,20 @@ export interface BodyIntent {
   readonly rewrite: string;
 }
 
+/**
+ * Intended mock source from rule config. File mocks store the logical path
+ * only (never the absolute mock folder). Inline mocks never store body bytes.
+ */
+export type MockIntent =
+  | { readonly source: "file"; readonly file: string }
+  | { readonly source: "inline" };
+
 export type MatchIndexIntent =
   | RedirectIntent
   | QueryIntent
   | HeaderIntent
-  | BodyIntent;
+  | BodyIntent
+  | MockIntent;
 
 export interface MatchIndexEntry {
   readonly ruleId: string;
@@ -56,7 +70,8 @@ export interface MatchIndexEntry {
     | "query"
     | "header"
     | "request-body"
-    | "response-body";
+    | "response-body"
+    | "mock";
   readonly redactSensitiveInLogs: boolean;
   readonly intent: MatchIndexIntent;
 }
@@ -97,6 +112,21 @@ function isBodyIntent(intent: MatchIndexIntent): intent is BodyIntent {
   return intentHasOwnString(intent, "mode");
 }
 
+function isMockIntent(intent: MatchIndexIntent): intent is MockIntent {
+  const source = (intent as { source?: unknown }).source;
+  if (source === "inline") return true;
+  if (source !== "file") return false;
+  return intentHasOwnString(intent, "file");
+}
+
+function mockIntentFromOperation(operation: MockOperation): MockIntent {
+  const file = operation.mock.file;
+  if (typeof file === "string") {
+    return { source: "file", file };
+  }
+  return { source: "inline" };
+}
+
 function bodyRewriteFromIntent(intent: BodyIntent): string {
   if (!Object.hasOwn(intent, "rewrite")) return "";
   const rewrite = (intent as { rewrite?: unknown }).rewrite;
@@ -110,7 +140,8 @@ function boundStoredKind(kind: string): MatchIndexEntry["kind"] {
     truncated === "query" ||
     truncated === "header" ||
     truncated === "request-body" ||
-    truncated === "response-body"
+    truncated === "response-body" ||
+    truncated === "mock"
   ) {
     return truncated;
   }
@@ -242,6 +273,12 @@ function sanitizeIntentByShape(
       ),
     };
   }
+  if (isMockIntent(intent)) {
+    if (intent.source === "file") {
+      return { source: "file", file: truncateLogString(intent.file) };
+    }
+    return { source: "inline" };
+  }
   if (intent === null || typeof intent !== "object" || Array.isArray(intent)) {
     return intent;
   }
@@ -326,6 +363,15 @@ function rawEntryFromOperation(
       },
     };
   }
+  if (operation.kind === "mock") {
+    return {
+      ruleId: operation.ruleId,
+      name: operation.name,
+      kind: "mock",
+      redactSensitiveInLogs,
+      intent: mockIntentFromOperation(operation),
+    };
+  }
   return undefined;
 }
 
@@ -387,6 +433,18 @@ export function sanitizeMatchIndexEntry(
           redactSensitiveInLogs,
         ),
       },
+    };
+  }
+  if (entry.kind === "mock" && isMockIntent(entry.intent)) {
+    return {
+      ruleId,
+      name,
+      kind,
+      redactSensitiveInLogs,
+      intent:
+        entry.intent.source === "file"
+          ? { source: "file", file: truncateLogString(entry.intent.file) }
+          : { source: "inline" },
     };
   }
   return {
@@ -498,6 +556,64 @@ export function bodyMarkerEntriesFromSnapshot(
   return body;
 }
 
+/**
+ * Merge mock-redirect install ids into the durable match index (lockstep with
+ * session install order: `MOCK_REDIRECT_ID_MIN + i`). Never indexes the allow
+ * guard at `MOCK_GUARD_ID`.
+ */
+export async function mergeMockRedirectIndexEntries(
+  api: ChromeApi,
+  operations: readonly MockOperation[],
+): Promise<void> {
+  await withMatchIndexWriteLock(async () => {
+    const current = await readMatchIndexSnapshot(api);
+    const next: MatchIndexSnapshot = { ...current };
+    for (const [key] of Object.entries(next)) {
+      const numeric = Number(key);
+      if (isMockRedirectId(numeric)) delete next[key];
+    }
+    for (let index = 0; index < operations.length; index += 1) {
+      const operation = operations[index];
+      const entry = rawEntryFromOperation(operation);
+      if (entry === undefined) continue;
+      const ruleId = MOCK_REDIRECT_ID_MIN + index;
+      if (ruleId === MOCK_GUARD_ID) continue;
+      next[String(ruleId)] = entry;
+    }
+    await writeMatchIndex(api, next);
+  });
+}
+
+/** Drop all mock-redirect band ids from the match index (session stop / failure). */
+export async function dropMockRedirectBandFromMatchIndex(
+  api: ChromeApi,
+): Promise<void> {
+  await withMatchIndexWriteLock(async () => {
+    const current = await readMatchIndexSnapshot(api);
+    const next: MatchIndexSnapshot = {};
+    for (const [key, entry] of Object.entries(current)) {
+      const numeric = Number(key);
+      if (isMockRedirectId(numeric)) continue;
+      next[key] = entry;
+    }
+    await writeMatchIndex(api, next);
+  });
+}
+
+/** Mock-redirect band slice of a snapshot (for wholesale DNR index preserve). */
+export function mockRedirectEntriesFromSnapshot(
+  snapshot: MatchIndexSnapshot,
+): MatchIndexSnapshot {
+  const mock: MatchIndexSnapshot = {};
+  for (const [key, entry] of Object.entries(snapshot)) {
+    const numeric = Number(key);
+    if (!isMockRedirectId(numeric) || numeric === MOCK_GUARD_ID) continue;
+    if (entry.kind !== "mock") continue;
+    mock[key] = entry;
+  }
+  return mock;
+}
+
 // Inherited members of a tampered stored object are not data.
 function own(raw: Record<string, unknown>, key: string): unknown {
   return Object.hasOwn(raw, key) ? raw[key] : undefined;
@@ -575,6 +691,15 @@ function parseBodyIntent(raw: Record<string, unknown>): BodyIntent | undefined {
   };
 }
 
+function parseMockIntent(raw: Record<string, unknown>): MockIntent | undefined {
+  const source = own(raw, "source");
+  if (source === "inline") return { source: "inline" };
+  if (source !== "file") return undefined;
+  const file = own(raw, "file");
+  if (typeof file !== "string") return undefined;
+  return { source: "file", file };
+}
+
 function parseStoredEntry(raw: unknown): MatchIndexEntry | undefined {
   const entry = ownRecord(raw);
   if (entry === undefined) return undefined;
@@ -589,7 +714,8 @@ function parseStoredEntry(raw: unknown): MatchIndexEntry | undefined {
     kind !== "query" &&
     kind !== "header" &&
     kind !== "request-body" &&
-    kind !== "response-body"
+    kind !== "response-body" &&
+    kind !== "mock"
   ) {
     return undefined;
   }
@@ -600,6 +726,7 @@ function parseStoredEntry(raw: unknown): MatchIndexEntry | undefined {
   if (kind === "redirect") intent = parseRedirectIntent(intentRaw);
   else if (kind === "query") intent = parseQueryIntent(intentRaw);
   else if (kind === "header") intent = parseHeaderIntent(intentRaw);
+  else if (kind === "mock") intent = parseMockIntent(intentRaw);
   else intent = parseBodyIntent(intentRaw);
   if (intent === undefined) return undefined;
   return { ruleId, name, kind, redactSensitiveInLogs, intent };

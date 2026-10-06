@@ -1,5 +1,6 @@
 import type {
   HeaderOperation,
+  MockOperation,
   QueryOperation,
   RedirectOperation,
   RequestBodyOperation,
@@ -11,9 +12,13 @@ import { createDnrInstaller } from "../src/dnr.js";
 import {
   type BodyIntent,
   buildInstallIndexSnapshot,
+  dropMockRedirectBandFromMatchIndex,
   type HeaderIntent,
   lookupMatchIndexEntry,
   MATCH_LOGGING_INDEX_KEY,
+  type MockIntent,
+  mergeMockRedirectIndexEntries,
+  mockRedirectEntriesFromSnapshot,
   type QueryIntent,
   type QueryIntentParam,
   sanitizeMatchIndexEntry,
@@ -23,6 +28,10 @@ import {
   LOG_STRING_MAX,
   truncateLogString,
 } from "../src/match-log-redaction.js";
+import {
+  MOCK_GUARD_ID,
+  MOCK_REDIRECT_ID_MIN,
+} from "../src/mock-redirect-ids.js";
 import { bodyMarkerIdForIndex } from "../src/session-body-markers.js";
 
 function storageApi(initial: Record<string, unknown> = {}): {
@@ -1032,5 +1041,113 @@ describe("match index", () => {
     expect(
       Object.values(index).some((entry) => entry.kind === "redirect"),
     ).toBe(true);
+  });
+
+  it("indexes file and inline mocks under redirect ids and never the allow guard", async () => {
+    const fileOp: MockOperation = {
+      kind: "mock",
+      groupId: "g1",
+      ruleId: "rule-mock-file",
+      name: "Serve a local file",
+      redactSensitiveInLogs: false,
+      matcher: {
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/mock-file$",
+        },
+        resourceTypes: ["main_frame"],
+        priority: 700,
+      },
+      mock: { status: 200, file: "fixture.txt" },
+    };
+    const inlineOp: MockOperation = {
+      kind: "mock",
+      groupId: "g1",
+      ruleId: "rule-mock-inline",
+      name: "Inline mock",
+      redactSensitiveInLogs: true,
+      matcher: {
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/mock-inline$",
+        },
+        resourceTypes: ["xmlhttprequest"],
+        priority: 710,
+      },
+      mock: { status: 200, body: "hello-bytes-must-not-store" },
+    };
+
+    const { api, store } = storageApi({
+      [MATCH_LOGGING_INDEX_KEY]: {
+        "100": {
+          ruleId: "r1",
+          name: "r1",
+          kind: "redirect",
+          redactSensitiveInLogs: false,
+          intent: { destination: "https://other.example/" },
+        },
+      },
+    });
+
+    await mergeMockRedirectIndexEntries(api, [fileOp, inlineOp]);
+
+    const stored = store[MATCH_LOGGING_INDEX_KEY] as Record<
+      string,
+      { kind: string; intent: MockIntent }
+    >;
+    expect(stored["100"]).toBeDefined();
+    expect(stored[String(MOCK_REDIRECT_ID_MIN)]).toMatchObject({
+      kind: "mock",
+      ruleId: "rule-mock-file",
+      intent: { source: "file", file: "fixture.txt" },
+    });
+    expect(stored[String(MOCK_REDIRECT_ID_MIN + 1)]).toMatchObject({
+      kind: "mock",
+      ruleId: "rule-mock-inline",
+      intent: { source: "inline" },
+    });
+    expect(JSON.stringify(stored)).not.toContain("hello-bytes-must-not-store");
+    expect(stored[String(MOCK_GUARD_ID)]).toBeUndefined();
+    expect(await lookupMatchIndexEntry(api, MOCK_GUARD_ID)).toBeUndefined();
+
+    await dropMockRedirectBandFromMatchIndex(api);
+    const afterDrop = store[MATCH_LOGGING_INDEX_KEY] as Record<string, unknown>;
+    expect(afterDrop[String(MOCK_REDIRECT_ID_MIN)]).toBeUndefined();
+    expect(afterDrop[String(MOCK_REDIRECT_ID_MIN + 1)]).toBeUndefined();
+    expect(afterDrop["100"]).toBeDefined();
+  });
+
+  it("preserves mock-redirect index entries across wholesale DNR install", async () => {
+    const mockEntry = {
+      ruleId: "rule-mock-file",
+      name: "Serve a local file",
+      kind: "mock" as const,
+      redactSensitiveInLogs: false,
+      intent: { source: "file" as const, file: "fixture.txt" },
+    };
+    const prior = {
+      [String(MOCK_REDIRECT_ID_MIN)]: mockEntry,
+      [String(MOCK_GUARD_ID)]: mockEntry,
+    };
+    expect(mockRedirectEntriesFromSnapshot(prior)).toEqual({
+      [String(MOCK_REDIRECT_ID_MIN)]: mockEntry,
+    });
+
+    const { api, store } = storageApi({
+      [MATCH_LOGGING_INDEX_KEY]: prior,
+    });
+    const installer = createDnrInstaller(
+      dnrApi(
+        api.storage,
+        vi.fn(async () => {}),
+      ),
+    );
+    expect(await installer.install([redirectOp])).toEqual({ ok: true });
+
+    const index = store[MATCH_LOGGING_INDEX_KEY] as Record<string, unknown>;
+    expect(index[String(MOCK_REDIRECT_ID_MIN)]).toMatchObject(mockEntry);
+    expect(index[String(MOCK_GUARD_ID)]).toBeUndefined();
   });
 });

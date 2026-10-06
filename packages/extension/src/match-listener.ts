@@ -9,6 +9,7 @@ import {
   MATCH_LOGGING_ENABLED_KEY,
   readMatchLoggingEnabled,
 } from "./match-logging-enabled.js";
+import { MOCK_GUARD_ID } from "./mock-redirect-ids.js";
 
 export { MATCH_LOGGING_ENABLED_KEY };
 
@@ -153,6 +154,9 @@ export async function handleRuleMatchedDebug(
 
     const tabId = request.tabId;
     if (typeof tabId !== "number" || tabId === -1) return;
+
+    // Allow-guard session rule is not a user mock; never emit a match line.
+    if (info.rule.ruleId === MOCK_GUARD_ID) return;
 
     const entry = await lookupMatchIndexEntry(api, info.rule.ruleId);
     if (entry === undefined) return;

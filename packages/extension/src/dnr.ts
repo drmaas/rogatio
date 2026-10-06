@@ -17,6 +17,7 @@ import {
   bodyMarkerEntriesFromSnapshot,
   buildInstallIndexSnapshot,
   type MatchIndexSnapshot,
+  mockRedirectEntriesFromSnapshot,
   readMatchIndexSnapshot,
   withMatchIndexWriteLock,
   writeMatchIndex,
@@ -208,6 +209,7 @@ export function createDnrInstaller(api: ChromeApi): DnrInstallerWithMatchIndex {
         ...buildInstallIndexSnapshot(redirectQueryEntries),
         ...buildInstallIndexSnapshot(trackedHeaderEntries),
         ...bodyMarkerEntriesFromSnapshot(prior),
+        ...mockRedirectEntriesFromSnapshot(prior),
       };
       try {
         await writeMatchIndex(api, snapshot);
