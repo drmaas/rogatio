@@ -8,12 +8,17 @@ import { projectSourceCondition } from "./source-projection.js";
  * body markers start at 3_000_001. This band is session-store only.
  */
 export const RESPONSE_BODY_REDIRECT_ID_MIN = 4_000_001;
+export const RESPONSE_BODY_REDIRECT_ID_MAX = 5_000_000;
 
 /** Keep in sync with the runtime listener prefix. */
 export const RESPONSE_BODY_LISTENER_PREFIX = "/.rogatio/body/";
 
 export function isResponseBodyRedirectId(id: number): boolean {
-  return Number.isInteger(id) && id >= RESPONSE_BODY_REDIRECT_ID_MIN;
+  return (
+    Number.isInteger(id) &&
+    id >= RESPONSE_BODY_REDIRECT_ID_MIN &&
+    id <= RESPONSE_BODY_REDIRECT_ID_MAX
+  );
 }
 
 export function responseBodyRedirectSubstitution(

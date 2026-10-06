@@ -1,13 +1,16 @@
-import type { FileHandle } from "node:fs/promises";
 import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { normalizeLogicalPath } from "./path.js";
-import { isConfinedFileSupported, openConfinedFile } from "./platform-file.js";
+import {
+  type ConfinedHandle,
+  isConfinedFileSupported,
+  openConfinedFile,
+} from "./platform-file.js";
 import type { AuthorizedOperation, RuntimeResult } from "./types.js";
 
 export { isConfinedFileSupported } from "./platform-file.js";
 
-async function closeQuietly(file: FileHandle): Promise<void> {
+async function closeQuietly(file: ConfinedHandle): Promise<void> {
   try {
     await file.close();
   } catch {
@@ -15,20 +18,10 @@ async function closeQuietly(file: FileHandle): Promise<void> {
   }
 }
 
-export async function readConfinedFile(
-  operation: AuthorizedOperation,
-  root: string,
+async function readOpenedConfinedFile(
+  file: ConfinedHandle,
   signal?: AbortSignal,
 ): Promise<RuntimeResult<Uint8Array>> {
-  if (operation.kind !== "confined-file") return failure("runtime.file-denied");
-  if (!isConfinedFileSupported())
-    return failure("runtime.platform-unsupported");
-  const logicalPath = normalizeLogicalPath(operation.target);
-  if (logicalPath === null) return failure("runtime.file-denied");
-  const opened = await openConfinedFile(root, logicalPath);
-  if (!opened.ok) return opened;
-
-  const file = opened.value;
   try {
     const chunks: Uint8Array[] = [];
     let total = 0;
@@ -49,8 +42,9 @@ export async function readConfinedFile(
     const finalStat = await file.stat();
     if (
       !finalStat.isFile() ||
-      finalStat.nlink > 1 ||
-      finalStat.size > RUNTIME_LIMITS.maxFileBytes
+      finalStat.nlink !== 1 ||
+      finalStat.size > RUNTIME_LIMITS.maxFileBytes ||
+      finalStat.size !== total
     ) {
       return failure(
         finalStat.size > RUNTIME_LIMITS.maxFileBytes
@@ -69,7 +63,37 @@ export async function readConfinedFile(
     return signal?.aborted
       ? failure("runtime.timeout")
       : failure("runtime.file-denied");
+  }
+}
+
+/** Read a normalized logical path under root using the shared confined reader. */
+export async function readConfinedPathBytes(
+  root: string,
+  logicalPath: string,
+  signal?: AbortSignal,
+): Promise<RuntimeResult<Uint8Array>> {
+  const normalized = normalizeLogicalPath(logicalPath);
+  if (normalized === null) return failure("runtime.file-denied");
+  if (!isConfinedFileSupported())
+    return failure("runtime.platform-unsupported");
+  if (signal?.aborted) return failure("runtime.timeout");
+
+  const opened = await openConfinedFile(root, normalized);
+  if (!opened.ok) return opened;
+
+  const file = opened.value;
+  try {
+    return await readOpenedConfinedFile(file, signal);
   } finally {
     await closeQuietly(file);
   }
+}
+
+export async function readConfinedFile(
+  operation: AuthorizedOperation,
+  root: string,
+  signal?: AbortSignal,
+): Promise<RuntimeResult<Uint8Array>> {
+  if (operation.kind !== "confined-file") return failure("runtime.file-denied");
+  return readConfinedPathBytes(root, operation.target, signal);
 }

@@ -3,3 +3,7 @@ packages:
 
 allowBuilds:
   esbuild: true
+  # The prebuilt binding is the optional package @koromix/koffi-<platform>-<arch>.
+  # koffi's own install script is a source build. Do not run it. If the prebuild
+  # is missing, macOS file reads fail closed.
+  koffi: false

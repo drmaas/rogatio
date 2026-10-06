@@ -60,8 +60,9 @@ Trust lifecycle and native-host entry (see [Local runtime](/guides/runtime/)):
   local unpacked build without the release key) and for forks.
 - `rogatio runtime host [path]` — run the consolidated native-messaging host for a project
   on stdio (normally launched by the browser extension; run manually only for debugging).
-  Accepts `--root <dir>` to override the confined file root and `--mock-port <n>` to bind
-  the loopback mock-response faucet.
+  Accepts `--root <dir>` to override the confined mock file root. When omitted, a saved
+  device-local root for that project file is used, otherwise the project directory. A
+  stdin project that contains a file mock requires `--root`.
 
 Start/stop of the runtime session itself is driven from the extension's **Start runtime** /
 **Stop runtime** controls; the CLI does not have a session lifecycle subcommand.

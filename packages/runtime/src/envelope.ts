@@ -6,10 +6,13 @@ import {
   PROTOCOL,
 } from "./types.js";
 
-const FORBIDDEN_BODY_KEYS = new Set(["body", "requestBody", "responseBody"]);
+const FORBIDDEN_BODY_KEYS = new Set([
+  "body",
+  "requestBody",
+  "responseBody",
+  "mockBody",
+]);
 
-const MOCK_BODY_KEY = "mockBody";
-const MOCK_BODY_ALLOWED_TYPES = new Set(["mock.response"]);
 const BODY_CHECK_EXEMPT_TYPES = new Set(["runtime.project.set"]);
 
 const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
@@ -28,12 +31,13 @@ const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "authorize.request",
   "authorize.response",
   "mock.connect",
-  "mock.request",
-  "mock.response",
   "ai.complete",
   "ai.stream.chunk",
   "ai.error",
   "ai.status",
+  "runtime.pick-directory",
+  "runtime.check-directory",
+  "runtime.set-file-root",
 ]);
 
 export class EnvelopeError extends Error {
@@ -63,9 +67,8 @@ export function containsBodyKey(value: unknown): boolean {
 }
 
 /**
- * Body confidentiality (spec REQ-006): request/response body keys are forbidden
- * on every envelope; the base64 `mockBody` field is permitted only on the
- * `mock.response` envelope.
+ * Body confidentiality: request, response, and rendered mock bodies never
+ * cross an envelope. Authored project config may, on `runtime.project.set`.
  */
 function assertNoBodyContent(
   type: string,
@@ -75,11 +78,6 @@ function assertNoBodyContent(
   if (containsBodyKey(metadata)) {
     throw new EnvelopeError(
       "envelope must not carry request or response body content",
-    );
-  }
-  if (MOCK_BODY_KEY in metadata && !MOCK_BODY_ALLOWED_TYPES.has(type)) {
-    throw new EnvelopeError(
-      "mockBody is only permitted on the mock.response envelope",
     );
   }
 }

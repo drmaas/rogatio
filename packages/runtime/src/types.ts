@@ -161,6 +161,9 @@ export type RuntimeErrorCode =
   | "runtime.address-denied"
   | "runtime.dns-failed"
   | "runtime.redirect-rejected"
+  | "runtime.project-stage-invalid"
+  | "runtime.root-invalid"
+  | "runtime.groups-invalid"
   | "runtime.file-denied"
   | "runtime.file-race-rejected"
   | "runtime.platform-unsupported"
@@ -310,12 +313,13 @@ export type EnvelopeMessageType =
   | "authorize.request"
   | "authorize.response"
   | "mock.connect"
-  | "mock.request"
-  | "mock.response"
   | "ai.complete"
   | "ai.stream.chunk"
   | "ai.error"
-  | "ai.status";
+  | "ai.status"
+  | "runtime.pick-directory"
+  | "runtime.check-directory"
+  | "runtime.set-file-root";
 
 /**
  * Provider metadata reported by `ai.status` (spec REQ-001). This is a pick-type:
@@ -373,21 +377,7 @@ export interface MockConnectResponse {
     readonly ruleId: string;
     readonly token: string;
   }[];
-  /** Loopback faucet port the browser redirects mock requests to (spec REQ-003). */
-  readonly port?: number;
   readonly error?: string;
-  readonly [key: string]: unknown;
-}
-
-export interface MockRequest {
-  readonly token: string;
-  readonly method?: string;
-}
-
-export interface MockResponse {
-  readonly status: number;
-  readonly headers?: readonly (readonly [string, string])[];
-  readonly mockBody: string;
   readonly [key: string]: unknown;
 }
 

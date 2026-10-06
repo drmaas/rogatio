@@ -26,7 +26,12 @@ export type ExtensionDiagnosticCode =
   | "extension.ai-assist-failed"
   | "extension.ai-invalid-proposal"
   | "extension.ai-request-too-large"
-  | "extension.project-invalid";
+  | "extension.project-invalid"
+  | "extension.mock-file-denied"
+  | "extension.mock-file-race"
+  | "extension.mock-size-limit"
+  | "extension.mock-platform-unsupported"
+  | "extension.picker-unavailable";
 
 export interface ExtensionDiagnostic {
   readonly code: ExtensionDiagnosticCode;
@@ -83,6 +88,13 @@ const MESSAGES: Record<ExtensionDiagnosticCode, string> = {
   "extension.ai-request-too-large":
     "AI Assist request is too large for the native messaging envelope.",
   "extension.project-invalid": "The project could not be tested.",
+  "extension.mock-file-denied": "The mock file could not be read.",
+  "extension.mock-file-race": "The mock file changed while it was being read.",
+  "extension.mock-size-limit": "The mock file is larger than the allowed size.",
+  "extension.mock-platform-unsupported":
+    "This platform cannot prove the mock file stays inside its root.",
+  "extension.picker-unavailable":
+    "This computer has no folder dialog. Paste a full path instead.",
 };
 
 export function extensionDiagnostic(

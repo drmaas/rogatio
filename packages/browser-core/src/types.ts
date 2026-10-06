@@ -12,6 +12,8 @@ export interface StoredProject {
   readonly createdAt: number;
   readonly updatedAt: number;
   readonly enabledGroupIds: readonly string[];
+  /** Device-local mock file root. Absent from exported project data. */
+  readonly mockFileRoot?: string;
 }
 
 export interface StoredEnvelope {
@@ -65,6 +67,7 @@ export type RuleStatusKind =
   | "active"
   | "disabled"
   | "needs runtime"
+  | "needs root directory"
   | "unsupported"
   | "error";
 

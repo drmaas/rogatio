@@ -91,7 +91,7 @@ const targets: BuildTarget[] = [
     output: "packages/runtime/dist/node/index.js",
     platform: "node",
     target: "node24",
-    external: ["@rogatio/schema", "@rogatio/compiler"],
+    external: ["@rogatio/schema", "@rogatio/compiler", "koffi"],
   },
   {
     entry: "packages/requestly-import/src/index.ts",
@@ -105,7 +105,7 @@ const targets: BuildTarget[] = [
     output: "packages/cli/dist/node/index.js",
     platform: "node",
     target: "node24",
-    external: ["ajv"],
+    external: ["ajv", "koffi"],
     alias: {
       "@rogatio/schema": resolve(root, "packages/schema/dist/node/index.js"),
       "@rogatio/compiler": resolve(

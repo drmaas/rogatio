@@ -12,6 +12,7 @@ export interface AttentionExplanation {
 const ATTENTION_PRECEDENCE: readonly string[] = [
   "error",
   "needs runtime",
+  "needs root directory",
   "unsupported",
 ];
 
@@ -47,6 +48,13 @@ export function attentionFromRuleStatuses(input: {
         blocking: "needs runtime: start the native runtime",
         explanation: "some rules need the native runtime.",
         fix: "Click 'Start runtime'.",
+      };
+    }
+    if (blocking === "needs root directory") {
+      return {
+        blocking: "needs root directory",
+        explanation: "a file mock has no folder.",
+        fix: "Set the mock files folder under Project details.",
       };
     }
     return {

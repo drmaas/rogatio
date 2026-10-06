@@ -376,6 +376,35 @@
   font-weight: 600;
   font-size: 0.8125rem;
 }
+.rogatio-editor [data-mock-file-root] {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.rogatio-editor [data-mock-file-root] > span {
+  font-weight: 600;
+}
+.rogatio-editor [data-mock-file-root-hint] {
+  color: var(--rogatio-muted);
+  font-size: 0.8125rem;
+}
+.rogatio-editor [data-mock-file-root-value] {
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.8125rem;
+}
+.rogatio-editor [data-mock-file-root] p {
+  margin: 0;
+}
+.rogatio-editor [data-mock-file-root-actions] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.rogatio-editor [data-mock-file-root-error] {
+  color: var(--rogatio-danger);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
 .rogatio-editor [data-editor-origin-row] {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

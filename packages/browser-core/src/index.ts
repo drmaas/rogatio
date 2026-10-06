@@ -1,7 +1,12 @@
 export type { CoreDiagnostic, CoreDiagnosticCode } from "./diagnostics.js";
 export { coreDiagnostic } from "./diagnostics.js";
 export { InstallService } from "./install.js";
-export { createEmptyEnvelope, migrateEnvelope } from "./migrate.js";
+export {
+  createEmptyEnvelope,
+  isAbsoluteMockFileRoot,
+  migrateEnvelope,
+  normalizeMockFileRoot,
+} from "./migrate.js";
 export type { RepositoryOptions } from "./repository.js";
 export { MAX_PROJECTS, ProjectRepository } from "./repository.js";
 export {

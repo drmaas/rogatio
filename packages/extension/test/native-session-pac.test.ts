@@ -96,4 +96,98 @@ describe("startNativeSession pacRoutes", () => {
     expect(result.ok).toBe(true);
     expect(start).toHaveBeenCalledOnce();
   });
+
+  it("starts the listener for an enabled mock and installs one redirect plus the guard", async () => {
+    const added: Array<{ id: number; action?: { type: string } }> = [];
+    const start = vi.fn(
+      async (config: {
+        contentListener: boolean;
+        pacRoutes: readonly string[];
+      }) => {
+        expect(config.contentListener).toBe(true);
+        expect(config.pacRoutes).toEqual([]);
+        return {
+          state: "started" as const,
+          proxy: { host: "127.0.0.1", port: 9 },
+        };
+      },
+    );
+    const result = await startNativeSession({
+      extensionId: "ext",
+      nativeRuntime: {
+        start,
+        stop: async () => ({ state: "stopped" }),
+        status: async () => ({ state: "stopped" }),
+        sendPolicy: async () => undefined,
+        send: async (envelope) => {
+          if (envelope.type === "mock.connect") {
+            return {
+              protocol: "v1",
+              type: "mock.connect",
+              timestamp: Date.now(),
+              metadata: { mocks: [{ ruleId: "rule-mock", token: "abc" }] },
+            };
+          }
+          return {
+            protocol: "v1",
+            type: envelope.type,
+            timestamp: Date.now(),
+            metadata: { ok: true, presetDigest: "sha256:abc" },
+          };
+        },
+      },
+      getProject: async () => ({
+        data: {
+          version: 2,
+          name: "Mocks",
+          groups: [
+            {
+              id: "g1",
+              name: "G",
+              rules: [
+                {
+                  id: "rule-mock",
+                  name: "Mock",
+                  source: {
+                    key: "url",
+                    operator: "regex",
+                    value: "^https://example\\.com/",
+                  },
+                  resourceTypes: ["main_frame"],
+                  priority: 1,
+                  type: "mock",
+                  mock: { status: 200, body: "" },
+                },
+              ],
+            },
+          ],
+        },
+        enabledGroupIds: ["g1"],
+      }),
+      bodyMarkers: {
+        api: {
+          storage: {
+            local: {
+              get: async () => ({}),
+              set: async () => undefined,
+            },
+          },
+          declarativeNetRequest: {
+            getSessionRules: async () => [],
+            updateSessionRules: async (payload: {
+              addRules?: Array<{ id: number; action?: { type: string } }>;
+            }) => {
+              added.push(...(payload.addRules ?? []));
+            },
+          },
+        } as never,
+        runtimeStripPathAvailable: false,
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(added.map((rule) => rule.action?.type).sort()).toEqual([
+      "allow",
+      "redirect",
+    ]);
+  });
 });

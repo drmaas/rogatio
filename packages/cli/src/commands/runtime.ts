@@ -1,12 +1,13 @@
 import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import type { MatcherOperation, RogatioOperation } from "@rogatio/compiler";
 import { compileProject } from "@rogatio/compiler";
 import {
   createRequestBodyTrustController,
   defaultTrustInstallRoot,
   describeExtensionIdMismatch,
   extensionOriginListed,
+  matchersFromOperations,
+  mocksFromOperations,
   normalizeRuntimePreset,
   RELEASE_EXTENSION_ID,
   RUNTIME_LIMITS,
@@ -16,6 +17,7 @@ import {
 } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { showRuntimeHelp } from "../help.js";
+import { readSavedMockRoot } from "../mock-root-config.js";
 import {
   createJsonFileProjectStorage,
   type ProjectStorage,
@@ -29,21 +31,6 @@ export interface RuntimeCommandOptions {
 export interface RuntimeCommandResult {
   exitCode: Promise<number>;
   shutdown: () => void;
-}
-
-function toMatcherOperations(
-  operations: readonly RogatioOperation[],
-): MatcherOperation[] {
-  return operations.map(
-    ({ groupId, ruleId, name, matcher, redactSensitiveInLogs }) => ({
-      kind: "matcher",
-      groupId,
-      ruleId,
-      name,
-      matcher,
-      redactSensitiveInLogs,
-    }),
-  );
 }
 
 /**
@@ -288,7 +275,6 @@ async function runtimeHostCommand(
   options: RuntimeCommandOptions = {},
 ): Promise<number> {
   let root: string | undefined;
-  let mockPort: number | undefined;
   const positional: string[] = [];
   let argumentError: string | undefined;
 
@@ -298,15 +284,6 @@ async function runtimeHostCommand(
       root = resolve(args[++index]);
     } else if (arg === "--root") {
       argumentError = "--root requires a value";
-    } else if (arg === "--mock-port" && index + 1 < args.length) {
-      const parsed = Number(args[++index]);
-      if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 65535) {
-        argumentError = "--mock-port must be an integer port in 1..65535";
-      } else {
-        mockPort = parsed;
-      }
-    } else if (arg === "--mock-port") {
-      argumentError = "--mock-port requires a value";
     } else if (arg === "-" || !arg.startsWith("-")) {
       positional.push(arg);
     } else {
@@ -326,7 +303,6 @@ async function runtimeHostCommand(
     const aiProviderConfig = await readProviderConfig();
     await runNativeHost({
       fileRoot: root,
-      ...(mockPort !== undefined ? { mockPort } : {}),
       ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
       aiConfigReader: readProviderConfig,
       onReady: () =>
@@ -343,12 +319,18 @@ async function runtimeHostCommand(
   const storage = options.storage ?? createJsonFileProjectStorage();
   try {
     if (inputPath === "-") {
-      const chunks: string[] = [];
-      for await (const chunk of process.stdin) {
-        chunks.push(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
-      }
       filePath = "<stdin>";
-      projectData = JSON.parse(chunks.join(""));
+      if (options.stdinInput !== undefined) {
+        projectData = JSON.parse(options.stdinInput);
+      } else {
+        const chunks: string[] = [];
+        for await (const chunk of process.stdin) {
+          chunks.push(
+            typeof chunk === "string" ? chunk : chunk.toString("utf8"),
+          );
+        }
+        projectData = JSON.parse(chunks.join(""));
+      }
     } else {
       filePath = resolve(inputPath);
       projectData = await storage.get(filePath);
@@ -378,14 +360,29 @@ async function runtimeHostCommand(
     return 1;
   }
 
+  const fileMock = compileResult.operations.some(
+    (operation) =>
+      operation.kind === "mock" && operation.mock.file !== undefined,
+  );
+  if (inputPath === "-" && fileMock && root === undefined) {
+    console.error("Error: runtime.root-required");
+    return 2;
+  }
+
+  const savedRoot =
+    root === undefined && inputPath !== "-"
+      ? await readSavedMockRoot(filePath)
+      : undefined;
   const rootDir =
-    root ?? (inputPath === "-" ? process.cwd() : dirname(filePath));
+    root ?? savedRoot ?? (inputPath === "-" ? undefined : dirname(filePath));
+  const mocks = mocksFromOperations(compileResult.operations, undefined);
 
   const normalized = normalizeRuntimePreset({
     version: 1,
     limits: RUNTIME_LIMITS,
-    matchers: toMatcherOperations(compileResult.operations),
+    matchers: matchersFromOperations(compileResult.operations),
     grants: [],
+    ...(mocks.length > 0 ? { mocks } : {}),
   });
   if (!normalized.ok) {
     console.error("Error: Failed to build runtime preset");
@@ -395,8 +392,7 @@ async function runtimeHostCommand(
   const aiProviderConfig = await readProviderConfig();
   await runNativeHost({
     preset: normalized.value,
-    fileRoot: rootDir,
-    ...(mockPort !== undefined ? { mockPort } : {}),
+    ...(rootDir !== undefined ? { fileRoot: rootDir } : {}),
     ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
     aiConfigReader: readProviderConfig,
     onReady: () => console.error("rogatio runtime-host active"),

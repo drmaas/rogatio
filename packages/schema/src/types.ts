@@ -48,7 +48,21 @@ export type RuleType =
   | "query"
   | "header"
   | "response-body"
-  | "request-body";
+  | "request-body"
+  | "mock";
+
+export interface MockHeader {
+  name: string;
+  value: string;
+}
+
+export interface MockAction {
+  status: number;
+  headers?: MockHeader[];
+  delayMs?: number;
+  body?: string;
+  file?: string;
+}
 
 export type HeaderDirection = "request" | "response";
 export type HeaderOperationKind = "set" | "append" | "remove";
@@ -157,6 +171,9 @@ export interface RogatioRule {
   responseBody?: ResponseBodyAction;
   /** Required iff type === "request-body". */
   requestBody?: RequestBodyAction;
+
+  /** Required iff type === "mock". */
+  mock?: MockAction;
 
   /** When true, deny-list sensitive query/header values in match logs. Absent => false. */
   redactSensitiveInLogs?: boolean;

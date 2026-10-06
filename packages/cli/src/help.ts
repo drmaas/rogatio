@@ -68,8 +68,10 @@ Options:
   --extension-id  Extension ID for the native messaging manifest. Release users
                   never need this. It is only for development (a local unpacked
                   build without the release key) and for forks.
-  --root <dir>    Root for confined runtime file access (host only; default: project directory)
-  --mock-port <n> Bind the loopback mock-response faucet to this port (host only, 1-65535)
+  --root <dir>    Root for confined runtime file access (host only). Default: the
+                  saved device-local root for that project file, otherwise the
+                  project directory. Required when the host reads a stdin
+                  project that contains a file mock.
   --help, -h      Show this help
 
 Exit codes:

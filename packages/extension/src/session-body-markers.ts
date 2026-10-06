@@ -11,6 +11,7 @@ import { projectSourceCondition } from "./source-projection.js";
  * (1–1_000_000) and header (2_000_001+) bands are a separate store.
  */
 export const BODY_MARKER_ID_MIN = 3_000_001;
+export const BODY_MARKER_ID_MAX = 4_000_000;
 
 /** Reserved request header name for logging-only markers (runtime strips). */
 export const BODY_MARKER_HEADER_NAME = "X-Rogatio-Dispatch-BodyMatch";
@@ -41,7 +42,9 @@ export interface BodyMarkerSessionRule {
 }
 
 export function isBodyMarkerBandId(id: number): boolean {
-  return Number.isInteger(id) && id >= BODY_MARKER_ID_MIN;
+  return (
+    Number.isInteger(id) && id >= BODY_MARKER_ID_MIN && id <= BODY_MARKER_ID_MAX
+  );
 }
 
 export function bodyMarkerIdForIndex(index: number): number {

@@ -11,6 +11,8 @@ import type {
 } from "@rogatio/compiler";
 import { sourceMatches } from "@rogatio/compiler";
 import { RUNTIME_LIMITS } from "./limits.js";
+import type { RenderedMock } from "./mock.js";
+import { MOCK_LISTENER_PREFIX, parseMockRedirect } from "./mock-listener.js";
 import { rewriteRequestBody } from "./request-body.js";
 import {
   fetchAndRewriteAuthorizedResponse,
@@ -18,7 +20,7 @@ import {
 } from "./response-body.js";
 import { parseResponseBodyRedirect } from "./response-body-listener.js";
 import { revalidateAuthority } from "./revalidate.js";
-import type { PresetDigest } from "./types.js";
+import type { PresetDigest, RuntimeResult } from "./types.js";
 import { canonicalizeOutboundTarget } from "./url.js";
 
 export interface ProxyEndpoint {
@@ -32,8 +34,17 @@ export interface InterceptProxyPolicy {
   readonly presetDigest?: string;
 }
 
+export interface MockServeRequest {
+  readonly token: string;
+  readonly method: string;
+  readonly signal: AbortSignal;
+}
+
 export interface InterceptProxyOptions {
   readonly policy?: InterceptProxyPolicy | null;
+  readonly serveMock?: (
+    request: MockServeRequest,
+  ) => Promise<RuntimeResult<RenderedMock>>;
 }
 
 export interface InterceptProxyHandle {
@@ -399,6 +410,10 @@ export async function startInterceptProxy(
   options: InterceptProxyOptions = {},
 ): Promise<InterceptProxyHandle> {
   let policy: InterceptProxyPolicy | null = options.policy ?? null;
+  const serveMock = options.serveMock;
+  let activeMocks = 0;
+  const mockAborts = new Set<AbortController>();
+  let stopped = false;
 
   const server = createServer((req, res) => {
     void handleHttp(req, res);
@@ -416,6 +431,10 @@ export async function startInterceptProxy(
       const targetUrl = req.url ?? "";
       if (targetUrl.startsWith("/.rogatio/body/")) {
         await handleResponseBodyRedirect(req, res, targetUrl);
+        return;
+      }
+      if (targetUrl.startsWith(MOCK_LISTENER_PREFIX.slice(0, -1))) {
+        await handleMockRedirect(req, res, targetUrl);
         return;
       }
       if (!/^https?:\/\//i.test(targetUrl)) {
@@ -561,6 +580,87 @@ export async function startInterceptProxy(
         res.writeHead(502);
         res.end();
       }
+    }
+  }
+
+  function endEmpty(res: ServerResponse, status: number): void {
+    if (res.writableEnded) return;
+    res.writeHead(status, {
+      "cache-control": "no-store",
+      "content-length": "0",
+    });
+    res.end();
+  }
+
+  function discardRequestBody(req: IncomingMessage): void {
+    req.on("data", () => {});
+    req.resume();
+  }
+
+  async function handleMockRedirect(
+    req: IncomingMessage,
+    res: ServerResponse,
+    rawUrl: string,
+  ): Promise<void> {
+    discardRequestBody(req);
+    const parsed = parseMockRedirect(rawUrl);
+    if (parsed === null) {
+      endEmpty(res, 400);
+      return;
+    }
+    const active = policy;
+    if (
+      serveMock === undefined ||
+      active === null ||
+      active.presetDigest === undefined ||
+      active.presetDigest.length === 0
+    ) {
+      endEmpty(res, 403);
+      return;
+    }
+    if (parsed.digest !== active.presetDigest) {
+      endEmpty(res, 403);
+      return;
+    }
+    if (activeMocks >= RUNTIME_LIMITS.maxConcurrentOperations) {
+      endEmpty(res, 429);
+      return;
+    }
+    activeMocks += 1;
+    const abort = new AbortController();
+    mockAborts.add(abort);
+    const cancel = () => {
+      if (!res.writableFinished) abort.abort();
+    };
+    req.on("aborted", cancel);
+    res.on("close", cancel);
+    try {
+      const rendered = await serveMock({
+        token: parsed.token,
+        method: (req.method ?? "GET").toUpperCase(),
+        signal: abort.signal,
+      });
+      if (abort.signal.aborted || res.writableEnded) return;
+      if (!rendered.ok) {
+        const status =
+          rendered.error.code === "runtime.unsupported-method"
+            ? 405
+            : rendered.error.code === "runtime.mock-unknown"
+              ? 404
+              : 502;
+        endEmpty(res, status);
+        return;
+      }
+      res.writeHead(
+        rendered.value.status,
+        rendered.value.headers.map(([name, value]) => [name, value]),
+      );
+      res.end(Buffer.from(rendered.value.bodyBytes));
+    } catch {
+      endEmpty(res, 502);
+    } finally {
+      mockAborts.delete(abort);
+      activeMocks = Math.max(0, activeMocks - 1);
     }
   }
 
@@ -721,6 +821,10 @@ export async function startInterceptProxy(
       policy = next;
     },
     async stop() {
+      if (stopped) return;
+      stopped = true;
+      for (const abort of mockAborts) abort.abort();
+      server.closeAllConnections();
       await new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));
       });

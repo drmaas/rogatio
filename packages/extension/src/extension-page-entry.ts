@@ -19,6 +19,11 @@ import {
 } from "./match-logging-enabled.js";
 import { createMatchLoggingToggle } from "./match-logging-toggle.js";
 import {
+  mockFileRootCommandValue,
+  mockFileRootFieldError,
+  renderMockFileRootControl,
+} from "./mock-file-root-control.js";
+import {
   projectImportFailure,
   type SaveFilePickerOptions,
   type ShowSaveFilePicker,
@@ -42,6 +47,7 @@ interface StoredProject {
   readonly data: unknown;
   readonly revision: number;
   readonly enabledGroupIds: readonly string[];
+  readonly mockFileRoot?: string;
 }
 
 interface Envelope {
@@ -56,7 +62,10 @@ interface Envelope {
 interface ExtensionResponse {
   readonly ok?: boolean;
   readonly value?: unknown;
-  readonly diagnostic?: { readonly code?: string };
+  readonly diagnostic?: {
+    readonly code?: string;
+    readonly params?: { readonly reason?: unknown };
+  };
   readonly diagnostics?: readonly {
     readonly code?: string;
     readonly path?: string;
@@ -151,6 +160,8 @@ let editor: EditorController | undefined;
 /** True once an editor has been mounted, to tell navigation from a rebuild. */
 let editorHasMounted = false;
 let statusMessage = "";
+let mockRootDraft: string | undefined;
+let mockRootError = "";
 /** Ready-to-run native host install command shown with a copy button. */
 let installCommand: string | null = null;
 /** AI support status from native host */
@@ -680,7 +691,7 @@ function runtimeRecoveryText(): string {
 /**
  * The blocking status behind the badge's attention flag, derived from the
  * actual rule statuses (REQ-GAV-004) with the shared f21 precedence
- * (error > needs runtime > unsupported > active). The badge and the
+ * (error > needs runtime > needs root directory > unsupported > active). The badge and the
  * sidebar note must describe what is actually blocking — never a canned
  * "grant access" hint when permissions are already granted.
  */
@@ -1412,7 +1423,10 @@ function renderShell(): void {
     const guidanceFix = document.createElement("p");
     guidanceFix.textContent = runtimeRecoveryText();
     guidance.append(guidanceTitle, guidanceError, guidanceFix);
-    if (runtimePhase === "failed") {
+    const mockRootFailure = (state.nativeRuntimeError ?? "").includes(
+      "runtime.root-invalid",
+    );
+    if (runtimePhase === "failed" && !mockRootFailure) {
       const id = extensionId();
       const cmd = id.length > 0 ? runtimeInstallCommand(id) : installCommand;
       if (cmd) {
@@ -1503,6 +1517,32 @@ function renderShell(): void {
     if (command === "stop-native-runtime")
       void nativeRuntimeCommand("stop-native-runtime");
     if (command === "show-diagnostics") void showDiagnostics();
+    if (command === "pick-mock-file-root") {
+      void pickMockFileRoot();
+    }
+    if (
+      command === "set-mock-file-root" ||
+      command === "clear-mock-file-root"
+    ) {
+      const projectId = state.activeProjectId;
+      const root = mockFileRootCommandValue(shell, command);
+      if (projectId && root !== undefined) {
+        if (typeof root === "string") {
+          const error = mockFileRootFieldError(root);
+          if (error) {
+            mockRootDraft = root;
+            showMockRootError(error);
+            return;
+          }
+          mockRootDraft = root.trim();
+          void setMockFileRoot(projectId, root.trim());
+        } else {
+          mockRootDraft = undefined;
+          mockRootError = "";
+          void setMockFileRoot(projectId, null);
+        }
+      }
+    }
     if (command === "export" || command === "remove") {
       // Project details actions belong to the open project. A dashboard
       // selection that has not been switched must not redirect them.
@@ -1665,6 +1705,21 @@ function renderShell(): void {
           { command: "export", label: "Export project" },
           { command: "remove", label: "Remove project", tone: "danger" },
         ],
+        mountProjectDetails(parent) {
+          const saved = state.activeProjectId
+            ? state.projects[state.activeProjectId]?.mockFileRoot
+            : undefined;
+          parent.append(
+            renderMockFileRootControl(document, {
+              saved,
+              draft: mockRootDraft,
+              error: mockRootError,
+              onDraft(value) {
+                mockRootDraft = value;
+              },
+            }),
+          );
+        },
       });
       // The URL is the source of truth for the destination, so a remount must
       // not silently drop it. But only the *first* mount reveals and focuses the
@@ -1884,11 +1939,13 @@ async function nativeRuntimeCommand(
     state.nativeRuntimeError &&
     code !== "extension.native-host-origin-forbidden"
   ) {
-    statusMessage = [
-      "The runtime action failed.",
-      `Runtime error: ${state.nativeRuntimeError}`,
-      "Fix: run the install command if the host is missing, then reload the extension and restart Chrome.",
-    ].join(" ");
+    statusMessage = state.nativeRuntimeError.includes("runtime.root-invalid")
+      ? "The mock files folder must be a full path to a folder that exists. Set it under Project details."
+      : [
+          "The runtime action failed.",
+          `Runtime error: ${state.nativeRuntimeError}`,
+          "Fix: run the install command if the host is missing, then reload the extension and restart Chrome.",
+        ].join(" ");
     renderShell();
   }
 }
@@ -2191,6 +2248,105 @@ async function switchProject(): Promise<void> {
   }
   statusMessage = "Project switched.";
   await refresh();
+}
+
+function showMockRootError(message: string): void {
+  mockRootError = message;
+  statusMessage = "";
+  const errorNode = document.querySelector("[data-mock-file-root-error]");
+  const input = document.querySelector("[data-mock-file-root-input]");
+  const status = document.querySelector(".rogatio-status");
+  if (status) status.textContent = "";
+  if (errorNode instanceof HTMLElement) {
+    errorNode.hidden = false;
+    errorNode.textContent = message;
+    if (input instanceof HTMLInputElement) {
+      input.setAttribute("aria-invalid", "true");
+    }
+    return;
+  }
+  renderShell();
+}
+
+function mockRootErrorFromResponse(
+  response: ExtensionResponse | undefined,
+  root: string | null,
+): string {
+  const reason = response?.diagnostic?.params?.reason;
+  if (reason === "relative") {
+    return (
+      mockFileRootFieldError(typeof root === "string" ? root : "") ??
+      "Use a full path to a folder."
+    );
+  }
+  if (reason === "runtime.root-invalid") {
+    return "That path is not a folder that exists.";
+  }
+  if (response?.diagnostic?.code === "extension.invalid-message") {
+    return "Remove control characters from the path.";
+  }
+  return "The mock files folder could not be saved.";
+}
+
+async function setMockFileRoot(
+  projectId: string,
+  root: string | null,
+): Promise<void> {
+  const response = await client.send({
+    version: 1,
+    command: "set-mock-file-root",
+    projectId,
+    root,
+  });
+  if (response?.ok !== true) {
+    if (typeof root === "string") mockRootDraft = root;
+    showMockRootError(mockRootErrorFromResponse(response, root));
+    return;
+  }
+  mockRootDraft = undefined;
+  mockRootError = "";
+  statusMessage =
+    root === null ? "Mock files folder cleared." : "Mock files folder saved.";
+  await refresh();
+}
+
+async function pickMockFileRoot(): Promise<void> {
+  const projectId = state.activeProjectId;
+  if (!projectId) return;
+  mockRootError = "";
+  statusMessage = "Choose a folder in the dialog.";
+  const status = document.querySelector(".rogatio-status");
+  if (status) status.textContent = statusMessage;
+  const response = await client.send({
+    version: 1,
+    command: "pick-mock-file-root",
+  });
+  if (response?.ok !== true) {
+    const code = response?.diagnostic?.code;
+    showMockRootError(
+      code === "extension.native-host-missing"
+        ? "Install the runtime host before choosing a folder. You can still paste a full path."
+        : code === "extension.invalid-message"
+          ? "That path is not a folder that exists."
+          : "This computer has no folder dialog. Paste a full path instead.",
+    );
+    return;
+  }
+  const value =
+    response.value !== null &&
+    typeof response.value === "object" &&
+    !Array.isArray(response.value)
+      ? (response.value as { cancelled?: unknown; path?: unknown })
+      : {};
+  if (value.cancelled === true) {
+    statusMessage = "";
+    if (status) status.textContent = "";
+    return;
+  }
+  if (typeof value.path === "string") {
+    mockRootDraft = value.path;
+    await setMockFileRoot(projectId, value.path);
+  }
 }
 
 async function exportProject(explicitId?: string): Promise<void> {

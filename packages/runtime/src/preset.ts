@@ -60,7 +60,8 @@ function normalizeMockHeader(
     return null;
   if (
     typeof record.value !== "string" ||
-    record.value.length > LIMITS.maxMockHeaderValueLength
+    record.value.length > LIMITS.maxMockHeaderValueLength ||
+    hasControl(record.value)
   )
     return null;
   return { name: record.name, value: record.value };
@@ -368,6 +369,36 @@ function makeGrant(
     target,
     method: record.method,
   });
+}
+
+/** Group ids the extension says are enabled. Absent means every project group. */
+export function parseEnabledGroupIds(
+  metadata: object,
+  groupIds: readonly string[],
+): RuntimeResult<ReadonlySet<string> | undefined> {
+  if (!hasOwn(metadata, "enabledGroupIds")) {
+    return { ok: true, value: undefined };
+  }
+  const value = (metadata as Record<string, unknown>).enabledGroupIds;
+  if (!Array.isArray(value) || value.length > LIMITS.maxGroups) {
+    return failure("runtime.groups-invalid");
+  }
+  const known = new Set(groupIds);
+  const enabled = new Set<string>();
+  for (let index = 0; index < value.length; index += 1) {
+    if (!Object.hasOwn(value, index)) return failure("runtime.groups-invalid");
+    const id = value[index];
+    if (
+      typeof id !== "string" ||
+      !ID_PATTERN.test(id) ||
+      !known.has(id) ||
+      enabled.has(id)
+    ) {
+      return failure("runtime.groups-invalid");
+    }
+    enabled.add(id);
+  }
+  return { ok: true, value: enabled };
 }
 
 export function normalizeRuntimePreset(

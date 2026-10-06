@@ -91,6 +91,9 @@ describe("resolveRuntimeRecoveryText", () => {
     expect(resolveRuntimeRecoveryText("failed", "trust the CA")).toContain(
       "trust the device-local CA",
     );
+    expect(
+      resolveRuntimeRecoveryText("failed", "runtime.root-invalid"),
+    ).toContain("Project details");
   });
 
   it("covers unsupported without a concrete error", () => {

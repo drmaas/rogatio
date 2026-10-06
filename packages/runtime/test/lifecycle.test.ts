@@ -1,4 +1,9 @@
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { isConfinedFileSupported } from "../src/confined-file.js";
+import { parseEnvelope } from "../src/envelope.js";
 import { RUNTIME_LIMITS } from "../src/index.js";
 import { createNativeRuntimeController } from "../src/lifecycle.js";
 import type {
@@ -18,10 +23,6 @@ function buildPreset(mocks: RuntimeMockConfig[] = []): NormalizedRuntimePreset {
       "sha256:0000000000000000000000000000000000000000000000000000000000000000" as PresetDigest,
     ...(mocks.length > 0 ? { mocks } : {}),
   };
-}
-
-function decodeMockBody(mockBody: string): string {
-  return Buffer.from(mockBody, "base64").toString("utf8");
 }
 
 describe("createNativeRuntimeController", () => {
@@ -50,6 +51,38 @@ describe("createNativeRuntimeController", () => {
     await controller.start();
     const second = await controller.start();
     expect(second.state).toBe("running");
+  });
+
+  it("picks a mock folder before the runtime is started", async () => {
+    const controller = createNativeRuntimeController({
+      preset: buildPreset(),
+      directoryPicker: async () => ({
+        ok: true,
+        path: "/tmp/rogatio-missing-mock-folder",
+      }),
+    });
+    const response = await controller.handleEnvelope({
+      type: "runtime.pick-directory",
+      metadata: {},
+    });
+    expect(response.metadata).toMatchObject({
+      ok: false,
+      error: "runtime.root-invalid",
+    });
+    expect(controller.status().state).toBe("idle");
+  });
+
+  it("reports a cancelled folder dialog without starting", async () => {
+    const controller = createNativeRuntimeController({
+      preset: buildPreset(),
+      directoryPicker: async () => ({ ok: true, path: null }),
+    });
+    const response = await controller.handleEnvelope({
+      type: "runtime.pick-directory",
+      metadata: {},
+    });
+    expect(response.metadata).toEqual({ ok: true, cancelled: true });
+    expect(controller.status().state).toBe("idle");
   });
 
   it("rejects envelopes before start", async () => {
@@ -93,45 +126,16 @@ describe("mock delivery over the envelope", () => {
     expect(typeof meta.mocks[0]?.token).toBe("string");
   });
 
-  it("mock.request delivers the rendered body as base64 mockBody", async () => {
-    const controller = createNativeRuntimeController({
-      preset: buildPreset(mocks),
-    });
-    await controller.start();
-    const connect = await controller.handleEnvelope({
-      type: "mock.connect",
-      metadata: {
-        presetDigest:
-          "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-      },
-    });
-    const token = (connect.metadata as { mocks: readonly { token: string }[] })
-      .mocks[0]?.token;
-    const response = await controller.handleEnvelope({
-      type: "mock.request",
-      metadata: { token },
-    });
-    expect(response.type).toBe("mock.response");
-    const meta = response.metadata as {
-      status: number;
-      headers: readonly (readonly [string, string])[];
-      mockBody: string;
-    };
-    expect(meta.status).toBe(200);
-    expect(decodeMockBody(meta.mockBody)).toBe('{"ok":true}');
-  });
-
-  it("mock.request for an unknown token returns 404", async () => {
-    const controller = createNativeRuntimeController({
-      preset: buildPreset(mocks),
-    });
-    await controller.start();
-    const response = await controller.handleEnvelope({
-      type: "mock.request",
-      metadata: { token: "deadbeef" },
-    });
-    const meta = response.metadata as { status: number };
-    expect(meta.status).toBe(404);
+  it("rejects a retired mock.request envelope", () => {
+    expect(() =>
+      parseEnvelope(
+        JSON.stringify({
+          protocol: "v1",
+          type: "mock.request",
+          metadata: { token: "abc" },
+        }),
+      ),
+    ).toThrow(/type invalid/);
   });
 });
 
@@ -314,7 +318,7 @@ describe("pairing and authorization success (spec REQ-005)", () => {
   });
 });
 
-describe("mock faucet port and serveMock", () => {
+describe("mock connect and serveMock", () => {
   const faucetMocks: RuntimeMockConfig[] = [
     {
       ruleId: "m1",
@@ -324,27 +328,129 @@ describe("mock faucet port and serveMock", () => {
     },
   ];
 
-  it("mock.connect reports the configured loopback faucet port (REQ-003)", async () => {
+  it("mock.connect returns tokens and no faucet port", async () => {
     const controller = createNativeRuntimeController({
       preset: buildPreset(faucetMocks),
-      mockPort: 9123,
     });
     await controller.start();
     const connect = await controller.handleEnvelope({
       type: "mock.connect",
       metadata: { presetDigest: DIGEST },
     });
-    const meta = connect.metadata as { port?: number };
-    expect(meta.port).toBe(9123);
+    const meta = connect.metadata as {
+      port?: number;
+      mocks: readonly { ruleId: string }[];
+    };
+    expect(meta.port).toBeUndefined();
+    expect(meta.mocks[0]?.ruleId).toBe("m1");
   });
 
   it("serveMock returns runtime.mock-unknown for an unknown token", async () => {
     const controller = createNativeRuntimeController({
       preset: buildPreset(faucetMocks),
-      mockPort: 9123,
     });
     await controller.start();
     const result = await controller.serveMock("nope");
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected failure");
+    expect(result.error.code).toBe("runtime.mock-unknown");
+  });
+
+  it("serves a file from a folder set after start, then stops after clear", async () => {
+    const root = await mkdtemp(join(tmpdir(), "rogatio-mock-root-"));
+    try {
+      await writeFile(join(root, "fixture.txt"), "rogatio file mock\n");
+      const controller = createNativeRuntimeController({
+        preset: buildPreset([
+          { ruleId: "file-1", status: 200, file: "fixture.txt" },
+        ]),
+      });
+      await controller.start();
+      const connect = await controller.handleEnvelope({
+        type: "mock.connect",
+        metadata: {},
+      });
+      const token =
+        (connect.metadata as { mocks: readonly { token: string }[] }).mocks[0]
+          ?.token ?? "";
+      const before = await controller.serveMock(token);
+      expect(before.ok).toBe(false);
+      if (before.ok) throw new Error("expected failure");
+      expect(before.error.code).toBe("runtime.file-denied");
+
+      const set = await controller.handleEnvelope({
+        type: "runtime.set-file-root",
+        metadata: { path: root },
+      });
+      expect(set.metadata).toMatchObject({
+        ok: true,
+        path: await realpath(root),
+      });
+      const served = await controller.serveMock(token);
+      if (!isConfinedFileSupported()) {
+        expect(served.ok).toBe(false);
+        if (served.ok) throw new Error("expected failure");
+        expect(served.error.code).toBe("runtime.platform-unsupported");
+      } else {
+        expect(served.ok).toBe(true);
+        if (!served.ok) throw new Error("expected bytes");
+        expect(Buffer.from(served.value.bodyBytes).toString("utf8")).toBe(
+          "rogatio file mock\n",
+        );
+      }
+
+      const rejected = await controller.handleEnvelope({
+        type: "runtime.set-file-root",
+        metadata: { path: "/tmp/rogatio-missing-mock-folder" },
+      });
+      expect(rejected.metadata).toMatchObject({
+        ok: false,
+        error: "runtime.root-invalid",
+      });
+      if (isConfinedFileSupported()) {
+        const still = await controller.serveMock(token);
+        expect(still.ok).toBe(true);
+      }
+
+      const cleared = await controller.handleEnvelope({
+        type: "runtime.set-file-root",
+        metadata: { path: null },
+      });
+      expect(cleared.metadata).toMatchObject({ ok: true, cleared: true });
+      const after = await controller.serveMock(token);
+      expect(after.ok).toBe(false);
+      if (after.ok) throw new Error("expected failure");
+      expect(after.error.code).toBe("runtime.file-denied");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a mock folder update before the runtime is started", async () => {
+    const controller = createNativeRuntimeController({ preset: buildPreset() });
+    const response = await controller.handleEnvelope({
+      type: "runtime.set-file-root",
+      metadata: { path: "/tmp" },
+    });
+    expect(response.metadata).toMatchObject({
+      ok: false,
+      error: "runtime.not-started",
+    });
+    expect(controller.status().state).toBe("idle");
+  });
+
+  it("rejects a method when the issued mock has no matcher", async () => {
+    const controller = createNativeRuntimeController({
+      preset: buildPreset(faucetMocks),
+    });
+    await controller.start();
+    const connect = await controller.handleEnvelope({
+      type: "mock.connect",
+      metadata: {},
+    });
+    const token = (connect.metadata as { mocks: readonly { token: string }[] })
+      .mocks[0]?.token;
+    const result = await controller.serveMock(token ?? "", { method: "GET" });
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected failure");
     expect(result.error.code).toBe("runtime.mock-unknown");

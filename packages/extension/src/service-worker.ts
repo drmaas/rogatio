@@ -1,6 +1,7 @@
 import {
   computeBadge,
   computeRuleStatuses,
+  isAbsoluteMockFileRoot,
   type NativeRuntimePhase,
   ProjectRepository,
   type RuleInstallerAdapter,
@@ -96,7 +97,10 @@ export interface ExtensionApplicationOptions {
     status(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
     sendPolicy(frames: Uint8Array[]): Promise<void>;
     /** Envelope protocol to the consolidated native host (spec REQ-001). */
-    send?(envelope: NativeEnvelopeInput): Promise<NativeEnvelope>;
+    send?(
+      envelope: NativeEnvelopeInput,
+      timeoutMs?: number,
+    ): Promise<NativeEnvelope>;
     /** Chrome's last connectNative error message, if any. */
     lastConnectError?(): string | null;
   };
@@ -140,6 +144,14 @@ function conflict(current: unknown): Failure {
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function nativeHostMissingMessage(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return (
+    message.includes("extension.native-host-missing") ||
+    message.includes("Specified native messaging host not found")
+  );
 }
 
 const MAX_AI_PROMPT_LENGTH = 4000;
@@ -189,12 +201,21 @@ const AI_GENERATION_SYSTEM_PROMPT = [
   `Example: ${JSON.stringify(AI_GENERATION_EXAMPLE)}`,
 ].join(" ");
 
+const MOCK_FILE_DIAGNOSTICS = {
+  "runtime.file-denied": "extension.mock-file-denied",
+  "runtime.file-race-rejected": "extension.mock-file-race",
+  "runtime.size-limit": "extension.mock-size-limit",
+  "runtime.platform-unsupported": "extension.mock-platform-unsupported",
+} as const;
+
 function operationStatuses(
   operations: readonly RogatioOperation[],
   installedRuleIds: readonly string[],
   enabledGroupIds: readonly string[],
   nativePhase: NativeRuntimePhase | "unsupported",
   dnrInstallErrors: readonly DnrInstallError[] = [],
+  mockFileErrors: ReadonlyMap<string, string> = new Map(),
+  hasMockFileRoot = false,
 ): readonly Record<string, unknown>[] {
   const statuses = computeRuleStatuses({
     operations,
@@ -288,6 +309,66 @@ function operationStatuses(
         status: "active",
       };
     }
+    if (operation.kind === "mock") {
+      if (status.status === "disabled") return { ...status };
+      if (
+        nativePhase === "unsupported" ||
+        !projectSourceCondition(operation.matcher).projectable
+      ) {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "unsupported",
+          diagnostics: [extensionDiagnostic("extension.unsupported")],
+        };
+      }
+      if (
+        typeof operation.mock.file === "string" &&
+        operation.mock.file.length > 0 &&
+        !hasMockFileRoot
+      ) {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "needs root directory",
+        };
+      }
+      const fileCode = mockFileErrors.get(operation.ruleId);
+      const fileDiagnostic =
+        fileCode !== undefined
+          ? MOCK_FILE_DIAGNOSTICS[
+              fileCode as keyof typeof MOCK_FILE_DIAGNOSTICS
+            ]
+          : undefined;
+      if (fileDiagnostic !== undefined) {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "error",
+          diagnostics: [extensionDiagnostic(fileDiagnostic)],
+        };
+      }
+      if (nativePhase === "failed") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "error",
+          diagnostics: [extensionDiagnostic("extension.install-failed")],
+        };
+      }
+      if (nativePhase !== "started") {
+        return {
+          groupId: status.groupId,
+          ruleId: status.ruleId,
+          status: "needs runtime",
+        };
+      }
+      return {
+        groupId: status.groupId,
+        ruleId: status.ruleId,
+        status: "active",
+      };
+    }
     if (operation.kind === "header" && status.status === "active") {
       return {
         groupId: status.groupId,
@@ -316,6 +397,55 @@ export function createExtensionApplication(
     : "unsupported";
   let nativeRuntimeError: string | null = null;
   let pendingProjectId: string | null = null;
+  const mockFileErrors = new Map<string, string>();
+  /** Save clears the overlay until the next host start or stop. */
+  let ignoreHostMockFileErrors = false;
+
+  async function refreshMockFileErrors(): Promise<void> {
+    if (
+      ignoreHostMockFileErrors ||
+      nativePhase !== "started" ||
+      options.nativeRuntime?.send === undefined
+    ) {
+      if (nativePhase !== "started") mockFileErrors.clear();
+      return;
+    }
+    try {
+      const reply = await options.nativeRuntime.send({
+        protocol: "v1",
+        type: "runtime.status",
+        timestamp: options.now?.() ?? Date.now(),
+        metadata: {},
+      });
+      const listed = reply.metadata.mockFileErrors;
+      mockFileErrors.clear();
+      if (!Array.isArray(listed)) return;
+      for (const entry of listed) {
+        if (
+          typeof entry !== "object" ||
+          entry === null ||
+          Array.isArray(entry)
+        ) {
+          continue;
+        }
+        const record = entry as {
+          ruleId?: unknown;
+          code?: unknown;
+          message?: unknown;
+        };
+        if (
+          typeof record.ruleId !== "string" ||
+          typeof record.code !== "string"
+        ) {
+          continue;
+        }
+        if (!(record.code in MOCK_FILE_DIAGNOSTICS)) continue;
+        mockFileErrors.set(record.ruleId, record.code);
+      }
+    } catch {
+      // Keep the last overlay when the host cannot answer.
+    }
+  }
 
   /**
    * The DNR-managed operation set for the active project. Browser-side
@@ -349,6 +479,7 @@ export function createExtensionApplication(
         {
           readonly data: unknown;
           readonly enabledGroupIds: readonly string[];
+          readonly mockFileRoot?: string;
         }
       >
     >;
@@ -422,12 +553,16 @@ export function createExtensionApplication(
       // Install failure surfaces as rule-not-installed / error statuses below.
       dnrInstallErrors = takeDnrInstallErrors(options.installer);
     }
+    await refreshMockFileErrors();
     const statuses = operationStatuses(
       compiled.operations,
       installedRuleIds,
       project.enabledGroupIds,
       nativePhase,
       dnrInstallErrors,
+      mockFileErrors,
+      typeof project.mockFileRoot === "string" &&
+        project.mockFileRoot.length > 0,
     );
     const badgeStatuses = statuses.map((status) => ({
       groupId: String(status.groupId),
@@ -436,6 +571,7 @@ export function createExtensionApplication(
         | "active"
         | "disabled"
         | "needs runtime"
+        | "needs root directory"
         | "unsupported"
         | "error",
     }));
@@ -719,8 +855,129 @@ export function createExtensionApplication(
           ? conflict(result.current)
           : failure("extension.storage-failed");
       }
+      ignoreHostMockFileErrors = true;
+      mockFileErrors.clear();
       await state();
       return { ok: true, value: result.value };
+    }
+    if (request.command === "set-mock-file-root") {
+      const projectId = stringValue(data.projectId);
+      if (!projectId || !Object.hasOwn(data, "root")) {
+        return failure("extension.invalid-message");
+      }
+      let root = data.root;
+      if (typeof root === "string" && root !== "") {
+        const trimmed = root.trim();
+        if (!isAbsoluteMockFileRoot(trimmed)) {
+          return failure("extension.invalid-message", { reason: "relative" });
+        }
+        root = trimmed;
+        const send = options.nativeRuntime?.send;
+        if (send) {
+          try {
+            const checked = await send({
+              protocol: "v1",
+              type: "runtime.check-directory",
+              timestamp: Date.now(),
+              metadata: { path: trimmed },
+            });
+            if (checked.metadata.ok !== true) {
+              const reason =
+                typeof checked.metadata.error === "string"
+                  ? checked.metadata.error
+                  : "runtime.root-invalid";
+              return failure("extension.invalid-message", { reason });
+            }
+            if (typeof checked.metadata.path === "string") {
+              root = checked.metadata.path;
+            }
+          } catch (error) {
+            if (!nativeHostMissingMessage(error)) {
+              return failure("extension.invalid-message", {
+                reason: "runtime.root-invalid",
+              });
+            }
+          }
+        }
+      }
+      if (nativePhase === "started" && options.nativeRuntime?.send) {
+        try {
+          const pushed = await options.nativeRuntime.send({
+            protocol: "v1",
+            type: "runtime.set-file-root",
+            timestamp: Date.now(),
+            metadata: {
+              path: typeof root === "string" && root !== "" ? root : null,
+            },
+          });
+          if (pushed.metadata.ok !== true) {
+            const reason =
+              typeof pushed.metadata.error === "string"
+                ? pushed.metadata.error
+                : "runtime.root-invalid";
+            return failure("extension.invalid-message", { reason });
+          }
+          if (typeof pushed.metadata.path === "string") {
+            root = pushed.metadata.path;
+          }
+        } catch (error) {
+          if (nativeHostMissingMessage(error)) {
+            return failure("extension.native-host-missing");
+          }
+          return failure("extension.invalid-message", {
+            reason: "runtime.root-invalid",
+          });
+        }
+      }
+      const result = await repository.setMockFileRoot(projectId, root);
+      if (!result.ok) {
+        if (result.kind === "conflict") return conflict(result.current);
+        return result.diagnostics.some(
+          (diagnostic) => diagnostic.code === "core.not-found",
+        )
+          ? failure("extension.not-found")
+          : failure("extension.invalid-message");
+      }
+      await state();
+      return { ok: true, value: result.value };
+    }
+    if (request.command === "pick-mock-file-root") {
+      const send = options.nativeRuntime?.send;
+      if (!send) return failure("extension.native-runtime-unavailable");
+      try {
+        const response = await send(
+          {
+            protocol: "v1",
+            type: "runtime.pick-directory",
+            timestamp: Date.now(),
+            metadata: {},
+          },
+          180_000,
+        );
+        if (response.metadata.ok !== true) {
+          const error =
+            typeof response.metadata.error === "string"
+              ? response.metadata.error
+              : "runtime.picker-unavailable";
+          if (error === "runtime.picker-unavailable") {
+            return failure("extension.picker-unavailable");
+          }
+          return failure("extension.invalid-message", { reason: error });
+        }
+        if (response.metadata.cancelled === true) {
+          return { ok: true, value: { cancelled: true } };
+        }
+        const path = response.metadata.path;
+        if (typeof path !== "string" || path.length === 0) {
+          return failure("extension.invalid-message");
+        }
+        return { ok: true, value: { path } };
+      } catch (error) {
+        if (nativeHostMissingMessage(error)) {
+          return failure("extension.native-host-missing");
+        }
+        return failure("extension.picker-unavailable");
+      }
     }
     if (request.command === "remove-project") {
       const projectId = stringValue(data.projectId);
@@ -813,7 +1070,13 @@ export function createExtensionApplication(
           sessionResult = await startNativeSession({
             extensionId: options.extensionId,
             nativeRuntime: options.nativeRuntime,
-            getProject: async () => ({ data: projectData, enabledGroupIds }),
+            getProject: async () => ({
+              data: projectData,
+              enabledGroupIds,
+              ...(typeof project?.mockFileRoot === "string"
+                ? { fileRoot: project.mockFileRoot }
+                : {}),
+            }),
             bodyMarkers:
               options.chromeApi === undefined
                 ? undefined
@@ -877,6 +1140,7 @@ export function createExtensionApplication(
 
         nativePhase = "started";
         nativeRuntimeError = null;
+        ignoreHostMockFileErrors = false;
         // DNR reconcile runs inside state() → projectState (full desired set).
         return state();
       }
@@ -894,6 +1158,9 @@ export function createExtensionApplication(
             return {
               data: project.data,
               enabledGroupIds: project.enabledGroupIds,
+              ...(typeof project.mockFileRoot === "string"
+                ? { fileRoot: project.mockFileRoot }
+                : {}),
             };
           },
           bodyMarkers:
@@ -907,6 +1174,8 @@ export function createExtensionApplication(
         });
         nativePhase = "stopped";
         nativeRuntimeError = null;
+        ignoreHostMockFileErrors = false;
+        mockFileErrors.clear();
         // DNR reconcile runs inside state() → projectState (full desired set).
         return state();
       }

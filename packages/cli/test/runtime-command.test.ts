@@ -54,7 +54,8 @@ describe("rogatio runtime command", () => {
     await runtimeCommand(["--help"]);
     const output = log.mock.calls.join("\n");
     expect(output).toMatch(/^ {2}verify\b/m);
-    expect(output).toContain("--mock-port");
+    expect(output).toContain("--root");
+    expect(output).not.toContain("--mock-port");
     expect(output).toContain("rolled back");
   });
 

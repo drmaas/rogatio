@@ -2,6 +2,7 @@ import type {
   HeaderDirection,
   HeaderOperationKind,
   HttpMethod,
+  MockAction,
   RequestBodyAction,
   ResourceType,
   ResponseBodyAction,
@@ -66,13 +67,20 @@ export interface RequestBodyOperation extends OperationBase {
   readonly requestBody: RequestBodyAction;
 }
 
+export interface MockOperation extends OperationBase {
+  readonly kind: "mock";
+  readonly matcher: NormalizedMatcher;
+  readonly mock: MockAction;
+}
+
 export type RogatioOperation =
   | MatcherOperation
   | RedirectOperation
   | QueryOperation
   | HeaderOperation
   | ResponseBodyOperation
-  | RequestBodyOperation;
+  | RequestBodyOperation
+  | MockOperation;
 
 export type CompilerDiagnosticCode =
   | "schema.required"
@@ -90,7 +98,9 @@ export type CompilerDiagnosticCode =
   | "compiler.header-value-required"
   | "compiler.header-value-unexpected"
   | "compiler.invalid-header-direction"
-  | "compiler.invalid-header-operation";
+  | "compiler.invalid-header-operation"
+  | "compiler.mock-body-source"
+  | "compiler.mock-forbidden-header";
 
 export interface CompilerDiagnostic {
   readonly code: CompilerDiagnosticCode;

@@ -47,6 +47,7 @@ const DNR_RULE_IDS = [
 ] as const;
 
 const BODY_RULE_IDS = ["rule-response-body", "rule-request-body"] as const;
+const MOCK_RULE_ID = "rule-mock-file";
 
 type ProbeMatchEvent = { readonly ruleId: number; readonly url?: string };
 
@@ -128,6 +129,10 @@ testStandalone(
           "needs runtime",
         );
       }
+      vitestExpect(
+        statusFor(statuses, MOCK_RULE_ID),
+        `${MOCK_RULE_ID} status`,
+      ).toBe("needs root directory");
 
       vitestExpect(await installMatchDebugProbe(page)).toBe(true);
       const redirectDnrId = await dnrIdForRule(page, "rule-redirect");

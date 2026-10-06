@@ -63,6 +63,10 @@ const MESSAGES: Record<CompilerDiagnosticCode, string> = {
     "Header value must not be provided for remove operation.",
   "compiler.invalid-header-direction": "Invalid header direction.",
   "compiler.invalid-header-operation": "Invalid header operation.",
+  "compiler.mock-body-source":
+    "Mock rules require exactly one of body or file.",
+  "compiler.mock-forbidden-header":
+    "The header name is forbidden for mock response headers.",
 };
 
 export { MESSAGES as diagnosticMessages };
@@ -129,14 +133,31 @@ function stableParams(params: Readonly<Record<string, unknown>>): string {
     .join(",");
 }
 
+const MOCK_HEADER_NAME_PATH =
+  /^\/groups\/\d+\/rules\/\d+\/mock\/headers\/\d+\/name$/;
+
+function validationIssueCode(issue: ValidationIssue): CompilerDiagnosticCode {
+  if (issue.keyword === "mock-body-source") {
+    return "compiler.mock-body-source";
+  }
+  if (
+    issue.keyword === "forbiddenHeader" &&
+    MOCK_HEADER_NAME_PATH.test(issue.instancePath)
+  ) {
+    return "compiler.mock-forbidden-header";
+  }
+  if (Object.hasOwn(ISSUE_CODES, issue.keyword)) {
+    return ISSUE_CODES[issue.keyword];
+  }
+  return "schema.invalid-value";
+}
+
 export function mapValidationIssues(
   issues: readonly ValidationIssue[],
 ): CompilerDiagnostic[] {
   return issues
     .map((issue) => {
-      const code = Object.hasOwn(ISSUE_CODES, issue.keyword)
-        ? ISSUE_CODES[issue.keyword]
-        : "schema.invalid-value";
+      const code = validationIssueCode(issue);
       return {
         code,
         severity: "error",

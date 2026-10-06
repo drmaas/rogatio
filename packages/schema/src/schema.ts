@@ -96,6 +96,7 @@ const projectSchemaDefinition = {
             "header",
             "response-body",
             "request-body",
+            "mock",
           ],
         },
         redirect: {
@@ -120,6 +121,7 @@ const projectSchemaDefinition = {
         },
         responseBody: { $ref: "#/$defs/responseBodyAction" },
         requestBody: { $ref: "#/$defs/requestBodyAction" },
+        mock: { $ref: "#/$defs/mockAction" },
         redactSensitiveInLogs: { type: "boolean" },
       },
       allOf: [
@@ -203,7 +205,64 @@ const projectSchemaDefinition = {
             required: ["requestBody", "method", "resourceTypes"],
           },
         },
+        {
+          if: {
+            required: ["type"],
+            properties: { type: { const: "mock" } },
+          },
+          // biome-ignore lint/suspicious/noThenProperty: AJV conditional schema keyword
+          then: {
+            required: ["mock"],
+          },
+        },
       ],
+    },
+    mockHeader: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "value"],
+      properties: {
+        name: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxMockHeaderNameLength,
+        },
+        value: {
+          type: "string",
+          maxLength: LIMITS.maxMockHeaderValueLength,
+        },
+      },
+    },
+    mockAction: {
+      type: "object",
+      additionalProperties: false,
+      required: ["status"],
+      properties: {
+        status: {
+          type: "integer",
+          minimum: LIMITS.minMockStatus,
+          maximum: LIMITS.maxMockStatus,
+        },
+        headers: {
+          type: "array",
+          maxItems: LIMITS.maxMockHeadersPerRule,
+          items: { $ref: "#/$defs/mockHeader" },
+        },
+        delayMs: {
+          type: "integer",
+          minimum: 0,
+          maximum: LIMITS.maxMockDelayMs,
+        },
+        body: {
+          type: "string",
+          maxLength: LIMITS.maxMockInlineBodyLength,
+        },
+        file: {
+          type: "string",
+          minLength: 1,
+          maxLength: LIMITS.maxMockFilePathLength,
+        },
+      },
     },
     queryParam: {
       type: "object",

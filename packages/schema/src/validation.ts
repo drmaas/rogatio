@@ -1,6 +1,7 @@
 import type { ErrorObject, ValidateFunction } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { validateCaptureTemplate } from "./captures.js";
+import { hasControl } from "./control.js";
 import { type HeaderDirection, isForbiddenHeader } from "./headers.js";
 import { normalizeNameKey } from "./identity.js";
 import { LIMITS } from "./limits.js";
@@ -257,13 +258,14 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
         rule.type !== "query" &&
         rule.type !== "header" &&
         rule.type !== "response-body" &&
-        rule.type !== "request-body"
+        rule.type !== "request-body" &&
+        rule.type !== "mock"
       ) {
         issues.push({
           instancePath: `${rulePath}/type`,
           keyword: "enum",
           message:
-            'must be "redirect", "query", "header", "response-body", or "request-body"',
+            'must be "redirect", "query", "header", "response-body", "request-body", or "mock"',
           params: {
             allowedValues: [
               "redirect",
@@ -271,6 +273,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
               "header",
               "response-body",
               "request-body",
+              "mock",
             ],
           },
         });
@@ -606,6 +609,99 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
           });
         }
       }
+
+      if (rule.type === "mock") {
+        const mock = rule.mock;
+        const mockPath = `${rulePath}/mock`;
+        if (mock !== undefined) {
+          const forbiddenMockStatuses = new Set([204, 205, 304]);
+          if (forbiddenMockStatuses.has(mock.status)) {
+            issues.push({
+              instancePath: `${mockPath}/status`,
+              keyword: "mock-status",
+              message:
+                "Mock status must not be 204, 205, or 304 because those responses require special body handling.",
+              params: { status: mock.status },
+            });
+          }
+
+          const bodySet = mock.body !== undefined;
+          const fileSet = mock.file !== undefined;
+          if (bodySet === fileSet) {
+            issues.push({
+              instancePath: mockPath,
+              keyword: "mock-body-source",
+              message: "Mock rules require exactly one of body or file.",
+              params: {},
+            });
+          } else if (
+            fileSet &&
+            typeof mock.file === "string" &&
+            !isValidMockLogicalPath(mock.file)
+          ) {
+            issues.push({
+              instancePath: `${mockPath}/file`,
+              keyword: "mock-file-path",
+              message:
+                "Mock file must be a relative logical path without absolute segments, backslashes, percent escapes, control characters, dot segments, colons, or glob characters.",
+              params: {},
+            });
+          }
+
+          if (mock.headers !== undefined) {
+            const seenHeaderNames = new Set<string>();
+            for (let index = 0; index < mock.headers.length; index += 1) {
+              const header = mock.headers[index];
+              if (header === undefined) continue;
+              const namePath = `${mockPath}/headers/${index}/name`;
+              const valuePath = `${mockPath}/headers/${index}/value`;
+              if (hasControl(header.name)) {
+                issues.push({
+                  instancePath: namePath,
+                  keyword: "mock-header-control",
+                  message:
+                    "Mock header names must not contain control characters.",
+                  params: {},
+                });
+              }
+              if (hasControl(header.value)) {
+                issues.push({
+                  instancePath: valuePath,
+                  keyword: "mock-header-control",
+                  message:
+                    "Mock header values must not contain control characters.",
+                  params: {},
+                });
+              }
+              // Trim before comparing so a padded name such as "Content-Length "
+              // cannot slip past the forbidden and duplicate checks.
+              const comparableName = header.name.trim();
+              if (isForbiddenHeader(comparableName, "response")) {
+                issues.push({
+                  instancePath: namePath,
+                  keyword: "forbiddenHeader",
+                  message: `Header "${header.name}" is forbidden for response headers.`,
+                  params: {
+                    headerName: header.name,
+                    headerDirection: "response",
+                  },
+                });
+              }
+              const normalizedName = comparableName.toLowerCase();
+              if (seenHeaderNames.has(normalizedName)) {
+                issues.push({
+                  instancePath: namePath,
+                  keyword: "uniqueMockHeaderName",
+                  message: `mock header name must be unique; duplicate "${header.name}"`,
+                  params: { name: header.name },
+                });
+              } else {
+                seenHeaderNames.add(normalizedName);
+              }
+            }
+          }
+        }
+      }
     }
   }
 
@@ -679,6 +775,31 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
 export interface RedirectDestinationIssue {
   readonly code: string;
   readonly message: string;
+}
+
+function isValidMockLogicalPath(value: string): boolean {
+  if (value.length === 0) return false;
+  if (value.includes("\\") || value.includes("%") || hasControl(value)) {
+    return false;
+  }
+  if (value.startsWith("/") || value.endsWith("/") || value.includes("//")) {
+    return false;
+  }
+
+  const parts = value.split("/");
+  if (
+    parts.some(
+      (part) =>
+        part.length === 0 ||
+        part === "." ||
+        part === ".." ||
+        part.includes(":") ||
+        /[*?[\]]/.test(part),
+    )
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function captureValidationIssues(

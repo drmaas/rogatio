@@ -26,9 +26,11 @@ const expectedAjv = cliManifest.dependencies?.ajv;
 const runtimeManifest = JSON.parse(
   await readFile(join(root, "packages/runtime/package.json"), "utf8"),
 ) as { dependencies?: Record<string, string> };
-const runtimeExternalPkgs = ["@peculiar/x509", "reflect-metadata"].filter(
-  (dep) => runtimeManifest.dependencies?.[dep],
-);
+const runtimeExternalPkgs = [
+  "@peculiar/x509",
+  "reflect-metadata",
+  "koffi",
+].filter((dep) => runtimeManifest.dependencies?.[dep]);
 
 async function run(command: string, args: string[], cwd: string) {
   try {

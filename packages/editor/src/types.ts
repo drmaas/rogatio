@@ -246,6 +246,11 @@ export interface EditorOptions {
   readonly groupEnablement?: EditorGroupEnablement;
   /** Omit on hosts that have no project lifecycle actions, such as the CLI. */
   readonly projectActions?: readonly EditorProjectAction[];
+  /**
+   * Host-owned block inside Project details, after the description.
+   * The editor does not read or save what the host mounts here.
+   */
+  readonly mountProjectDetails?: (parent: HTMLElement) => void;
 }
 
 export interface EditorController {

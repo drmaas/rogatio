@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "Sample Rules Project",
-  "description": "Exercises redirect, query, header, response-body, and request-body rule types.",
+  "description": "Exercises redirect, query, header, response-body, request-body, and mock rule types.",
   "groups": [
     {
       "id": "grp-sample",
@@ -103,6 +103,23 @@
           "requestBody": {
             "mode": "replace",
             "body": "{\"user\":\"$1\"}"
+          }
+        },
+        {
+          "id": "rule-mock-file",
+          "name": "Serve a local file",
+          "source": {
+            "key": "url",
+            "operator": "regex",
+            "value": "^https://example\\.com/mock-file$"
+          },
+          "resourceTypes": ["main_frame", "xmlhttprequest"],
+          "priority": 700,
+          "type": "mock",
+          "mock": {
+            "status": 200,
+            "file": "fixture.txt",
+            "headers": [{ "name": "Content-Type", "value": "text/plain" }]
           }
         }
       ]

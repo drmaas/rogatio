@@ -1,6 +1,6 @@
 # Sample Rules Project
 
-A minimal `.rogatio.json` that exercises all five Rogatio rule types so you can verify the
+A minimal `.rogatio.json` that exercises every Rogatio rule type so you can verify the
 schema, compiler, CLI behavior, the Chrome extension, and each rule's live browser effect
 end-to-end.
 
@@ -14,6 +14,7 @@ end-to-end.
 | `header`          | `rule-header-remove`| Removes `X-Test-Header` response header    |
 | `request-body`    | `rule-request-body` | Replaces the POST body (URL capture `$1`) |
 | `response-body`   | `rule-response-body`| Replaces response body text             |
+| `mock`            | `rule-mock-file`    | Serves `fixture.txt` for `/mock-file`   |
 
 The shipped sample targets `https://example.com`. `example.com` is a real, publicly
 reachable domain, which makes a few rules observable **live in the browser without any
@@ -77,16 +78,16 @@ per-origin grant step.
 1. Open **Workspace**, open **Sample Rules Group**, and click **Enable** on the group heading.
 2. After the group is enabled, each rule shows a status in the management page and the toolbar popup:
    `active`, `disabled`, `needs runtime`, `unsupported`, or `error`. Redirect, query, and
-   header rules should read `active` once installed; response-body and request-body rules
-   read `needs runtime` until the native runtime is started. A response-body rule matches
+   header rules should read `active` once installed; response-body, request-body, and
+   mock rules read `needs runtime` until the native runtime is started. A response-body rule matches
    its URL regex in the browser and becomes `active` after start. A request-body rule
    becomes `active` when its regex names one literal host, like `^https://api.example.com/`,
    with escaped dots, a slash after the host, and no top-level `|`. The proxy then steers
    that host. A request-body regex that does not name one literal host stays `needs runtime`.
 
-## 5. Start the runtime (response-body, request-body)
+## 5. Start the runtime (response-body, request-body, mock)
 
-Response-body and request-body rules use the unified native runtime. First, register the native-messaging host once:
+Response-body, request-body, and mock rules use the unified native runtime. First, register the native-messaging host once:
 
 First, register the native-messaging host once so Chrome can launch it. On macOS and other
 capable platforms, this same install command also provisions and trusts the device-local
@@ -143,6 +144,9 @@ rogatio test samples/basic/.rogatio.json --urls "https://example.com/data.json" 
 
 # request-body (xmlhttprequest, POST)
 rogatio test samples/basic/.rogatio.json --urls "https://example.com/submit" --resource-type xmlhttprequest --method POST --json
+
+# file mock (main_frame, GET) — preview only; the file is read when the runtime serves it
+rogatio test samples/basic/.rogatio.json --urls "https://example.com/mock-file" --resource-type main_frame --method GET --json
 ```
 
 Each run should report the corresponding rule as a match. A mismatch (wrong resource type or
@@ -278,6 +282,20 @@ the group again. Then:
 2. The displayed JSON is `{"value":"newValue"}` — `oldValue` was rewritten to `newValue` in
    the response body (requires the runtime connected for response-body rules).
 
+**File mock** (`rule-mock-file`):
+
+The rule reads `samples/basic/fixture.txt`. That path is relative to a folder you choose.
+It is not stored in the project file.
+
+1. In **Workspace**, set the mock file root to the `samples/basic` directory
+   (the folder that contains `fixture.txt`).
+2. Start the runtime (step 5). Saving the folder after the runtime is already running applies immediately. A restart is not required.
+3. Visit `https://example.com/mock-file`.
+
+The page shows `rogatio file mock`. The browser does not contact example.com.
+If you open this project with `rogatio edit samples/basic/.rogatio.json` and no
+root is saved yet, the root defaults to that same directory.
+
 **Request-body** (`rule-request-body`):
 
 1. With the runtime installed, trusted, and started (step 6), run from the Console:
@@ -290,7 +308,8 @@ the group again. Then:
 
 ```
 samples/basic/
-├── .rogatio.json          # canonical source of truth (all five rule types)
+├── .rogatio.json          # canonical source of truth (every rule type)
+├── fixture.txt            # body served by rule-mock-file
 ├── README.md              # this file
 └── validate-server.mjs    # optional local target for live header/body checks
 ```

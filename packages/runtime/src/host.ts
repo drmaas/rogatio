@@ -1,6 +1,5 @@
 import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
-import { createServer, type Server } from "node:http";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import type { AIProviderConfig } from "./ai-client.js";
@@ -16,6 +15,19 @@ import {
   registerInterceptionProvider,
 } from "./interception.js";
 import { createNativeRuntimeController } from "./lifecycle.js";
+import {
+  decodeNativeFrame,
+  encodeNativeFrame,
+  type NativeFrame,
+  NativeFrameType,
+  type PolicyStageState,
+} from "./native-framing.js";
+import {
+  acceptProjectPart,
+  beginProjectStage,
+  finishProjectStage,
+  isProjectStageType,
+} from "./project-stage.js";
 import { defaultTrustInstallRoot } from "./trust.js";
 import type {
   Envelope,
@@ -26,8 +38,6 @@ import type {
 export interface NativeHostOptions {
   readonly preset?: NormalizedRuntimePreset;
   readonly fileRoot?: string;
-  /** Loopback port for the mock-body faucet (browser DNR redirect target). */
-  readonly mockPort?: number;
   readonly aiProviderConfig?: AIProviderConfig;
   /**
    * Reader used to re-read the AI provider config while the host runs, so
@@ -43,10 +53,25 @@ export interface NativeHostHandle {
   readonly controller: ReturnType<typeof createNativeRuntimeController>;
   /** Process one length-prefixed stdio frame and return the response frame. */
   readonly processFrame: (frame: Uint8Array) => Promise<Uint8Array | null>;
-  /** Bound mock-body faucet port, or null when no faucet is configured. */
-  readonly mockPort: number | null;
   start(): Promise<void>;
   stop(): Promise<void>;
+}
+
+function stageAck(
+  type: NativeFrameType,
+  requestId: string | undefined,
+  ok: boolean,
+  error?: string,
+): Uint8Array {
+  return encodeNativeFrame({
+    protocol: "v1",
+    type,
+    ...(requestId !== undefined ? { requestId } : {}),
+    data: JSON.stringify({
+      ok,
+      ...(error !== undefined ? { error } : {}),
+    }),
+  });
 }
 
 function encodeEnvelopeFrame(envelope: Envelope): Uint8Array {
@@ -71,50 +96,6 @@ function decodeEnvelopeFrame(buffer: Uint8Array): Envelope {
   return parseEnvelope(json);
 }
 
-/**
- * Loopback faucet that serves rendered mock bodies for browser DNR redirects
- * (spec REQ-003). The control plane stays on stdio; this is purely a bytes
- * faucet keyed by the per-rule mock token returned from `mock.connect`.
- */
-function startMockFaucet(
-  port: number,
-  controller: ReturnType<typeof createNativeRuntimeController>,
-): Promise<Server> {
-  const server = createServer((req, res) => {
-    void (async () => {
-      try {
-        const url = new URL(req.url ?? "", "http://localhost");
-        const match = /^\/mock\/([a-f0-9]+)$/.exec(url.pathname);
-        if (!match || req.method !== "GET") {
-          res.writeHead(404);
-          res.end();
-          return;
-        }
-        const result = await controller.serveMock(match[1]);
-        if (!result.ok) {
-          res.writeHead(404);
-          res.end();
-          return;
-        }
-        const { status, headers, bodyBytes } = result.value;
-        res.writeHead(
-          status,
-          Object.fromEntries(
-            headers.map((h: readonly [string, string]) => [h[0], h[1]]),
-          ),
-        );
-        res.end(Buffer.from(bodyBytes));
-      } catch {
-        if (!res.headersSent) res.writeHead(500);
-        res.end();
-      }
-    })();
-  });
-  return new Promise<Server>((resolve) =>
-    server.listen(port, () => resolve(server)),
-  );
-}
-
 function defaultTrustRoot(): string {
   return defaultTrustInstallRoot(process.platform);
 }
@@ -128,7 +109,6 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
   const controller = createNativeRuntimeController({
     preset: options.preset,
     fileRoot: options.fileRoot,
-    ...(options.mockPort !== undefined ? { mockPort: options.mockPort } : {}),
     ...(options.aiProviderConfig !== undefined
       ? { aiProviderConfig: options.aiProviderConfig }
       : {}),
@@ -138,7 +118,6 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
     ...(options.clock ? { clock: options.clock } : {}),
   });
 
-  let faucet: Server | null = null;
   let interceptProxy: InterceptProxyHandle | null = null;
   let outboundWrite: ((frame: Uint8Array) => void) | null = null;
   let hostRequestCounter = 0;
@@ -238,6 +217,11 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
               presetDigest: policy.presetDigest,
             }
           : null,
+        serveMock: (request) =>
+          controller.serveMock(request.token, {
+            method: request.method,
+            signal: request.signal,
+          }),
       });
       return interceptProxy.endpoint;
     },
@@ -287,20 +271,97 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
   // The lifecycle stores pacRoutes on activation when provided in
   // sessionConfig (activation.pacRoutes). Use that.
 
+  let projectStage: PolicyStageState | undefined;
+
+  async function handleProjectStage(
+    frame: NativeFrame,
+  ): Promise<Uint8Array | null> {
+    const requestId = frame.requestId;
+    if (frame.type === NativeFrameType.PolicyBegin) {
+      const begun = beginProjectStage(frame);
+      if (!begun.ok) {
+        projectStage = undefined;
+        return stageAck(
+          NativeFrameType.PolicyBegin,
+          requestId,
+          false,
+          begun.error.code,
+        );
+      }
+      projectStage = begun.value;
+      return stageAck(NativeFrameType.PolicyBegin, requestId, true);
+    }
+    if (frame.type === NativeFrameType.PolicyPart) {
+      if (projectStage === undefined) {
+        return stageAck(
+          NativeFrameType.PolicyPart,
+          requestId,
+          false,
+          "runtime.project-stage-invalid",
+        );
+      }
+      const accepted = acceptProjectPart(projectStage, frame);
+      if (!accepted.ok) {
+        projectStage = undefined;
+        return stageAck(
+          NativeFrameType.PolicyPart,
+          requestId,
+          false,
+          accepted.error.code,
+        );
+      }
+      return stageAck(NativeFrameType.PolicyPart, requestId, true);
+    }
+    if (projectStage === undefined) {
+      return stageAck(
+        NativeFrameType.PolicyCommit,
+        requestId,
+        false,
+        "runtime.project-stage-invalid",
+      );
+    }
+    const finished = finishProjectStage(projectStage);
+    projectStage = undefined;
+    if (!finished.ok) {
+      return stageAck(
+        NativeFrameType.PolicyCommit,
+        requestId,
+        false,
+        finished.error.code,
+      );
+    }
+    try {
+      const json = new TextDecoder("utf-8", { fatal: true }).decode(
+        finished.value,
+      );
+      const envelope = parseEnvelope(json);
+      if (envelope.type !== "runtime.project.set") {
+        return stageAck(
+          NativeFrameType.PolicyCommit,
+          requestId,
+          false,
+          "runtime.project-stage-invalid",
+        );
+      }
+      const response = await controller.handleEnvelope(envelope);
+      return encodeEnvelopeFrame(response);
+    } catch {
+      return stageAck(
+        NativeFrameType.PolicyCommit,
+        requestId,
+        false,
+        "runtime.project-stage-invalid",
+      );
+    }
+  }
+
   const handle: NativeHostHandle = {
     controller,
-    mockPort: options.mockPort ?? null,
     async start() {
       await controller.start();
-      if (options.mockPort !== undefined) {
-        faucet = await startMockFaucet(options.mockPort, controller);
-      }
     },
     async stop() {
-      if (faucet) {
-        await new Promise<void>((resolve) => faucet?.close(() => resolve()));
-        faucet = null;
-      }
+      projectStage = undefined;
       await controller.stop();
       clearSession();
       if (interceptProxy) {
@@ -309,6 +370,11 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
       }
     },
     async processFrame(frame: Uint8Array): Promise<Uint8Array | null> {
+      const native = decodeNativeFrame(frame);
+      if (native.ok && isProjectStageType(native.value.type)) {
+        return handleProjectStage(native.value);
+      }
+
       let envelope: Envelope;
       try {
         envelope = decodeEnvelopeFrame(frame);

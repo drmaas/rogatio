@@ -469,7 +469,29 @@ function generateEditorHtml(
         onCancel: () => {
           cancel();
         },
+        projectActions: [
+          { command: 'set-mock-root', label: 'Set mock file root' },
+          { command: 'clear-mock-root', label: 'Clear mock file root' },
+        ],
         ${aiAssistHandler}
+      });
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const command = target.closest('[data-command]')?.getAttribute('data-command');
+        if (command !== 'set-mock-root' && command !== 'clear-mock-root') return;
+        const root = command === 'clear-mock-root'
+          ? null
+          : window.prompt('Mock file root');
+        if (command === 'set-mock-root' && root === null) return;
+        void fetch(apiBase + '/api/mock-root', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          body: JSON.stringify({ root }),
+        });
       });
       void editor;
     } catch (error) {

@@ -15,7 +15,9 @@ import {
   findSession,
   pairCapability,
 } from "./capability.js";
+import { type DirectoryPick, pickDirectory } from "./directory-picker.js";
 import { failure } from "./errors.js";
+import { resolveConfinedRoot } from "./file-root.js";
 import {
   getCurrentSession,
   hasActiveSession,
@@ -25,15 +27,22 @@ import {
 } from "./interception.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { mintToken, type RenderedMock, renderMockResponse } from "./mock.js";
-import { normalizeRuntimePreset } from "./preset.js";
+import {
+  clearMockFileError,
+  listMockFileErrors,
+  recordMockFileError,
+} from "./mock-errors.js";
+import { normalizeRuntimePreset, parseEnabledGroupIds } from "./preset.js";
+import {
+  matchersFromOperations,
+  mocksFromOperations,
+} from "./project-preset.js";
 import type {
   AIStatusMetadata,
   AuthorizeRequest,
   Envelope,
   EnvelopeInput,
   MockConnectResponse,
-  MockRequest,
-  MockResponse,
   NativeRuntimeState,
   NormalizedRuntimePreset,
   PairRequest,
@@ -70,8 +79,6 @@ export interface SessionConfig {
 export interface NativeRuntimeControllerOptions {
   readonly preset?: NormalizedRuntimePreset;
   readonly fileRoot?: string;
-  /** Loopback faucet port the native host binds to serve mock bodies (REQ-003). */
-  readonly mockPort?: number;
   readonly onStart?: (
     activation: RuntimeActivation,
     session: SessionProvider | null,
@@ -88,6 +95,11 @@ export interface NativeRuntimeControllerOptions {
    * force unchanged.
    */
   readonly aiConfigReader?: () => Promise<AIProviderConfig | null>;
+  /**
+   * Opens the system folder dialog. Tests inject this so a host envelope
+   * never waits on a real dialog.
+   */
+  readonly directoryPicker?: () => Promise<DirectoryPick>;
 }
 
 export interface RuntimeStartResult {
@@ -116,7 +128,13 @@ export interface NativeRuntimeController {
   /** Immutable active policy retained from `runtime.project.set`. */
   getActivePolicy(): ActiveRuntimePolicy | null;
   /** Resolve a stored mock token to rendered response bytes (loopback faucet). */
-  serveMock(token: string): Promise<RuntimeResult<RenderedMock>>;
+  serveMock(
+    token: string,
+    options?: {
+      readonly method?: string;
+      readonly signal?: AbortSignal;
+    },
+  ): Promise<RuntimeResult<RenderedMock>>;
   /**
    * The single-use bootstrap capability token the extension presents in
    * `pair.request` (spec REQ-005). Returns undefined before start, after the
@@ -128,15 +146,6 @@ export interface NativeRuntimeController {
    * (spec REQ-001..REQ-005). Throws EnvelopeError for malformed input.
    */
   handleEnvelope(input: EnvelopeInput): Promise<Envelope>;
-}
-
-function base64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("base64");
-}
-
-async function delay(ms: number): Promise<void> {
-  if (ms <= 0) return;
-  await new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -153,9 +162,10 @@ export function createNativeRuntimeController(
   options: NativeRuntimeControllerOptions,
 ): NativeRuntimeController {
   let preset: NormalizedRuntimePreset | undefined = options.preset;
-  const fileRoot = options.fileRoot;
-  const mockPort = options.mockPort;
+  let fileRoot = options.fileRoot;
   const clock = options.clock ?? (() => Date.now());
+  const directoryPicker = options.directoryPicker ?? pickDirectory;
+  const mockFileErrors = new Map<string, string>();
 
   let state: NativeRuntimeState = "idle";
   let activation: RuntimeActivation | undefined;
@@ -296,6 +306,7 @@ export function createNativeRuntimeController(
 
       const startedAt = clock();
       capability = createCapabilityState(preset, startedAt);
+      mockFileErrors.clear();
       mockTokens.clear();
       for (const mock of preset.mocks ?? []) {
         mockTokens.set(mintToken(), mock);
@@ -328,6 +339,7 @@ export function createNativeRuntimeController(
         return { state: "stopped" };
       }
       state = "stopping";
+      mockFileErrors.clear();
       if (options.onStop) await options.onStop();
       await stopInterception();
       if (capability) closeCapabilityState(capability);
@@ -350,15 +362,44 @@ export function createNativeRuntimeController(
       return activePolicy;
     },
 
-    async serveMock(token: string): Promise<RuntimeResult<RenderedMock>> {
+    async serveMock(
+      token: string,
+      options?: {
+        readonly method?: string;
+        readonly signal?: AbortSignal;
+      },
+    ): Promise<RuntimeResult<RenderedMock>> {
       const mock = mockTokens.get(token);
-      if (mock === undefined) return failure("runtime.mock-unknown");
-      if (!preset) throw new Error("runtime not started");
-      return renderMockResponse({
+      if (mock === undefined || state !== "running" || preset === undefined) {
+        return failure("runtime.mock-unknown");
+      }
+      const method = options?.method?.toUpperCase();
+      const matcher = preset.matchers.find(
+        (candidate) => candidate.ruleId === mock.ruleId,
+      );
+      if (method !== undefined) {
+        if (matcher === undefined) return failure("runtime.mock-unknown");
+        if (
+          matcher.matcher.method !== undefined &&
+          matcher.matcher.method !== method
+        ) {
+          return failure("runtime.unsupported-method");
+        }
+      }
+      const rendered = await renderMockResponse({
         mock,
         fileRoot,
         presetDigest: preset.digest,
+        ...(method !== undefined ? { method } : {}),
+        ...(options?.signal !== undefined ? { signal: options.signal } : {}),
       });
+      if (!rendered.ok) {
+        recordMockFileError(mockFileErrors, mock.ruleId, rendered.error.code);
+        return rendered;
+      }
+      if (mock.file !== undefined)
+        clearMockFileError(mockFileErrors, mock.ruleId);
+      return rendered;
     },
 
     getBootstrapCapability() {
@@ -416,24 +457,56 @@ export function createNativeRuntimeController(
           };
         }
 
-        const matcherOps: RogatioOperation[] = [];
-        for (const op of compileResult.operations) {
-          if ("matcher" in op) {
-            matcherOps.push({
-              kind: "matcher",
-              groupId: op.groupId,
-              ruleId: op.ruleId,
-              redactSensitiveInLogs: op.redactSensitiveInLogs,
-              matcher: (op as { matcher: unknown }).matcher,
-            } as RogatioOperation);
+        const metadata = input.metadata;
+        if (metadata === null || typeof metadata !== "object") {
+          return {
+            protocol: "v1",
+            type: "runtime.project.set",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: "runtime.project-missing" },
+          };
+        }
+        const enabledGroups = parseEnabledGroupIds(
+          metadata,
+          schemaResult.data.groups.map((group) => group.id),
+        );
+        if (!enabledGroups.ok) {
+          return {
+            protocol: "v1",
+            type: "runtime.project.set",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: enabledGroups.error.code },
+          };
+        }
+        if (Object.hasOwn(metadata, "fileRoot")) {
+          const resolvedRoot = await resolveConfinedRoot(
+            (metadata as Record<string, unknown>).fileRoot,
+          );
+          if (!resolvedRoot.ok) {
+            return {
+              protocol: "v1",
+              type: "runtime.project.set",
+              ...(requestId !== undefined ? { requestId } : {}),
+              timestamp,
+              metadata: { ok: false, error: resolvedRoot.error.code },
+            };
           }
+          fileRoot = resolvedRoot.value;
         }
 
+        const matcherOps = matchersFromOperations(compileResult.operations);
+        const mocks = mocksFromOperations(
+          compileResult.operations,
+          enabledGroups.value,
+        );
         const presetInput = {
           version: 1,
           limits: RUNTIME_LIMITS,
           matchers: matcherOps,
           grants: [],
+          ...(mocks.length > 0 ? { mocks } : {}),
         };
         console.error(
           "[rogatio-host] normalizeRuntimePreset input: matchers=",
@@ -565,6 +638,95 @@ export function createNativeRuntimeController(
         };
       }
 
+      if (input.type === "runtime.pick-directory") {
+        const picked = await directoryPicker();
+        if (!picked.ok) {
+          return {
+            protocol: "v1",
+            type: "runtime.pick-directory",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: picked.code },
+          };
+        }
+        if (picked.path === null) {
+          return {
+            protocol: "v1",
+            type: "runtime.pick-directory",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: true, cancelled: true },
+          };
+        }
+        const resolved = await resolveConfinedRoot(picked.path);
+        return {
+          protocol: "v1",
+          type: "runtime.pick-directory",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: resolved.ok
+            ? { ok: true, path: resolved.value }
+            : { ok: false, error: resolved.error.code },
+        };
+      }
+
+      if (input.type === "runtime.set-file-root") {
+        if (state !== "running") {
+          return {
+            protocol: "v1",
+            type: "runtime.set-file-root",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: "runtime.not-started" },
+          };
+        }
+        const candidate = input.metadata.path;
+        if (candidate === undefined || candidate === null || candidate === "") {
+          fileRoot = undefined;
+          mockFileErrors.clear();
+          return {
+            protocol: "v1",
+            type: "runtime.set-file-root",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: true, cleared: true },
+          };
+        }
+        const resolved = await resolveConfinedRoot(candidate);
+        if (!resolved.ok) {
+          return {
+            protocol: "v1",
+            type: "runtime.set-file-root",
+            ...(requestId !== undefined ? { requestId } : {}),
+            timestamp,
+            metadata: { ok: false, error: resolved.error.code },
+          };
+        }
+        fileRoot = resolved.value;
+        mockFileErrors.clear();
+        return {
+          protocol: "v1",
+          type: "runtime.set-file-root",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: { ok: true, path: resolved.value },
+        };
+      }
+
+      if (input.type === "runtime.check-directory") {
+        const candidate = input.metadata.path;
+        const resolved = await resolveConfinedRoot(candidate);
+        return {
+          protocol: "v1",
+          type: "runtime.check-directory",
+          ...(requestId !== undefined ? { requestId } : {}),
+          timestamp,
+          metadata: resolved.ok
+            ? { ok: true, path: resolved.value }
+            : { ok: false, error: resolved.error.code },
+        };
+      }
+
       // All other envelopes require running state
       if (state !== "running" || capability === undefined) {
         throw new Error("runtime not started");
@@ -679,7 +841,6 @@ export function createNativeRuntimeController(
             protocol: "v1",
             presetDigest: preset.digest,
             mocks,
-            ...(mockPort !== undefined ? { port: mockPort } : {}),
           };
           return {
             protocol: "v1",
@@ -689,29 +850,6 @@ export function createNativeRuntimeController(
             metadata,
           };
         }
-        case "mock.request": {
-          const meta = input.metadata as unknown as MockRequest;
-          const mock = mockTokens.get(meta.token);
-          if (mock === undefined) {
-            const body = JSON.stringify({
-              ok: false,
-              error: { code: "runtime.mock-unknown" },
-            });
-            const metadata: MockResponse = {
-              status: 404,
-              headers: [["Content-Type", "application/json"]],
-              mockBody: base64(new TextEncoder().encode(body)),
-            };
-            return {
-              protocol: "v1",
-              type: "mock.response",
-              ...(requestId !== undefined ? { requestId } : {}),
-              timestamp,
-              metadata,
-            };
-          }
-          return renderMock(mock, requestId, timestamp);
-        }
         case "runtime.status": {
           if (!preset) throw new Error("runtime not started");
           return {
@@ -719,7 +857,11 @@ export function createNativeRuntimeController(
             type: "runtime.status",
             ...(requestId !== undefined ? { requestId } : {}),
             timestamp,
-            metadata: { state, presetDigest: preset.digest },
+            metadata: {
+              state,
+              presetDigest: preset.digest,
+              mockFileErrors: listMockFileErrors(mockFileErrors),
+            },
           };
         }
         case "ai.status": {
@@ -877,52 +1019,4 @@ export function createNativeRuntimeController(
       }
     },
   };
-
-  async function renderMock(
-    mock: RuntimeMockConfig,
-    requestId: string | undefined,
-    timestamp: number,
-  ): Promise<Envelope> {
-    if (mock.delayMs !== undefined) await delay(mock.delayMs);
-    if (!preset) throw new Error("runtime not started");
-    const rendered = await renderMockResponse({
-      mock,
-      fileRoot,
-      presetDigest: preset.digest,
-    });
-    if (!rendered.ok) {
-      const body = JSON.stringify({
-        ok: false,
-        error: { code: rendered.error.code },
-      });
-      const metadata: MockResponse = {
-        status: 500,
-        headers: [["Content-Type", "application/json"]],
-        mockBody: base64(new TextEncoder().encode(body)),
-      };
-      return {
-        protocol: "v1",
-        type: "mock.response",
-        ...(requestId !== undefined ? { requestId } : {}),
-        timestamp,
-        metadata,
-      };
-    }
-    const headers: Array<readonly [string, string]> = [];
-    for (const header of rendered.value.headers) {
-      headers.push([header[0], header[1]]);
-    }
-    const metadata: MockResponse = {
-      status: rendered.value.status,
-      headers,
-      mockBody: base64(rendered.value.bodyBytes),
-    };
-    return {
-      protocol: "v1",
-      type: "mock.response",
-      ...(requestId !== undefined ? { requestId } : {}),
-      timestamp,
-      metadata,
-    };
-  }
 }

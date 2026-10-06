@@ -77,7 +77,10 @@ export async function startInterception(
     return { kind: "unsupported", reasons: ["no-interception-provider"] };
   }
   const capabilities = registeredProvider.detect();
-  if (!capabilities.supported) {
+  // A listener with no PAC routes does not install a proxy or use the
+  // device-local CA. An untrusted CA must not block mock or response-body
+  // serving.
+  if (pacRoutes.length > 0 && !capabilities.supported) {
     return { kind: "unsupported", reasons: capabilities.reasons };
   }
 

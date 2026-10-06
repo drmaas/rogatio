@@ -131,6 +131,55 @@ describe("migrateEnvelope", () => {
     }
   });
 
+  it("keeps a stored mock file root and drops a hostile one", () => {
+    const kept = structuredClone(makeEnvelope(2)) as EnvelopeFixture & {
+      projects: Record<string, ProjectFixture & { mockFileRoot?: unknown }>;
+    };
+    kept.projects.p1.mockFileRoot = "/var/mocks";
+    const keptResult = migrateEnvelope(kept);
+    expect(keptResult.ok).toBe(true);
+    if (keptResult.ok) {
+      expect(keptResult.envelope.projects.p1?.mockFileRoot).toBe("/var/mocks");
+    }
+
+    const hostile = structuredClone(makeEnvelope(2)) as EnvelopeFixture & {
+      projects: Record<string, ProjectFixture & { mockFileRoot?: unknown }>;
+    };
+    hostile.projects.p1.mockFileRoot = {
+      toString: () => "/etc",
+    };
+    const dropped = migrateEnvelope(hostile);
+    expect(dropped.ok).toBe(true);
+    if (dropped.ok) {
+      expect(dropped.envelope.projects.p1).not.toHaveProperty("mockFileRoot");
+      expect(dropped.envelope.projects.p1?.id).toBe("p1");
+    }
+
+    const control = structuredClone(makeEnvelope(2)) as EnvelopeFixture & {
+      projects: Record<string, ProjectFixture & { mockFileRoot?: unknown }>;
+    };
+    const relative = structuredClone(makeEnvelope(2)) as EnvelopeFixture & {
+      projects: Record<string, ProjectFixture & { mockFileRoot?: unknown }>;
+    };
+    relative.projects.p1.mockFileRoot = "samples/basic";
+    const droppedRelative = migrateEnvelope(relative);
+    expect(droppedRelative.ok).toBe(true);
+    if (droppedRelative.ok) {
+      expect(droppedRelative.envelope.projects.p1).not.toHaveProperty(
+        "mockFileRoot",
+      );
+    }
+
+    control.projects.p1.mockFileRoot = "/tmp/root\n";
+    const controlResult = migrateEnvelope(control);
+    expect(controlResult.ok).toBe(true);
+    if (controlResult.ok) {
+      expect(controlResult.envelope.projects.p1).not.toHaveProperty(
+        "mockFileRoot",
+      );
+    }
+  });
+
   it("rejects unknown envelope versions", () => {
     for (const version of [0, -1, 3, "2"]) {
       const result = migrateEnvelope({
