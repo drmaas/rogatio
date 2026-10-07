@@ -138,6 +138,7 @@ export async function editCommand(
     shutdown: () => {
       shutdown();
     },
+    boundPort: 0,
     editorHtml: "",
     editorBundlePath: "",
     editorCssPath: "",
@@ -159,6 +160,7 @@ export async function editCommand(
     return { exitCode: Promise.resolve(2), shutdown: () => {} };
   }
 
+  context.boundPort = server.port;
   const serverUrl = `http://127.0.0.1:${server.port}`;
   const editorUrl = `${serverUrl}/editor.html`;
 
@@ -319,9 +321,9 @@ function generateEditorHtml(
       import { createEditor } from '@rogatio/editor';
     
     const root = document.getElementById('editor-root');
-    const apiBase = '${apiBase}';
-    const csrfToken = '${csrfToken}';
-    const filePath = '${filePath}';
+    const apiBase = ${JSON.stringify(apiBase)};
+    const csrfToken = ${JSON.stringify(csrfToken)};
+    const filePath = ${JSON.stringify(filePath)};
     
     async function fetchProject() {
       const res = await fetch(apiBase + '/api/project');

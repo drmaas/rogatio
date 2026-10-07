@@ -20,6 +20,8 @@ export interface RouteContext {
   csrfToken: string;
   storage: ProjectStorage;
   shutdown: () => void;
+  /** Bound loopback port after `server.start()`; used for Host/Origin checks. */
+  boundPort: number;
   /** HTML document served at GET /editor.html. */
   editorHtml: string;
   /** Absolute path to the editor browser bundle shipped with the cli, served at GET /vendor/editor.js. */
@@ -32,6 +34,44 @@ export interface RouteContext {
   aiClient?: AIClient;
   /** Provider config (model/url/key) when AI is configured. */
   aiProviderConfig?: AIProviderConfig;
+}
+
+function headerValue(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (
+    Array.isArray(value) &&
+    value.length === 1 &&
+    typeof value[0] === "string"
+  ) {
+    return value[0];
+  }
+  return undefined;
+}
+
+/** Exact Host allowlist for the loopback editor server. */
+export function isAllowedEditorHost(
+  host: string | undefined,
+  boundPort: number,
+): boolean {
+  if (host === undefined || !Number.isInteger(boundPort) || boundPort <= 0) {
+    return false;
+  }
+  const expected = String(boundPort);
+  return host === `127.0.0.1:${expected}` || host === `localhost:${expected}`;
+}
+
+/** Exact Origin allowlist when Origin is present on a state-changing request. */
+export function isAllowedEditorOrigin(
+  origin: string | undefined,
+  boundPort: number,
+): boolean {
+  if (origin === undefined) return true;
+  if (!Number.isInteger(boundPort) || boundPort <= 0) return false;
+  const expected = String(boundPort);
+  return (
+    origin === `http://127.0.0.1:${expected}` ||
+    origin === `http://localhost:${expected}`
+  );
 }
 
 export function generateCsrfToken(): string {
@@ -215,18 +255,37 @@ export function createRoutes(context: RouteContext) {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
+    const host = headerValue(req.headers.host);
+    if (!isAllowedEditorHost(host, context.boundPort)) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          code: "host-invalid",
+          message: "Invalid Host header",
+        }),
+      );
+      return;
+    }
+
     const { pathname } = parseUrl(req);
     const method = req.method || "GET";
 
-    // CORS headers for local development
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "http://127.0.0.1:*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-CSRF-Token",
-    };
+    if (method === "POST") {
+      const origin = headerValue(req.headers.origin);
+      if (!isAllowedEditorOrigin(origin, context.boundPort)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "origin-invalid",
+            message: "Invalid Origin header",
+          }),
+        );
+        return;
+      }
+    }
 
     if (method === "OPTIONS") {
-      res.writeHead(204, corsHeaders);
+      res.writeHead(204);
       res.end();
       return;
     }
@@ -235,7 +294,6 @@ export function createRoutes(context: RouteContext) {
     if (pathname === "/editor.html" && method === "GET") {
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
-        ...corsHeaders,
       });
       res.end(context.editorHtml);
       return;
@@ -247,7 +305,6 @@ export function createRoutes(context: RouteContext) {
         const bundle = await readFile(context.editorBundlePath, "utf-8");
         res.writeHead(200, {
           "Content-Type": "text/javascript; charset=utf-8",
-          ...corsHeaders,
         });
         res.end(bundle);
       } catch (e) {
@@ -269,7 +326,6 @@ export function createRoutes(context: RouteContext) {
         const css = await readFile(context.editorCssPath, "utf-8");
         res.writeHead(200, {
           "Content-Type": "text/css; charset=utf-8",
-          ...corsHeaders,
         });
         res.end(css);
       } catch (e) {
@@ -304,7 +360,6 @@ export function createRoutes(context: RouteContext) {
         const font = await readFile(resolve(context.editorFontsPath, fileName));
         res.writeHead(200, {
           "Content-Type": "font/woff2",
-          ...corsHeaders,
         });
         res.end(font);
       } catch {
@@ -730,7 +785,6 @@ export function createRoutes(context: RouteContext) {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
           Connection: "keep-alive",
-          ...corsHeaders,
         });
 
         const stream = context.aiClient?.stream(options);

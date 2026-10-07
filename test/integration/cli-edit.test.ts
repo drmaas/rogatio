@@ -55,9 +55,10 @@ describe(" real CLI edit server", () => {
       expect(projectResponse.status).toBe(200);
       expect(await projectResponse.json()).toEqual(validProject);
 
-      const csrfMatch = html.match(/const csrfToken = '([^']+)'/u);
+      const csrfMatch = html.match(/const csrfToken = ("(?:\\.|[^"\\])*")/u);
       expect(csrfMatch?.[1]).toBeTruthy();
-      const csrf = csrfMatch?.[1] ?? "";
+      const csrf = JSON.parse(csrfMatch?.[1] ?? '""') as string;
+      expect(csrf.length).toBeGreaterThan(0);
 
       const denied = await fetch(`${serverUrl}/api/save`, {
         method: "POST",
