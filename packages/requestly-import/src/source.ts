@@ -25,6 +25,10 @@ export const SOURCE_CHANGE = {
   path: "The path condition was imported as a URL regular expression.",
 } as const;
 
+/** Skip reason when a host Matches pair cannot be confined to the authority. */
+export const HOST_MATCHES_SKIP_REASON =
+  "Host regular expressions cannot be confined to the host in a URL regex.";
+
 export interface ConvertedSource {
   readonly source: SourceCondition;
   readonly changes: readonly string[];
@@ -190,25 +194,22 @@ function convertHost(operator: string, value: string): ConvertResult {
   }
   if (operator === "Contains") {
     const body =
-      value.length === 0 ? "[^/?#]*" : `[^/?#]*${escapeRegex(value)}[^/?#]*`;
+      value.length === 0 ? "[^/?#@]*" : `[^/?#@]*${escapeRegex(value)}[^/?#@]*`;
     return finishUrl(`^https?:\\/\\/${body}(?:[/?#].*)?$`, [
       SOURCE_CHANGE.hostAsUrl,
     ]);
   }
   if (operator === "Wildcard_Matches") {
-    return finishUrl(`^https?:\\/\\/${wildcardBody(value)}(?:[/?#].*)?$`, [
-      SOURCE_CHANGE.hostAsUrl,
-    ]);
+    // Host-only wildcards: * must not cross /, ?, #, or @ (authority only).
+    // Optional :port keeps non-default ports in the authority match.
+    return finishUrl(
+      `^https?:\\/\\/${hostWildcardBody(value)}(?::[0-9]+)?(?:[/?#].*)?$`,
+      [SOURCE_CHANGE.hostAsUrl],
+    );
   }
   if (operator === "Matches") {
-    const parsed = parseRequestlyRegex(value);
-    if (!parsed.ok) return parsed;
-    return finishUrl(
-      `^https?:\\/\\/(?:${parsed.source})(?:[/?#].*)?$`,
-      parsed.caseInsensitive
-        ? [SOURCE_CHANGE.hostAsUrl, SOURCE_CHANGE.caseInsensitive]
-        : [SOURCE_CHANGE.hostAsUrl],
-    );
+    // RE2 has no lookarounds, so a user regex cannot be confined to the host.
+    return { ok: false, reason: HOST_MATCHES_SKIP_REASON };
   }
   return { ok: false, reason: `Unsupported source operator "${operator}".` };
 }
@@ -297,6 +298,17 @@ export function wildcardBody(pattern: string): string {
     .split("*")
     .map((part) => escapeRegex(part))
     .join("(.*?)");
+}
+
+/**
+ * Host Wildcard_Matches body: same capture count as {@link wildcardBody}, but
+ * each `*` is confined to authority characters (no `/`, `?`, `#`, or `@`).
+ */
+export function hostWildcardBody(pattern: string): string {
+  return pattern
+    .split("*")
+    .map((part) => escapeRegex(part))
+    .join("([^/?#@]*?)");
 }
 
 export function isRequestlyRegexLiteral(value: string): boolean {
