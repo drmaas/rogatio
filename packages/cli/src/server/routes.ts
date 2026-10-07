@@ -2,7 +2,6 @@ import { randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, isAbsolute, resolve } from "node:path";
-import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import { dryRunProject, previewRuleAction } from "@rogatio/dry-run";
 import type {
@@ -11,7 +10,7 @@ import type {
   AIProviderConfig,
 } from "@rogatio/runtime";
 import { runAIAssist } from "@rogatio/runtime";
-import { validateProjectDetailed } from "@rogatio/schema";
+import { diagnoseProject } from "../commands/diagnose.js";
 import { readSavedMockRoot, writeSavedMockRoot } from "../mock-root-config.js";
 import type { ProjectStorage } from "../utils/file.js";
 export interface RouteContext {
@@ -171,34 +170,19 @@ function parseUrl(req: IncomingMessage): {
   return { pathname: url.pathname, searchParams: url.searchParams };
 }
 
-function parseDiagnostics(
-  result: ReturnType<typeof validateProjectDetailed>,
-): unknown[] {
-  if (!result.valid) {
-    return result.errors.map((e) => ({
-      code: `schema.${e.keyword}`,
-      severity: "error",
-      path: e.instancePath || "/",
-      message: e.message,
-      params: e.params,
-    }));
-  }
-  return [];
-}
-
 function schemaDiagnosticsForAssist(value: unknown): readonly {
   readonly code: string;
   readonly severity: "error";
   readonly path: string;
   readonly message: string;
 }[] {
-  const result = validateProjectDetailed(value);
-  if (result.valid) return [];
-  return result.errors.map((error) => ({
-    code: `schema.${error.keyword}`,
+  const diagnosis = diagnoseProject(value);
+  if (diagnosis.stage !== "schema") return [];
+  return diagnosis.diagnostics.map((diagnostic) => ({
+    code: diagnostic.code,
     severity: "error" as const,
-    path: error.instancePath || "/",
-    message: error.message ?? "The project contains invalid data.",
+    path: diagnostic.path,
+    message: diagnostic.message,
   }));
 }
 
@@ -233,21 +217,6 @@ function isAIAssistRequestBody(body: unknown): body is {
   if (typeof body.prompt !== "string") return false;
   if (!isRecord(body.context) || !isRecord(body.context.project)) return false;
   return true;
-}
-
-function parseCompilerDiagnostics(
-  result: ReturnType<typeof compileProject>,
-): unknown[] {
-  if (!result.ok) {
-    return result.diagnostics.map((d) => ({
-      code: d.code,
-      severity: d.severity,
-      path: d.path,
-      message: d.message,
-      params: d.params,
-    }));
-  }
-  return [];
 }
 
 export function createRoutes(context: RouteContext) {
@@ -400,16 +369,10 @@ export function createRoutes(context: RouteContext) {
         return;
       }
 
-      const schemaResult = validateProjectDetailed(body);
-      const diagnostics = [...parseDiagnostics(schemaResult)];
-
-      if (schemaResult.valid) {
-        const compileResult = compileProject(schemaResult.data);
-        diagnostics.push(...parseCompilerDiagnostics(compileResult));
-      }
+      const diagnosis = diagnoseProject(body);
 
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ diagnostics }));
+      res.end(JSON.stringify({ diagnostics: diagnosis.diagnostics }));
       return;
     }
 
@@ -499,27 +462,25 @@ export function createRoutes(context: RouteContext) {
         return;
       }
 
-      const schemaResult = validateProjectDetailed(body);
-      if (!schemaResult.valid) {
+      const diagnosis = diagnoseProject(body);
+      if (diagnosis.stage === "schema") {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
             code: "validation-failed",
             message: "Project validation failed",
-            diagnostics: parseDiagnostics(schemaResult),
+            diagnostics: diagnosis.diagnostics,
           }),
         );
         return;
       }
-
-      const compileResult = compileProject(schemaResult.data);
-      if (!compileResult.ok) {
+      if (diagnosis.stage === "compiler") {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
             code: "compilation-failed",
             message: "Project compilation failed",
-            diagnostics: parseCompilerDiagnostics(compileResult),
+            diagnostics: diagnosis.diagnostics,
           }),
         );
         return;
@@ -608,30 +569,31 @@ export function createRoutes(context: RouteContext) {
         return;
       }
 
-      const schemaResult = validateProjectDetailed(body.project);
-      if (!schemaResult.valid) {
+      const diagnosis = diagnoseProject(body.project);
+      if (diagnosis.stage === "schema") {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
             code: "validation-failed",
             message: "Project validation failed",
-            diagnostics: parseDiagnostics(schemaResult),
+            diagnostics: diagnosis.diagnostics,
           }),
         );
         return;
       }
-
-      const compileResult = compileProject(schemaResult.data);
-      if (!compileResult.ok) {
+      if (diagnosis.stage === "compiler") {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(
           JSON.stringify({
             code: "compilation-failed",
             message: "Project compilation failed",
-            diagnostics: parseCompilerDiagnostics(compileResult),
+            diagnostics: diagnosis.diagnostics,
           }),
         );
         return;
+      }
+      if (diagnosis.operations === undefined) {
+        throw new Error("Valid project diagnosis is missing operations");
       }
 
       const requested =
@@ -644,7 +606,7 @@ export function createRoutes(context: RouteContext) {
       const options: DryRunOptions = { previewAction: previewRuleAction };
       if (requested !== undefined) options.maxCases = requested;
       const result = dryRunProject(
-        compileResult.operations,
+        diagnosis.operations,
         body.cases as DryRunTestCase[],
         options,
       );

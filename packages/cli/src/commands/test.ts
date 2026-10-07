@@ -1,17 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { compileProject } from "@rogatio/compiler";
 import type { DryRunOptions, DryRunTestCase } from "@rogatio/dry-run";
 import {
   dryRunProject,
   parseTestUrl,
   previewRuleAction,
 } from "@rogatio/dry-run";
-import { validateProjectDetailed } from "@rogatio/schema";
 import {
   createJsonFileProjectStorage,
   type ProjectStorage,
 } from "../utils/file.js";
+import { diagnoseProject } from "./diagnose.js";
 export interface TestCommandOptions {
   storage?: ProjectStorage;
 }
@@ -20,14 +19,6 @@ interface TestCaseInput {
   url: string;
   method?: string;
   resourceType?: string;
-}
-
-interface Diagnostic {
-  code: string;
-  severity: string;
-  path: string;
-  message: string;
-  params: Record<string, unknown>;
 }
 
 function usageError(message: string): string {
@@ -110,31 +101,6 @@ function resultOptions(maxCases: number | undefined): DryRunOptions {
   const options: DryRunOptions = { previewAction: previewRuleAction };
   if (maxCases !== undefined) options.maxCases = maxCases;
   return options;
-}
-
-function diagnosticsFromSchema(projectData: unknown): Diagnostic[] {
-  const result = validateProjectDetailed(projectData);
-  if (result.valid) return [];
-  return result.errors.map((error) => ({
-    code: `schema.${error.keyword}`,
-    severity: "error",
-    path: error.instancePath || "/",
-    message: error.message,
-    params: error.params as Record<string, unknown>,
-  }));
-}
-
-function diagnosticsFromCompiler(
-  result: ReturnType<typeof compileProject>,
-): Diagnostic[] {
-  if (result.ok) return [];
-  return result.diagnostics.map((diagnostic) => ({
-    code: diagnostic.code,
-    severity: diagnostic.severity,
-    path: diagnostic.path,
-    message: diagnostic.message,
-    params: diagnostic.params as Record<string, unknown>,
-  }));
 }
 
 function jsonOutput(value: unknown): string {
@@ -318,26 +284,13 @@ async function testCommandImpl(
     return 2;
   }
 
-  const schemaResult = validateProjectDetailed(projectData);
-  let diagnostics = diagnosticsFromSchema(projectData);
-  if (!schemaResult.valid) {
-    const output = jsonMode
-      ? jsonOutput({ diagnostics })
-      : diagnostics
-          .map(
-            (diagnostic) =>
-              `${diagnostic.path}: ${diagnostic.message} (${diagnostic.code})\n`,
-          )
-          .join("");
-    if (captureOutput) return output;
-    if (jsonMode) console.log(output.trim());
-    else console.error(output.trim());
-    return 1;
-  }
-
-  const compileResult = compileProject(schemaResult.data);
-  diagnostics = diagnosticsFromCompiler(compileResult);
-  if (!compileResult.ok) {
+  const diagnosis = diagnoseProject(projectData);
+  if (
+    diagnosis.stage !== undefined ||
+    diagnosis.project === undefined ||
+    diagnosis.operations === undefined
+  ) {
+    const diagnostics = diagnosis.diagnostics;
     const output = jsonMode
       ? jsonOutput({ diagnostics })
       : diagnostics
@@ -358,7 +311,7 @@ async function testCommandImpl(
     defaultResourceType,
   ) as DryRunTestCase[];
   const dryRunResult = dryRunProject(
-    compileResult.operations,
+    diagnosis.operations,
     testCases,
     resultOptions(maxCases),
   );
@@ -373,13 +326,11 @@ async function testCommandImpl(
     // compiled operation, both already in hand, so the dry-run contract — and
     // therefore `--json` — is untouched.
     const groupNames = new Map<string, string>();
-    if (schemaResult.valid) {
-      for (const group of schemaResult.data.groups) {
-        groupNames.set(group.id, group.name);
-      }
+    for (const group of diagnosis.project.groups) {
+      groupNames.set(group.id, group.name);
     }
     const labels = new Map<string, string>();
-    for (const operation of compileResult.operations) {
+    for (const operation of diagnosis.operations) {
       const groupName = groupNames.get(operation.groupId);
       labels.set(
         `${operation.groupId}/${operation.ruleId}`,
