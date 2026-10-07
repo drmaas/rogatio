@@ -9,7 +9,10 @@ import {
 } from "@rogatio/schema";
 import { describe, expect, it } from "vitest";
 import { importRequestlyExport, mergeProjects } from "../src/index.js";
-import { HOST_MATCHES_SKIP_REASON } from "../src/source.js";
+import {
+  HOST_AUTHORITY_META_SKIP_REASON,
+  HOST_MATCHES_SKIP_REASON,
+} from "../src/source.js";
 
 function load(name: string): unknown {
   return JSON.parse(
@@ -238,27 +241,37 @@ describe("requestly import fixtures", () => {
 });
 
 describe("host source authority confinement", () => {
-  it("keeps host Wildcard_Matches inside the URL authority", () => {
-    const result = importRequestlyExport({
+  function headerRule(
+    name: string,
+    id: string,
+    source: { key: string; operator: string; value: string },
+  ): Record<string, unknown> {
+    return {
       objectType: "rule",
-      id: "Headers_corp",
-      name: "Corp host wildcard",
+      id,
+      name,
       ruleType: "Headers",
       status: "Active",
       pairs: [
         {
-          source: {
-            key: "host",
-            operator: "Wildcard_Matches",
-            value: "*.corp.example.com",
-          },
+          source,
           modifications: {
             Request: [{ header: "X-Debug", value: "1", type: "Add" }],
             Response: [],
           },
         },
       ],
-    });
+    };
+  }
+
+  it("keeps host Wildcard_Matches inside the URL authority", () => {
+    const result = importRequestlyExport(
+      headerRule("Corp host wildcard", "Headers_corp", {
+        key: "host",
+        operator: "Wildcard_Matches",
+        value: "*.corp.example.com",
+      }),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     assertValid(result.project);
@@ -273,31 +286,92 @@ describe("host source authority confinement", () => {
 
     expect(regex.test("https://attacker.test/x.corp.example.com")).toBe(false);
     expect(regex.test("https://attacker.test/#.corp.example.com")).toBe(false);
+    expect(regex.test("https://attacker.test/?x.corp.example.com")).toBe(false);
+    expect(regex.test("https://corp.example.com@attacker.test/")).toBe(false);
+    expect(regex.test("https://api.corp.example.com.evil.com/")).toBe(false);
     expect(regex.test("https://api.corp.example.com/v1")).toBe(true);
     expect(regex.test("https://api.corp.example.com:8443/")).toBe(true);
   });
 
+  it("keeps host Contains inside the URL authority", () => {
+    const result = importRequestlyExport(
+      headerRule("Corp host contains", "Headers_contains", {
+        key: "host",
+        operator: "Contains",
+        value: "corp.example.com",
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    assertValid(result.project);
+    const rule = ruleNamed(result.project, "Corp host contains");
+    expect(rule.source.key).toBe("url");
+    expect(rule.source.value).toContain("[^/?#@]*");
+    expect(rule.source.value).not.toContain("[^/?#]*");
+
+    const regex = compileUrlRegex(rule.source.value);
+    expect(regex).not.toBeNull();
+    if (regex === null) return;
+
+    // Reverting [^/?#@] to [^/?#] makes the userinfo URL match.
+    expect(regex.test("https://corp.example.com@attacker.test/")).toBe(false);
+    expect(regex.test("https://attacker.test/?corp.example.com")).toBe(false);
+    expect(regex.test("https://attacker.test/#corp.example.com")).toBe(false);
+    expect(
+      regex.test("https://attacker.test/api.corp.example.com.evil.com"),
+    ).toBe(false);
+    expect(regex.test("https://api.corp.example.com/v1")).toBe(true);
+    expect(regex.test("https://api.corp.example.com:8443/")).toBe(true);
+  });
+
+  it("skips host Contains values that embed authority metacharacters", () => {
+    const result = importRequestlyExport(
+      headerRule("Host contains meta", "Headers_contains_meta", {
+        key: "host",
+        operator: "Contains",
+        value: "user@corp.example.com",
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.report.skipped).toBe(1);
+    expect(result.report.rules[0]?.status).toBe("skipped");
+    expect(result.report.rules[0]?.reason).toBe(
+      HOST_AUTHORITY_META_SKIP_REASON,
+    );
+    expect(result.project.groups.flatMap((group) => group.rules)).toHaveLength(
+      0,
+    );
+  });
+
+  it("skips host Wildcard_Matches values that embed authority metacharacters", () => {
+    const result = importRequestlyExport(
+      headerRule("Host wildcard meta", "Headers_wild_meta", {
+        key: "host",
+        operator: "Wildcard_Matches",
+        value: "attacker.test/*.corp.example.com",
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.report.skipped).toBe(1);
+    expect(result.report.rules[0]?.status).toBe("skipped");
+    expect(result.report.rules[0]?.reason).toBe(
+      HOST_AUTHORITY_META_SKIP_REASON,
+    );
+    expect(result.project.groups.flatMap((group) => group.rules)).toHaveLength(
+      0,
+    );
+  });
+
   it("skips host Matches pairs that cannot be confined to the host", () => {
-    const result = importRequestlyExport({
-      objectType: "rule",
-      id: "Headers_host_re",
-      name: "Host regex",
-      ruleType: "Headers",
-      status: "Active",
-      pairs: [
-        {
-          source: {
-            key: "host",
-            operator: "Matches",
-            value: "/.*\\.corp\\.example\\.com/",
-          },
-          modifications: {
-            Request: [{ header: "X-Debug", value: "1", type: "Add" }],
-            Response: [],
-          },
-        },
-      ],
-    });
+    const result = importRequestlyExport(
+      headerRule("Host regex", "Headers_host_re", {
+        key: "host",
+        operator: "Matches",
+        value: "/.*\\.corp\\.example\\.com/",
+      }),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.report.skipped).toBe(1);

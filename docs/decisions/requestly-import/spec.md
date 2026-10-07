@@ -224,8 +224,12 @@ Requestly compares host sources against `URL.host` only (assumption 3). Lowering
 
 | Requestly source | Rogatio result | Notes |
 | --- | --- | --- |
-| `key: "host"`, `Wildcard_Matches` | `key: "url"` regex `^https?://` + host-only wildcard body + optional `:\d+` + `(?:[/?#].*)?$` | Each `*` becomes `([^/?#@]*?)` (same capture count as URL/path wildcards). URL and path `Wildcard_Matches` keep `(.*?)`. |
-| `key: "host"`, `Contains` | `key: "url"` regex over the authority using `[^/?#@]*` | Tightened from `[^/?#]*` so `@` cannot pull userinfo into the host match. |
+| `key: "host"`, `Wildcard_Matches` | `key: "url"` regex `^https?://` + host-only wildcard body + optional `:\d+` + `(?:[/?#].*)?$` | Each `*` becomes `([^/?#@]*?)` (same capture count as URL/path wildcards). URL and path `Wildcard_Matches` keep `(.*?)`. Values containing `/`, `?`, `#`, `@`, or `\` are skipped (see below). |
+| `key: "host"`, `Contains` | `key: "url"` regex over the authority using `[^/?#@]*` | Tightened from `[^/?#]*` so `@` cannot pull userinfo into the host match. Values containing `/`, `?`, `#`, `@`, or `\` are skipped (see below). |
 | `key: "host"`, `Matches` | Pair skipped | Reason: `Host regular expressions cannot be confined to the host in a URL regex.` RE2 has no lookarounds. |
 
-Projects imported before this change from host wildcards or host regular expressions should be re-imported or reviewed.
+Host `Contains` or `Wildcard_Matches` values that match `/[\/?#@\\]/` are skipped with reason: `Host Contains or Wildcard values with /, ?, #, @, or \ cannot be confined to the host in a URL regex.` Copying those characters into the URL regex would let the pattern leave the authority (for example a `/` in a Wildcard value, or `@` in a Contains value).
+
+The reported `hostAsUrl` change text is: host conditions become a URL regex over the authority; Wildcard host patterns accept any numeric port; Contains does not pin a port.
+
+Projects imported before this change from host wildcards, host contains, or host regular expressions should be re-imported or reviewed.
