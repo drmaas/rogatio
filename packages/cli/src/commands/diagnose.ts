@@ -1,4 +1,4 @@
-import { compileProject } from "@rogatio/compiler";
+import { compileProject, type RogatioOperation } from "@rogatio/compiler";
 import { type RogatioProject, validateProjectDetailed } from "@rogatio/schema";
 
 export interface ProjectDiagnostic {
@@ -12,6 +12,8 @@ export interface ProjectDiagnostic {
 export interface Diagnosis {
   readonly diagnostics: readonly ProjectDiagnostic[];
   readonly project?: RogatioProject;
+  readonly operations?: readonly RogatioOperation[];
+  readonly stage?: "schema" | "compiler";
 }
 
 export function diagnoseProject(projectData: unknown): Diagnosis {
@@ -27,7 +29,7 @@ export function diagnoseProject(projectData: unknown): Diagnosis {
         params: error.params,
       });
     }
-    return { diagnostics };
+    return { diagnostics, stage: "schema" };
   }
 
   const compileResult = compileProject(schemaResult.data);
@@ -41,9 +43,13 @@ export function diagnoseProject(projectData: unknown): Diagnosis {
         params: { ...diag.params },
       });
     }
-    return { diagnostics };
+    return { diagnostics, stage: "compiler" };
   }
-  return { diagnostics, project: schemaResult.data };
+  return {
+    diagnostics,
+    project: schemaResult.data,
+    operations: compileResult.operations,
+  };
 }
 
 export function formatDiagnostics(

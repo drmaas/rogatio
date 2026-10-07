@@ -386,7 +386,7 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 - Static file serving for the editor page (`GET /editor.html`) and the `@rogatio/editor` browser bundle (`GET /vendor/editor.js`, `GET /vendor/editor.css`, `GET /vendor/fonts/*`)
 - API endpoints:
   - `GET /api/project` → returns current project JSON
-  - `POST /api/validate` → runs schema + compiler validation
+  - `POST /api/validate` → runs schema + compiler validation through `diagnoseProject`
   - `POST /api/save` → writes project to file
   - `POST /api/cancel` → shuts down server
   - `POST /api/dry-run` → offline dry-run against bounded URL cases
@@ -399,15 +399,15 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 
 **3. Verify Command (`src/commands/verify.ts`)**
 - Reads `.rogatio.json` from path (default: cwd/.rogatio.json) or stdin (`-`)
-- Runs `validateProjectDetailed` from `@rogatio/schema`
-- If valid, runs `compileProject` from `@rogatio/compiler`
+- Runs the same schema and compiler checks as `import` (`diagnoseProject`)
 - Outputs diagnostics:
-  - Human-readable (default): grouped by severity, colored if TTY
+  - Human-readable (default): plain `path: message (code)` lines
   - JSON (`--json`): structured array for scripting
 - Exit codes: 0=valid, 1=invalid (diagnostics), 2=error (IO/parse)
 
 **4. Test Command (`src/commands/test.ts`)**
 - Offline dry-run via `@rogatio/dry-run` against `--urls` / `--urls-file` cases
+- Validates and compiles the project through `diagnoseProject` before the dry-run
 - Never contacts tested URLs, requests permission, or starts a runtime
 
 **5. Runtime Command (`src/commands/runtime.ts`)**
