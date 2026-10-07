@@ -215,3 +215,21 @@ The editor does not call the importer in this issue.
 ## 10. Security and privacy
 
 The importer reads a local file the user named and writes a local project file. It does not fetch URLs from the export, does not evaluate Requestly JavaScript (`code` bodies and script rules are skipped), and does not copy local-file paths into the project. Page-domain and payload filters are skipped rather than widened. Forbidden headers are not imported.
+
+## 11. Addendum — host sources confined to the URL authority (issue #307)
+
+Append-only correction. Do not rewrite the rows above; this section is authoritative for host non-Equals operators after #307.
+
+Requestly compares host sources against `URL.host` only (assumption 3). Lowering those operators to a URL regex must not let the pattern cross into the path, query, fragment, or userinfo.
+
+| Requestly source | Rogatio result | Notes |
+| --- | --- | --- |
+| `key: "host"`, `Wildcard_Matches` | `key: "url"` regex `^https?://` + host-only wildcard body + optional `:\d+` + `(?:[/?#].*)?$` | Each `*` becomes `([^/?#@]*?)` (same capture count as URL/path wildcards). URL and path `Wildcard_Matches` keep `(.*?)`. Values containing `/`, `?`, `#`, `@`, or `\` are skipped (see below). |
+| `key: "host"`, `Contains` | `key: "url"` regex over the authority using `[^/?#@]*` | Tightened from `[^/?#]*` so `@` cannot pull userinfo into the host match. Values containing `/`, `?`, `#`, `@`, or `\` are skipped (see below). |
+| `key: "host"`, `Matches` | Pair skipped | Reason: `Host regular expressions cannot be confined to the host in a URL regex.` RE2 has no lookarounds. |
+
+Host `Contains` or `Wildcard_Matches` values that match `/[\/?#@\\]/` are skipped with reason: `Host Contains or Wildcard values with /, ?, #, @, or \ cannot be confined to the host in a URL regex.` Copying those characters into the URL regex would let the pattern leave the authority (for example a `/` in a Wildcard value, or `@` in a Contains value).
+
+The reported `hostAsUrl` change text is: host conditions become a URL regex over the authority; Wildcard host patterns accept any numeric port; Contains does not pin a port.
+
+Projects imported before this change from host wildcards, host contains, or host regular expressions should be re-imported or reviewed.

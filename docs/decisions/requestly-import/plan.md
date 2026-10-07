@@ -64,3 +64,15 @@ CLI tests cover overwrite refusal, `--merge`, `--out`, and `--json`.
 ## Not in this change
 
 Editor import UI. Cancel, delay, and script rules stay skipped on purpose.
+
+## Addendum — host authority confinement (issue #307)
+
+`source.ts` `convertHost`:
+
+- `Wildcard_Matches` uses `hostWildcardBody` (`*` → `([^/?#@]*?)`) plus an optional `:port` before the path/query/fragment group.
+- `Contains` uses `[^/?#@]*` instead of `[^/?#]*`.
+- `Matches` is skipped with a fixed reason (RE2 has no lookarounds).
+- `Contains` and `Wildcard_Matches` values matching `/[\/?#@\\]/` are skipped with `HOST_AUTHORITY_META_SKIP_REASON` (literals would escape the authority).
+
+URL/path wildcard handling and `replace.ts` stay on `wildcardBody` (`(.*?)`).
+Regression coverage lives in `packages/requestly-import/test/import.test.ts`.

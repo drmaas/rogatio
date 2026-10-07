@@ -37,7 +37,16 @@ rogatio import requestly requestly-export.json --merge
 Requestly source operators (`Equals`, `Contains`, `Wildcard`, `Matches`) are
 lowered to a Rogatio regular expression. A host condition that is a literal
 hostname matches that hostname on any port, which the report calls out.
-Several request methods become one Rogatio rule per method.
+Host wildcards and host contains are confined to the URL authority (they do
+not match the same text in a path, query, fragment, or userinfo). Host
+`Matches` (regular expression) pairs are skipped, because a URL regex cannot
+confine an arbitrary host pattern to the authority. Host Contains or Wildcard
+values that include `/`, `?`, `#`, `@`, or `\` are also skipped for that
+reason. Several request methods become one Rogatio rule per method.
+
+If you imported a project from Requestly before host sources were confined to
+the authority, re-import the export or check any rules that used a host
+wildcard, host contains, or host regular expression.
 
 ## What is skipped
 
@@ -45,7 +54,9 @@ Cancel, delay, and script rules are skipped. So are local-file and mock
 redirects, JavaScript request or response bodies, response files on disk, and
 "remove all query parameters". Page URL, page domain, and request payload
 filters are skipped rather than widened to match more traffic. A forbidden
-header modification is not imported.
+header modification is not imported. Host `Matches` conditions are skipped,
+as are host Contains or Wildcard values that include `/`, `?`, `#`, `@`, or
+`\`.
 
 Each skipped rule is listed with its Requestly name and the reason. Skipped
 rules do not fail the command. Changed rules list what differs from Requestly.
