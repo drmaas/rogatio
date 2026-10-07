@@ -247,7 +247,12 @@ test("step 1a — onRuleMatchedDebug for modifyHeaders on smoke origin", async (
   await expect(page.getByRole("heading", { name: "Rogatio" })).toBeVisible();
 
   const hostGranted = await page.evaluate(async (originPattern) => {
-    return chrome.permissions.contains({ origins: [originPattern] });
+    const api = chrome as unknown as {
+      permissions: {
+        contains(options: { origins: readonly string[] }): Promise<boolean>;
+      };
+    };
+    return api.permissions.contains({ origins: [originPattern] });
   }, SMOKE_HOST_PATTERN);
   vitestExpect(hostGranted).toBe(true);
 
