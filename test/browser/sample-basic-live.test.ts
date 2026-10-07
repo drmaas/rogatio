@@ -114,7 +114,12 @@ testStandalone(
       ).toBeVisible();
 
       const granted = await page.evaluate(async (pattern) => {
-        return chrome.permissions.contains({ origins: [pattern] });
+        const api = chrome as unknown as {
+          permissions: {
+            contains(options: { origins: readonly string[] }): Promise<boolean>;
+          };
+        };
+        return api.permissions.contains({ origins: [pattern] });
       }, VALIDATE_HOST_PATTERN);
       vitestExpect(granted).toBe(true);
 

@@ -1,10 +1,8 @@
 export {
   type ChromeAction,
   type ChromeApi,
-  type ChromePermissions,
   type ChromeRuntime,
   type ChromeStorageArea,
-  createPermissionAdapter,
   createStorageAdapter,
   setBadge,
 } from "./chrome.js";

@@ -140,11 +140,6 @@ function installChromeMock(seed: MockEnvelope): void {
       storage: {
         local: { get: async () => ({ rogatio: state }), set: async () => {} },
       },
-      permissions: {
-        contains: async () => false,
-        request: async () => true,
-        remove: async () => true,
-      },
       action: {
         setBadgeText: async () => {},
         setBadgeBackgroundColor: async () => {},

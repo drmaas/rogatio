@@ -768,7 +768,7 @@ Compiler emits distinct operation types: `MatcherOperation` (actionless), `Redir
 
 ### Extension (extension boundary change)
 
-`projection.ts` `projectMatchers` dispatches on operation kind. For `QueryOperation` it builds a DNR rule with `redirect.transform.query`; for `RedirectOperation` it builds a DNR `redirect` rule; for `MatcherOperation` it returns `installable: false`. `service-worker.ts` `operationStatuses` reports redirect and query rules as `active` when compiled, enabled, and granted; actionless matchers remain `unsupported`. Permission domains derive from origin hostnames (requestDomains/initiatorDomains). Successful DNR install writes the match-logging index for redirect, query, and header ids through one wholesale writer on `install()`. Console match logging is described under Chrome MV3 Extension Architecture.
+`projection.ts` `projectMatchers` dispatches on operation kind. For `QueryOperation` it builds a DNR rule with `redirect.transform.query`; for `RedirectOperation` it builds a DNR `redirect` rule; for `MatcherOperation` it returns `installable: false`. `service-worker.ts` `operationStatuses` reports redirect and query rules as `active` when compiled and enabled; actionless matchers remain `unsupported`. Request/initiator domains derive from origin hostnames (`requestDomains` / `initiatorDomains`). Successful DNR install writes the match-logging index for redirect, query, and header ids through one wholesale writer on `install()`. Console match logging is described under Chrome MV3 Extension Architecture.
 
 ### Editor (editor boundary change)
 
@@ -1156,10 +1156,10 @@ packed tarballs, and the real extension service worker.
    - **Extension lifecycle journey:** the real built extension is loaded into a persistent
      headless Chrome for Testing profile (`--disable-extensions-except` +
      `--load-extension`, binary from `pnpm browser:install` / `@puppeteer/browsers`
-     `chrome@stable`). The journey imports a project, reviews declared permissions
-     (real `chrome.permissions.contains`), activates groups, reads rule statuses and the
-     badge, switches/creates/exports/removes projects, and proves storage persistence
-     across service-worker restarts.
+     `chrome@stable`). The journey imports a project (rejecting non-Rogatio files),
+     activates a group, asserts the rule status becomes `active`, mounts the editor,
+     exercises create/refresh on the management page, and relies on broad install-time
+     `host_permissions` rather than a per-origin grant step.
    - **Extension DNR journey:** a redirect DNR rule in the extension's own rule shape is
      installed through the real `chrome.declarativeNetRequest.updateDynamicRules` API and
      accepted by Chrome, proving the translated rule shape is Chrome-valid (RE2, domains,
@@ -1167,30 +1167,10 @@ packed tarballs, and the real extension service worker.
    - **Mock runtime journey:** the real `rogatio runtime host` process is started; the real
      extension's native-host `mock.connect` handshake pairs with it and reports `connected`.
 
-### The permission-prompt boundary (evidence-based)
-
-Chrome's optional-host-permission prompt cannot be automated: `chrome.permissions.request`
-never resolves in headless or headed Chrome when a prompt is required, profile
-pre-seeding of `granted_permissions` is rejected (Secure Preferences MAC), and the
-automation harness has no API to answer the Chrome host-permission prompt. The E2E suite
-therefore proves the permission flow at the integration seam (the extension's injected
-permission adapters and the exact-origin request), asserts the real-browser `needs
-permission` statuses, and documents the grant click as a manual check. No test hook,
-fake grant, or profile forging is added to the product; the browser grant stays a real
-user gesture. The granted-end-to-end redirect/mock interception remains covered by unit
-and integration tests plus the request-body-rules live E2E on capable runners.
-
 ### Product repairs surfaced by the suite (in scope)
 
 Building the real journeys exposed defects that the mocked unit tests could not:
 
-- **Permission origin patterns (`packages/extension/src/chrome.ts`):** `chrome.permissions`
-  rejects bare origins (`http://127.0.0.1:4173`) — the adapter now maps origins to match
-  patterns (`origin + "/*"`).
-- **User-gesture grant (`extension-page-entry.ts`, `service-worker.ts`):** a user gesture is
-  lost across the runtime message round trip, so the extension page performs
-  `chrome.permissions.request` directly in the click handler and the worker re-syncs stored
-  grants (a `granted` flag skips the worker-side request).
 - **Editor rule-type registration (`packages/editor/src/editor.ts`):** hosts pass
   `mock`/`response-body` rule types that are already built in; `normalizeExtensions` threw
   instead of replacing. Passed ids now replace built-ins; duplicates within the passed list
@@ -1198,9 +1178,9 @@ Building the real journeys exposed defects that the mocked unit tests could not:
 - **CLI packaged binary (`packages/cli/src/index.ts`):** the built entry lacked a shebang
   so the installed `rogatio` bin could not execute, and the `isDist` check used a
   POSIX-only separator, breaking packaged installs on Windows.
-- **DNR install wiring (`service-worker.ts`):** enabled+granted redirect/query rules were
+- **DNR install wiring (`service-worker.ts`):** enabled redirect/query rules were
   never installed (only mock rules at check-and-connect), leaving them `error` forever.
-  `projectState` now installs enabled+granted installable operations through the real
+  `projectState` now installs enabled installable operations through the real
   installer.
 
 ### Harness rules
@@ -1208,8 +1188,7 @@ Building the real journeys exposed defects that the mocked unit tests could not:
 - No new dependencies; Node-only orchestration; cross-platform paths; no shell-only
   scripts.
 - Real artifacts and real processes; a test that cannot reach its subject is a failure,
-  not a skip. The only skipped-by-default cases are the request-body-rules live E2E and the manual
-  permission-grant check.
+  not a skip. The only skipped-by-default case is the request-body-rules live E2E.
 - Deterministic diagnostics; assertions never depend on third-party wording or
   incidental iteration order.
 - The extension E2E computes the unpacked extension id from the path
@@ -1223,9 +1202,8 @@ Building the real journeys exposed defects that the mocked unit tests could not:
 - CLI/runtime integration: real `node` children of the built CLI, real loopback HTTP.
 - Packaged install: real tarballs via `npm install --offline` into a temp dir.
 - Extension E2E: Chrome for Testing (`pnpm browser:install`), real extension, real
-  `chrome.permissions`, `chrome.storage.local`, and `chrome.declarativeNetRequest`.
-- Grant flow: the extension's injected `PermissionAdapter` (existing seam) plus the
-  manual browser check.
+  `chrome.storage.local`, and `chrome.declarativeNetRequest`. Host access comes from
+  the manifest's broad `host_permissions` grant at install time.
 - DNR shape: `chrome.declarativeNetRequest.updateDynamicRules` acceptance in Chrome
   for Testing.
 
@@ -1234,15 +1212,8 @@ Building the real journeys exposed defects that the mocked unit tests could not:
 - Mocking `chrome` APIs in the browser journey: rejected — that is what the existing
   fixture-based `extension.spec.ts` does and it cannot catch real Chrome boundary
   failures (the bugs above).
-- Pre-seeding `granted_permissions` in the Chrome profile: rejected after empirical
-  failure (Secure Preferences MAC validation) and because committing a browser profile
-  would import machine-local state.
-- Test-only permission hooks in the extension: rejected — they would weaken the
-  permission boundary in the shipped artifact.
 - A synthetic DNR test page instead of the real extension: rejected — the journeys must
   load the real built extension.
-- Committing a golden profile with manually granted permissions: rejected — machine-
-  and Chrome-version-specific, and it would carry browser state into the repository.
 
 ## Native runtime consolidation (feature/consolidated-native-runtime)
 

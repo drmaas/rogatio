@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   type ChromeApi,
-  createPermissionAdapter,
   createProxyAdapter,
   createStorageAdapter,
 } from "../src/chrome.js";
@@ -13,11 +12,6 @@ function apiFor(storage: {
 }): ChromeApi {
   return {
     storage: { local: storage },
-    permissions: {
-      contains: async () => false,
-      request: async () => true,
-      remove: async () => true,
-    },
     action: {
       setBadgeText: async () => {},
       setBadgeBackgroundColor: async () => {},
@@ -27,37 +21,16 @@ function apiFor(storage: {
 }
 
 describe("F7 Chrome adapters", () => {
-  it("converts exact origins to Chrome match patterns", async () => {
-    const contains = vi.fn(async () => true);
-    const request = vi.fn(async () => true);
-    const remove = vi.fn(async () => true);
-    const api = {
-      ...apiFor({ get: async () => ({}), set: async () => {} }),
-      permissions: { contains, request, remove },
-    };
-    const adapter = createPermissionAdapter(api);
-    await adapter.contains(["https://example.com", "https://example.org/"]);
-    await adapter.request(["https://example.com", "https://example.org/"]);
-    await adapter.remove(["https://example.com", "https://example.org/"]);
-    expect(contains).toHaveBeenCalledWith({
-      origins: ["https://example.com/*", "https://example.org/*"],
-    });
-    expect(request).toHaveBeenCalledWith({
-      origins: ["https://example.com/*", "https://example.org/*"],
-    });
-    expect(remove).toHaveBeenCalledWith({
-      origins: ["https://example.com/*", "https://example.org/*"],
-    });
-  });
-
   it("uses compare-and-swap to protect stored state", async () => {
     let value: unknown;
     const set = vi.fn(async (next: Record<string, unknown>) => {
       value = next.rogatio;
     });
-    const storage = createStorageAdapter(
-      apiFor({ get: async () => ({ rogatio: value }), set }),
-    );
+    const storage = createStorageAdapter({
+      storage: {
+        local: { get: async () => ({ rogatio: value }), set },
+      },
+    });
     expect(await storage.compareAndSwap(undefined, { version: 1 })).toBe(true);
     expect(set).toHaveBeenCalledTimes(1);
     expect(await storage.compareAndSwap({ version: 0 }, { version: 2 })).toBe(
@@ -68,14 +41,15 @@ describe("F7 Chrome adapters", () => {
   it("constructs adapters when match-logging ports are omitted", () => {
     const api = apiFor({ get: async () => ({}), set: async () => {} });
     expect(() => createStorageAdapter(api)).not.toThrow();
-    expect(() => createPermissionAdapter(api)).not.toThrow();
     expect(() => createDnrInstaller(api)).not.toThrow();
   });
 
   it("reads and writes only the rogatio storage key", async () => {
     const get = vi.fn(async () => ({ rogatio: { version: 1 } }));
     const set = vi.fn(async () => {});
-    const storage = createStorageAdapter(apiFor({ get, set }));
+    const storage = createStorageAdapter({
+      storage: { local: { get, set } },
+    });
     await storage.read();
     expect(get).toHaveBeenCalledWith("rogatio");
     await storage.compareAndSwap({ version: 1 }, { version: 2 });
@@ -92,9 +66,11 @@ describe("F7 Chrome adapters", () => {
       await setReady;
       value = next.rogatio;
     });
-    const storage = createStorageAdapter(
-      apiFor({ get: async () => ({ rogatio: value }), set }),
-    );
+    const storage = createStorageAdapter({
+      storage: {
+        local: { get: async () => ({ rogatio: value }), set },
+      },
+    });
     const first = storage.compareAndSwap(undefined, { version: 1 });
     const second = storage.compareAndSwap(undefined, { version: 2 });
     releaseSet();
@@ -121,7 +97,7 @@ describe("chrome proxy adapter", () => {
         }),
     );
     const adapter = createProxyAdapter({
-      ...apiFor({ get: async () => ({}), set: async () => {} }),
+      runtime: { sendMessage: () => {}, onMessage: { addListener: () => {} } },
       proxy: { settings: { get, set, clear } },
     } as never);
     await adapter.installPac('function FindProxyForURL(){ return "DIRECT"; }');
@@ -142,7 +118,7 @@ describe("chrome proxy adapter", () => {
         }),
     );
     const adapter = createProxyAdapter({
-      ...apiFor({ get: async () => ({}), set: async () => {} }),
+      runtime: { sendMessage: () => {}, onMessage: { addListener: () => {} } },
       proxy: {
         settings: {
           get,

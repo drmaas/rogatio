@@ -3,12 +3,6 @@ export interface ChromeStorageArea {
   set(value: Record<string, unknown>): Promise<void>;
 }
 
-export interface ChromePermissions {
-  contains(options: { origins: readonly string[] }): Promise<boolean>;
-  request(options: { origins: readonly string[] }): Promise<boolean>;
-  remove(options: { origins: readonly string[] }): Promise<boolean>;
-}
-
 export interface ChromeAction {
   setBadgeText(details: { text: string }): Promise<void>;
   setBadgeBackgroundColor(details: { color: string }): Promise<void>;
@@ -117,7 +111,6 @@ export interface ChromeProxySettings {
 
 export interface ChromeApi {
   storage: { local: ChromeStorageArea };
-  permissions: ChromePermissions;
   action: ChromeAction;
   runtime: ChromeRuntime;
   declarativeNetRequest?: ChromeDeclarativeNetRequest;
@@ -136,7 +129,9 @@ export function chromeApi(): ChromeApi {
   return chrome;
 }
 
-export function createStorageAdapter(api: ChromeApi = chromeApi()) {
+export function createStorageAdapter(
+  api: Pick<ChromeApi, "storage"> = chromeApi(),
+) {
   let mutationTail: Promise<void> = Promise.resolve();
 
   function withMutationLock<T>(operation: () => Promise<T>): Promise<T> {
@@ -179,34 +174,9 @@ export function createStorageAdapter(api: ChromeApi = chromeApi()) {
   };
 }
 
-function originMatchPattern(origin: string): string {
-  const normalized = origin.endsWith("/") ? origin.slice(0, -1) : origin;
-  return `${normalized}/*`;
-}
-
-export function createPermissionAdapter(api: ChromeApi = chromeApi()) {
-  return {
-    contains(origins: readonly string[]): Promise<boolean> {
-      return api.permissions.contains({
-        origins: origins.map(originMatchPattern),
-      });
-    },
-    request(origins: readonly string[]): Promise<boolean> {
-      return api.permissions.request({
-        origins: origins.map(originMatchPattern),
-      });
-    },
-    remove(origins: readonly string[]): Promise<boolean> {
-      return api.permissions.remove({
-        origins: origins.map(originMatchPattern),
-      });
-    },
-  };
-}
-
 export async function setBadge(
   badge: { readonly text: string; readonly attention: boolean },
-  api: ChromeApi = chromeApi(),
+  api: Pick<ChromeApi, "action"> = chromeApi(),
 ): Promise<void> {
   await api.action.setBadgeText({ text: badge.text });
   await api.action.setBadgeBackgroundColor({
@@ -227,14 +197,16 @@ export interface ProxyAdapter {
   detectCollision(): Promise<ProxyCollisionReason | null>;
 }
 
-function proxyLastError(api: ChromeApi): string | undefined {
+function proxyLastError(api: Pick<ChromeApi, "runtime">): string | undefined {
   return api.runtime.lastError?.message;
 }
 
 /**
  * chrome.proxy.settings adapter for PAC install/clear and collision detection.
  */
-export function createProxyAdapter(api: ChromeApi = chromeApi()): ProxyAdapter {
+export function createProxyAdapter(
+  api: Pick<ChromeApi, "proxy" | "runtime"> = chromeApi(),
+): ProxyAdapter {
   const settings = api.proxy?.settings;
   return {
     async detectCollision() {

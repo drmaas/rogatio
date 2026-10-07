@@ -71,11 +71,6 @@ function installDashboardMock(seed: DashboardSeed): void {
       storage: {
         local: { get: async () => ({ rogatio: state }), set: async () => {} },
       },
-      permissions: {
-        contains: async () => false,
-        request: async () => true,
-        remove: async () => true,
-      },
       action: {
         setBadgeText: async () => {},
         setBadgeBackgroundColor: async () => {},

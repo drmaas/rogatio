@@ -95,11 +95,6 @@ function harness(
         return true;
       },
     },
-    permissions: {
-      contains: async () => true,
-      request: async () => true,
-      remove: async () => true,
-    },
     installer: {
       current: async () => installed,
       install: async (operations: readonly RogatioOperation[]) => {

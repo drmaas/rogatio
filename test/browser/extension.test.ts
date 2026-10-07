@@ -61,11 +61,6 @@ test("keeps project selection separate from explicit switch", async ({
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
         },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
-        },
         action: {
           setBadgeText: async () => {},
           setBadgeBackgroundColor: async () => {},
@@ -146,11 +141,6 @@ test("reports an actionable message and failed status when the native host is mi
       value: {
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
-        },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
         },
         action: {
           setBadgeText: async () => {},
@@ -285,11 +275,6 @@ test("runtime card names an allowed_origins mismatch and the re-pin command", as
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
         },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
-        },
         action: {
           setBadgeText: async () => {},
           setBadgeBackgroundColor: async () => {},
@@ -372,11 +357,6 @@ test("shows AI needs runtime before start and configured after a successful star
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
         },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
-        },
         action: {
           setBadgeText: async () => {},
           setBadgeBackgroundColor: async () => {},
@@ -448,11 +428,6 @@ test("keeps the platform-unavailable wording and truthful unsupported status", a
       value: {
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
-        },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
         },
         action: {
           setBadgeText: async () => {},
@@ -598,11 +573,6 @@ test("reports the highest-precedence blocking status as the attention reason", a
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
         },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
-        },
         action: {
           setBadgeText: async () => {},
           setBadgeBackgroundColor: async () => {},
@@ -645,11 +615,6 @@ async function installExtensionChromeMock(
       value: {
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
-        },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
         },
         action: {
           setBadgeText: async () => {},
@@ -951,11 +916,6 @@ test("tolerates malformed, inherited, and throwing diagnostic payloads", async (
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
         },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
-        },
         action: {
           setBadgeText: async () => {},
           setBadgeBackgroundColor: async () => {},
@@ -1020,11 +980,6 @@ test("ignores an inherited params record when resolving the reason", async ({
       value: {
         storage: {
           local: { get: async () => ({ rogatio: state }), set: async () => {} },
-        },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
         },
         action: {
           setBadgeText: async () => {},
@@ -1137,11 +1092,6 @@ test("reconciles stale error selection after refresh and removes the card when e
               get: async () => ({ rogatio: state }),
               set: async () => {},
             },
-          },
-          permissions: {
-            contains: async () => false,
-            request: async () => true,
-            remove: async () => true,
           },
           action: {
             setBadgeText: async () => {},

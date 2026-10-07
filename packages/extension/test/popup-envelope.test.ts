@@ -14,11 +14,6 @@ function harness() {
         return true;
       },
     },
-    permissions: {
-      contains: async () => false,
-      request: vi.fn(async () => true),
-      remove: async () => true,
-    },
     installer: {
       current: async () => [] as RogatioOperation[],
       install: vi.fn(async () => ({ ok: true as const })),
