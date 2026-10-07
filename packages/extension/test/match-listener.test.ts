@@ -152,11 +152,6 @@ function createHarness(initial: Record<string, unknown> = {}) {
         },
       },
     },
-    permissions: {
-      contains: async () => false,
-      request: async () => true,
-      remove: async () => true,
-    },
     action: {
       setBadgeText: async () => {},
       setBadgeBackgroundColor: async () => {},
@@ -579,11 +574,6 @@ describe("match log listener", () => {
           set: async () => {},
         },
       },
-      permissions: {
-        contains: async () => false,
-        request: async () => true,
-        remove: async () => true,
-      },
       action: {
         setBadgeText: async () => {},
         setBadgeBackgroundColor: async () => {},
@@ -620,11 +610,6 @@ describe("match log listener", () => {
           },
           set: async () => {},
         },
-      },
-      permissions: {
-        contains: async () => false,
-        request: async () => true,
-        remove: async () => true,
       },
       action: {
         setBadgeText: async () => {},
@@ -740,11 +725,6 @@ describe("match log listener", () => {
           },
           set: async () => {},
         },
-      },
-      permissions: {
-        contains: async () => false,
-        request: async () => true,
-        remove: async () => true,
       },
       action: {
         setBadgeText: async () => {},
@@ -956,11 +936,6 @@ describe("match log listener", () => {
             },
             set: async () => {},
           },
-        },
-        permissions: {
-          contains: async () => false,
-          request: async () => true,
-          remove: async () => true,
         },
         action: {
           setBadgeText: async () => {},

@@ -123,11 +123,6 @@ function installToggleChromeMock(seed: ToggleMockSeed): void {
           },
         },
       },
-      permissions: {
-        contains: async () => false,
-        request: async () => true,
-        remove: async () => true,
-      },
       action: {
         setBadgeText: async () => {},
         setBadgeBackgroundColor: async () => {},
