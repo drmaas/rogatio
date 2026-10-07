@@ -15,6 +15,8 @@ describe("API routes", () => {
   let handler: ReturnType<typeof createRoutes>;
   let updateMock: ReturnType<typeof vi.fn<ProjectStorage["update"]>>;
   let storage: ProjectStorage;
+  const boundPort = 34567;
+  const allowedHost = `127.0.0.1:${boundPort}`;
 
   const validProject = {
     version: 2,
@@ -61,6 +63,7 @@ describe("API routes", () => {
       csrfToken,
       storage,
       shutdown: vi.fn(),
+      boundPort,
       editorHtml: "<!DOCTYPE html><html></html>",
       editorBundlePath: "/dev/null",
       editorCssPath: "/dev/null",
@@ -78,7 +81,7 @@ describe("API routes", () => {
     const req = new IncomingMessage(new (require("node:stream").PassThrough)());
     Object.defineProperty(req, "method", { value: method, writable: true });
     Object.defineProperty(req, "url", { value: path, writable: true });
-    req.headers = headers;
+    req.headers = { host: allowedHost, ...headers };
     req.push(body);
     req.push(null);
     return req;
@@ -93,6 +96,115 @@ describe("API routes", () => {
     res.getHeader = vi.fn();
     return res as unknown as ServerResponse;
   }
+
+  describe("Host and Origin checks", () => {
+    it("rejects a foreign Host on /editor.html", async () => {
+      const req = createMockReq("GET", "/editor.html", {
+        host: "evil.example:80",
+      });
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(403, {
+        "Content-Type": "application/json",
+      });
+      const data = JSON.parse(String(vi.mocked(res.end).mock.calls[0][0]));
+      expect(data.code).toBe("host-invalid");
+    });
+
+    it("rejects a foreign Host on /api/project", async () => {
+      const req = createMockReq("GET", "/api/project", {
+        host: "evil.example:80",
+      });
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(403, {
+        "Content-Type": "application/json",
+      });
+      const data = JSON.parse(String(vi.mocked(res.end).mock.calls[0][0]));
+      expect(data.code).toBe("host-invalid");
+    });
+
+    it("rejects a foreign Host on /api/save", async () => {
+      const req = createMockReq(
+        "POST",
+        "/api/save",
+        {
+          host: "evil.example:80",
+          "x-csrf-token": "test-csrf-token",
+        },
+        JSON.stringify(validProject),
+      );
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(403, {
+        "Content-Type": "application/json",
+      });
+      const data = JSON.parse(String(vi.mocked(res.end).mock.calls[0][0]));
+      expect(data.code).toBe("host-invalid");
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it("accepts localhost Host for /api/project", async () => {
+      const req = createMockReq("GET", "/api/project", {
+        host: `localhost:${boundPort}`,
+      });
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(200, {
+        "Content-Type": "application/json",
+      });
+      expect(res.end).toHaveBeenCalledWith(JSON.stringify(validProject));
+    });
+
+    it("rejects a mismatched Origin on POST /api/save", async () => {
+      const req = createMockReq(
+        "POST",
+        "/api/save",
+        {
+          "x-csrf-token": "test-csrf-token",
+          origin: "https://evil.example",
+        },
+        JSON.stringify(validProject),
+      );
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(403, {
+        "Content-Type": "application/json",
+      });
+      const data = JSON.parse(String(vi.mocked(res.end).mock.calls[0][0]));
+      expect(data.code).toBe("origin-invalid");
+      expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it("allows a matching Origin on POST /api/save", async () => {
+      const req = createMockReq(
+        "POST",
+        "/api/save",
+        {
+          "x-csrf-token": "test-csrf-token",
+          origin: `http://127.0.0.1:${boundPort}`,
+        },
+        JSON.stringify(validProject),
+      );
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(200, {
+        "Content-Type": "application/json",
+      });
+      expect(updateMock).toHaveBeenCalled();
+    });
+
+    it("does not set Access-Control-Allow-Origin on /editor.html", async () => {
+      const req = createMockReq("GET", "/editor.html");
+      const res = createMockRes();
+      await handler(req, res);
+      const headers = vi.mocked(res.writeHead).mock.calls[0]?.[1] as
+        | Record<string, string>
+        | undefined;
+      expect(headers).toBeDefined();
+      expect(headers?.["Access-Control-Allow-Origin"]).toBeUndefined();
+    });
+  });
 
   describe("GET /api/project", () => {
     it("returns current project", async () => {
