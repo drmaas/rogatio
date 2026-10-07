@@ -547,10 +547,10 @@ The offline dry-run package adds a pure-offline, bounded URL-batch dry-run capab
 
 - **`src/types.ts`** — Type definitions: `DryRunTestCase`, `DryRunResult`, `MatchDimension` (state + detail), `RuleMatchResult`, `UrlDryRunResult`, `DryRunError`, `DryRunSummary`, `DryRunOptions` (maxCases, previewAction), `PreviewActionFn`.
 - **`src/url.ts`** — `parseTestUrl(input: unknown)`: WHATWG URL parsing, rejects non-string, empty, non-absolute, non-http(s); no network.
-- **`src/dryrun.ts`** — `dryRunProject(operations, cases, options?)`: core engine:
-  - Defensive case validation: rejects proxies, accessors, symbols, cycles without invoking getters; returns `dryrun.invalid-case`.
-  - `maxCases` default 256; exceeding returns `dryrun.batch-limit`.
-  - Regex cache per operation (`compileUrlRegex` from `@rogatio/schema`).
+- **`src/errors.ts`** — Stable `DryRunError` constructors: `invalidCase`, `invalidUrl`, `invalidOptions`, `batchLimit`.
+- **`src/input.ts`** — Untrusted case/option guards: `validateCase`, `normalizeOptions`, `readCaseBatch`; rejects proxies, accessors, symbols, cycles, sparse arrays without invoking getters; `maxCases` default 256; exceeding returns `dryrun.batch-limit`.
+- **`src/evaluate.ts`** — Per-rule three-dimension evaluation: `sourceDimension`, `methodDimension`, `resourceTypeDimension`, `evaluateRule`, `safePreview`. Source matching via `sourceMatches` from `@rogatio/compiler`.
+- **`src/dryrun.ts`** — `dryRunProject(operations, cases, options?)`: orchestration only (normalize options, read batch, parse URLs, evaluate rules, aggregate summary):
   - Three matching dimensions per rule:
     - `source`: `sourceMatches(matcher.source, fullUrl)` → matched/unmatched.
     - `method`: not-applicable if test case omits; matched if rule.method undefined or equal; else unmatched.
@@ -626,7 +626,7 @@ rogatio test / POST /api/dry-run / extension dry-run
 
 ### Testing Seams
 
-- Unit tests for `parseTestUrl`, `dryRunProject` (258 tests total).
+- Unit tests for `parseTestUrl`, `dryRunProject` (including a golden full-result pin), plus direct `input` (`validateCase`, `normalizeOptions`, `readCaseBatch`) and `evaluate` (per-dimension detail strings, throwing `previewAction`) unit tests.
 - CLI integration tests (exit codes, JSON output, stdin/file inputs).
 - Server endpoint tests (200/403/400).
 - Editor panel accessibility tests (keyboard, SR, forced-colors, 200% zoom via Selenium).
@@ -648,7 +648,7 @@ rogatio test / POST /api/dry-run / extension dry-run
 | AC | Description | Test |
 |----|-------------|------|
 | AC-001 | Simple match | `dryrun.test.ts` |
-| AC-002 | Four dimensions with states | `dryrun.test.ts` |
+| AC-002 | Three dimensions with states | `dryrun.test.ts` |
 | AC-003 | Invalid case → dryrun.invalid-case | `dryrun.test.ts` |
 | AC-004 | Invalid URL → dryrun.invalid-url | `dryrun.test.ts` |
 | AC-005 | Default maxCases 256 | `dryrun.test.ts` |
