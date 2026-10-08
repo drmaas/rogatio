@@ -20,7 +20,7 @@ Every rule can be tested against a bounded batch of HTTP(S) URLs before saving. 
 
 The typical workflow is:
 
-1. Install the Node 24+ CLI and manually load the Chrome extension.
+1. Install the Node 26+ CLI and manually load the Chrome extension.
 2. Run `rogatio edit`, create or update rules in the visual editor, test them, verify them, and save `.rogatio.json`.
 3. Import the file into Chrome, review the complete project, and enable groups when ready.
 4. Explicitly enable the required groups.

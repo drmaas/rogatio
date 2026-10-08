@@ -53,7 +53,7 @@ browser would do. Nothing is contacted, and nothing is saved.
 ## CLI
 
 The CLI is distributed as an npm package from the public npm registry. It
-requires **Node.js 24 or newer**. Install the CLI globally with your preferred
+requires **Node.js 26 or newer**. Install the CLI globally with your preferred
 package manager:
 
 ```sh
@@ -293,7 +293,7 @@ This is a strict-TypeScript 7, ESM/NodeNext pnpm monorepo.
 
 Prerequisites:
 
-- Node.js **24** or newer (Node 24 is the CI baseline)
+- Node.js **26.11.1** (CI baseline; Node 26 or newer)
 - pnpm **12.10.1**
 - Chrome for Testing, for browser e2e (`pnpm browser:install`)
 

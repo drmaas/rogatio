@@ -9,7 +9,7 @@ optional local runtime used for response/request body rewriting.
 
 ## Install
 
-Requires Node.js 24 or newer. Install the CLI globally with your preferred
+Requires Node.js 26 or newer. Install the CLI globally with your preferred
 package manager:
 
 ```sh

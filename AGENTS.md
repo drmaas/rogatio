@@ -6,7 +6,7 @@ Read `rogatio-overview.md` and `docs/architecture.md` before changing scope. Res
 
 ## Codebase Structure
 
-Strict TS 7, ESM/NodeNext monorepo, pnpm 12.10.1, Node 24. Built with esbuild (`scripts/build.ts`); linted/formatted by Biome; tested by Vitest (unit) and Selenium (browser journeys via Chrome for Testing); docs site uses Astro 7 + Starlight.
+Strict TS 7, ESM/NodeNext monorepo, pnpm 12.10.1, Node 26.11.1. Built with esbuild (`scripts/build.ts`); linted/formatted by Biome; tested by Vitest (unit) and Selenium (browser journeys via Chrome for Testing); docs site uses Astro 7 + Starlight.
 
 Dependency direction (no cycles, no skipping):
 
@@ -62,7 +62,7 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 
 ## Repository Rules
 
-- Preserve the documented pnpm `12.10.1`, Node 24 baseline, TypeScript 7, and ESM/NodeNext constraints unless the specification is explicitly revised.
+- Preserve the documented pnpm `12.10.1`, Node 26.11.1 baseline, TypeScript 7, and ESM/NodeNext constraints unless the specification is explicitly revised.
 - Keep package boundaries and dependency direction explicit.
 - Do not commit generated build output, coverage, browser binaries, dependency directories, environment files, or secrets.
 - Every commit must reference an open issue (`#<NN>` or `Closes #<NN>`) and follow Conventional Commits format; the `.husky/commit-msg` hook enforces both. Before committing, reuse an existing issue or create one automatically, and confirm the issue number with the user rather than inventing one. See `CONTRIBUTING.md`.
