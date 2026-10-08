@@ -38,6 +38,7 @@ rogatio <command> [options]
 | --- | --- |
 | `rogatio edit [path]` | Launch the browser editor. Any filename is accepted; the default is `.rogatio.json` in the current directory. `--port <n>` fixes the port; `--no-open` skips opening a browser. Edits save back to the file that was opened. |
 | `rogatio verify [path]` | Validate a project file (schema + compiler). Any filename is accepted; the default is `.rogatio.json` in the current directory. |
+| `rogatio doctor [path]` | Check Node, the project file, the native host, the device CA, a loopback PAC answer, and optional AI Assist. `--json` prints a stable report. `--check-updates` asks the npm registry about a newer CLI. Release users never pass `--extension-id`. |
 | `rogatio import requestly <export.json>` | Migrate a Requestly export into `.rogatio.json`. `--out <path>` chooses the file (default `.rogatio.json`); `--merge` appends onto an existing project; `--json` prints the report. |
 | `rogatio test [path] [url...]` | Run offline dry-run tests. Any filename is accepted; the default is `.rogatio.json` in the current directory. |
 | `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
@@ -66,8 +67,8 @@ rogatio runtime host .rogatio.json
 ## Exit codes
 
 - `0` — success
-- `1` — invalid project (diagnostics present), test/validation errors, or a failed
-  `runtime install` / `runtime verify` check
+- `1` — invalid project (diagnostics present), test/validation errors, a failed
+  `runtime install` / `runtime verify` check, or a required `rogatio doctor` check
 - `2` — usage or IO error
 
 ## Local runtime

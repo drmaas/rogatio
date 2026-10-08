@@ -394,6 +394,17 @@ body {
     outline-color: Highlight;
   }
 }
+.rogatio-popup .rogatio-doctor-report {
+  display: grid;
+  gap: 0.35rem;
+}
+.rogatio-popup .rogatio-doctor-check {
+  margin: 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 @media (prefers-reduced-motion: reduce) {
   .rogatio-popup *,
   .rogatio-popup *::before,

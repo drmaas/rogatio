@@ -3,6 +3,12 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import type { AIProviderConfig } from "./ai-client.js";
+import {
+  type DoctorReport,
+  doctorFromHostMetadata,
+  doctorInterruptedReport,
+  doctorReportValue,
+} from "./doctor.js";
 import { parseEnvelope, serializeEnvelope } from "./envelope.js";
 import {
   type InterceptProxyHandle,
@@ -47,6 +53,15 @@ export interface NativeHostOptions {
   readonly clock?: () => number;
   /** Override CA material root used by provisionOrVerifyCa (tests). */
   readonly trustRoot?: string;
+  /** CLI package version reported by `runtime.doctor`. */
+  readonly cliVersion?: string;
+  /**
+   * Override the doctor run (tests). Production reads the envelope and calls
+   * the shared doctor implementation.
+   */
+  readonly runDoctor?: (
+    metadata: Readonly<Record<string, unknown>>,
+  ) => Promise<DoctorReport>;
 }
 
 export interface NativeHostHandle {
@@ -384,6 +399,37 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
           error instanceof Error ? error.message : String(error),
         );
         return null;
+      }
+
+      if (envelope.type === "runtime.doctor") {
+        try {
+          const run =
+            options.runDoctor ??
+            ((metadata: Readonly<Record<string, unknown>>) =>
+              doctorFromHostMetadata(metadata, {
+                cliVersion: options.cliVersion ?? "",
+              }));
+          const doctorReport = await run(envelope.metadata);
+          return encodeEnvelopeFrame({
+            protocol: "v1",
+            type: "runtime.doctor",
+            ...(envelope.requestId !== undefined
+              ? { requestId: envelope.requestId }
+              : {}),
+            timestamp: Date.now(),
+            metadata: { report: doctorReportValue(doctorReport) },
+          });
+        } catch {
+          return encodeEnvelopeFrame({
+            protocol: "v1",
+            type: "runtime.doctor",
+            ...(envelope.requestId !== undefined
+              ? { requestId: envelope.requestId }
+              : {}),
+            timestamp: Date.now(),
+            metadata: { report: doctorReportValue(doctorInterruptedReport()) },
+          });
+        }
       }
 
       // Host-initiated PAC responses resolve the pending map; no reply.

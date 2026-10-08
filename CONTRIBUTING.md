@@ -115,7 +115,7 @@ Use [bug.yml](.github/ISSUE_TEMPLATE/bug.yml). Include:
 - Extension version (management-page sidebar, or `chrome://extensions` → Rogatio → Details)
 - Chrome version
 - Operating system
-- Whether the runtime is installed, and the output of `rogatio runtime verify`
+- Whether the runtime is installed, the output of `rogatio runtime verify`, and `rogatio doctor --json` when you ran it
 - Rule kind (`redirect`, `query`, `header`, `response-body`, `request-body`, or other)
 - A minimal `.rogatio.json` snippet
 - Steps to reproduce, the expected behavior, and what actually happened

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { aiCommand } from "./commands/ai.js";
+import { doctorCommand } from "./commands/doctor.js";
 import { editCommand } from "./commands/edit.js";
 import { importCommand } from "./commands/import.js";
 import { runRuntimeHostEntry, runtimeCommand } from "./commands/runtime.js";
@@ -10,25 +11,16 @@ import { testCommand, testCommandNeedsStdin } from "./commands/test.js";
 import { verifyCommand } from "./commands/verify.js";
 import {
   showAIHelp,
+  showDoctorHelp,
   showEditHelp,
   showImportHelp,
   showRuntimeHelp,
   showTestHelp,
   showVerifyHelp,
 } from "./help.js";
-import { isDistBuild } from "./utils/asset-paths.js";
+import { readCliVersion } from "./version.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const packageJsonPath = resolve(
-  __dirname,
-  isDistBuild(__dirname) ? "../../package.json" : "../package.json",
-);
-const packageJson = JSON.parse(
-  await import("node:fs/promises").then((fs) =>
-    fs.readFile(packageJsonPath, "utf-8"),
-  ),
-);
-const VERSION = packageJson.version;
+const VERSION = readCliVersion();
 
 export async function cli(
   args: string[] = process.argv.slice(2),
@@ -41,6 +33,8 @@ export async function cli(
   const commandArgs = args.slice(1);
 
   switch (command) {
+    case "doctor":
+      return handleDoctor(commandArgs);
     case "edit":
       return handleEdit(commandArgs);
     case "test":
@@ -65,6 +59,14 @@ export async function cli(
       console.error("Run 'rogatio --help' for usage.");
       return 2;
   }
+}
+
+async function handleDoctor(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    showDoctorHelp();
+    return 0;
+  }
+  return doctorCommand(args);
 }
 
 async function handleEdit(args: string[]): Promise<number> {
@@ -140,6 +142,7 @@ function showHelp(): number {
 Usage: rogatio <command> [options]
 
 Commands:
+  doctor [path]   Check the local stack and print a fix for each problem
   edit [path]     Launch browser editor (default: .rogatio.json; any filename)
   test [path] [url...]  Run offline dry-run tests (default: .rogatio.json; any filename)
   verify [path]   Validate a project file (default: .rogatio.json; any filename)

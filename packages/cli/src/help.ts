@@ -16,6 +16,41 @@ bound to 127.0.0.1. Changes are saved atomically to the file that was opened.
 When path is omitted, the CLI looks for .rogatio.json in the current directory.`);
 }
 
+export function showDoctorHelp(): void {
+  console.log(`Usage: rogatio doctor [options] [path]
+
+Check the local Rogatio stack and print a copy-paste fix for each problem.
+
+Arguments:
+  path            Project file (any filename; default: .rogatio.json in the current directory)
+
+Options:
+  --json            Print a stable JSON report
+  --check-updates   Ask the npm registry whether a newer CLI release exists.
+                    Omitted by default. Doctor makes no other registry call.
+  --extension-id    Extension ID the host manifest should allow. Release users
+                    never need this. It is only for development (a local unpacked
+                    build without the release key) and for forks.
+  --help, -h        Show this help
+
+Checks, in order:
+  node      Node.js 26 or newer, and this CLI version
+  project   Project file found and valid (same schema and compiler checks as verify)
+  host      Native host manifest present and allowed_origins matches the extension ID
+  ca        Device CA present and trusted (same signal as rogatio runtime verify)
+  pac       Runtime answers a loopback PAC request within 10000ms
+  ai        AI Assist provider configured and reachable (optional)
+
+Nothing is sent off the machine unless you pass --check-updates (npm registry)
+or an AI provider is already configured (the same Hello request as rogatio ai test).
+The PAC check does not change Chrome proxy settings.
+
+Exit codes:
+  0  Every required check passed. Warnings, including optional AI, are allowed.
+  1  One or more required checks failed
+  2  Usage error`);
+}
+
 export function showVerifyHelp(): void {
   console.log(`Usage: rogatio verify [options] [path]
 

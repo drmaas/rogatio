@@ -9,6 +9,8 @@ import { type AiPreviewSummary, summarizeAiPreview } from "./ai-preview.js";
 import { attentionFromRuleStatuses } from "./attention.js";
 import { PROJECT_VERSION, validateProjectDetailed } from "./browser-schema.js";
 import { createDashboardSystemStatus } from "./dashboard-status.js";
+import { parseDoctorReport, unreachableDoctorReport } from "./doctor-report.js";
+import { renderDoctorReport } from "./doctor-view.js";
 import {
   nativeHostOriginMismatchMessage,
   runtimeInstallCommand,
@@ -195,6 +197,8 @@ function readRuleDeepLink(): { groupId: string; ruleId: string } | null {
 
 /** Diagnostics modal state */
 let diagnosticsOpen = false;
+let doctorReport: ReturnType<typeof parseDoctorReport> = null;
+let doctorRunning = false;
 let diagnosticsData: {
   phase: string;
   extensionId: string | null;
@@ -393,7 +397,7 @@ function createSidebarCard(
  * with the Dashboard system-status surface; status text/tone share
  * `runtimeStatusText`/`runtimeStatusTone` via `status-cards.ts`. The Dashboard
  * builds its own block in `dashboard-status.ts` (live regions + recovery
- * line), so this stays sidebar-only and sidebar markup is byte-identical.
+ * line). Both surfaces include Run checks.
  */
 function appendRuntimeCardBody(body: HTMLElement): void {
   const runtimePhase = state.nativeRuntimeState?.phase ?? "stopped";
@@ -404,7 +408,9 @@ function appendRuntimeCardBody(body: HTMLElement): void {
   startRuntime.disabled = controlsDisabled.start;
   const stopRuntime = button("Stop runtime", "stop-native-runtime");
   stopRuntime.disabled = controlsDisabled.stop;
-  actions.append(startRuntime, stopRuntime);
+  const runChecks = button("Run checks", "run-doctor");
+  runChecks.disabled = doctorRunning;
+  actions.append(startRuntime, stopRuntime, runChecks);
   body.append(actions);
 
   // Runtime status sits directly under the Start/Stop controls so the current
@@ -451,6 +457,7 @@ function appendRuntimeCardBody(body: HTMLElement): void {
       }
     }
   }
+  renderDoctorReport(body, doctorReport);
 }
 
 /**
@@ -1372,6 +1379,8 @@ function renderOverview(shell: HTMLElement): void {
     aiStatusChecked,
     aiReported,
     aiProvider,
+    doctorReport,
+    doctorRunning,
   });
 
   overview.append(systemStatus, creationSection, projectsSection);
@@ -1517,6 +1526,7 @@ function renderShell(): void {
     if (command === "stop-native-runtime")
       void nativeRuntimeCommand("stop-native-runtime");
     if (command === "show-diagnostics") void showDiagnostics();
+    if (command === "run-doctor") void runDoctorChecks();
     if (command === "pick-mock-file-root") {
       void pickMockFileRoot();
     }
@@ -2046,6 +2056,23 @@ async function checkNativeAISupport(): Promise<void> {
     aiReported = false;
     aiProvider = null;
     aiStatusChecked = true;
+  }
+}
+
+async function runDoctorChecks(): Promise<void> {
+  if (doctorRunning) return;
+  doctorRunning = true;
+  renderShell();
+  try {
+    const response = await client.send({ version: 1, command: "run-doctor" });
+    const value =
+      response?.ok === true ? parseDoctorReport(response.value) : null;
+    doctorReport = value ?? unreachableDoctorReport();
+  } catch {
+    doctorReport = unreachableDoctorReport();
+  } finally {
+    doctorRunning = false;
+    renderShell();
   }
 }
 

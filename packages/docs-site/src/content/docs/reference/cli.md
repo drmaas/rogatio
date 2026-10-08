@@ -1,9 +1,9 @@
 ---
 title: CLI reference
-description: The rogatio CLI commands edit, verify, test, runtime, ai, and import.
+description: The rogatio CLI commands edit, verify, test, doctor, runtime, ai, and import.
 ---
 
-The public CLI consists of `edit`, `verify`, `test`, `runtime`, `ai`, and `import`.
+The public CLI consists of `edit`, `verify`, `test`, `doctor`, `runtime`, `ai`, and `import`.
 
 `edit`, `verify`, and `test` accept a project file with any filename. When the path is
 omitted they look for `.rogatio.json` in the current directory. A directory listing
@@ -28,6 +28,27 @@ Validates a project file (any filename; default `cwd/.rogatio.json`, or `-` for 
 - Runs schema validation, then compiler validation.
 - Human-readable output by default; `--json` for machine-readable structured diagnostics.
 - Exit codes: `0` = valid, `1` = invalid (diagnostics), `2` = error (IO/parse).
+
+## `rogatio doctor [path]`
+
+Checks the local stack and prints `pass`, `warn`, or `fail` with one copy-paste fix for each problem. The path is any filename and defaults to `.rogatio.json` in the current directory.
+
+Checks, in order:
+
+1. Node.js 26 or newer, and this CLI version.
+2. The project file, using the same schema and compiler checks as `verify`.
+3. The native-host manifest, including whether `allowed_origins` matches the extension ID.
+4. The device CA, using the same signal as `rogatio runtime verify`.
+5. A loopback PAC answer within 10 seconds. This does not change Chrome's proxy settings.
+6. AI Assist, marked optional. When a provider is configured, doctor sends the same Hello request as `rogatio ai test`.
+
+`--json` prints a stable report (`version`, `ok`, `exitCode`, `checks`). `--check-updates` is the only time doctor contacts the npm registry. Without that flag, and without a configured AI provider, nothing leaves the machine.
+
+Release users never pass `--extension-id`. That flag is only for development (a local unpacked build without the release key) and for forks.
+
+Exit codes: `0` every required check passed (warnings are allowed), `1` a required check failed, `2` usage error.
+
+The extension's **Run checks** button runs these same checks through the native host.
 
 ## `rogatio test [path]`
 

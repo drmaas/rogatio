@@ -24,6 +24,7 @@ export type ExtensionCommand =
   | "stop-native-runtime"
   | "get-native-runtime-status"
   | "diagnose-native-runtime"
+  | "run-doctor"
   | "generate-project"
   | "check-ai-support"
   | "ai-assist"
@@ -63,6 +64,7 @@ const COMMANDS = new Set<ExtensionCommand>([
   "stop-native-runtime",
   "get-native-runtime-status",
   "diagnose-native-runtime",
+  "run-doctor",
   "generate-project",
   "check-ai-support",
   "ai-assist",

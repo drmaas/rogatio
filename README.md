@@ -113,10 +113,10 @@ editor and extension distributions; no fonts or assets are fetched at runtime.
 The toolbar button opens a compact popup that lists the active project's saved groups with
 one enable/disable switch each, a truthful runtime status, an **Open app** button (the full
 management page at Overview), and a pencil that opens the management page on that group. It
-also offers **New project** (an inline name form) and **Import project** (a file picker)
-actions that reuse the management page's create/import lifecycle. The popup reuses the
-existing group-enablement lifecycle; it contains no editor, search, proxy, permission, or
-rule-authoring controls.
+also offers **New project** (an inline name form), **Import project** (a file picker),
+and **Run checks**. Run checks asks the native host for the same report as `rogatio doctor`.
+The popup reuses the existing group-enablement lifecycle; it contains no editor, search,
+proxy, permission, or rule-authoring controls.
 
 On the management page, each rule reports `active`, `disabled`, `needs runtime`,
 `unsupported`, or `error`. When a rule fails to install, the status word
@@ -142,6 +142,7 @@ cat .rogatio.json | rogatio verify - --json
 | `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port; `--no-open` starts the server without opening a browser. |
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
+| `rogatio doctor [path]` | Checks Node, the project file, the native host, the device CA, a loopback PAC answer, and optional AI Assist. Prints `pass` / `warn` / `fail` and a copy-paste fix. `--json` prints a stable report. `--check-updates` is the only npm-registry call. |
 | `rogatio import requestly <export.json>` | Migrates a Requestly export into `.rogatio.json` (default `--out`). `--merge` appends onto an existing project. Prints imported, changed, and skipped rules. |
 | `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
 | `rogatio runtime <install\|uninstall\|verify>` | Request-body trust lifecycle. `install` registers the native-messaging host manifest **and** provisions and trusts the device-local CA in a single, transactional call: it needs elevated privileges (Linux `sudo`, macOS keychain authorization, Windows Administrator) and capability-gates the OS trust step, rolling the manifest back and exiting `1` with `trust unsupported: <reasons>` when a capability or elevation is missing. `uninstall` removes the host manifest, the device-local CA files, and the trust installation (idempotent). `verify` reports whether the manifest, the `runtime-host` wrapper, the allowed origins, and the CA trust are all present and valid (exit `0` only when all pass). |
@@ -253,7 +254,9 @@ rogatio runtime host .rogatio.json --root ~/projects/demo
 Then open the extension, click **Start runtime**, and response-body and
 request-body rules become active through the native host. The
 sidebar runtime status line shows the current phase next to the Start/Stop
-controls, with the loaded extension ID shown beneath it. Release builds carry
+controls, with the loaded extension ID shown beneath it. **Run checks** on that
+card, on the dashboard runtime block, and in the toolbar popup asks the native
+host for the same six checks as `rogatio doctor`. Release builds carry
 a public `key` in the extension manifest, so that ID stays the same when a new
 ZIP is unpacked into a different folder. If the host manifest is not installed,
 starting shows the ready-to-run install command with a one-click copy button

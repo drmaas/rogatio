@@ -1,4 +1,10 @@
 import {
+  type DoctorReport,
+  parseDoctorReport,
+  unreachableDoctorReport,
+} from "./doctor-report.js";
+import { renderDoctorReport } from "./doctor-view.js";
+import {
   MATCH_LOGGING_ENABLED_KEY,
   readMatchLoggingEnabledFromStorageResult,
 } from "./match-logging-enabled.js";
@@ -49,6 +55,8 @@ let createDraft = "";
 let statusMessage = "";
 /** Console match logging toggle; missing storage key defaults on. */
 let matchLoggingEnabled = true;
+let doctorReport: DoctorReport | null = null;
+let doctorRunning = false;
 
 function statusLabel(status: string): string {
   switch (status) {
@@ -273,7 +281,18 @@ function render(): void {
     },
   });
 
-  actions.append(newProject, importProject, openApp, matchLoggingLabel);
+  const runChecks = projectAction("Run checks", "runDoctor");
+  runChecks.disabled = doctorRunning;
+  runChecks.addEventListener("click", () => {
+    void runDoctorChecks();
+  });
+  actions.append(
+    newProject,
+    importProject,
+    openApp,
+    runChecks,
+    matchLoggingLabel,
+  );
 
   const list = document.createElement("ul");
   list.dataset.groupList = "true";
@@ -364,8 +383,31 @@ function render(): void {
   const parts: HTMLElement[] = [header, actions];
   if (createFormOpen) parts.push(createForm());
   if (statusMessage) parts.push(statusLine());
+  if (doctorReport) {
+    const doctor = document.createElement("section");
+    doctor.dataset.doctorReport = "true";
+    renderDoctorReport(doctor, doctorReport);
+    parts.push(doctor);
+  }
   parts.push(list, importField());
   container.append(...parts);
+}
+
+async function runDoctorChecks(): Promise<void> {
+  if (doctorRunning) return;
+  doctorRunning = true;
+  render();
+  try {
+    const response = await client.send({ version: 1, command: "run-doctor" });
+    const value =
+      response?.ok === true ? parseDoctorReport(response.value) : null;
+    doctorReport = value ?? unreachableDoctorReport();
+  } catch {
+    doctorReport = unreachableDoctorReport();
+  } finally {
+    doctorRunning = false;
+    render();
+  }
 }
 
 async function loadMatchLoggingEnabled(): Promise<void> {

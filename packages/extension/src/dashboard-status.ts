@@ -11,6 +11,8 @@
  * sidebar card has no recovery line. All strings render via `textContent`.
  */
 
+import type { DoctorReport } from "./doctor-report.js";
+import { renderDoctorReport } from "./doctor-view.js";
 import { runtimeInstallCommand } from "./extension-id.js";
 import { runtimeControlDisabled } from "./runtime-controls.js";
 import {
@@ -32,6 +34,8 @@ export interface DashboardStatusInput {
   readonly aiStatusChecked: boolean;
   readonly aiReported: boolean;
   readonly aiProvider: DashboardAiProvider | null;
+  readonly doctorReport?: DoctorReport | null;
+  readonly doctorRunning?: boolean;
 }
 
 function dashboardButton(label: string, command: string): HTMLButtonElement {
@@ -53,7 +57,9 @@ function appendDashboardRuntimeBlock(
   startRuntime.disabled = controlsDisabled.start;
   const stopRuntime = dashboardButton("Stop runtime", "stop-native-runtime");
   stopRuntime.disabled = controlsDisabled.stop;
-  actions.append(startRuntime, stopRuntime);
+  const runChecks = dashboardButton("Run checks", "run-doctor");
+  runChecks.disabled = input.doctorRunning === true;
+  actions.append(startRuntime, stopRuntime, runChecks);
   block.append(actions);
 
   const nativeRuntime = document.createElement("p");
@@ -102,6 +108,7 @@ function appendDashboardRuntimeBlock(
     );
     block.append(recovery);
   }
+  renderDoctorReport(block, input.doctorReport ?? null);
 }
 
 function appendDashboardAiBlock(
