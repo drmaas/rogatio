@@ -2,8 +2,9 @@ name: Release
 
 # Real releases run only after "Repository checks" succeeds for a push to main.
 # workflow_dispatch stays available as a dry run and does not publish.
-# The npm trusted publisher for @rogatio/cli must name this file (release.yml)
-# with no GitHub environment. Do not pass NPM_TOKEN or NODE_AUTH_TOKEN.
+# npm publish runs in this file. The @rogatio/cli trusted publisher is bound to
+# the filename release.yml, with no GitHub environment. Do not rename this file
+# or move publish into a called workflow. Do not pass NPM_TOKEN or NODE_AUTH_TOKEN.
 
 on:
   workflow_run:
