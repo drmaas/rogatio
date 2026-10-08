@@ -3,7 +3,7 @@ title: Architecture
 description: Rogatio's package boundaries and how they fit together.
 ---
 
-Rogatio is a strict TypeScript 7, ESM/NodeNext monorepo using pnpm 12.4.1.
+Rogatio is a strict TypeScript 7, ESM/NodeNext monorepo using pnpm 12.10.1.
 
 For package decisions, rejected alternatives, and feature-slice history, see the repository
 file `docs/architecture.md`. This page is the short user-facing summary.
