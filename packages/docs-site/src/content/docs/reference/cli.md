@@ -96,4 +96,4 @@ OpenAI-compatible providers.
 ## Notes
 
 - The CLI is distributed as `@rogatio/cli` from the public npm registry.
-- Requires **Node.js 24** or newer.
+- Requires **Node.js 26** or newer.
