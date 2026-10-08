@@ -23,7 +23,7 @@ vi.mock("@rogatio/runtime", async () => {
     );
   return {
     ...actual,
-    createRequestBodyTrustController: () => ({
+    createInstalledTrustController: () => ({
       install: async () => ({ ok: true, state: "installed" as const }),
       uninstall: async () => ({ ok: true, state: "uninstalled" as const }),
       status: async () => ({
@@ -32,14 +32,6 @@ vi.mock("@rogatio/runtime", async () => {
         platform: "linux",
         capabilityReasons: [],
       }),
-    }),
-    selectTrustPlatformAdapter: () => ({
-      platform: "linux",
-      defaultManifestDir: () => "/mock/manifest",
-      defaultCaInstallPath: () => "/mock/ca",
-      detect: () => ({ manifest: true, caTrust: true, reasons: [] }),
-      caTrustInstaller: async () => {},
-      caTrustRemover: async () => {},
     }),
   };
 });

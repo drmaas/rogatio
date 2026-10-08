@@ -437,7 +437,10 @@ export function createRequestBodyTrustController(
         try {
           const fileStat = await stat(parsed.path);
           binaryExists = fileStat.isFile();
-          binaryExecutable = (fileStat.mode & 0o111) !== 0;
+          // Node never sets the Unix execute bit on Windows. A regular file
+          // there is the wrapper Chrome will launch.
+          binaryExecutable =
+            platform === "win32" ? binaryExists : (fileStat.mode & 0o111) !== 0;
           if (!binaryExists) reasons.push("binary-not-found");
           if (!binaryExecutable) reasons.push("binary-not-executable");
         } catch {

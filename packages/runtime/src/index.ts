@@ -5,10 +5,12 @@ export * from "./ai-config.js";
 export * from "./ai-prompt.js";
 export { authorizeExact } from "./authorization.js";
 export { isConfinedFileSupported, readConfinedFile } from "./confined-file.js";
+export * from "./doctor.js";
 export * from "./envelope.js";
 export * from "./extension-id.js";
 export { resolveConfinedRoot } from "./file-root.js";
 export * from "./host.js";
+export * from "./installed-trust.js";
 export {
   type InterceptProxyHandle,
   type InterceptProxyOptions,
@@ -23,6 +25,12 @@ export { fetchAuthorized } from "./outbound.js";
 export * from "./pac.js";
 export * from "./policy.js";
 export { normalizeRuntimePreset, parseEnabledGroupIds } from "./preset.js";
+export {
+  type Diagnosis,
+  diagnoseProjectData,
+  formatProjectDiagnostics,
+  type ProjectDiagnostic,
+} from "./project-diagnose.js";
 export {
   matchersFromOperations,
   mocksFromOperations,

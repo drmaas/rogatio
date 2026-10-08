@@ -2,7 +2,7 @@ import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { compileProject } from "@rogatio/compiler";
 import {
-  createRequestBodyTrustController,
+  createInstalledTrustController,
   defaultTrustInstallRoot,
   describeExtensionIdMismatch,
   extensionOriginListed,
@@ -13,7 +13,6 @@ import {
   RUNTIME_LIMITS,
   readProviderConfig,
   runNativeHost,
-  selectTrustPlatformAdapter,
 } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { showRuntimeHelp } from "../help.js";
@@ -22,6 +21,7 @@ import {
   createJsonFileProjectStorage,
   type ProjectStorage,
 } from "../utils/file.js";
+import { readCliVersion } from "../version.js";
 
 export interface RuntimeCommandOptions {
   stdinInput?: string;
@@ -69,20 +69,7 @@ async function writeHostWrapper(
 }
 
 function makeTrustController() {
-  const platform = process.platform;
-  const adapter = selectTrustPlatformAdapter(platform);
-  const installRoot = defaultTrustInstallRoot(platform);
-  return createRequestBodyTrustController({
-    platform,
-    installRoot,
-    hostPath: join(installRoot, "runtime-host"),
-    hostName: "com.rogatio.runtime",
-    allowedOrigins: [],
-    manifestDir: adapter.defaultManifestDir(),
-    detectCapabilities: () => adapter.detect(),
-    caTrustInstaller: (cert) => adapter.caTrustInstaller(cert),
-    caTrustRemover: () => adapter.caTrustRemover(),
-  });
+  return createInstalledTrustController();
 }
 
 function reportTrust(
@@ -303,6 +290,7 @@ async function runtimeHostCommand(
     const aiProviderConfig = await readProviderConfig();
     await runNativeHost({
       fileRoot: root,
+      cliVersion: readCliVersion(),
       ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
       aiConfigReader: readProviderConfig,
       onReady: () =>
@@ -392,6 +380,7 @@ async function runtimeHostCommand(
   const aiProviderConfig = await readProviderConfig();
   await runNativeHost({
     preset: normalized.value,
+    cliVersion: readCliVersion(),
     ...(rootDir !== undefined ? { fileRoot: rootDir } : {}),
     ...(aiProviderConfig !== null ? { aiProviderConfig } : {}),
     aiConfigReader: readProviderConfig,

@@ -60,6 +60,15 @@ export function extensionOriginListed(
 }
 
 /**
+ * The install command that pins `allowed_origins` to this extension.
+ * Release builds omit `--extension-id`.
+ */
+export function extensionIdInstallCommand(extensionId: string): string {
+  if (extensionId === RELEASE_EXTENSION_ID) return "rogatio runtime install";
+  return `rogatio runtime install --extension-id ${extensionId}`;
+}
+
+/**
  * Actionable verify text when the host manifest is pinned to a different ID.
  * The command rewrites `allowed_origins`. Release builds omit the flag.
  */
@@ -69,10 +78,7 @@ export function describeExtensionIdMismatch(
 ): string {
   const allowed =
     allowedOrigins.length > 0 ? allowedOrigins.join(", ") : "(none)";
-  const command =
-    expectedExtensionId === RELEASE_EXTENSION_ID
-      ? "rogatio runtime install"
-      : `rogatio runtime install --extension-id ${expectedExtensionId}`;
+  const command = extensionIdInstallCommand(expectedExtensionId);
   return [
     `Extension ID ${expectedExtensionId} is not in the host manifest allowed_origins.`,
     `The host manifest allows: ${allowed}.`,

@@ -13,7 +13,10 @@ const FORBIDDEN_BODY_KEYS = new Set([
   "mockBody",
 ]);
 
-const BODY_CHECK_EXEMPT_TYPES = new Set(["runtime.project.set"]);
+const BODY_CHECK_EXEMPT_TYPES = new Set([
+  "runtime.project.set",
+  "runtime.doctor",
+]);
 
 const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "runtime.start",
@@ -38,6 +41,7 @@ const ENVELOPE_MESSAGE_TYPES: ReadonlySet<string> = new Set([
   "runtime.pick-directory",
   "runtime.check-directory",
   "runtime.set-file-root",
+  "runtime.doctor",
 ]);
 
 export class EnvelopeError extends Error {

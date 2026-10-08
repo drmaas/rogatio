@@ -27,6 +27,11 @@ import {
   extensionDiagnostic,
 } from "./diagnostics.js";
 import type { DnrInstallError, DnrInstallerWithMatchIndex } from "./dnr.js";
+import {
+  buildDoctorRequestMetadata,
+  doctorReportFromReply,
+  unreachableDoctorReport,
+} from "./doctor-report.js";
 import { runExtensionDryRun } from "./dry-run-command.js";
 import {
   isNativeHostOriginForbiddenMessage,
@@ -1186,6 +1191,36 @@ export function createExtensionApplication(
         ok: true,
         value: { nativeRuntimeState: { phase: nativePhase } },
       };
+    }
+    if (request.command === "run-doctor") {
+      if (!options.nativeRuntime?.send) {
+        return { ok: true, value: unreachableDoctorReport() };
+      }
+      let project: unknown = null;
+      const current = await repository.state();
+      if (current.ok && current.value.activeProjectId !== null) {
+        project =
+          current.value.projects[current.value.activeProjectId]?.data ?? null;
+      }
+      const metadata = buildDoctorRequestMetadata(
+        project,
+        options.extensionId ?? "",
+      );
+      try {
+        const reply = await options.nativeRuntime.send(
+          {
+            protocol: "v1",
+            type: "runtime.doctor",
+            timestamp: Date.now(),
+            metadata,
+          },
+          25_000,
+        );
+        const report = doctorReportFromReply(reply.metadata);
+        return { ok: true, value: report ?? unreachableDoctorReport() };
+      } catch {
+        return { ok: true, value: unreachableDoctorReport() };
+      }
     }
     if (request.command === "diagnose-native-runtime") {
       const chromeError = options.nativeRuntime?.lastConnectError?.() ?? null;

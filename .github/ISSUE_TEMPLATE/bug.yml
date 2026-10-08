@@ -57,10 +57,18 @@ body:
     id: runtime-verify
     attributes:
       label: rogatio runtime verify output
-      description: Paste the full output of `rogatio runtime verify`. If you did not run it, say why.
+      description: Paste the full output of `rogatio runtime verify`. If you did not run it, say why. For a whole-stack report, also paste `rogatio doctor --json` in the field below.
       render: shell
     validations:
       required: true
+  - type: textarea
+    id: doctor-json
+    attributes:
+      label: rogatio doctor --json
+      description: Paste the output of `rogatio doctor --json`. This is the whole-stack health report (Node, project, native host, device CA, PAC, and optional AI Assist). If you did not run it, say why.
+      render: json
+    validations:
+      required: false
   - type: dropdown
     id: rule-kind
     attributes:

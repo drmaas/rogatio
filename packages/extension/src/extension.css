@@ -1229,6 +1229,24 @@ body {
   font-size: 12px;
   color: var(--rogatio-subtext, #a6adc8);
 }
+.rogatio-doctor-report {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+.rogatio-doctor-check {
+  margin: 0;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rogatio-doctor-check[data-status="fail"] {
+  color: var(--rogatio-danger);
+}
+.rogatio-doctor-check[data-status="warn"] {
+  color: var(--rogatio-warning);
+}
 @media (prefers-reduced-motion: reduce) {
   .rogatio-shell *,
   .rogatio-shell *::before,

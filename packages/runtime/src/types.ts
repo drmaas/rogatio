@@ -319,7 +319,8 @@ export type EnvelopeMessageType =
   | "ai.status"
   | "runtime.pick-directory"
   | "runtime.check-directory"
-  | "runtime.set-file-root";
+  | "runtime.set-file-root"
+  | "runtime.doctor";
 
 /**
  * Provider metadata reported by `ai.status` (spec REQ-001). This is a pick-type:

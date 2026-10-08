@@ -481,15 +481,10 @@ describe("verify allowed_origins", () => {
     expect(checked.allowedOrigins).toEqual([`chrome-extension://${pinned}/`]);
     expect(checked.manifestValid).toBe(true);
     expect(checked.binaryExists).toBe(true);
+    expect(checked.binaryExecutable).toBe(true);
     expect(checked.caTrusted).toBe(true);
-    // Node's stat mode does not report a Unix execute bit on Windows, so
-    // verify records binary-not-executable there even after chmod 0o755.
-    const reasonsBesidesWindowsMode = checked.reasons.filter(
-      (reason) =>
-        !(process.platform === "win32" && reason === "binary-not-executable"),
-    );
-    expect(reasonsBesidesWindowsMode).toEqual([]);
-    if (process.platform !== "win32") expect(checked.ok).toBe(true);
+    expect(checked.reasons).toEqual([]);
+    expect(checked.ok).toBe(true);
     expect(extensionOriginListed(pinned, checked.allowedOrigins)).toBe(true);
 
     const other = "bcdefghijklmnopabcdefghijklmnopa";
