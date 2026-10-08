@@ -15,8 +15,12 @@ on:
 permissions:
   contents: read
 
+# Share `release` only for a successful push to main. GitHub keeps one pending
+# run per group even when cancel-in-progress is false, so a pull-request checks
+# completion must not take that slot and drop a queued publish. Other runs,
+# including workflow_dispatch (no workflow_run payload), use github.run_id.
 concurrency:
-  group: release
+  group: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' && 'release' || github.run_id }}
   cancel-in-progress: false
 
 env:
