@@ -71,9 +71,17 @@ const host = {
 describe("editor doctor", () => {
   it("quotes the edit command when the server has stopped", () => {
     const report = editorServerStoppedReport("/tmp/my project.json");
+    const expected =
+      process.platform === "win32"
+        ? 'rogatio edit "/tmp/my project.json"'
+        : "rogatio edit '/tmp/my project.json'";
     expect(report.ui.checks[0]?.summary).toBe(EDITOR_SERVER_STOPPED_SUMMARY);
-    expect(report.ui.checks[0]?.fix).toBe(
+    expect(report.ui.checks[0]?.fix).toBe(expected);
+    expect(editorEditFix("/tmp/my project.json", "linux")).toBe(
       "rogatio edit '/tmp/my project.json'",
+    );
+    expect(editorEditFix("/tmp/my project.json", "win32")).toBe(
+      'rogatio edit "/tmp/my project.json"',
     );
     expect(report.host).toBeNull();
   });
@@ -142,7 +150,17 @@ describe("editor doctor", () => {
     expect(project?.summary.startsWith(EDITOR_PROJECT_INVALID_SUMMARY)).toBe(
       true,
     );
-    expect(project?.fix).toBe("rogatio verify /tmp/project.json");
+    expect(project?.fix).toBe(
+      process.platform === "win32"
+        ? 'rogatio verify "/tmp/project.json"'
+        : "rogatio verify /tmp/project.json",
+    );
+    expect(editorVerifyFix("/tmp/project.json", "linux")).toBe(
+      "rogatio verify /tmp/project.json",
+    );
+    expect(editorVerifyFix("/tmp/project.json", "win32")).toBe(
+      'rogatio verify "/tmp/project.json"',
+    );
     const text = serializeEditorDiagnostics(report);
     expect(text).not.toContain("PROJECT_BODY_SECRET");
     expect(text).not.toContain("sk-doctor-secret-key");
@@ -209,7 +227,15 @@ describe("editor doctor", () => {
     expect(html).toContain("Run checks");
     expect(html).toContain("/api/doctor");
     expect(html).toContain(EDITOR_SERVER_STOPPED_SUMMARY);
-    expect(html).toContain("rogatio edit '/tmp/my project.json'");
+    const command =
+      process.platform === "win32"
+        ? 'rogatio edit "/tmp/my project.json"'
+        : "rogatio edit '/tmp/my project.json'";
+    const embedded = JSON.stringify(JSON.stringify(command).slice(1, -1)).slice(
+      1,
+      -1,
+    );
+    expect(html).toContain(embedded);
     expect(html).toContain("textContent");
     expect(html).not.toContain("innerHTML");
   });
