@@ -8,11 +8,18 @@ import type {
   AIClient,
   AICompletionOptions,
   AIProviderConfig,
+  DoctorReport,
 } from "@rogatio/runtime";
-import { runAIAssist } from "@rogatio/runtime";
+import { doctorInterruptedReport, runAIAssist } from "@rogatio/runtime";
 import { diagnoseProject } from "../commands/diagnose.js";
+import {
+  buildEditorDoctor,
+  runEditorFileDoctor,
+  serializeEditorDiagnostics,
+} from "../editor-doctor.js";
 import { readSavedMockRoot, writeSavedMockRoot } from "../mock-root-config.js";
 import type { ProjectStorage } from "../utils/file.js";
+import { readCliVersion } from "../version.js";
 export interface RouteContext {
   project: unknown;
   filePath: string;
@@ -33,6 +40,14 @@ export interface RouteContext {
   aiClient?: AIClient;
   /** Provider config (model/url/key) when AI is configured. */
   aiProviderConfig?: AIProviderConfig;
+  /**
+   * Doctor for the open file. Tests inject this so the route does not probe
+   * the network, the CA, or the PAC listener. Production uses
+   * `runEditorFileDoctor`.
+   */
+  runFileDoctor?: () => Promise<DoctorReport>;
+  /** Current AI provider config. Absent means not configured. */
+  readProviderConfig?: () => Promise<unknown>;
 }
 
 function headerValue(value: string | string[] | undefined): string | undefined {
@@ -373,6 +388,73 @@ export function createRoutes(context: RouteContext) {
 
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ diagnostics: diagnosis.diagnostics }));
+      return;
+    }
+
+    if (pathname === "/api/doctor" && method === "POST") {
+      if (!validateCsrf(req, context.csrfToken)) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            code: "csrf-invalid",
+            message: "Invalid CSRF token",
+          }),
+        );
+        return;
+      }
+      let draft = context.project;
+      let draftParsed = true;
+      try {
+        const bodyText = await getRequestBody(req);
+        if (bodyText.length > 0) draft = JSON.parse(bodyText);
+      } catch (error) {
+        if (error instanceof RequestBodyError) {
+          const failure = bodyErrorResponse(error);
+          res.writeHead(failure.status, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(failure.body));
+          return;
+        }
+        draftParsed = false;
+      }
+      let host: DoctorReport;
+      try {
+        host = context.runFileDoctor
+          ? await context.runFileDoctor()
+          : await runEditorFileDoctor({
+              filePath: context.filePath,
+              cliVersion: readCliVersion(),
+              storageGet: (path) => context.storage.get(path),
+            });
+      } catch {
+        host = doctorInterruptedReport();
+      }
+      let configuredNow = false;
+      try {
+        const config = await (
+          context.readProviderConfig ?? (async () => null)
+        )();
+        configuredNow = config !== null && config !== undefined;
+      } catch {
+        configuredNow = false;
+      }
+      let mockRootSaved = false;
+      try {
+        mockRootSaved =
+          (await readSavedMockRoot(context.filePath)) !== undefined;
+      } catch {
+        mockRootSaved = false;
+      }
+      const report = buildEditorDoctor({
+        filePath: context.filePath,
+        draft,
+        draftParsed,
+        assistInPage: context.aiClient !== undefined,
+        configuredNow,
+        mockRootSaved,
+        host,
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(serializeEditorDiagnostics(report));
       return;
     }
 

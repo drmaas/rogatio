@@ -8,6 +8,7 @@ import {
   doctorFromHostMetadata,
   doctorInterruptedReport,
   doctorReportValue,
+  exactDoctorVersion,
 } from "./doctor.js";
 import { parseEnvelope, serializeEnvelope } from "./envelope.js";
 import {
@@ -120,6 +121,18 @@ function defaultTrustRoot(): string {
  * stdin and writes response frames to stdout (spec REQ-001). All pairing,
  * authorization, and mock delivery happen in this single process.
  */
+function doctorReplyMetadata(
+  report: DoctorReport,
+  cliVersion: string | undefined,
+): { report: ReturnType<typeof doctorReportValue>; cliVersion?: string } {
+  const version =
+    typeof cliVersion === "string" ? exactDoctorVersion(cliVersion) : null;
+  return {
+    report: doctorReportValue(report),
+    ...(version !== null ? { cliVersion: version } : {}),
+  };
+}
+
 export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
   const controller = createNativeRuntimeController({
     preset: options.preset,
@@ -417,7 +430,7 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
               ? { requestId: envelope.requestId }
               : {}),
             timestamp: Date.now(),
-            metadata: { report: doctorReportValue(doctorReport) },
+            metadata: doctorReplyMetadata(doctorReport, options.cliVersion),
           });
         } catch {
           return encodeEnvelopeFrame({
@@ -427,7 +440,10 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
               ? { requestId: envelope.requestId }
               : {}),
             timestamp: Date.now(),
-            metadata: { report: doctorReportValue(doctorInterruptedReport()) },
+            metadata: doctorReplyMetadata(
+              doctorInterruptedReport(),
+              options.cliVersion,
+            ),
           });
         }
       }

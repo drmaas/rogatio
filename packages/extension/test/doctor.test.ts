@@ -4,19 +4,27 @@ import { describe, expect, it, vi } from "vitest";
 import { createDashboardSystemStatus } from "../src/dashboard-status.js";
 import {
   buildDoctorRequestMetadata,
-  DOCTOR_HOST_UNREACHABLE_FIX,
-  DOCTOR_HOST_UNREACHABLE_SUMMARY,
   type DoctorReport,
   parseDoctorReport,
-  unreachableDoctorReport,
 } from "../src/doctor-report.js";
 import { renderDoctorReport } from "../src/doctor-view.js";
+import { runtimeInstallCommand } from "../src/extension-id.js";
 import type {
   NativeEnvelope,
   NativeEnvelopeInput,
 } from "../src/native-session.js";
 import { parseRequest } from "../src/protocol.js";
 import { createExtensionApplication } from "../src/service-worker.js";
+import {
+  buildExtensionDoctor,
+  EXT_NATIVE_MISSING_SUMMARY,
+  EXT_NATIVE_ORIGIN_SUMMARY,
+  EXT_NATIVE_TIMEOUT_SUMMARY,
+  EXT_WORKER_FAIL_SUMMARY,
+  EXT_WORKER_FIX,
+  type ExtensionDoctorFacts,
+  workerUnreachableDiagnostics,
+} from "../src/ui-doctor.js";
 
 const EXTENSION_ID = "abcdefghijklmnopabcdefghijklmnop";
 
@@ -132,12 +140,15 @@ describe("doctor report", () => {
 
   it("renders fix text as text and not markup", () => {
     const parent = document.createElement("div");
-    renderDoctorReport(parent, report());
+    renderDoctorReport(parent, shell(report()));
     const project = parent.querySelector("[data-check='project']");
     expect(project?.textContent).toContain("Fix: rogatio edit");
     expect(parent.innerHTML).not.toContain("<script");
     const host = parent.querySelector("[data-check='host']");
     expect(host?.textContent).toContain("Fix: rogatio runtime install");
+    expect(
+      parent.querySelector("[data-command='copy-doctor']")?.textContent,
+    ).toBe("Copy diagnostics");
   });
 
   it("shows Run checks and the fix on the dashboard runtime card", () => {
@@ -149,16 +160,42 @@ describe("doctor report", () => {
       aiStatusChecked: true,
       aiReported: true,
       aiProvider: null,
-      doctorReport: unreachableDoctorReport(),
+      doctorReport: workerUnreachableDiagnostics(),
     });
     const button = section.querySelector("[data-command='run-doctor']");
     expect(button?.textContent).toBe("Run checks");
-    expect(section.textContent).toContain(DOCTOR_HOST_UNREACHABLE_SUMMARY);
-    expect(section.textContent).toContain(
-      `Fix: ${DOCTOR_HOST_UNREACHABLE_FIX}`,
-    );
+    expect(section.textContent).toContain(EXT_WORKER_FAIL_SUMMARY);
+    expect(section.textContent).toContain(`Fix: ${EXT_WORKER_FIX}`);
   });
 });
+
+function shell(host: DoctorReport) {
+  return buildExtensionDoctor(baseFacts(host));
+}
+
+function baseFacts(host: DoctorReport): ExtensionDoctorFacts {
+  return {
+    workerReached: true,
+    extensionId: EXTENSION_ID,
+    extensionVersion: "6.15.0",
+    cliVersion: "6.15.0",
+    native: "ok",
+    phase: "stopped",
+    proxy: {
+      available: true,
+      levelOfControl: "controllable_by_this_extension",
+      mode: "direct",
+    },
+    siteAccess: true,
+    incognito: true,
+    activeProject: false,
+    rulesReadable: true,
+    enabledGroupCount: 0,
+    statuses: [],
+    tab: null,
+    host,
+  };
+}
 
 describe("run-doctor command", () => {
   function harness(
@@ -206,18 +243,65 @@ describe("run-doctor command", () => {
     });
     const result = await app.handle({ version: 1, command: "run-doctor" });
     expect(send).toHaveBeenCalledOnce();
-    expect(result).toEqual({ ok: true, value: expected });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const value = result.value as {
+      host: DoctorReport;
+      ui: { checks: { id: string; status: string }[] };
+    };
+    expect(value.host).toEqual(expected);
+    expect(JSON.stringify(value.host)).toBe(JSON.stringify(expected));
+    expect(
+      value.ui.checks.find((item) => item.id === "ext.native")?.status,
+    ).toBe("pass");
+    expect(JSON.stringify(value)).not.toContain("cliVersion");
   });
 
-  it("returns the unreachable fix when the host does not answer", async () => {
+  it("classifies a missing host instead of one generic row", async () => {
     const { app } = harness(async () => {
       throw new Error("extension.native-host-missing");
     });
     const result = await app.handle({ version: 1, command: "run-doctor" });
-    expect(result).toEqual({ ok: true, value: unreachableDoctorReport() });
-    if (result.ok) {
-      const value = result.value as DoctorReport;
-      expect(value.checks[0]?.fix).toBe(DOCTOR_HOST_UNREACHABLE_FIX);
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const value = result.value as {
+      host: null;
+      ui: { checks: { id: string; summary: string; fix: string | null }[] };
+    };
+    expect(value.host).toBeNull();
+    const native = value.ui.checks.find((item) => item.id === "ext.native");
+    expect(native?.summary).toBe(EXT_NATIVE_MISSING_SUMMARY);
+    expect(native?.fix).toBe(runtimeInstallCommand(EXTENSION_ID));
+    expect(value.ui.checks.some((item) => item.id === "node")).toBe(false);
+  });
+
+  it("classifies origin forbidden with the dev install command", async () => {
+    const { app } = harness(async () => {
+      throw new Error(
+        "Access to the specified native messaging host is forbidden. sk-secret",
+      );
+    });
+    const result = await app.handle({ version: 1, command: "run-doctor" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const text = JSON.stringify(result.value);
+    expect(text).toContain(EXT_NATIVE_ORIGIN_SUMMARY);
+    expect(text).toContain(runtimeInstallCommand(EXTENSION_ID));
+    expect(text).not.toContain("sk-secret");
+  });
+
+  it("classifies a host timeout", async () => {
+    const { app } = harness(async () => {
+      throw new Error("Native messaging host timed out before responding.");
+    });
+    const result = await app.handle({ version: 1, command: "run-doctor" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const value = result.value as {
+      ui: { checks: { id: string; summary: string; fix: string | null }[] };
+    };
+    const native = value.ui.checks.find((item) => item.id === "ext.native");
+    expect(native?.summary).toBe(EXT_NATIVE_TIMEOUT_SUMMARY);
+    expect(native?.fix).toBe("rogatio doctor");
   });
 });

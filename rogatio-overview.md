@@ -21,7 +21,7 @@ Every rule can be tested against a bounded batch of HTTP(S) URLs before saving. 
 The typical workflow is:
 
 1. Install the Node 26+ CLI and manually load the Chrome extension.
-2. Run `rogatio edit`, create or update rules in the visual editor, test them, verify them, and save `.rogatio.json`. `rogatio doctor` checks Node, that file, the native host, the device CA, a loopback PAC answer, and optional AI Assist.
+2. Run `rogatio edit`, create or update rules in the visual editor, test them, verify them, and save `.rogatio.json`. `rogatio doctor` checks Node, that file, the native host, the device CA, a loopback PAC answer, and optional AI Assist. The extension and `rogatio edit` add checks from their own side of the stack and keep that host report unchanged.
 3. Import the file into Chrome, review the complete project, and enable groups when ready.
 4. Explicitly enable the required groups.
 5. Start the local runtime from the extension's **Start runtime** control when response-body rules or request-body rules require one. Stop it from the extension's **Stop runtime** control when done.

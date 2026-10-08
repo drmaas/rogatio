@@ -45,6 +45,8 @@ rogatio <command> [options]
 | `rogatio runtime <install\|uninstall\|verify>` | Register the native-messaging host with `install` and trust the device-local CA in one **transactional** call; it needs elevated privileges (Linux `sudo`, macOS keychain authorization, Windows Administrator) and rolls back with exit `1` and `trust unsupported: <reasons>` when a capability or elevation is missing. Release users never pass `--extension-id`. That flag is only for development (a local unpacked build without the release key) and for forks. `uninstall` removes the host manifest, the device-local CA files, and the CA trust installation (idempotent). `verify` reports whether manifest, `runtime-host` wrapper, allowed origins, and CA trust are all valid, and fails when `allowed_origins` omits the release ID. Release users never pass `--extension-id` on verify either. |
 | `rogatio runtime host [path]` | Run the consolidated native-messaging host for the project (pair/authorize/body transforms and mock responses over stdio). Normally launched by the browser; run manually only for debugging. `--root <dir>` overrides the confined mock file root. When omitted, a saved device-local root for that project file is used, otherwise the project directory. A stdin project that contains a file mock requires `--root`. |
 
+`rogatio edit` includes **Run checks**. It calls `POST /api/doctor` (CSRF-protected) and shows editor checks plus the same report as `rogatio doctor` for the open file. A provider configured after the page opened is picked up on the next `rogatio edit`.
+
 Global options: `--help, -h` and `--version, -v`. Run `rogatio <command> --help`
 for command-specific usage.
 

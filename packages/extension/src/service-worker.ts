@@ -30,14 +30,12 @@ import type { DnrInstallError, DnrInstallerWithMatchIndex } from "./dnr.js";
 import {
   buildDoctorRequestMetadata,
   doctorReportFromReply,
-  unreachableDoctorReport,
 } from "./doctor-report.js";
 import { runExtensionDryRun } from "./dry-run-command.js";
 import {
   isNativeHostOriginForbiddenMessage,
   nativeHostOriginMismatchMessage,
 } from "./extension-id.js";
-
 import type { NativeEnvelope, NativeEnvelopeInput } from "./native-session.js";
 import {
   type NativeRuntimeConfig,
@@ -51,6 +49,13 @@ import {
   isRequestBodySteerable,
   projectSourceCondition,
 } from "./source-projection.js";
+import {
+  classifyNativeFailure,
+  cliVersionFromMetadata,
+  combinedDiagnosticsValue,
+  type NativeConnectCode,
+} from "./ui-doctor.js";
+import { collectExtensionDoctor } from "./ui-doctor-browser.js";
 
 function installerWithMatchIndex(
   installer: RuleInstallerAdapter,
@@ -599,6 +604,85 @@ export function createExtensionApplication(
         nativeRuntimeError,
       },
     };
+  }
+
+  async function readDoctorRuleFacts(): Promise<{
+    readonly active: boolean;
+    readonly readable: boolean;
+    readonly project: unknown | null;
+    readonly enabledGroupIds: readonly string[];
+    readonly statuses: readonly {
+      readonly ruleId: string;
+      readonly status: string;
+    }[];
+  }> {
+    const empty = {
+      active: false,
+      readable: true,
+      project: null,
+      enabledGroupIds: [],
+      statuses: [],
+    };
+    const current = await repository.state();
+    if (!current.ok || current.value.activeProjectId === null) return empty;
+    const project = current.value.projects[current.value.activeProjectId];
+    if (!project) return empty;
+    try {
+      const enabledGroupIds = Array.isArray(project.enabledGroupIds)
+        ? project.enabledGroupIds.map((id) => String(id))
+        : [];
+      const compiled = compileProject(project.data);
+      if (!compiled.ok) {
+        return {
+          active: true,
+          readable: false,
+          project: project.data,
+          enabledGroupIds,
+          statuses: [],
+        };
+      }
+      let installedRuleIds: string[] = [];
+      try {
+        const installed = await options.installer.current();
+        installedRuleIds = installed.map((operation) => operation.ruleId);
+      } catch {
+        installedRuleIds = [];
+      }
+      const raw = operationStatuses(
+        compiled.operations,
+        installedRuleIds,
+        enabledGroupIds,
+        nativePhase,
+        [],
+        mockFileErrors,
+        typeof project.mockFileRoot === "string" &&
+          project.mockFileRoot.length > 0,
+      );
+      return {
+        active: true,
+        readable: true,
+        project: project.data,
+        enabledGroupIds,
+        statuses: raw.map((status) => ({
+          ruleId: typeof status.ruleId === "string" ? status.ruleId : "",
+          status: typeof status.status === "string" ? status.status : "",
+        })),
+      };
+    } catch {
+      let data: unknown = null;
+      try {
+        data = project.data;
+      } catch {
+        data = null;
+      }
+      return {
+        active: true,
+        readable: false,
+        project: data,
+        enabledGroupIds: [],
+        statuses: [],
+      };
+    }
   }
 
   async function handleRequest(
@@ -1193,34 +1277,56 @@ export function createExtensionApplication(
       };
     }
     if (request.command === "run-doctor") {
-      if (!options.nativeRuntime?.send) {
-        return { ok: true, value: unreachableDoctorReport() };
-      }
-      let project: unknown = null;
-      const current = await repository.state();
-      if (current.ok && current.value.activeProjectId !== null) {
-        project =
-          current.value.projects[current.value.activeProjectId]?.data ?? null;
-      }
-      const metadata = buildDoctorRequestMetadata(
-        project,
-        options.extensionId ?? "",
-      );
-      try {
-        const reply = await options.nativeRuntime.send(
-          {
-            protocol: "v1",
-            type: "runtime.doctor",
-            timestamp: Date.now(),
-            metadata,
-          },
-          25_000,
+      const surface = request.surface === "popup" ? "popup" : "page";
+      const ruleFacts = await readDoctorRuleFacts();
+      let host: Awaited<ReturnType<typeof doctorReportFromReply>> = null;
+      let cliVersion: string | null = null;
+      let native: NativeConnectCode = "host-missing";
+      if (options.nativeRuntime?.send) {
+        const metadata = buildDoctorRequestMetadata(
+          ruleFacts.project,
+          options.extensionId ?? "",
         );
-        const report = doctorReportFromReply(reply.metadata);
-        return { ok: true, value: report ?? unreachableDoctorReport() };
-      } catch {
-        return { ok: true, value: unreachableDoctorReport() };
+        try {
+          const reply = await options.nativeRuntime.send(
+            {
+              protocol: "v1",
+              type: "runtime.doctor",
+              timestamp: Date.now(),
+              metadata,
+            },
+            25_000,
+          );
+          const parsed = doctorReportFromReply(reply.metadata);
+          cliVersion = cliVersionFromMetadata(reply.metadata);
+          if (parsed !== null && parsed.checks.length === 6) {
+            host = parsed;
+            native = "ok";
+          } else {
+            native = "unreadable";
+          }
+        } catch (error) {
+          native = classifyNativeFailure(
+            error instanceof Error ? error.message : "",
+            options.nativeRuntime.lastConnectError?.() ?? null,
+          );
+        }
       }
+      const report = await collectExtensionDoctor({
+        surface,
+        extensionId: options.extensionId ?? "",
+        phase: nativePhase,
+        chrome: options.chromeApi,
+        project: ruleFacts.project,
+        enabledGroupIds: ruleFacts.enabledGroupIds,
+        statuses: ruleFacts.statuses,
+        rulesReadable: ruleFacts.readable,
+        activeProject: ruleFacts.active,
+        native,
+        cliVersion,
+        host,
+      });
+      return { ok: true, value: combinedDiagnosticsValue(report) };
     }
     if (request.command === "diagnose-native-runtime") {
       const chromeError = options.nativeRuntime?.lastConnectError?.() ?? null;

@@ -426,7 +426,7 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 - `doctor [path] [--json] [--check-updates] [--extension-id <id>]` runs the six checks in `@rogatio/runtime` (`runDoctor`): Node and CLI version, project file (the same `diagnoseProjectData` sequence as `verify`), native-host manifest and `allowed_origins`, device CA (`verify().caTrusted`), a loopback PAC answer within 10000ms, and optional AI Assist reachability.
 - `--check-updates` is the only npm-registry call. A configured AI provider is contacted only for the optional AI check, the same Hello completion as `rogatio ai test`. The PAC probe does not change Chrome proxy settings.
 - Exit codes: `0` required checks passed (warnings allowed), `1` a required check failed, `2` usage. `--json` prints a versioned report with stable key order.
-- The extension **Run checks** button sends `runtime.doctor`. The host runs the same function and returns the report. The extension does not import `@rogatio/runtime`.
+- The extension **Run checks** button sends `runtime.doctor`. The host runs the same function and returns the report, plus `cliVersion` beside it when that version is exactly `major.minor.patch`. The extension adds its own checks (service worker, native connection, extension id, versions, proxy, site access, rules, incognito, and the popup's current tab) and nests the host report under `host`. It does not import `@rogatio/runtime`. Popup and management-page bundles do not import `@rogatio/dry-run` or Ajv.
 
 **8. AI Command (`src/commands/ai.ts`)**
 - Provider configuration: `setup | ls | show | delete | test`
@@ -439,6 +439,7 @@ The internal proxy remains narrowly scoped: exact authorized origins, bounded HT
 - The import map maps `@rogatio/editor` to `/vendor/editor.js`, served by the CLI's own HTTP server
 - The `@rogatio/editor` browser bundle is resolved at runtime via `import.meta.resolve("@rogatio/editor")` and streamed from disk on `GET /vendor/editor.js` — no separate CLI browser build target is required
 - Editor instantiates via `createEditor(root, options)` with HTTP-based callbacks (`validate`, `save`, `onCancel`)
+- `POST /api/doctor` is CSRF-protected. It runs `runInstalledDoctor` for the open file with `checkUpdates: false` and returns that report nested under `host`, plus editor checks for the server, the session, the draft, AI Assist, and an optional mock file root. The extension Workspace editor does not call this route.
 
 **10. Utilities (`src/utils/`)**
 - `project-storage.ts`: CLI-owned `ProjectStorage` port (`list` / `get` / `create` / `import` / `update` / `delete`) plus the JSON-file adapter (`createJsonFileProjectStorage`). Path-as-id; atomic write (pretty JSON, mkdir, temp + rename). `list` keeps `.rogatio.json` and `*.rogatio.json` as the fast path and also includes other `*.json` files whose contents validate as a Rogatio project (own numeric `version` of 1 or 2, then schema validation, migrating version 1 first). Non-project JSON such as `package.json` is skipped. `edit`, `verify`, and `test` accept an explicit path of any filename and default to `./.rogatio.json`. Production `edit` / `verify` / `test` / `doctor` / `runtime` / `import` and save use the port for file-backed I/O. This surface is separate from browser-core `ProjectRepository` / `StorageAdapter` (envelope store); the two are not unified.
@@ -498,7 +499,7 @@ rogatio edit [path]
 
 ### Security Boundaries
 - Server binds only to `127.0.0.1` (never `0.0.0.0`)
-- CSRF token required for mutating endpoints (`/api/save`, `/api/cancel`, `/api/dry-run`, `/api/ai/complete`, `/api/ai/stream`, `/api/ai/assist`)
+- CSRF token required for mutating endpoints (`/api/save`, `/api/cancel`, `/api/dry-run`, `/api/doctor`, `/api/ai/complete`, `/api/ai/stream`, `/api/ai/assist`)
 - No authentication (local-only, short-lived)
 - File access confined to target `.rogatio.json` path
 - AI routes use the locally configured provider only; they do not introduce Rogatio-hosted inference

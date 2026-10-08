@@ -94,7 +94,29 @@ describe("runtime.doctor envelope", () => {
     expect(reply.type).toBe("runtime.doctor");
     expect(reply.requestId).toBe("doctor-1");
     expect(reply.metadata.report).toEqual(report);
+    expect(reply.metadata.cliVersion).toBe("1.2.3");
     expect(JSON.stringify(reply.metadata)).not.toContain("secret-body");
+  });
+
+  it("omits a CLI version that is not major.minor.patch", async () => {
+    const host = createNativeHost({
+      cliVersion: "1.2.3; touch /tmp/pwned",
+      runDoctor: async () => report,
+    });
+    const frame = await host.processFrame(
+      encodeFrame({
+        protocol: "v1",
+        type: "runtime.doctor",
+        timestamp: 1,
+        metadata: {},
+      }),
+    );
+    expect(frame).not.toBeNull();
+    if (frame === null) throw new Error("expected a doctor reply");
+    const reply = decodeFrame(frame);
+    expect(reply.metadata.cliVersion).toBeUndefined();
+    expect(JSON.stringify(reply.metadata)).not.toContain("pwned");
+    expect(reply.metadata.report).toEqual(report);
   });
 
   it("allows a project body on the doctor request", () => {

@@ -9,7 +9,6 @@ import { type AiPreviewSummary, summarizeAiPreview } from "./ai-preview.js";
 import { attentionFromRuleStatuses } from "./attention.js";
 import { PROJECT_VERSION, validateProjectDetailed } from "./browser-schema.js";
 import { createDashboardSystemStatus } from "./dashboard-status.js";
-import { parseDoctorReport, unreachableDoctorReport } from "./doctor-report.js";
 import { renderDoctorReport } from "./doctor-view.js";
 import {
   nativeHostOriginMismatchMessage,
@@ -41,6 +40,12 @@ import {
   resolveRuntimeTone,
   shouldShowRuntimeDiagnostics,
 } from "./status-cards.js";
+import {
+  type CombinedDiagnostics,
+  parseExtensionDoctor,
+  serializeCombinedDiagnostics,
+  workerUnreachableDiagnostics,
+} from "./ui-doctor.js";
 import { shouldRemountEditorAfterGroupEnablement } from "./workspace-enablement-refresh.js";
 
 interface StoredProject {
@@ -197,7 +202,7 @@ function readRuleDeepLink(): { groupId: string; ruleId: string } | null {
 
 /** Diagnostics modal state */
 let diagnosticsOpen = false;
-let doctorReport: ReturnType<typeof parseDoctorReport> = null;
+let doctorReport: CombinedDiagnostics | null = null;
 let doctorRunning = false;
 let diagnosticsData: {
   phase: string;
@@ -2064,12 +2069,16 @@ async function runDoctorChecks(): Promise<void> {
   doctorRunning = true;
   renderShell();
   try {
-    const response = await client.send({ version: 1, command: "run-doctor" });
+    const response = await client.send({
+      version: 1,
+      command: "run-doctor",
+      surface: "page",
+    });
     const value =
-      response?.ok === true ? parseDoctorReport(response.value) : null;
-    doctorReport = value ?? unreachableDoctorReport();
+      response?.ok === true ? parseExtensionDoctor(response.value) : null;
+    doctorReport = value ?? workerUnreachableDiagnostics();
   } catch {
-    doctorReport = unreachableDoctorReport();
+    doctorReport = workerUnreachableDiagnostics();
   } finally {
     doctorRunning = false;
     renderShell();
@@ -2111,7 +2120,9 @@ function formatDiagnosticsText(): string {
 }
 
 async function copyDiagnostics(): Promise<void> {
-  const text = formatDiagnosticsText();
+  const text = doctorReport
+    ? serializeCombinedDiagnostics(doctorReport)
+    : formatDiagnosticsText();
   if (!text) return;
   const ok = await copyText(text);
   statusMessage = ok

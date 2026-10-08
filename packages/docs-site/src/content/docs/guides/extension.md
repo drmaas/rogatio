@@ -20,7 +20,7 @@ The toolbar **popup** lists the active project's saved groups. Each row has the 
 name, a separate status indicator, a prominent **Enable** or **Disable** button, and a
 pencil that opens the management page on that group. The popup also has **Match logging**,
 **Open app** (management page Overview / Dashboard), **New project** (inline name form),
-**Import project** (a file picker that accepts any filename), and **Run checks**. The popup has no editor, search, proxy, permission,
+**Import project** (a file picker that accepts any filename), and **Run checks**. **Run checks** in the popup also compares the current tab with enabled rules. The tab URL is not stored or sent. The popup has no editor, search, proxy, permission,
 or rule-authoring controls.
 
 The management page uses a **Dashboard** overview and a **Workspace** editor shell. The
@@ -31,7 +31,7 @@ The Active rules label sits on the Rules card. The Dashboard keeps its project c
 does not show this breadcrumb.
 
 The Workspace sidebar is a set of cards. **Runtime** holds Start/Stop, **Run checks**, the runtime status, the
-extension ID, and a **Show diagnostics** control when the runtime has failed. **Run checks** asks the native host for the same report as `rogatio doctor` (Node, project, host manifest, device CA, a loopback PAC answer, and optional AI Assist). The dashboard runtime block and the toolbar popup use that same action. When Chrome
+extension ID, and a **Show diagnostics** control when the runtime has failed. **Run checks** shows browser-side checks and then the same report as `rogatio doctor` (Node, project, host manifest, device CA, a loopback PAC answer, and optional AI Assist). The browser checks cover the service worker, the native connection (a missing host, an extension id that is not allowed, a timeout, and a disconnect are different lines), the extension id, the extension and CLI versions, Chrome's proxy settings, site access, rule statuses, and incognito. The popup adds the current tab. **Copy diagnostics** writes JSON with those checks and the host report nested under `host`. The dashboard runtime block and the toolbar popup use that same action. Nothing is checked on a timer, and Run checks does not contact the npm registry. When Chrome
 rejects the native host because that ID is not in `allowed_origins`, the card names the
 mismatch and shows the `rogatio runtime install` command that re-pins it. **AI** reports
 whether AI is configured: `Configured` with the provider URL and model the native host will

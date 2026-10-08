@@ -1,5 +1,13 @@
 import { resolve } from "node:path";
 import { createAIClient, readProviderConfig } from "@rogatio/runtime";
+import {
+  editorPageTitles,
+  editorServerRejectedReport,
+  editorServerStoppedReport,
+  editorSessionStaleReport,
+  embedJson,
+  serializeEditorDiagnostics,
+} from "../editor-doctor.js";
 import { showEditHelp } from "../help.js";
 import { createServer } from "../server/http.js";
 import {
@@ -145,6 +153,7 @@ export async function editCommand(
     editorFontsPath: "",
     aiClient,
     aiProviderConfig: providerConfig ?? undefined,
+    readProviderConfig,
   };
 
   // Create and start server (optionally on a fixed port)
@@ -264,7 +273,7 @@ async function ensureCivilizationProjectName(
   return named;
 }
 
-function generateEditorHtml(
+export function generateEditorHtml(
   apiBase: string,
   csrfToken: string,
   filePath: string,
@@ -310,9 +319,23 @@ function generateEditorHtml(
       background-size: 24px 24px;
     }
     #editor-root { min-height: 100vh; }
+    #editor-doctor {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #1c1f24;
+      color: #e7eaf0;
+      padding: 12px 16px;
+      font: 13px/1.45 ui-monospace, monospace;
+      white-space: pre-wrap;
+    }
+    #editor-doctor[hidden] { display: none; }
+    #editor-doctor p { margin: 0 0 0.35rem; }
+    #editor-doctor button { margin-top: 0.5rem; }
   </style>
 </head>
 <body>
+   <div id="editor-doctor" hidden></div>
    <div id="editor-root"></div>
    <script type="importmap">
      { "imports": { "@rogatio/editor": "/vendor/editor.js" } }
@@ -323,7 +346,11 @@ function generateEditorHtml(
     const root = document.getElementById('editor-root');
     const apiBase = ${JSON.stringify(apiBase)};
     const csrfToken = ${JSON.stringify(csrfToken)};
-    const filePath = ${JSON.stringify(filePath)};
+    const filePath = ${embedJson(filePath)};
+    const doctorTitles = ${embedJson(editorPageTitles())};
+    const serverStoppedJson = ${embedJson(serializeEditorDiagnostics(editorServerStoppedReport(filePath)))};
+    const sessionStaleJson = ${embedJson(serializeEditorDiagnostics(editorSessionStaleReport()))};
+    const serverRejectedJson = ${embedJson(serializeEditorDiagnostics(editorServerRejectedReport()))};
     
     async function fetchProject() {
       const res = await fetch(apiBase + '/api/project');
@@ -472,15 +499,110 @@ function generateEditorHtml(
           cancel();
         },
         projectActions: [
+          { command: 'run-doctor', label: 'Run checks' },
           { command: 'set-mock-root', label: 'Set mock file root' },
           { command: 'clear-mock-root', label: 'Clear mock file root' },
         ],
         ${aiAssistHandler}
       });
+      let lastDoctorJson = '';
+      let doctorRunning = false;
+      function renderDoctor(report, rawJson) {
+        const panel = document.getElementById('editor-doctor');
+        if (!panel) return;
+        panel.replaceChildren();
+        panel.hidden = false;
+        lastDoctorJson = rawJson;
+        const ui = report && report.ui && Array.isArray(report.ui.checks)
+          ? report.ui.checks
+          : [];
+        const host = report && report.host && Array.isArray(report.host.checks)
+          ? report.host.checks
+          : [];
+        for (const item of ui.concat(host)) {
+          if (!item || typeof item.summary !== 'string' || typeof item.status !== 'string') {
+            continue;
+          }
+          const id = typeof item.id === 'string' ? item.id : '';
+          const title = Object.prototype.hasOwnProperty.call(doctorTitles, id)
+            ? doctorTitles[id]
+            : id;
+          const line = document.createElement('p');
+          line.dataset.check = id;
+          const fix = typeof item.fix === 'string' ? item.fix : null;
+          line.textContent = fix === null
+            ? item.status + '  ' + title + '  ' + item.summary
+            : item.status + '  ' + title + '  ' + item.summary + '\\nFix: ' + fix;
+          panel.append(line);
+        }
+        const copy = document.createElement('button');
+        copy.type = 'button';
+        copy.textContent = 'Copy diagnostics';
+        copy.addEventListener('click', () => {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            void navigator.clipboard.writeText(lastDoctorJson);
+          }
+        });
+        panel.append(copy);
+      }
+      async function runEditorDoctor() {
+        if (doctorRunning) return;
+        doctorRunning = true;
+        try {
+          let body;
+          try {
+            body = JSON.stringify(editor.getDraft());
+          } catch (error) {
+            renderDoctor(JSON.parse(serverRejectedJson), serverRejectedJson);
+            return;
+          }
+          let res;
+          try {
+            res = await fetch(apiBase + '/api/doctor', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+              },
+              body,
+            });
+          } catch (error) {
+            renderDoctor(JSON.parse(serverStoppedJson), serverStoppedJson);
+            return;
+          }
+          const text = await res.text();
+          if (res.status === 403) {
+            let payload = null;
+            try { payload = JSON.parse(text); } catch (error) { payload = null; }
+            if (payload && payload.code === 'csrf-invalid') {
+              renderDoctor(JSON.parse(sessionStaleJson), sessionStaleJson);
+              return;
+            }
+          }
+          if (!res.ok) {
+            renderDoctor(JSON.parse(serverRejectedJson), serverRejectedJson);
+            return;
+          }
+          let report;
+          try {
+            report = JSON.parse(text);
+          } catch (error) {
+            renderDoctor(JSON.parse(serverRejectedJson), serverRejectedJson);
+            return;
+          }
+          renderDoctor(report, text);
+        } finally {
+          doctorRunning = false;
+        }
+      }
       document.addEventListener('click', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
         const command = target.closest('[data-command]')?.getAttribute('data-command');
+        if (command === 'run-doctor') {
+          void runEditorDoctor();
+          return;
+        }
         if (command !== 'set-mock-root' && command !== 'clear-mock-root') return;
         const root = command === 'clear-mock-root'
           ? null
