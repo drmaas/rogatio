@@ -294,7 +294,7 @@ This is a strict-TypeScript 7, ESM/NodeNext pnpm monorepo.
 Prerequisites:
 
 - Node.js **24** or newer (Node 24 is the CI baseline)
-- pnpm **12.4.1**
+- pnpm **12.10.1**
 - Chrome for Testing, for browser e2e (`pnpm browser:install`)
 
 Install dependencies and the browser test binary:

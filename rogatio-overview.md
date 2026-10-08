@@ -39,7 +39,7 @@ When Chrome authoritatively reports a Rogatio-installed DNR rule match (unpacked
 
 ## Architecture and technology
 
-Rogatio is a strict TypeScript 7, ESM/NodeNext monorepo using pnpm 12.4.1 as its package manager:
+Rogatio is a strict TypeScript 7, ESM/NodeNext monorepo using pnpm 12.10.1 as its package manager:
 
 - **`schema`** owns the version-2 JSON Schema, generated AJV validation, source conditions, bounds, forbidden headers, and v1→v2 migration.
 - **`compiler`** converts validated source into browser-neutral operations and stable diagnostics.
