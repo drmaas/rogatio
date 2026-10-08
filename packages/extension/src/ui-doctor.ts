@@ -98,6 +98,7 @@ export const EXT_RULES_NO_GROUPS_FIX = "Enable a group.";
 export const EXT_RULES_OK_SUMMARY = "Enabled rules have no attention status.";
 export const EXT_RULES_ERROR_FIX = "Open the rule and read its error.";
 export const EXT_RULES_RUNTIME_FIX = "Click Start runtime.";
+export const EXT_RULES_UNROUTABLE_FIX = "This rule's source can't be routed.";
 export const EXT_RULES_ROOT_FIX = "Set mock file root.";
 export const EXT_RULES_UNSUPPORTED_FIX =
   "This rule is unsupported in this browser.";
@@ -457,8 +458,11 @@ function proxyCheck(phase: string, proxy: ProxySnapshot): UiDoctorCheck {
       null,
     );
   }
-  const started = phase === "started";
-  if (started && proxy.levelOfControl === "controlled_by_other_extensions") {
+  const blockingPhase = phase === "started" || phase === "failed";
+  if (
+    blockingPhase &&
+    proxy.levelOfControl === "controlled_by_other_extensions"
+  ) {
     return check(
       "ext.proxy",
       "fail",
@@ -467,10 +471,13 @@ function proxyCheck(phase: string, proxy: ProxySnapshot): UiDoctorCheck {
       EXT_PROXY_OTHER_FIX,
     );
   }
-  if (started && proxy.levelOfControl === "not_controllable") {
+  if (blockingPhase && proxy.levelOfControl === "not_controllable") {
     return check("ext.proxy", "fail", false, EXT_PROXY_POLICY_SUMMARY, null);
   }
-  if (started && proxy.levelOfControl === "controllable_by_this_extension") {
+  if (
+    phase === "started" &&
+    proxy.levelOfControl === "controllable_by_this_extension"
+  ) {
     return check(
       "ext.proxy",
       "fail",
@@ -479,11 +486,14 @@ function proxyCheck(phase: string, proxy: ProxySnapshot): UiDoctorCheck {
       EXT_PROXY_ABSENT_FIX,
     );
   }
-  if (started && proxy.levelOfControl === "controlled_by_this_extension") {
+  if (
+    phase === "started" &&
+    proxy.levelOfControl === "controlled_by_this_extension"
+  ) {
     return check("ext.proxy", "pass", false, EXT_PROXY_OURS_SUMMARY, null);
   }
   if (
-    !started &&
+    phase === "stopped" &&
     proxy.levelOfControl === "controlled_by_this_extension" &&
     proxy.mode === "pac_script"
   ) {
@@ -612,7 +622,9 @@ function rulesCheck(facts: ExtensionDoctorFacts): UiDoctorCheck {
     blocking === "error"
       ? EXT_RULES_ERROR_FIX
       : blocking === "needs runtime"
-        ? EXT_RULES_RUNTIME_FIX
+        ? facts.phase === "started"
+          ? EXT_RULES_UNROUTABLE_FIX
+          : EXT_RULES_RUNTIME_FIX
         : blocking === "needs root directory"
           ? EXT_RULES_ROOT_FIX
           : EXT_RULES_UNSUPPORTED_FIX;

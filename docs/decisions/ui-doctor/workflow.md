@@ -11,4 +11,6 @@
 
 ## Evidence
 
-`pnpm validate` completed successfully on 2026-10-08: format, lint, typecheck, build, 177 unit files (1765 tests), and browser smoke (100 passed, 9 skipped).
+`pnpm validate` completed successfully on 2026-10-08 before the first pull request: format, lint, typecheck, build, 177 unit files (1765 tests), and browser smoke (100 passed, 9 skipped).
+
+Review follow-up: stale PAC only when the phase is `stopped`; another extension or a policy proxy fails when the phase is `started` or `failed`; a `needs runtime` rule while the runtime is started says the source can't be routed; editor `edit` and `verify` fixes quote for Windows cmd.exe. The six host checks still use POSIX `quoteDoctorArg`.

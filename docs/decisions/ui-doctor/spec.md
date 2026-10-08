@@ -144,12 +144,12 @@ The extension version is `chrome.runtime.getManifest().version`, accepted only w
 | Condition | Status | Summary | Fix |
 | --- | --- | --- | --- |
 | settings could not be read | `warn` | `Chrome proxy settings could not be read.` | none |
-| phase `started` and `controlled_by_other_extensions` | `fail` | `Another extension controls the proxy.` | `Disable the other proxy/VPN extension, then click Start runtime.` |
-| phase `started` and `not_controllable` | `fail` | `The proxy is set by policy.` | none |
+| phase `started` or `failed`, and `controlled_by_other_extensions` | `fail` | `Another extension controls the proxy.` | `Disable the other proxy/VPN extension, then click Start runtime.` |
+| phase `started` or `failed`, and `not_controllable` | `fail` | `The proxy is set by policy.` | none |
 | phase `started` and `controllable_by_this_extension` | `fail` | `Runtime is started, but this extension does not control the proxy.` | `Click Stop runtime, then Start runtime.` |
 | phase `started` and `controlled_by_this_extension` | `pass` | `This extension controls the proxy.` | none |
-| phase is not `started`, this extension still has `mode: pac_script` and `controlled_by_this_extension` | `warn` | `A Rogatio PAC script is still set after the runtime stopped.` | `Click Start runtime, then Stop runtime.` |
-| otherwise | `pass` | `Chrome proxy settings do not block Rogatio.` | none |
+| phase `stopped`, this extension still has `mode: pac_script` and `controlled_by_this_extension` | `warn` | `A Rogatio PAC script is still set after the runtime stopped.` | `Click Start runtime, then Stop runtime.` |
+| otherwise, including `starting` and a `failed` phase that this extension still controls | `pass` | `Chrome proxy settings do not block Rogatio.` | none |
 
 Doctor does not call `settings.set` or `settings.clear`.
 
@@ -172,9 +172,9 @@ Read-only. Doctor does not install or remove DNR rules. Status values other than
 | no enabled group | `warn` | `The active project has no enabled groups.` | `Enable a group.` |
 | no attention status | `pass` | `Enabled rules have no attention status.` | none |
 | one or more `error` | `fail` | counts, then `First problem: <id> (<status>).` | `Open the rule and read its error.` |
-| otherwise | `warn` | the same count sentence | `Click Start runtime.` for needs runtime, `Set mock file root.` for a mock root, `This rule is unsupported in this browser.` for unsupported |
+| otherwise | `warn` | the same count sentence | `Click Start runtime.` for needs runtime, except when the phase is `started`: `This rule's source can't be routed.` `Set mock file root.` for a mock root. `This rule is unsupported in this browser.` for unsupported |
 
-Counts use `1 error` / `N errors`, `1 needs runtime` / `N need runtime`, `1 needs a mock file root` / `N need a mock file root`, and `1 unsupported` / `N unsupported`, in that order, joined by `, ` and ending with `.`. Precedence for the fix and the first problem is error, needs runtime, needs root directory, unsupported.
+Counts use `1 error` / `N errors`, `1 needs runtime` / `N need runtime`, `1 needs a mock file root` / `N need a mock file root`, and `1 unsupported` / `N unsupported`, in that order, joined by `, ` and ending with `.`. Precedence for the fix and the first problem is error, needs runtime, needs root directory, unsupported. A `needs runtime` status while the phase is `started` is a request-body source the proxy cannot steer. The fix does not tell the user to start the runtime.
 
 ### 5.8 Incognito
 
@@ -221,12 +221,12 @@ These two are known only to the page.
 
 | Result | Checks |
 | --- | --- |
-| `fetch` throws | only `editor.server` `fail`, summary `The editor server stopped.`, fix `rogatio edit <path>` quoted with `quoteDoctorArg`. `host` is null. |
+| `fetch` throws | only `editor.server` `fail`, summary `The editor server stopped.`, fix `rogatio edit <path>` quoted for the editor server's platform. `host` is null. |
 | HTTP 403 and body `code` is `csrf-invalid` | `editor.server` `pass` `The editor server answered.`, then `editor.session` `fail` `This tab is stale. Its editor token was rejected.` fix `Reload this tab`. `host` is null. |
 | any other non-OK response | `editor.server` `fail` `The editor server could not finish doctor.` fix `rogatio doctor`. The response body is not copied. |
 | HTTP 200 | the server's combined report, which includes `editor.server` `pass` and `editor.session` `pass` `The editor token was accepted.` |
 
-The path is the open file. `quoteDoctorArg` wraps values that are not a bare shell word. The page embeds that already-quoted fix. It does not build a shell command itself.
+The path is the open file. On Windows the argument is wrapped in double quotes, with an embedded `"` written as `""` and an embedded `%` written as `%%`. On every other platform `quoteDoctorArg` wraps values that are not a bare shell word. The page embeds that already-quoted fix. It does not build a shell command itself. The six host checks still use `quoteDoctorArg` on every platform.
 
 ### 6.2 Draft
 

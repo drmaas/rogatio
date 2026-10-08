@@ -9,10 +9,12 @@ import {
   EDITOR_SERVER_REJECTED_SUMMARY,
   EDITOR_SERVER_STOPPED_SUMMARY,
   EDITOR_SESSION_STALE_SUMMARY,
+  editorEditFix,
   editorFileDoctorOptions,
   editorServerRejectedReport,
   editorServerStoppedReport,
   editorSessionStaleReport,
+  editorVerifyFix,
   serializeEditorDiagnostics,
 } from "../src/editor-doctor.js";
 
@@ -74,6 +76,19 @@ describe("editor doctor", () => {
       "rogatio edit '/tmp/my project.json'",
     );
     expect(report.host).toBeNull();
+  });
+
+  it("quotes an ampersand for cmd.exe", () => {
+    const path = "C:\\temp\\a&b.json";
+    expect(editorEditFix(path, "win32")).toBe(
+      'rogatio edit "C:\\temp\\a&b.json"',
+    );
+    expect(editorVerifyFix('C:\\temp\\say "hi" 100%.json', "win32")).toBe(
+      'rogatio verify "C:\\temp\\say ""hi"" 100%%.json"',
+    );
+    expect(editorEditFix(path, "linux")).toBe(
+      "rogatio edit 'C:\\temp\\a&b.json'",
+    );
   });
 
   it("tells a stale tab to reload", () => {

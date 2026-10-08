@@ -22,5 +22,5 @@
 ## Risks
 
 - A host reply that is not the six-check report must not be rendered as the old one-line fallback.
-- Shell fixes must go through `runtimeInstallCommand`, `quoteDoctorArg`, or the exact version grammar.
+- Shell fixes must go through `runtimeInstallCommand`, `quoteDoctorArg`, or the exact version grammar. Editor `edit` and `verify` fixes quote for the server platform; the host report stays on `quoteDoctorArg`.
 - `projectState` installs DNR rules. The rules check uses the read-only status helper instead.

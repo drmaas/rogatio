@@ -104,12 +104,31 @@ function combined(
   };
 }
 
-export function editorEditFix(filePath: string): string {
-  return `rogatio edit ${quoteDoctorArg(filePath)}`;
+/**
+ * Quote a path for the editor's own fix lines. Windows uses cmd.exe double
+ * quotes. Other platforms keep `quoteDoctorArg`. The host report still uses
+ * `quoteDoctorArg` on every platform.
+ */
+export function quoteEditorArg(
+  value: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform !== "win32") return quoteDoctorArg(value);
+  return `"${value.replaceAll("%", "%%").replaceAll('"', '""')}"`;
 }
 
-export function editorVerifyFix(filePath: string): string {
-  return `rogatio verify ${quoteDoctorArg(filePath)}`;
+export function editorEditFix(
+  filePath: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  return `rogatio edit ${quoteEditorArg(filePath, platform)}`;
+}
+
+export function editorVerifyFix(
+  filePath: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  return `rogatio verify ${quoteEditorArg(filePath, platform)}`;
 }
 
 export function editorServerStoppedReport(

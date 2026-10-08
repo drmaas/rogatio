@@ -5,6 +5,7 @@ import {
   buildExtensionDoctor,
   EXT_PROXY_ABSENT_FIX,
   EXT_PROXY_ABSENT_SUMMARY,
+  EXT_PROXY_CLEAR_SUMMARY,
   EXT_PROXY_OTHER_FIX,
   EXT_PROXY_OTHER_SUMMARY,
   EXT_PROXY_OURS_SUMMARY,
@@ -14,6 +15,7 @@ import {
   EXT_RULES_ERROR_FIX,
   EXT_RULES_ROOT_FIX,
   EXT_RULES_RUNTIME_FIX,
+  EXT_RULES_UNROUTABLE_FIX,
   EXT_VERSION_UNAVAILABLE_SUMMARY,
   EXT_WORKER_FAIL_SUMMARY,
   type ExtensionDoctorFacts,
@@ -184,6 +186,20 @@ describe("extension UI doctor", () => {
     expect(rules?.summary).toContain("rule-1");
   });
 
+  it("does not tell the user to start a runtime that is already running", () => {
+    const report = buildExtensionDoctor(
+      facts({
+        phase: "started",
+        statuses: [{ ruleId: "rule-1", status: "needs runtime" }],
+      }),
+    );
+    const rules = report.ui.checks.find((item) => item.id === "ext.rules");
+    expect(rules?.status).toBe("warn");
+    expect(rules?.fix).toBe(EXT_RULES_UNROUTABLE_FIX);
+    expect(rules?.summary).toContain("needs runtime");
+    expect(rules?.fix).not.toContain("Start runtime");
+  });
+
   it("hides a rule id that is not a safe token", () => {
     const report = buildExtensionDoctor(
       facts({
@@ -248,6 +264,52 @@ describe("proxy snapshot", () => {
     const row = report.ui.checks.find((item) => item.id === "ext.proxy");
     expect(row?.summary).toBe(EXT_PROXY_ABSENT_SUMMARY);
     expect(row?.fix).toBe(EXT_PROXY_ABSENT_FIX);
+  });
+
+  it.each(["starting", "failed"] as const)(
+    "does not call a %s PAC script stale",
+    async (phase) => {
+      const proxy = await readProxySnapshot(
+        proxyApi("controlled_by_this_extension", "pac_script"),
+      );
+      const report = buildExtensionDoctor(facts({ phase, proxy }));
+      const row = report.ui.checks.find((item) => item.id === "ext.proxy");
+      expect(row?.status).toBe("pass");
+      expect(row?.summary).toBe(EXT_PROXY_CLEAR_SUMMARY);
+      expect(row?.fix).toBeNull();
+    },
+  );
+
+  it("fails when the runtime failed and another extension controls the proxy", async () => {
+    const proxy = await readProxySnapshot(
+      proxyApi("controlled_by_other_extensions", "fixed_servers"),
+    );
+    const report = buildExtensionDoctor(facts({ phase: "failed", proxy }));
+    const row = report.ui.checks.find((item) => item.id === "ext.proxy");
+    expect(row?.status).toBe("fail");
+    expect(row?.summary).toBe(EXT_PROXY_OTHER_SUMMARY);
+    expect(row?.fix).toBe(EXT_PROXY_OTHER_FIX);
+  });
+
+  it("fails when the runtime failed and policy owns the proxy", async () => {
+    const proxy = await readProxySnapshot(
+      proxyApi("not_controllable", "fixed_servers"),
+    );
+    const report = buildExtensionDoctor(facts({ phase: "failed", proxy }));
+    const row = report.ui.checks.find((item) => item.id === "ext.proxy");
+    expect(row?.status).toBe("fail");
+    expect(row?.summary).toBe(EXT_PROXY_POLICY_SUMMARY);
+    expect(row?.fix).toBeNull();
+  });
+
+  it("passes when the runtime is starting and another extension controls the proxy", async () => {
+    const proxy = await readProxySnapshot(
+      proxyApi("controlled_by_other_extensions", "pac_script"),
+    );
+    const report = buildExtensionDoctor(facts({ phase: "starting", proxy }));
+    const row = report.ui.checks.find((item) => item.id === "ext.proxy");
+    expect(row?.status).toBe("pass");
+    expect(row?.summary).toBe(EXT_PROXY_CLEAR_SUMMARY);
   });
 });
 
