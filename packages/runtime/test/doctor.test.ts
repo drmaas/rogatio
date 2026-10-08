@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DOCTOR_FIX_AI_SETUP,
   DOCTOR_FIX_AI_TEST,
@@ -14,6 +14,7 @@ import {
   type DoctorProjectInput,
   doctorFixCliUpdate,
   doctorFromHostMetadata,
+  fetchLatestCliVersion,
   formatDoctorReport,
   probeAiProvider,
   probePacAnswer,
@@ -106,6 +107,10 @@ function fileProject(
 }
 
 describe("rogatio doctor", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("passes every check and prints stable JSON", async () => {
     const report = await runDoctor(input());
     expect(report.exitCode).toBe(0);
@@ -214,6 +219,48 @@ describe("rogatio doctor", () => {
     expect(formatDoctorReport(report)).toContain(
       "Fix: npm install -g @rogatio/cli@1.2.4",
     );
+  });
+
+  it.each(["1.2.4;touch /tmp/pwned", "1.2.4\nrm -rf /"])(
+    "does not copy an unsafe registry version into the report (%j)",
+    async (payload) => {
+      const report = await runDoctor(
+        input({
+          checkUpdates: true,
+          fetchLatestVersion: async () => payload,
+        }),
+      );
+      expect(report.checks[0]?.status).toBe("warn");
+      expect(report.checks[0]?.fix).toBeNull();
+      expect(report.exitCode).toBe(0);
+      const rendered = `${formatDoctorReport(report)}\n${serializeDoctorReport(report)}`;
+      expect(rendered).not.toContain(payload);
+      expect(rendered).not.toContain("touch");
+      expect(rendered).not.toContain("rm -rf");
+    },
+  );
+
+  it("drops a registry body whose version is not exactly major.minor.patch", async () => {
+    const payloads = ["1.2.4;touch /tmp/pwned", "1.2.4\nrm -rf /"];
+    for (const payload of payloads) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => ({
+          ok: true,
+          json: async () => ({ version: payload }),
+        })),
+      );
+      await expect(fetchLatestCliVersion()).resolves.toBeNull();
+      vi.unstubAllGlobals();
+    }
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ version: "1.2.4" }),
+      })),
+    );
+    await expect(fetchLatestCliVersion()).resolves.toBe("1.2.4");
   });
 
   it("warns without a fix when the registry check fails", async () => {

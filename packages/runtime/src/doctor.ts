@@ -60,8 +60,19 @@ export const DOCTOR_CHECK_TITLES: Record<DoctorCheckId, string> = {
 
 const MINIMUM_NODE_MAJOR = 26;
 const EXTENSION_ID_RE = /^[a-p]{32}$/;
-const VERSION_RE = /^(\d+)\.(\d+)\.(\d+)/;
+/** Local Node and CLI versions may carry a suffix after major.minor.patch. */
+const NODE_VERSION_RE = /^(\d+)\.(\d+)\.(\d+)/;
+/**
+ * A registry version is copied into a shell command. The whole string must be
+ * major.minor.patch, with nothing before or after it.
+ */
+const REGISTRY_VERSION_RE = /^(\d+)\.(\d+)\.(\d+)$/;
 const MAX_DIAGNOSTICS = 20;
+
+function exactRegistryVersion(value: string): string | null {
+  const match = REGISTRY_VERSION_RE.exec(value);
+  return match === null ? null : match[0];
+}
 
 export interface DoctorCheck {
   readonly id: DoctorCheckId;
@@ -161,8 +172,8 @@ function report(checks: readonly DoctorCheck[]): DoctorReport {
 }
 
 function compareVersions(left: string, right: string): number | null {
-  const a = VERSION_RE.exec(left);
-  const b = VERSION_RE.exec(right);
+  const a = NODE_VERSION_RE.exec(left);
+  const b = REGISTRY_VERSION_RE.exec(right);
   if (a === null || b === null) return null;
   for (let index = 1; index <= 3; index += 1) {
     const av = Number(a[index]);
@@ -173,7 +184,7 @@ function compareVersions(left: string, right: string): number | null {
 }
 
 function nodeMajor(version: string): number | null {
-  const match = VERSION_RE.exec(version);
+  const match = NODE_VERSION_RE.exec(version);
   if (match === null) return null;
   return Number(match[1]);
 }
@@ -198,11 +209,12 @@ async function nodeCheck(input: DoctorInput): Promise<DoctorCheck> {
   }
   let latest: string | null = null;
   try {
-    latest = await input.fetchLatestVersion();
+    const fetched = await input.fetchLatestVersion();
+    latest = typeof fetched === "string" ? exactRegistryVersion(fetched) : null;
   } catch {
     latest = null;
   }
-  if (latest === null || VERSION_RE.exec(latest) === null) {
+  if (latest === null) {
     return check(
       "node",
       "warn",
@@ -675,9 +687,7 @@ export async function fetchLatestCliVersion(
       return null;
     }
     const version = own(body, "version");
-    return typeof version === "string" && VERSION_RE.exec(version) !== null
-      ? version
-      : null;
+    return typeof version === "string" ? exactRegistryVersion(version) : null;
   } catch {
     return null;
   } finally {
