@@ -11,7 +11,6 @@
  * sidebar card has no recovery line. All strings render via `textContent`.
  */
 
-import type { DoctorReport } from "./doctor-report.js";
 import { renderDoctorReport } from "./doctor-view.js";
 import { runtimeInstallCommand } from "./extension-id.js";
 import { runtimeControlDisabled } from "./runtime-controls.js";
@@ -23,6 +22,7 @@ import {
   resolveRuntimeStatusText,
   shouldShowRuntimeDiagnostics,
 } from "./status-cards.js";
+import type { CombinedDiagnostics } from "./ui-doctor.js";
 
 export type DashboardAiProvider = AiProviderDisplay;
 
@@ -34,7 +34,7 @@ export interface DashboardStatusInput {
   readonly aiStatusChecked: boolean;
   readonly aiReported: boolean;
   readonly aiProvider: DashboardAiProvider | null;
-  readonly doctorReport?: DoctorReport | null;
+  readonly doctorReport?: CombinedDiagnostics | null;
   readonly doctorRunning?: boolean;
 }
 

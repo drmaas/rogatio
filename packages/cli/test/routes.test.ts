@@ -725,4 +725,136 @@ describe("API routes", () => {
       expect(body.summary).toBeUndefined();
     });
   });
+
+  describe("POST /api/doctor", () => {
+    const hostReport = {
+      version: 1 as const,
+      ok: true as const,
+      exitCode: 0 as const,
+      checks: [
+        {
+          id: "node" as const,
+          status: "pass" as const,
+          optional: false,
+          summary: "Node 26.11.1, CLI 1.2.3.",
+          fix: null,
+        },
+        {
+          id: "project" as const,
+          status: "pass" as const,
+          optional: false,
+          summary: "Project file is valid: /test/.rogatio.json",
+          fix: null,
+        },
+        {
+          id: "host" as const,
+          status: "pass" as const,
+          optional: false,
+          summary: "allowed_origins includes the release id.",
+          fix: null,
+        },
+        {
+          id: "ca" as const,
+          status: "pass" as const,
+          optional: false,
+          summary: "Device CA is present and trusted.",
+          fix: null,
+        },
+        {
+          id: "pac" as const,
+          status: "pass" as const,
+          optional: false,
+          summary: "Runtime answered a PAC request.",
+          fix: null,
+        },
+        {
+          id: "ai" as const,
+          status: "warn" as const,
+          optional: true,
+          summary: "Optional. No AI provider is configured.",
+          fix: "rogatio ai setup",
+        },
+      ],
+    };
+
+    it("requires the CSRF token and does not run doctor", async () => {
+      const runFileDoctor = vi.fn(async () => hostReport);
+      context.runFileDoctor = runFileDoctor;
+      handler = createRoutes(context);
+      const req = createMockReq(
+        "POST",
+        "/api/doctor",
+        {},
+        JSON.stringify(validProject),
+      );
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(403, {
+        "Content-Type": "application/json",
+      });
+      const data = JSON.parse(String(vi.mocked(res.end).mock.calls[0]?.[0]));
+      expect(data.code).toBe("csrf-invalid");
+      expect(runFileDoctor).not.toHaveBeenCalled();
+    });
+
+    it("returns the file doctor report unchanged and omits the draft", async () => {
+      const runFileDoctor = vi.fn(async () => hostReport);
+      context.runFileDoctor = runFileDoctor;
+      context.aiClient = undefined;
+      context.readProviderConfig = async () => ({
+        apiKey: "sk-doctor-secret-key",
+        url: "https://provider.example/v1",
+      });
+      handler = createRoutes(context);
+      const draft = {
+        ...validProject,
+        groups: [
+          {
+            ...validProject.groups[0],
+            rules: [
+              {
+                ...validProject.groups[0]?.rules[0],
+                type: "response-body",
+                redirect: undefined,
+                responseBody: {
+                  mode: "replace",
+                  body: "PROJECT_BODY_SECRET",
+                },
+              },
+            ],
+          },
+        ],
+      };
+      const req = createMockReq(
+        "POST",
+        "/api/doctor",
+        { "x-csrf-token": "test-csrf-token" },
+        JSON.stringify(draft),
+      );
+      const res = createMockRes();
+      await handler(req, res);
+      expect(runFileDoctor).toHaveBeenCalledOnce();
+      expect(res.writeHead).toHaveBeenCalledWith(200, {
+        "Content-Type": "application/json",
+      });
+      const raw = String(vi.mocked(res.end).mock.calls[0]?.[0]);
+      const data = JSON.parse(raw) as {
+        surface: string;
+        host: typeof hostReport;
+        ui: { checks: { id: string; summary: string; fix: string | null }[] };
+      };
+      expect(data.surface).toBe("editor");
+      expect(`${JSON.stringify(data.host, null, 2)}\n`).toBe(
+        `${JSON.stringify(hostReport, null, 2)}\n`,
+      );
+      expect(raw).not.toContain("PROJECT_BODY_SECRET");
+      expect(raw).not.toContain("sk-doctor-secret-key");
+      expect(raw).not.toContain("https://provider.example/v1");
+      const ai = data.ui.checks.find((item) => item.id === "editor.ai");
+      expect(ai?.summary).toBe(
+        "AI Assist was configured after this editor started.",
+      );
+      expect(ai?.fix).toBe("Restart rogatio edit");
+    });
+  });
 });

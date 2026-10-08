@@ -64,8 +64,8 @@ body:
   - type: textarea
     id: doctor-json
     attributes:
-      label: rogatio doctor --json
-      description: Paste the output of `rogatio doctor --json`. This is the whole-stack health report (Node, project, native host, device CA, PAC, and optional AI Assist). If you did not run it, say why.
+      label: Doctor JSON
+      description: Paste `rogatio doctor --json`, or Copy diagnostics from the extension or from `rogatio edit`. The CLI report is the six host checks. Copy diagnostics nests that report under `host` and adds the UI checks. If you did not run it, say why.
       render: json
     validations:
       required: false

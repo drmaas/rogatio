@@ -30,9 +30,11 @@ editor.
 `save` validates first, then writes the project. `cancel` requires confirmation when there
 are unsaved changes and restores the committed snapshot.
 
+The `rogatio edit` page has **Run checks** under Project details. It reports whether the editor server is still up, whether this tab's token is still accepted, whether the draft validates, whether AI Assist is available in this page, and, when the draft has mock rules, whether a mock file root is saved. It also asks the editor server for the same report as `rogatio doctor` on the open file. **Copy diagnostics** writes JSON. A provider configured with `rogatio ai setup` after the page opened stays hidden until you start `rogatio edit` again; Run checks says to restart. The extension Workspace uses the extension's Run checks instead of this button.
+
 The editor does not evaluate user regular expressions, contact a network, access a
 filesystem, request permissions, or emit telemetry. Defensive snapshots reject hostile
-objects (proxies, accessors, cycles) without invoking them.
+objects (proxies, accessors, cycles) without invoking them. The doctor request stays on `127.0.0.1`.
 
 See also [`rogatio verify`](/reference/cli/#verify) for offline file validation outside the
 editor.

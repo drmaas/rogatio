@@ -32,16 +32,14 @@ describe("extension manifest", () => {
       host_permissions?: string[];
       optional_host_permissions?: string[];
     };
-    expect(manifest.permissions).toEqual(
-      expect.arrayContaining([
-        "storage",
-        "declarativeNetRequest",
-        "declarativeNetRequestFeedback",
-        "scripting",
-        "nativeMessaging",
-        "proxy",
-      ]),
-    );
+    expect(manifest.permissions).toEqual([
+      "storage",
+      "declarativeNetRequest",
+      "declarativeNetRequestFeedback",
+      "scripting",
+      "nativeMessaging",
+      "proxy",
+    ]);
     expect(manifest.permissions).not.toContain("tabs");
     expect(manifest.host_permissions).toEqual(["*://*/*"]);
     expect(manifest.optional_host_permissions).toBeUndefined();

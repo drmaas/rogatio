@@ -21,6 +21,7 @@ export interface ChromePort {
 export interface ChromeRuntime {
   lastError?: { readonly message?: string };
   id?: string;
+  getManifest?(): { readonly version?: string };
   sendMessage(message: unknown, callback: (response: unknown) => void): void;
   connectNative?(name: string): ChromePort;
   onMessage: {
@@ -109,6 +110,24 @@ export interface ChromeProxySettings {
   ): void;
 }
 
+export interface ChromePermissions {
+  contains(
+    permission: { origins?: string[] },
+    callback: (result: boolean) => void,
+  ): void;
+}
+
+export interface ChromeExtensionInfo {
+  isAllowedIncognitoAccess(callback: (allowed: boolean) => void): void;
+}
+
+export interface ChromeTabs {
+  query(
+    queryInfo: { active?: boolean; currentWindow?: boolean },
+    callback: (tabs: { url?: string }[]) => void,
+  ): void;
+}
+
 export interface ChromeApi {
   storage: { local: ChromeStorageArea };
   action: ChromeAction;
@@ -116,6 +135,9 @@ export interface ChromeApi {
   declarativeNetRequest?: ChromeDeclarativeNetRequest;
   scripting?: ChromeScripting;
   proxy?: { settings: ChromeProxySettings };
+  permissions?: ChromePermissions;
+  extension?: ChromeExtensionInfo;
+  tabs?: ChromeTabs;
 }
 
 declare global {

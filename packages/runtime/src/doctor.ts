@@ -74,6 +74,14 @@ function exactRegistryVersion(value: string): string | null {
   return match === null ? null : match[0];
 }
 
+/**
+ * A version that may be copied into a shell command or a doctor reply.
+ * The whole string must be major.minor.patch.
+ */
+export function exactDoctorVersion(value: string): string | null {
+  return exactRegistryVersion(value);
+}
+
 export interface DoctorCheck {
   readonly id: DoctorCheckId;
   readonly status: DoctorStatus;

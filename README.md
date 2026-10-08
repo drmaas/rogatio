@@ -114,7 +114,7 @@ The toolbar button opens a compact popup that lists the active project's saved g
 one enable/disable switch each, a truthful runtime status, an **Open app** button (the full
 management page at Overview), and a pencil that opens the management page on that group. It
 also offers **New project** (an inline name form), **Import project** (a file picker),
-and **Run checks**. Run checks asks the native host for the same report as `rogatio doctor`.
+and **Run checks**. Run checks shows browser-side checks and then the same host report as `rogatio doctor`.
 The popup reuses the existing group-enablement lifecycle; it contains no editor, search,
 proxy, permission, or rule-authoring controls.
 
@@ -204,7 +204,7 @@ The config file has `600` permissions (owner read/write only). The API key never
 
 ### In the Chrome Extension
 
-When the native runtime is started (`Start runtime`) and a provider is configured (`rogatio ai setup`), the extension management page shows an **AI Status** card that also lists the configured provider URL and model — the API key never leaves your machine. **Create using AI** on the Dashboard and **AI Assist** in the Workspace editor both go through the service worker to the native host — they do not call the CLI edit server. `rogatio ai setup` takes effect immediately: the running runtime re-reads its provider configuration without a restart. If the management page is already open, click **Refresh** so it picks up the new configuration and remounts Workspace with Assist available.
+When the native runtime is started (`Start runtime`) and a provider is configured (`rogatio ai setup`), the extension management page shows an **AI Status** card that also lists the configured provider URL and model — the API key never leaves your machine. **Create using AI** on the Dashboard and **AI Assist** in the Workspace editor both go through the service worker to the native host — they do not call the CLI edit server. `rogatio ai setup` takes effect immediately for the running runtime: it re-reads its provider configuration without a restart. If the management page is already open, click **Refresh** so it picks up the new configuration and remounts Workspace with Assist available. A `rogatio edit` page that is already open does not gain Assist until you start `rogatio edit` again. **Run checks** on that page says so.
 
 ### Security & Privacy
 
@@ -255,8 +255,12 @@ Then open the extension, click **Start runtime**, and response-body and
 request-body rules become active through the native host. The
 sidebar runtime status line shows the current phase next to the Start/Stop
 controls, with the loaded extension ID shown beneath it. **Run checks** on that
-card, on the dashboard runtime block, and in the toolbar popup asks the native
-host for the same six checks as `rogatio doctor`. Release builds carry
+card, on the dashboard runtime block, and in the toolbar popup shows checks the
+browser can see (service worker, native connection, extension id, versions,
+proxy, site access, rules, and incognito; the popup also checks the current
+tab) and then the same six host checks as `rogatio doctor`. **Copy diagnostics**
+writes one JSON document with those UI checks and the host report nested under
+`host`. Release builds carry
 a public `key` in the extension manifest, so that ID stays the same when a new
 ZIP is unpacked into a different folder. If the host manifest is not installed,
 starting shows the ready-to-run install command with a one-click copy button

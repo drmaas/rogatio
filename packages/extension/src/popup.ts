@@ -1,8 +1,3 @@
-import {
-  type DoctorReport,
-  parseDoctorReport,
-  unreachableDoctorReport,
-} from "./doctor-report.js";
 import { renderDoctorReport } from "./doctor-view.js";
 import {
   MATCH_LOGGING_ENABLED_KEY,
@@ -11,6 +6,11 @@ import {
 import { createMatchLoggingToggle } from "./match-logging-toggle.js";
 import { createPopupModel, type PopupModel } from "./popup-model.js";
 import { projectImportFailure } from "./project-file.js";
+import {
+  type CombinedDiagnostics,
+  parseExtensionDoctor,
+  workerUnreachableDiagnostics,
+} from "./ui-doctor.js";
 
 const rootElement = document.querySelector<HTMLElement>("#rogatio-popup-root");
 if (!rootElement) throw new Error("popup.invalid-root");
@@ -55,7 +55,7 @@ let createDraft = "";
 let statusMessage = "";
 /** Console match logging toggle; missing storage key defaults on. */
 let matchLoggingEnabled = true;
-let doctorReport: DoctorReport | null = null;
+let doctorReport: CombinedDiagnostics | null = null;
 let doctorRunning = false;
 
 function statusLabel(status: string): string {
@@ -398,12 +398,16 @@ async function runDoctorChecks(): Promise<void> {
   doctorRunning = true;
   render();
   try {
-    const response = await client.send({ version: 1, command: "run-doctor" });
+    const response = await client.send({
+      version: 1,
+      command: "run-doctor",
+      surface: "popup",
+    });
     const value =
-      response?.ok === true ? parseDoctorReport(response.value) : null;
-    doctorReport = value ?? unreachableDoctorReport();
+      response?.ok === true ? parseExtensionDoctor(response.value) : null;
+    doctorReport = value ?? workerUnreachableDiagnostics();
   } catch {
-    doctorReport = unreachableDoctorReport();
+    doctorReport = workerUnreachableDiagnostics();
   } finally {
     doctorRunning = false;
     render();
