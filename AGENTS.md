@@ -66,7 +66,7 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 - Keep package boundaries and dependency direction explicit.
 - Do not commit generated build output, coverage, browser binaries, dependency directories, environment files, or secrets.
 - Every commit must reference an open issue (`#<NN>` or `Closes #<NN>`) and follow Conventional Commits format; the `.husky/commit-msg` hook enforces both. Before committing, reuse an existing issue or create one automatically, and confirm the issue number with the user rather than inventing one. See `CONTRIBUTING.md`.
-- Releases are cut by semantic-release on merge to `main` (conventional-commit driven): `fix:` bumps the patch, `feat:` the minor, and `!` / `BREAKING CHANGE:` a major. Version 2.0.0 therefore requires a breaking-change footer or `!` marker on a commit that merges to `main`.
+- Releases are cut by semantic-release after the `Repository checks` workflow succeeds for that `main` push (conventional-commit driven): `fix:` bumps the patch, `feat:` the minor, and `!` / `BREAKING CHANGE:` a major. Version 2.0.0 therefore requires a breaking-change footer or `!` marker on a commit that merges to `main`.
 - Review new dependencies and install-script permissions before adding them.
 - Use cross-platform Node-based scripts instead of Bash-only orchestration.
 - Verify real test execution, emitted builds, and browser prerequisites; do not accept false-green checks.

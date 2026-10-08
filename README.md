@@ -86,12 +86,20 @@ The public CLI consists of `edit`, `verify`, `test`, `runtime` (with
 The extension is **unsigned** and manually loaded from a GitHub Release ZIP.
 There is no browser-store install or automatic update.
 
-1. Download the extension ZIP attached to the latest
-   [GitHub Release](https://github.com/drmaas/rogatio/releases).
-2. Unpack it to a stable local directory.
-3. Open `chrome://extensions`, enable **Developer mode**, and choose
+1. Download `rogatio-extension.zip` and `rogatio-extension.zip.sha256` from the
+   latest [GitHub Release](https://github.com/drmaas/rogatio/releases) into the
+   same directory.
+2. Verify the ZIP:
+
+   ```sh
+   sha256sum -c rogatio-extension.zip.sha256
+   gh attestation verify rogatio-extension.zip --repo drmaas/rogatio
+   ```
+
+3. Unpack it to a stable local directory.
+4. Open `chrome://extensions`, enable **Developer mode**, and choose
    **Load unpacked**.
-4. Select the unpacked extension directory.
+5. Select the unpacked extension directory.
 
 Chrome sideloading may require the organization's extension entitlement. The
 extension declares broad host access (`*://*/*`) at install time so DNR rules can
@@ -348,10 +356,14 @@ The static site is deployed to GitHub Pages on every merge to `main` by the
 
 ## Release pipeline
 
-- `Release` runs on merge to `main`, using semantic-release to cut a version, publish
-  `@rogatio/cli` to the public npm registry, and attach the unsigned Chrome extension ZIP
-  to the GitHub Release. Configure `NPM_TOKEN` (and rely on the automatic `GITHUB_TOKEN`)
-  in repository secrets.
+- `Repository checks` runs on every pull request and on every push to `main`.
+- `Release` runs after that checks workflow succeeds for a push to `main`. It uses
+  semantic-release to cut a version, publish `@rogatio/cli` to the public npm
+  registry with [trusted publishing](https://docs.npmjs.com/trusted-publishers/)
+  (provenance included), and attach `rogatio-extension.zip` and
+  `rogatio-extension.zip.sha256` to the GitHub Release. A manual
+  `workflow_dispatch` of `Release` runs semantic-release with `--dry-run`.
+  Publishing uses the npm trusted publisher configured for this workflow.
 - `Deploy docs site` builds `packages/docs-site` and publishes it to GitHub Pages on merge
   to `main`. Enable Pages in repository settings with source **GitHub Actions**.
 
