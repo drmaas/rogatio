@@ -38,11 +38,19 @@ The public CLI consists of `edit`, `verify`, `test`, `runtime`, and `ai`. See th
 The extension is **unsigned** and manually loaded from a GitHub Release ZIP. There is no
 browser-store install or automatic update.
 
-1. Download the extension ZIP attached to the latest
-   [GitHub Release](https://github.com/drmaas/rogatio/releases).
-2. Unpack it to a stable local directory.
-3. Open `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.
-4. Select the unpacked extension directory.
+1. Download `rogatio-extension.zip` and `rogatio-extension.zip.sha256` from the
+   latest [GitHub Release](https://github.com/drmaas/rogatio/releases) into the
+   same directory.
+2. Verify the ZIP:
+
+   ```sh
+   sha256sum -c rogatio-extension.zip.sha256
+   gh attestation verify rogatio-extension.zip --repo drmaas/rogatio
+   ```
+
+3. Unpack it to a stable local directory.
+4. Open `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.
+5. Select the unpacked extension directory.
 
 Release builds include a public `key` in the extension manifest, so Chrome assigns
 the same extension ID no matter which folder you unpack into. Upgrading is: unpack

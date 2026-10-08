@@ -14,6 +14,10 @@
           {
             "path": "packages/extension/dist/rogatio-extension.zip",
             "label": "Chrome extension (ZIP)"
+          },
+          {
+            "path": "packages/extension/dist/rogatio-extension.zip.sha256",
+            "label": "Chrome extension ZIP SHA-256"
           }
         ]
       }
