@@ -1,4 +1,8 @@
-import { createPrivateKey, X509Certificate } from "node:crypto";
+import {
+  createPrivateKey,
+  createPublicKey,
+  X509Certificate,
+} from "node:crypto";
 import {
   access,
   chmod,
@@ -538,6 +542,94 @@ describe(" trust controller lifecycle", () => {
     );
   });
 
+  it("regenerates a CA when the key file holds only a public key", async () => {
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const publicPem = spkiPem(material.keyPem);
+    await writeCaFiles(root, material.certPem, publicPem, 0o600);
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    const certPem = await readFile(join(root, ".rogatio-ca.crt"), "utf8");
+    const keyPem = await readFile(join(root, ".rogatio-ca.key"), "utf8");
+    expect(keyPem).not.toBe(publicPem);
+    expect(certPem).not.toBe(material.certPem);
+    expect(
+      new X509Certificate(certPem).checkPrivateKey(createPrivateKey(keyPem)),
+    ).toBe(true);
+  });
+
+  it("regenerates a CA when the key file mixes a public key with another private key", async () => {
+    const unused = generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey;
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const other = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const mixedPem = `${spkiPem(material.keyPem)}${other.keyPem}`;
+    await writeCaFiles(root, material.certPem, mixedPem, 0o600);
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    const certPem = await readFile(join(root, ".rogatio-ca.crt"), "utf8");
+    const keyPem = await readFile(join(root, ".rogatio-ca.key"), "utf8");
+    expect(keyPem).not.toBe(mixedPem);
+    expect(
+      new X509Certificate(certPem).checkPrivateKey(createPrivateKey(keyPem)),
+    ).toBe(true);
+  });
+
+  it("regenerates a CA when the key file is a copy of the certificate", async () => {
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, material.certPem, material.certPem, 0o600);
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    const certPem = await readFile(join(root, ".rogatio-ca.crt"), "utf8");
+    const keyPem = await readFile(join(root, ".rogatio-ca.key"), "utf8");
+    expect(keyPem).not.toBe(material.certPem);
+    expect(certPem).not.toBe(material.certPem);
+    expect(
+      new X509Certificate(certPem).checkPrivateKey(createPrivateKey(keyPem)),
+    ).toBe(true);
+  });
+
   it("regenerates a CA when the stored certificate has trailing text", async () => {
     const material = await createCertificate(
       "CN=Rogatio Request-Body CA",
@@ -671,6 +763,13 @@ async function fileExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function spkiPem(privateKeyPem: string): string {
+  return createPublicKey(privateKeyPem).export({
+    type: "spki",
+    format: "pem",
+  });
 }
 
 async function writeCaFiles(

@@ -1,9 +1,4 @@
-import {
-  createPublicKey,
-  type KeyObject,
-  timingSafeEqual,
-  X509Certificate,
-} from "node:crypto";
+import { createPrivateKey, X509Certificate } from "node:crypto";
 import {
   chmod,
   lstat,
@@ -244,14 +239,10 @@ async function writeFileAtomic(
   }
 }
 
-function spkiDer(key: KeyObject): Buffer {
-  const exported = key.export({ format: "der", type: "spki" });
-  return Buffer.isBuffer(exported) ? exported : Buffer.from(exported);
-}
-
 /**
- * A stored pair is reusable only when the PEM is one CA certificate and its
- * public key is the public half of the private key.
+ * A stored pair is reusable only when the certificate is a CA and the key
+ * file is the matching private key. A public key, the certificate itself, or
+ * any other PEM returns false.
  */
 function caCertificateMatchesPrivateKey(
   certPem: string,
@@ -261,18 +252,7 @@ function caCertificateMatchesPrivateKey(
     if (!isInstallableCaCertificate(certPem)) return false;
     const certificate = new X509Certificate(certPem);
     if (!certificate.ca) return false;
-    const certificatePublic = createPublicKey({
-      key: certificate.publicKey.export({ format: "der", type: "spki" }),
-      format: "der",
-      type: "spki",
-    });
-    const privatePublic = createPublicKey(keyPem);
-    const fromCertificate = spkiDer(certificatePublic);
-    const fromPrivate = spkiDer(privatePublic);
-    return (
-      fromCertificate.length === fromPrivate.length &&
-      timingSafeEqual(fromCertificate, fromPrivate)
-    );
+    return certificate.checkPrivateKey(createPrivateKey(keyPem));
   } catch {
     return false;
   }
