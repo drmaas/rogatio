@@ -207,7 +207,10 @@ describe("linux CA installer/remover", () => {
   it("caTrustAnchorRemover does not spawn; the bundle rebuild replaces the file", async () => {
     const adapter = selectTrustPlatformAdapter("linux");
     await expect(
-      adapter.caTrustAnchorRemover("ab".repeat(20)),
+      adapter.caTrustAnchorRemover(
+        "ab".repeat(20),
+        "-----BEGIN CERTIFICATE-----\nMII...\n-----END CERTIFICATE-----\n",
+      ),
     ).resolves.toBeUndefined();
     expect(mockSpawn).not.toHaveBeenCalled();
   });

@@ -166,10 +166,14 @@ const linuxAdapter: TrustPlatformAdapter = {
     // Idempotent removal: we intentionally do not run update-ca-certificates
     // as it's not strictly necessary for removing trust and avoids permission issues
   },
-  async caTrustAnchorRemover(fingerprintSha1: string): Promise<void> {
+  async caTrustAnchorRemover(
+    fingerprintSha1: string,
+    certPem: string,
+  ): Promise<void> {
     // The installer replaces rogatio-ca.crt and update-ca-certificates rebuilds
     // the bundle, so there is no separate anchor to delete.
     void fingerprintSha1;
+    void certPem;
   },
 };
 

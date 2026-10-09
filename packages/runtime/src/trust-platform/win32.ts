@@ -114,7 +114,11 @@ const win32Adapter: TrustPlatformAdapter = {
       }
     }
   },
-  async caTrustAnchorRemover(fingerprintSha1: string): Promise<void> {
+  async caTrustAnchorRemover(
+    fingerprintSha1: string,
+    certPem: string,
+  ): Promise<void> {
+    void certPem;
     if (!/^[0-9a-f]{40}$/.test(fingerprintSha1)) {
       throw new TrustError("trust.internal", "invalid-ca-certificate", [
         "invalid-ca-certificate",

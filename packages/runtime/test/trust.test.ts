@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import {
   createPrivateKey,
   createPublicKey,
@@ -12,10 +13,12 @@ import {
   mkdtemp,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createRequestBodyTrustController,
@@ -26,7 +29,11 @@ import {
   TRUST_LIMITS,
   TrustError,
 } from "../src/index.js";
-import { createCertificate, generateCaKeyPair } from "../src/x509.js";
+import {
+  createCertificate,
+  generateCaKeyPair,
+  signCertificate,
+} from "../src/x509.js";
 
 const ORIGIN = "chrome-extension://abcdefghijklmnopabcdefghijklmnop/";
 const ORIGIN_B = "chrome-extension://abcdefghijklmnopponmlkjihgfedcba/";
@@ -754,11 +761,20 @@ describe(" trust controller lifecycle", () => {
     );
     await writeCaFiles(root, planted.certPem, other.keyPem, 0o600);
     const previous = sha1Of(planted.certPem);
+    expect(new X509Certificate(planted.certPem).subject).toBe(
+      "CN=CN=Rogatio Request-Body CA",
+    );
     const events: string[] = [];
+    let installed = "";
     const installer = vi.fn(async (pem: string) => {
+      installed = pem;
       events.push(pem === planted.certPem ? "install-old" : "install-new");
     });
-    const anchorRemover = vi.fn(async (fingerprint: string) => {
+    const anchorRemover = vi.fn(async (fingerprint: string, pem: string) => {
+      expect(pem).toBe(planted.certPem);
+      expect(pem).not.toBe(installed);
+      expect(fingerprint).toBe(previous);
+      expect(fingerprint).not.toBe(sha1Of(installed));
       events.push(`remove:${fingerprint}`);
     });
     const controller = createRequestBodyTrustController({
@@ -780,6 +796,76 @@ describe(" trust controller lifecycle", () => {
       other.keyPem,
     );
   });
+
+  it.each(["darwin", "win32"] as const)(
+    "does not remove a symlinked previous certificate on %s",
+    async (platform) => {
+      const planted = await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      );
+      await writeFile(join(root, "linked.crt"), planted.certPem, "utf8");
+      await symlink(join(root, "linked.crt"), join(root, ".rogatio-ca.crt"));
+      await expectNoAnchorRemoval(platform);
+    },
+  );
+
+  it.each(["darwin", "win32"] as const)(
+    "does not remove a non-regular previous certificate on %s",
+    async (platform) => {
+      await promisify(execFile)("mkfifo", [join(root, ".rogatio-ca.crt")]);
+      await expectNoAnchorRemoval(platform);
+    },
+  );
+
+  it.each(["darwin", "win32"] as const)(
+    "does not remove a previous certificate that is not a CA on %s",
+    async (platform) => {
+      const ca = await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      );
+      const leaf = await signCertificate(
+        "CN=Rogatio Request-Body CA",
+        ca.certPem,
+        ca.keyPem,
+        TRUST_LIMITS.caValidityDays,
+      );
+      const other = await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      );
+      expect(new X509Certificate(leaf).ca).toBe(false);
+      expect(new X509Certificate(leaf).subject).toBe(
+        "CN=CN=Rogatio Request-Body CA",
+      );
+      await writeCaFiles(root, leaf, other.keyPem, 0o600);
+      await expectNoAnchorRemoval(platform);
+    },
+  );
+
+  it.each(["darwin", "win32"] as const)(
+    "does not remove a previous certificate with a different subject on %s",
+    async (platform) => {
+      const planted = await createCertificate(
+        "CN=Other",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      );
+      const other = await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      );
+      expect(new X509Certificate(planted.certPem).ca).toBe(true);
+      expect(new X509Certificate(planted.certPem).subject).toBe("CN=CN=Other");
+      await writeCaFiles(root, planted.certPem, other.keyPem, 0o600);
+      await expectNoAnchorRemoval(platform);
+    },
+  );
 
   it("reports a previous-anchor removal failure without failing install", async () => {
     const unused = generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey;
@@ -938,6 +1024,36 @@ describe(" scope and limits", () => {
   });
 });
 
+async function expectNoAnchorRemoval(
+  platform: "darwin" | "win32",
+): Promise<void> {
+  const anchorRemover = vi.fn(async () => {});
+  const installer = vi.fn(async (pem: string) => {
+    const certificate = new X509Certificate(pem);
+    expect(certificate.ca).toBe(true);
+    expect(certificate.subject).toBe("CN=CN=Rogatio Request-Body CA");
+  });
+  const controller = createRequestBodyTrustController({
+    platform,
+    installRoot: root,
+    manifestDir: root,
+    hostPath: join(root, "runtime-host"),
+    detectCapabilities: capable,
+    caTrustInstaller: installer,
+    caTrustAnchorRemover: anchorRemover,
+  });
+
+  const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+  expect(result.ok).toBe(true);
+  expect(installer).toHaveBeenCalledTimes(1);
+  expect(anchorRemover).not.toHaveBeenCalled();
+  const installed = new X509Certificate(
+    await readFile(join(root, ".rogatio-ca.crt"), "utf8"),
+  );
+  expect(installed.ca).toBe(true);
+  expect(installed.subject).toBe("CN=CN=Rogatio Request-Body CA");
+}
+
 async function fileExists(path: string): Promise<boolean> {
   try {
     await access(path);
@@ -991,7 +1107,10 @@ function sequenceFields(
   return fields;
 }
 
-/** PKCS#8 whose public modulus matches, but the private coefficient does not. */
+/**
+ * PKCS#8 whose public modulus still matches, but every CRT parameter is zero.
+ * Zeroing only the inverse coefficient still verifies for some keys.
+ */
 function pkcs8WithInconsistentPrivateMaterial(privateKeyPem: string): string {
   const der = Buffer.from(
     createPrivateKey(privateKeyPem).export({ format: "der", type: "pkcs8" }),
@@ -1004,17 +1123,15 @@ function pkcs8WithInconsistentPrivateMaterial(privateKeyPem: string): string {
   }
   const rsa = readTlv(der, octet.valueStart);
   const rsaFields = sequenceFields(der, rsa.valueStart, rsa.valueEnd);
-  const coefficient = rsaFields[8];
-  if (coefficient?.tag !== 0x02) {
-    throw new Error("expected an RSA private coefficient");
-  }
   const copy = Buffer.from(der);
-  for (
-    let index = coefficient.valueStart;
-    index < coefficient.valueEnd;
-    index += 1
-  ) {
-    copy[index] = 0x11;
+  for (const fieldIndex of [4, 5, 6, 7, 8]) {
+    const field = rsaFields[fieldIndex];
+    if (field?.tag !== 0x02) {
+      throw new Error("expected RSA CRT parameters");
+    }
+    for (let index = field.valueStart; index < field.valueEnd; index += 1) {
+      copy[index] = 0x00;
+    }
   }
   const encoded = copy
     .toString("base64")

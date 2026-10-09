@@ -1,8 +1,11 @@
 import { createPrivateKey, sign, verify, X509Certificate } from "node:crypto";
+import { constants as fsConstants } from "node:fs";
 import {
   chmod,
+  type FileHandle,
   lstat,
   mkdir,
+  open,
   readFile,
   rename,
   rm,
@@ -188,9 +191,13 @@ export interface RequestBodyTrustControllerOptions {
     | Promise<TrustCapabilities>;
   readonly caTrustInstaller?: (certPem: string) => Promise<void> | void;
   readonly caTrustRemover?: () => Promise<void> | void;
-  /** Removes one previously trusted CA by SHA-1 fingerprint. Argv-only. */
+  /**
+   * Removes one previously trusted Rogatio CA. The fingerprint and PEM are
+   * the same validated certificate. Argv-only.
+   */
   readonly caTrustAnchorRemover?: (
     fingerprintSha1: string,
+    certPem: string,
   ) => Promise<void> | void;
 }
 
@@ -246,6 +253,12 @@ async function writeFileAtomic(
 const CA_POSSESSION_PAYLOAD = Buffer.from("rogatio-ca-possession");
 
 /**
+ * `createCertificate("CN=Rogatio Request-Body CA", ...)` stores that string
+ * as the common name, so Node reports the subject below.
+ */
+const ROGATIO_REQUEST_BODY_CA_SUBJECT = "CN=CN=Rogatio Request-Body CA";
+
+/**
  * A stored pair is reusable only when the certificate is a CA and the key
  * file can sign as that certificate's private key.
  */
@@ -268,6 +281,39 @@ function caCertificateMatchesPrivateKey(
     );
   } catch {
     return false;
+  }
+}
+
+/**
+ * The previous anchor is removable only when the cert path is a regular file
+ * and the bytes are the Rogatio Request-Body CA. Symlinks are not followed.
+ */
+async function readPreviousRogatioCa(
+  caCertFile: string,
+): Promise<{ fingerprint: string; pem: string } | undefined> {
+  let handle: FileHandle | undefined;
+  try {
+    const info = await lstat(caCertFile);
+    if (!info.isFile()) return undefined;
+    handle = await open(
+      caCertFile,
+      fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),
+    );
+    const opened = await handle.stat();
+    if (!opened.isFile()) return undefined;
+    const pem = await handle.readFile({ encoding: "utf8" });
+    const certificate = new X509Certificate(pem);
+    if (!certificate.ca) return undefined;
+    if (certificate.subject !== ROGATIO_REQUEST_BODY_CA_SUBJECT) {
+      return undefined;
+    }
+    const fingerprint = sha1Fingerprint(pem);
+    if (!fingerprint) return undefined;
+    return { fingerprint, pem };
+  } catch {
+    return undefined;
+  } finally {
+    await handle?.close().catch(() => undefined);
   }
 }
 
@@ -441,15 +487,9 @@ export function createRequestBodyTrustController(
     // Reuse a device-local CA only when the key proves possession and the
     // key file is a regular mode-0600 file owned by this user.
     anchorRemovalWarning = undefined;
-    let previousFingerprint: string | undefined;
+    let previous: { fingerprint: string; pem: string } | undefined;
     if (!(await reusableCaMaterial())) {
-      try {
-        previousFingerprint = sha1Fingerprint(
-          await readFile(caCertFile, "utf8"),
-        );
-      } catch {
-        previousFingerprint = undefined;
-      }
+      previous = await readPreviousRogatioCa(caCertFile);
       const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
       const certResult = await createCertificate(
         "CN=Rogatio Request-Body CA",
@@ -469,13 +509,13 @@ export function createRequestBodyTrustController(
       installerCalled = true;
       installedNew = true;
     }
-    if (installedNew && previousFingerprint && caTrustAnchorRemover) {
+    if (installedNew && previous && caTrustAnchorRemover) {
       const currentFingerprint = sha1Fingerprint(
         await readFile(caCertFile, "utf8"),
       );
-      if (currentFingerprint && currentFingerprint !== previousFingerprint) {
+      if (currentFingerprint && currentFingerprint !== previous.fingerprint) {
         try {
-          await caTrustAnchorRemover(previousFingerprint);
+          await caTrustAnchorRemover(previous.fingerprint, previous.pem);
         } catch {
           anchorRemovalWarning = "previous-anchor-not-removed";
           console.error("[rogatio] previous CA trust anchor was not removed");

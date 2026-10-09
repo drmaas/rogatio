@@ -7,5 +7,5 @@ export interface TrustPlatformAdapter {
   detect(): TrustCapabilities;
   caTrustInstaller(certPem: string): Promise<void>;
   caTrustRemover(): Promise<void>;
-  caTrustAnchorRemover(fingerprintSha1: string): Promise<void>;
+  caTrustAnchorRemover(fingerprintSha1: string, certPem: string): Promise<void>;
 }

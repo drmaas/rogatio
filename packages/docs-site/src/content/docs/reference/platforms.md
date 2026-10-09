@@ -37,8 +37,10 @@ CA trust adapters exist for all three supported operating systems; each needs di
 privilege. Linux writes the CA certificate with argv-only `sudo tee` (PEM on standard
 input, stdout discarded) and then runs argv-only `sudo update-ca-certificates`. macOS uses
 `security add-trusted-cert` against the login keychain, and Windows uses
-`certutil -addstore` into `Cert:\CurrentUser\Root`. When a new CA replaces an older one,
-macOS and Windows remove the previous anchor by SHA-1 fingerprint. Linux replaces the
+`certutil -addstore` into `Cert:\CurrentUser\Root`. When a new CA replaces an older
+Rogatio Request-Body CA stored as a regular file, macOS removes the previous anchor
+with argv-only `security remove-trusted-cert -d` and `security delete-certificate -Z`,
+and Windows removes it with argv-only `certutil -delstore`. Linux replaces the
 certificate file and rebuilds the bundle. A failure to remove the previous anchor is
 reported and does not fail the install.
 
