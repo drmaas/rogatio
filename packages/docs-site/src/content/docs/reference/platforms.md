@@ -34,9 +34,26 @@ supported browser.
   `rogatio runtime host <path>` (normally browser-launched).
 
 CA trust adapters exist for all three supported operating systems; each needs different
-privilege. Linux shells out to `sudo update-ca-certificates`, macOS uses
+privilege. Linux writes the CA certificate with argv-only `sudo tee` (PEM on standard
+input, stdout discarded) and then runs argv-only `sudo update-ca-certificates`. macOS uses
 `security add-trusted-cert` against the login keychain, and Windows uses
-`certutil -addstore` into `Cert:\CurrentUser\Root`.
+`certutil -addstore` into `Cert:\CurrentUser\Root`. When a new CA replaces an older
+Rogatio Request-Body CA stored as a regular file, macOS removes the previous anchor
+with argv-only `security remove-trusted-cert -d` and `security delete-certificate -Z`,
+and Windows removes it with argv-only `certutil -delstore`. Linux replaces the
+certificate file and rebuilds the bundle. The previous certificate is saved as
+`.rogatio-ca.previous.crt` before the live file is replaced, and that copy is kept
+when an install is cancelled so the next successful install can remove the old
+anchor. The new CA files are removed on failure only when that copy still validates
+and the live certificate differs. A stored CA is reused when the certificate and key
+are regular files and the key can sign as that certificate. POSIX also requires the
+key mode to be 0600 and the file to be owned by the current user. Windows skips those
+checks, because it has no POSIX mode bits or uid. A reusable CA is left unchanged when
+installation fails. If replacement stops before the new certificate is written, the
+previous key and public certificate are restored. A saved certificate that differs from the one left
+installed is removed first, including when the existing CA is reused. Uninstall
+removes that saved anchor when the private key is already gone. A failure to remove
+the previous anchor during install is reported and does not fail the install.
 
 ## Request-body capability gate
 

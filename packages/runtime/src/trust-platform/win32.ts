@@ -114,6 +114,40 @@ const win32Adapter: TrustPlatformAdapter = {
       }
     }
   },
+  async caTrustAnchorRemover(
+    fingerprintSha1: string,
+    certPem: string,
+  ): Promise<void> {
+    void certPem;
+    if (!/^[0-9a-f]{40}$/.test(fingerprintSha1)) {
+      throw new TrustError("trust.internal", "invalid-ca-certificate", [
+        "invalid-ca-certificate",
+      ]);
+    }
+    const result = await new Promise<{ code: number; stderr: string }>(
+      (resolve) => {
+        const child = spawn("certutil", ["-delstore", "Root", fingerprintSha1]);
+        let stderr = "";
+        child.stderr?.on("data", (data) => {
+          stderr += data.toString();
+        });
+        child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
+        child.on("error", (err) => resolve({ code: 1, stderr: err.message }));
+      },
+    );
+    if (result.code !== 0) {
+      const stderr = result.stderr.toLowerCase();
+      if (
+        !stderr.includes("not found") &&
+        !stderr.includes("does not exist") &&
+        !stderr.includes("cannot find")
+      ) {
+        throw new TrustError("trust.internal", "elevation-required", [
+          "elevation-required",
+        ]);
+      }
+    }
+  },
 };
 
 export default win32Adapter;

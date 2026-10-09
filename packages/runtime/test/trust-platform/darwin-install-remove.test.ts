@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrustError } from "../../src/trust.js";
 import { selectTrustPlatformAdapter } from "../../src/trust-platform/index.js";
@@ -14,10 +16,6 @@ vi.mock("node:fs", () => ({
   constants: { W_OK: 2 },
   writeFileSync: vi.fn(),
   unlinkSync: vi.fn(),
-}));
-
-vi.mock("node:os", () => ({
-  tmpdir: () => "/tmp",
 }));
 
 describe("darwin CA installer/remover", () => {
@@ -151,5 +149,112 @@ describe("darwin CA installer/remover", () => {
 
     // Both calls should complete without throwing
     expect(mockSpawn).toHaveBeenCalledTimes(2);
+  });
+
+  it("caTrustAnchorRemover clears the admin trust setting and deletes by SHA-1", async () => {
+    const fs = await vi.importActual<typeof import("node:fs")>("node:fs");
+    const previousPem =
+      "-----BEGIN CERTIFICATE-----\nMIIPREVIOUS\n-----END CERTIFICATE-----\n";
+    const seen: {
+      path?: string;
+      pem?: string;
+      mode?: number;
+      dirMode?: number;
+    } = {};
+    mockSpawn.mockImplementation((_command: string, args: string[]) => {
+      if (args[0] === "remove-trusted-cert") {
+        const certPath = args[2] ?? "";
+        seen.path = certPath;
+        seen.pem = fs.readFileSync(certPath, "utf8");
+        seen.mode = fs.statSync(certPath).mode & 0o777;
+        seen.dirMode = fs.statSync(dirname(certPath)).mode & 0o777;
+      }
+      return {
+        stderr: { on: vi.fn() },
+        on: (event: string, cb: (code: number) => void) => {
+          if (event === "close") cb(0);
+        },
+      };
+    });
+    const fingerprint = "ab".repeat(20);
+    const adapter = selectTrustPlatformAdapter("darwin");
+    await adapter.caTrustAnchorRemover(fingerprint, previousPem);
+
+    expect(seen.pem).toBe(previousPem);
+    if (process.platform !== "win32") {
+      expect(seen.mode).toBe(0o600);
+      expect(seen.dirMode).toBe(0o700);
+    }
+    const certPath = seen.path ?? "";
+    expect(certPath).toBe(join(dirname(certPath), "previous.crt"));
+    expect(dirname(dirname(certPath))).toBe(tmpdir());
+    expect(dirname(certPath)).toContain("rogatio-ca-");
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    expect(mockSpawn.mock.calls[0]?.[0]).toBe("security");
+    expect(mockSpawn.mock.calls[0]?.[1]).toEqual([
+      "remove-trusted-cert",
+      "-d",
+      seen.path,
+    ]);
+    expect(mockSpawn.mock.calls[0]?.[2]).toBeUndefined();
+    expect(mockSpawn.mock.calls[1]?.[1]).toEqual([
+      "delete-certificate",
+      "-Z",
+      fingerprint,
+      "/Users/test/Library/Keychains/login.keychain-db",
+    ]);
+    for (const call of mockSpawn.mock.calls) {
+      expect(call[1]).not.toContain("sh");
+      expect(call[1]).not.toContain("-c");
+    }
+    expect(fs.existsSync(dirname(seen.path ?? ""))).toBe(false);
+  });
+
+  it("caTrustAnchorRemover still deletes the keychain item when trust removal fails", async () => {
+    const fs = await vi.importActual<typeof import("node:fs")>("node:fs");
+    let certPath = "";
+    mockSpawn.mockImplementation((_command: string, args: string[]) => {
+      const fail = args[0] === "remove-trusted-cert";
+      if (fail) certPath = args[2] ?? "";
+      return {
+        stderr: {
+          on: (_event: string, cb: (chunk: Buffer) => void) => {
+            if (fail) cb(Buffer.from("permission denied"));
+          },
+        },
+        on: (event: string, cb: (code: number) => void) => {
+          if (event === "close") cb(fail ? 1 : 0);
+        },
+      };
+    });
+    const adapter = selectTrustPlatformAdapter("darwin");
+    await expect(
+      adapter.caTrustAnchorRemover(
+        "ab".repeat(20),
+        "-----BEGIN CERTIFICATE-----\nMIIPREVIOUS\n-----END CERTIFICATE-----\n",
+      ),
+    ).rejects.toThrow(TrustError);
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
+    expect(mockSpawn.mock.calls[1]?.[1]?.[0]).toBe("delete-certificate");
+    expect(fs.existsSync(dirname(certPath))).toBe(false);
+  });
+
+  it("caTrustAnchorRemover rejects a fingerprint that is not SHA-1 hex", async () => {
+    const adapter = selectTrustPlatformAdapter("darwin");
+    await expect(
+      adapter.caTrustAnchorRemover(
+        "EOF",
+        "-----BEGIN CERTIFICATE-----\nMII...\n-----END CERTIFICATE-----\n",
+      ),
+    ).rejects.toThrow(TrustError);
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+
+  it("caTrustAnchorRemover rejects an empty certificate before spawning", async () => {
+    const adapter = selectTrustPlatformAdapter("darwin");
+    await expect(
+      adapter.caTrustAnchorRemover("ab".repeat(20), ""),
+    ).rejects.toThrow(TrustError);
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });

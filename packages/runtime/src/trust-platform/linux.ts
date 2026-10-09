@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { join as posixJoin } from "node:path/posix";
 import type { TrustCapabilities } from "../trust.js";
 import { TrustError } from "../trust.js";
+import { isInstallableCaCertificate } from "./ca-pem.js";
 import type { TrustPlatformAdapter } from "./types.js";
 
 const CA_DIR = "/usr/local/share/ca-certificates";
@@ -12,6 +13,63 @@ const CERT_PATH = posixJoin(CA_DIR, "rogatio-ca.crt");
 function hasSudo(): boolean {
   const result = spawnSync("which", ["sudo"], { timeout: 1000 });
   return result.status === 0;
+}
+
+function installFailureReason(
+  stderr: string,
+): "ca-store-unwritable" | "elevation-required" {
+  const text = stderr.toLowerCase();
+  if (
+    text.includes("permission") ||
+    text.includes("not permitted") ||
+    text.includes("no tty") ||
+    text.includes("terminal")
+  ) {
+    return "elevation-required";
+  }
+  return "ca-store-unwritable";
+}
+
+/**
+ * Run an argv-only sudo command. Certificate bytes, when present, are written
+ * to stdin and never interpolated into a shell command. Stdout is discarded.
+ */
+function runSudo(
+  args: readonly string[],
+  stdin?: string,
+): Promise<{ code: number; stderr: string }> {
+  return new Promise((resolve) => {
+    let stderr = "";
+    let settled = false;
+    const finish = (code: number) => {
+      if (settled) return;
+      settled = true;
+      resolve({ code, stderr });
+    };
+    const child = spawn("sudo", [...args], {
+      stdio: [stdin === undefined ? "ignore" : "pipe", "ignore", "pipe"],
+    });
+    child.stderr?.on("data", (data: Buffer | string) => {
+      stderr += data.toString();
+    });
+    child.on("error", (err: Error) => {
+      stderr += err.message;
+      finish(1);
+    });
+    child.on("close", (code: number | null) => {
+      finish(code ?? 1);
+    });
+    if (stdin === undefined) return;
+    const input = child.stdin;
+    if (!input) {
+      finish(1);
+      return;
+    }
+    input.on("error", () => {
+      // sudo may exit before it reads stdin
+    });
+    input.end(stdin);
+  });
 }
 
 const linuxAdapter: TrustPlatformAdapter = {
@@ -73,6 +131,11 @@ const linuxAdapter: TrustPlatformAdapter = {
     };
   },
   async caTrustInstaller(certPem: string): Promise<void> {
+    if (!isInstallableCaCertificate(certPem)) {
+      throw new TrustError("trust.internal", "invalid-ca-certificate", [
+        "invalid-ca-certificate",
+      ]);
+    }
     try {
       mkdirSync(CA_DIR, { recursive: true });
     } catch {
@@ -81,61 +144,15 @@ const linuxAdapter: TrustPlatformAdapter = {
       ]);
     }
 
-    const certResult = await new Promise<{ code: number; stderr: string }>(
-      (resolve) => {
-        const child = spawn("sudo", [
-          "sh",
-          "-c",
-          `cat > "${CERT_PATH}" << 'EOF'\n${certPem}\nEOF`,
-        ]);
-        let stderr = "";
-        child.stderr?.on("data", (data) => {
-          stderr += data.toString();
-        });
-        child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
-        child.on("error", (err) => resolve({ code: 1, stderr: err.message }));
-      },
-    );
-
+    const certResult = await runSudo(["tee", CERT_PATH], certPem);
     if (certResult.code !== 0) {
-      const stderr = certResult.stderr.toLowerCase();
-      let reason: "ca-store-unwritable" | "elevation-required" =
-        "ca-store-unwritable";
-      if (
-        stderr.includes("permission") ||
-        stderr.includes("not permitted") ||
-        stderr.includes("no tty") ||
-        stderr.includes("terminal")
-      ) {
-        reason = "elevation-required";
-      }
+      const reason = installFailureReason(certResult.stderr);
       throw new TrustError("trust.internal", reason, [reason]);
     }
 
-    const result = await new Promise<{ code: number; stderr: string }>(
-      (resolve) => {
-        const child = spawn("sudo", ["update-ca-certificates"]);
-        let stderr = "";
-        child.stderr?.on("data", (data) => {
-          stderr += data.toString();
-        });
-        child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
-        child.on("error", (err) => resolve({ code: 1, stderr: err.message }));
-      },
-    );
-
+    const result = await runSudo(["update-ca-certificates"]);
     if (result.code !== 0) {
-      const stderr = result.stderr.toLowerCase();
-      let reason: "ca-store-unwritable" | "elevation-required" =
-        "ca-store-unwritable";
-      if (
-        stderr.includes("permission") ||
-        stderr.includes("not permitted") ||
-        stderr.includes("no tty") ||
-        stderr.includes("terminal")
-      ) {
-        reason = "elevation-required";
-      }
+      const reason = installFailureReason(result.stderr);
       throw new TrustError("trust.internal", reason, [reason]);
     }
   },
@@ -148,6 +165,15 @@ const linuxAdapter: TrustPlatformAdapter = {
 
     // Idempotent removal: we intentionally do not run update-ca-certificates
     // as it's not strictly necessary for removing trust and avoids permission issues
+  },
+  async caTrustAnchorRemover(
+    fingerprintSha1: string,
+    certPem: string,
+  ): Promise<void> {
+    // The installer replaces rogatio-ca.crt and update-ca-certificates rebuilds
+    // the bundle, so there is no separate anchor to delete.
+    void fingerprintSha1;
+    void certPem;
   },
 };
 

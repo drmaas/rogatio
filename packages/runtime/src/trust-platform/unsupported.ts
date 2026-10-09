@@ -23,4 +23,9 @@ export const unsupportedAdapter: TrustPlatformAdapter = {
       "no-capability-provider",
     ]);
   },
+  async caTrustAnchorRemover(): Promise<void> {
+    throw new TrustError("trust.internal", "unsupported-platform", [
+      "no-capability-provider",
+    ]);
+  },
 };
