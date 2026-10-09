@@ -45,9 +45,12 @@ certificate file and rebuilds the bundle. The previous certificate is saved as
 `.rogatio-ca.previous.crt` before the live file is replaced, and that copy is kept
 when an install is cancelled so the next successful install can remove the old
 anchor. The new CA files are removed on failure only when that copy still validates
-and the live certificate differs. A reusable CA is left unchanged when installation
-fails. If replacement stops before the new certificate is written, the previous key
-and public certificate are restored. A saved certificate that differs from the one left
+and the live certificate differs. A stored CA is reused when the certificate and key
+are regular files and the key can sign as that certificate. POSIX also requires the
+key mode to be 0600 and the file to be owned by the current user. Windows skips those
+checks, because it has no POSIX mode bits or uid. A reusable CA is left unchanged when
+installation fails. If replacement stops before the new certificate is written, the
+previous key and public certificate are restored. A saved certificate that differs from the one left
 installed is removed first, including when the existing CA is reused. Uninstall
 removes that saved anchor when the private key is already gone. A failure to remove
 the previous anchor during install is reported and does not fail the install.

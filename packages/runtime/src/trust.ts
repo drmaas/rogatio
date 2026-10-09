@@ -222,6 +222,16 @@ function isWellFormedManifest(
   );
 }
 
+/**
+ * Windows does not define `O_NOFOLLOW`. Treat a missing constant as "no
+ * extra flag" so `open` still succeeds; callers still reject symlinks with
+ * `lstat` or `O_EXCL`.
+ */
+function noFollowFlag(): number {
+  const flag = fsConstants.O_NOFOLLOW;
+  return typeof flag === "number" ? flag : 0;
+}
+
 async function writeFileAtomic(
   path: string,
   data: string,
@@ -234,7 +244,7 @@ async function writeFileAtomic(
     fsConstants.O_WRONLY |
     fsConstants.O_CREAT |
     fsConstants.O_EXCL |
-    (fsConstants.O_NOFOLLOW ?? 0);
+    noFollowFlag();
   let created = false;
   let handle: FileHandle | undefined;
   try {
@@ -304,10 +314,7 @@ async function readNoFollowRegularFile(
   try {
     const info = await lstat(path);
     if (!info.isFile()) return undefined;
-    handle = await open(
-      path,
-      fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),
-    );
+    handle = await open(path, fsConstants.O_RDONLY | noFollowFlag());
     const opened = await handle.stat();
     if (!opened.isFile()) return undefined;
     return await handle.readFile({ encoding: "utf8" });
@@ -503,6 +510,9 @@ export function createRequestBodyTrustController(
         lstat(caCertFile),
       ]);
       if (!keyStat.isFile() || !certStat.isFile()) return false;
+      // Windows has no POSIX mode bits or uid. Requiring 0600 and the
+      // current uid would regenerate, and re-prompt to trust, a valid CA
+      // on every install. Symlinks are already rejected above.
       if (process.platform !== "win32") {
         if ((keyStat.mode & 0o777) !== 0o600) return false;
         const uid = process.getuid?.();
@@ -580,8 +590,8 @@ export function createRequestBodyTrustController(
         caps.reasons,
       );
     }
-    // Reuse a device-local CA only when the key proves possession and the
-    // key file is a regular mode-0600 file owned by this user.
+    // Reuse a device-local CA only when both files are regular and the key
+    // proves possession. POSIX also requires mode 0600 owned by this user.
     anchorRemovalWarning = undefined;
     rememberedFingerprint = undefined;
     replacingPrevious = false;

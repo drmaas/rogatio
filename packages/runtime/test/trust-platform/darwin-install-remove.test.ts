@@ -1,4 +1,5 @@
-import { dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrustError } from "../../src/trust.js";
 import { selectTrustPlatformAdapter } from "../../src/trust-platform/index.js";
@@ -15,10 +16,6 @@ vi.mock("node:fs", () => ({
   constants: { W_OK: 2 },
   writeFileSync: vi.fn(),
   unlinkSync: vi.fn(),
-}));
-
-vi.mock("node:os", () => ({
-  tmpdir: () => "/tmp",
 }));
 
 describe("darwin CA installer/remover", () => {
@@ -184,9 +181,14 @@ describe("darwin CA installer/remover", () => {
     await adapter.caTrustAnchorRemover(fingerprint, previousPem);
 
     expect(seen.pem).toBe(previousPem);
-    expect(seen.mode).toBe(0o600);
-    expect(seen.dirMode).toBe(0o700);
-    expect(seen.path).toContain("rogatio-ca-");
+    if (process.platform !== "win32") {
+      expect(seen.mode).toBe(0o600);
+      expect(seen.dirMode).toBe(0o700);
+    }
+    const certPath = seen.path ?? "";
+    expect(certPath).toBe(join(dirname(certPath), "previous.crt"));
+    expect(dirname(dirname(certPath))).toBe(tmpdir());
+    expect(dirname(certPath)).toContain("rogatio-ca-");
     expect(mockSpawn).toHaveBeenCalledTimes(2);
     expect(mockSpawn.mock.calls[0]?.[0]).toBe("security");
     expect(mockSpawn.mock.calls[0]?.[1]).toEqual([
