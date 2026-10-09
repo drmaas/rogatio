@@ -14,6 +14,7 @@ import { isForbiddenHeader } from "../../schema/src/headers.js";
 import { normalizeNameKey } from "../../schema/src/identity.js";
 import { LIMITS } from "../../schema/src/limits.js";
 import { normalizeSiteOrigin } from "../../schema/src/origins.js";
+import { isValidMockLogicalPath } from "../../schema/src/path.js";
 import { isValidUrlRegex } from "../../schema/src/regex.js";
 import {
   HTTP_METHODS,
@@ -288,31 +289,6 @@ function addCaptureIssues(
       },
     });
   }
-}
-
-function isValidMockLogicalPath(value: string): boolean {
-  if (value.length === 0) return false;
-  if (value.includes("\\") || value.includes("%") || hasControl(value)) {
-    return false;
-  }
-  if (value.startsWith("/") || value.endsWith("/") || value.includes("//")) {
-    return false;
-  }
-
-  const parts = value.split("/");
-  if (
-    parts.some(
-      (part) =>
-        part.length === 0 ||
-        part === "." ||
-        part === ".." ||
-        part.includes(":") ||
-        /[*?[\]]/.test(part),
-    )
-  ) {
-    return false;
-  }
-  return true;
 }
 
 function pushSchemaIssue(
