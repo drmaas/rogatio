@@ -12,8 +12,8 @@ on:
     types: [completed]
   workflow_dispatch:
 
-permissions:
-  contents: read
+# No workflow-level token. The release job grants the scopes it needs.
+permissions: {}
 
 # Share `release` only for a successful push to main. GitHub keeps one pending
 # run per group even when cancel-in-progress is false, so a pull-request checks
@@ -50,6 +50,7 @@ jobs:
       - name: Checkout the verified commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          persist-credentials: false
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
