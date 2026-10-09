@@ -41,8 +41,11 @@ input, stdout discarded) and then runs argv-only `sudo update-ca-certificates`. 
 Rogatio Request-Body CA stored as a regular file, macOS removes the previous anchor
 with argv-only `security remove-trusted-cert -d` and `security delete-certificate -Z`,
 and Windows removes it with argv-only `certutil -delstore`. Linux replaces the
-certificate file and rebuilds the bundle. A failure to remove the previous anchor is
-reported and does not fail the install.
+certificate file and rebuilds the bundle. The previous certificate is saved as
+`.rogatio-ca.previous.crt` before the live file is replaced, and that copy is kept
+when an install is cancelled so the next successful install can remove the old
+anchor. A failure to remove the previous anchor is reported and does not fail the
+install.
 
 ## Request-body capability gate
 

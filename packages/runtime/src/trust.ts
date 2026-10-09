@@ -317,6 +317,14 @@ async function readPreviousRogatioCa(
   }
 }
 
+async function discardPreviousCa(caPreviousCertFile: string): Promise<void> {
+  try {
+    await rm(caPreviousCertFile, { force: true });
+  } catch {
+    // The next regeneration replaces a leftover copy.
+  }
+}
+
 function sha1Fingerprint(certPem: string): string | undefined {
   try {
     const hex = new X509Certificate(certPem).fingerprint
@@ -376,6 +384,10 @@ export function createRequestBodyTrustController(
     installRoot,
     options.caCertFileName ?? ".rogatio-ca.crt",
   );
+  const caPreviousCertFile = join(
+    dirname(caCertFile),
+    ".rogatio-ca.previous.crt",
+  );
   const manifestPath = (): string => join(manifestDir, `${hostName}.json`);
   let installerCalled = false;
 
@@ -434,6 +446,8 @@ export function createRequestBodyTrustController(
     const trustResult = await trust();
     if (!trustResult.ok) {
       try {
+        // `.rogatio-ca.previous.crt` stays. It is the copy of a CA whose
+        // install was cancelled, and the next success removes that anchor.
         await rm(caKeyFile, { force: true });
         await rm(caPubFile, { force: true });
         await rm(caCertFile, { force: true });
@@ -489,7 +503,15 @@ export function createRequestBodyTrustController(
     anchorRemovalWarning = undefined;
     let previous: { fingerprint: string; pem: string } | undefined;
     if (!(await reusableCaMaterial())) {
-      previous = await readPreviousRogatioCa(caCertFile);
+      previous =
+        (await readPreviousRogatioCa(caCertFile)) ??
+        (await readPreviousRogatioCa(caPreviousCertFile));
+      // Keep the validated PEM before replacing the live certificate. A
+      // cancelled installer deletes the live files and would otherwise
+      // drop the only copy of the previous CA.
+      if (previous) {
+        await writeFileAtomic(caPreviousCertFile, previous.pem, 0o600);
+      }
       const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
       const certResult = await createCertificate(
         "CN=Rogatio Request-Body CA",
@@ -509,17 +531,24 @@ export function createRequestBodyTrustController(
       installerCalled = true;
       installedNew = true;
     }
-    if (installedNew && previous && caTrustAnchorRemover) {
+    if (installedNew && previous) {
       const currentFingerprint = sha1Fingerprint(
         await readFile(caCertFile, "utf8"),
       );
-      if (currentFingerprint && currentFingerprint !== previous.fingerprint) {
+      const distinct =
+        currentFingerprint !== undefined &&
+        currentFingerprint !== previous.fingerprint;
+      if (distinct && caTrustAnchorRemover) {
         try {
           await caTrustAnchorRemover(previous.fingerprint, previous.pem);
         } catch {
           anchorRemovalWarning = "previous-anchor-not-removed";
           console.error("[rogatio] previous CA trust anchor was not removed");
         }
+        await discardPreviousCa(caPreviousCertFile);
+      } else if (currentFingerprint === previous.fingerprint) {
+        // The saved copy is the certificate just installed.
+        await discardPreviousCa(caPreviousCertFile);
       }
     }
   }
