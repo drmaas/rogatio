@@ -10,6 +10,7 @@ import {
   access,
   chmod,
   lstat,
+  mkdir,
   mkdtemp,
   readFile,
   rm,
@@ -1088,6 +1089,352 @@ describe(" trust controller lifecycle", () => {
     );
     expect(installed.ca).toBe(true);
     expect(installed.subject).toBe("CN=CN=Rogatio Request-Body CA");
+  });
+
+  it("does not follow a symlink at the CA key temp path", async () => {
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const otherKey = (
+      await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      )
+    ).keyPem;
+    await writeCaFiles(root, planted.certPem, otherKey, 0o600);
+    const sink = join(root, "key-sink");
+    await writeFile(sink, "SINK", "utf8");
+    const tmp = join(root, `..rogatio-ca.key.${process.pid}.tmp`);
+    await symlink(sink, tmp);
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(false);
+    expect(installer).not.toHaveBeenCalled();
+    expect(await readFile(sink, "utf8")).toBe("SINK");
+    expect((await lstat(tmp)).isSymbolicLink()).toBe(true);
+    expect(await readFile(join(root, ".rogatio-ca.crt"), "utf8")).toBe(
+      planted.certPem,
+    );
+    expect(await readFile(join(root, ".rogatio-ca.key"), "utf8")).toBe(
+      otherKey,
+    );
+  });
+
+  it("does not follow a symlink at the previous-CA temp path", async () => {
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const otherKey = (
+      await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      )
+    ).keyPem;
+    await writeCaFiles(root, planted.certPem, otherKey, 0o600);
+    const sink = join(root, "sibling-sink");
+    await writeFile(sink, "SINK", "utf8");
+    const tmp = join(root, `..rogatio-ca.previous.crt.${process.pid}.tmp`);
+    await symlink(sink, tmp);
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(false);
+    expect(installer).not.toHaveBeenCalled();
+    expect(await readFile(sink, "utf8")).toBe("SINK");
+    expect((await lstat(tmp)).isSymbolicLink()).toBe(true);
+    expect(await readFile(join(root, ".rogatio-ca.crt"), "utf8")).toBe(
+      planted.certPem,
+    );
+    expect(await readFile(join(root, ".rogatio-ca.key"), "utf8")).toBe(
+      otherKey,
+    );
+  });
+
+  it("keeps the live CA when the previous-CA path is a directory", async () => {
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const otherKey = (
+      await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      )
+    ).keyPem;
+    await writeCaFiles(root, planted.certPem, otherKey, 0o600);
+    const sibling = join(root, ".rogatio-ca.previous.crt");
+    await mkdir(sibling);
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(false);
+    expect((await lstat(sibling)).isDirectory()).toBe(true);
+    expect(await readFile(join(root, ".rogatio-ca.crt"), "utf8")).toBe(
+      planted.certPem,
+    );
+    expect(await readFile(join(root, ".rogatio-ca.key"), "utf8")).toBe(
+      otherKey,
+    );
+  });
+
+  it("deletes a sibling equal to the reused CA without removing it", async () => {
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, material.certPem, material.keyPem, 0o600);
+    const sibling = join(root, ".rogatio-ca.previous.crt");
+    await writeFile(sibling, material.certPem, "utf8");
+    const anchorRemover = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+      caTrustAnchorRemover: anchorRemover,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    expect(anchorRemover).not.toHaveBeenCalled();
+    expect(await fileExists(sibling)).toBe(false);
+    expect(await readFile(join(root, ".rogatio-ca.crt"), "utf8")).toBe(
+      material.certPem,
+    );
+  });
+
+  it("removes a stale sibling on the reuse path and keeps the installed CA", async () => {
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const stale = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, material.certPem, material.keyPem, 0o600);
+    const sibling = join(root, ".rogatio-ca.previous.crt");
+    await writeFile(sibling, stale.certPem, "utf8");
+    const anchorRemover = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+      caTrustAnchorRemover: anchorRemover,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    expect(anchorRemover).toHaveBeenCalledTimes(1);
+    expect(anchorRemover).toHaveBeenCalledWith(
+      sha1Of(stale.certPem),
+      stale.certPem,
+    );
+    expect(await fileExists(sibling)).toBe(false);
+    expect(await readFile(join(root, ".rogatio-ca.crt"), "utf8")).toBe(
+      material.certPem,
+    );
+  });
+
+  it("removes a stale sibling before replacing it with the outgoing CA", async () => {
+    const outgoing = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const stale = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const otherKey = (
+      await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      )
+    ).keyPem;
+    await writeCaFiles(root, outgoing.certPem, otherKey, 0o600);
+    await writeFile(
+      join(root, ".rogatio-ca.previous.crt"),
+      stale.certPem,
+      "utf8",
+    );
+    const removed: string[] = [];
+    let installed = "";
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async (pem: string) => {
+        installed = pem;
+      },
+      caTrustAnchorRemover: async (_fingerprint: string, pem: string) => {
+        removed.push(pem);
+      },
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    expect(removed[0]).toBe(stale.certPem);
+    expect(removed).toContain(outgoing.certPem);
+    expect(removed).not.toContain(installed);
+    expect(await fileExists(join(root, ".rogatio-ca.previous.crt"))).toBe(
+      false,
+    );
+    expect(await readFile(join(root, ".rogatio-ca.crt"), "utf8")).toBe(
+      installed,
+    );
+  });
+
+  it("uninstall removes the saved CA after a cancelled install", async () => {
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const otherKey = (
+      await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      )
+    ).keyPem;
+    await writeCaFiles(root, planted.certPem, otherKey, 0o600);
+    const sibling = join(root, ".rogatio-ca.previous.crt");
+    const cancelled = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {
+        throw new Error("install cancelled");
+      },
+    });
+    const failed = await cancelled.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(failed.ok).toBe(false);
+    expect(await readFile(sibling, "utf8")).toBe(planted.certPem);
+    expect(await fileExists(join(root, ".rogatio-ca.key"))).toBe(false);
+
+    const anchorRemover = vi.fn(async () => {});
+    const trustRemover = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      caTrustRemover: trustRemover,
+      caTrustAnchorRemover: anchorRemover,
+    });
+    const removed = await controller.uninstall();
+    expect(removed.ok).toBe(true);
+    expect(removed.state).toBe("uninstalled");
+    expect(trustRemover).not.toHaveBeenCalled();
+    expect(anchorRemover).toHaveBeenCalledTimes(1);
+    expect(anchorRemover).toHaveBeenCalledWith(
+      sha1Of(planted.certPem),
+      planted.certPem,
+    );
+    expect(await fileExists(sibling)).toBe(false);
+  });
+
+  it("uninstall fails and keeps the saved CA when anchor removal throws", async () => {
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const sibling = join(root, ".rogatio-ca.previous.crt");
+    await writeFile(sibling, planted.certPem, "utf8");
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      caTrustAnchorRemover: async () => {
+        throw new Error("anchor store unavailable");
+      },
+    });
+
+    const removed = await controller.uninstall();
+    expect(removed.ok).toBe(false);
+    expect(await readFile(sibling, "utf8")).toBe(planted.certPem);
+  });
+
+  it("uninstall leaves a symlinked or non-Rogatio sibling in place", async () => {
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const linked = join(root, "linked.crt");
+    await writeFile(linked, planted.certPem, "utf8");
+    const sibling = join(root, ".rogatio-ca.previous.crt");
+    await symlink(linked, sibling);
+    const anchorRemover = vi.fn(async () => {});
+    const symlinked = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      caTrustAnchorRemover: anchorRemover,
+    });
+    const first = await symlinked.uninstall();
+    expect(first.ok).toBe(true);
+    expect(anchorRemover).not.toHaveBeenCalled();
+    expect((await lstat(sibling)).isSymbolicLink()).toBe(true);
+    expect(await readFile(linked, "utf8")).toBe(planted.certPem);
+
+    await rm(sibling);
+    const other = await createCertificate(
+      "CN=Other",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeFile(sibling, other.certPem, "utf8");
+    const foreign = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      caTrustAnchorRemover: anchorRemover,
+    });
+    const second = await foreign.uninstall();
+    expect(second.ok).toBe(true);
+    expect(anchorRemover).not.toHaveBeenCalled();
+    expect(await readFile(sibling, "utf8")).toBe(other.certPem);
   });
 });
 

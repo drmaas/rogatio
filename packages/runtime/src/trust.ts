@@ -1,7 +1,6 @@
 import { createPrivateKey, sign, verify, X509Certificate } from "node:crypto";
 import { constants as fsConstants } from "node:fs";
 import {
-  chmod,
   type FileHandle,
   lstat,
   mkdir,
@@ -10,7 +9,6 @@ import {
   rename,
   rm,
   stat,
-  writeFile,
 } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { isInstallableCaCertificate } from "./trust-platform/ca-pem.js";
@@ -232,19 +230,30 @@ async function writeFileAtomic(
   const dir = dirname(path);
   await mkdir(dir, { recursive: true });
   const tmp = join(dir, `.${basename(path)}.${process.pid}.tmp`);
+  const flags =
+    fsConstants.O_WRONLY |
+    fsConstants.O_CREAT |
+    fsConstants.O_EXCL |
+    (fsConstants.O_NOFOLLOW ?? 0);
+  let created = false;
+  let handle: FileHandle | undefined;
   try {
-    if (mode === undefined) {
-      await writeFile(tmp, data, "utf8");
-    } else {
-      await writeFile(tmp, data, { encoding: "utf8", mode });
-      await chmod(tmp, mode);
-    }
+    // Exclusive create does not follow a symlink already at the temp path.
+    handle = await open(tmp, flags, 0o600);
+    created = true;
+    await handle.writeFile(data, "utf8");
+    await handle.chmod(mode ?? 0o644);
+    await handle.close();
+    handle = undefined;
     await rename(tmp, path);
   } catch (error) {
-    try {
-      await rm(tmp, { force: true });
-    } catch {
-      // best-effort cleanup of the temp file
+    await handle?.close().catch(() => undefined);
+    if (created) {
+      try {
+        await rm(tmp, { force: true });
+      } catch {
+        // best-effort cleanup of the temp file we created
+      }
     }
     throw error;
   }
@@ -379,6 +388,10 @@ export function createRequestBodyTrustController(
   const caTrustRemover = options.caTrustRemover;
   const caTrustAnchorRemover = options.caTrustAnchorRemover;
   let anchorRemovalWarning: string | undefined;
+  /** Fingerprint accepted in `.rogatio-ca.previous.crt` during this attempt. */
+  let rememberedFingerprint: string | undefined;
+  /** True when this attempt is replacing an existing Rogatio CA. */
+  let replacingPrevious = false;
 
   const caCertFile = join(
     installRoot,
@@ -446,11 +459,7 @@ export function createRequestBodyTrustController(
     const trustResult = await trust();
     if (!trustResult.ok) {
       try {
-        // `.rogatio-ca.previous.crt` stays. It is the copy of a CA whose
-        // install was cancelled, and the next success removes that anchor.
-        await rm(caKeyFile, { force: true });
-        await rm(caPubFile, { force: true });
-        await rm(caCertFile, { force: true });
+        await rollbackReplacedCa();
       } catch {
         // best-effort rollback; original error code still wins
       }
@@ -489,6 +498,44 @@ export function createRequestBodyTrustController(
     }
   }
 
+  async function retireAnchor(anchor: {
+    fingerprint: string;
+    pem: string;
+  }): Promise<void> {
+    if (!caTrustAnchorRemover) return;
+    try {
+      await caTrustAnchorRemover(anchor.fingerprint, anchor.pem);
+    } catch {
+      anchorRemovalWarning = "previous-anchor-not-removed";
+      console.error("[rogatio] previous CA trust anchor was not removed");
+    }
+  }
+
+  /**
+   * Drop the new key and certificate only when the previous CA was saved
+   * and the live file is no longer that certificate. A missing copy leaves
+   * the live files in place.
+   */
+  async function rollbackReplacedCa(): Promise<void> {
+    if (!replacingPrevious) {
+      await rm(caKeyFile, { force: true });
+      await rm(caPubFile, { force: true });
+      await rm(caCertFile, { force: true });
+      return;
+    }
+    const saved = await readPreviousRogatioCa(caPreviousCertFile);
+    const live = await readPreviousRogatioCa(caCertFile);
+    const copyKept =
+      rememberedFingerprint !== undefined &&
+      saved?.fingerprint === rememberedFingerprint;
+    const liveDiffers = live?.fingerprint !== rememberedFingerprint;
+    if (copyKept && liveDiffers) {
+      await rm(caKeyFile, { force: true });
+      await rm(caPubFile, { force: true });
+      await rm(caCertFile, { force: true });
+    }
+  }
+
   async function runCaTrust(): Promise<void> {
     const caps = await detect();
     if (!caps.caTrust) {
@@ -501,29 +548,54 @@ export function createRequestBodyTrustController(
     // Reuse a device-local CA only when the key proves possession and the
     // key file is a regular mode-0600 file owned by this user.
     anchorRemovalWarning = undefined;
-    let previous: { fingerprint: string; pem: string } | undefined;
-    if (!(await reusableCaMaterial())) {
-      previous =
-        (await readPreviousRogatioCa(caCertFile)) ??
-        (await readPreviousRogatioCa(caPreviousCertFile));
-      // Keep the validated PEM before replacing the live certificate. A
-      // cancelled installer deletes the live files and would otherwise
-      // drop the only copy of the previous CA.
-      if (previous) {
-        await writeFileAtomic(caPreviousCertFile, previous.pem, 0o600);
-      }
+    rememberedFingerprint = undefined;
+    replacingPrevious = false;
+    const reusable = await reusableCaMaterial();
+    const liveAnchor = await readPreviousRogatioCa(caCertFile);
+    const siblingAnchor = await readPreviousRogatioCa(caPreviousCertFile);
+    let preserved: { fingerprint: string; pem: string } | undefined;
+    if (!reusable) {
+      replacingPrevious =
+        liveAnchor !== undefined || siblingAnchor !== undefined;
       const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
       const certResult = await createCertificate(
         "CN=Rogatio Request-Body CA",
         privateKey,
         TRUST_LIMITS.caValidityDays,
       );
-      const certPem = certResult.certPem;
-      const certKeyPem = certResult.keyPem;
-
-      await writeFileAtomic(caKeyFile, certKeyPem, 0o600);
-      await writeFileAtomic(caPubFile, certPem);
-      await writeFileAtomic(caCertFile, certPem);
+      const nextFingerprint = sha1Fingerprint(certResult.certPem);
+      if (
+        liveAnchor &&
+        siblingAnchor &&
+        siblingAnchor.fingerprint !== liveAnchor.fingerprint &&
+        siblingAnchor.fingerprint !== nextFingerprint
+      ) {
+        // The sibling is a different CA. Remove its anchor before the
+        // outgoing certificate overwrites those bytes.
+        await retireAnchor(siblingAnchor);
+      }
+      if (liveAnchor) {
+        await writeFileAtomic(caPreviousCertFile, liveAnchor.pem, 0o600);
+        const accepted = await readPreviousRogatioCa(caPreviousCertFile);
+        if (!accepted || accepted.fingerprint !== liveAnchor.fingerprint) {
+          throw new TrustError("trust.internal", "invalid-ca-certificate", [
+            "invalid-ca-certificate",
+          ]);
+        }
+        rememberedFingerprint = accepted.fingerprint;
+        preserved = accepted;
+      } else if (
+        siblingAnchor &&
+        siblingAnchor.fingerprint !== nextFingerprint
+      ) {
+        rememberedFingerprint = siblingAnchor.fingerprint;
+        preserved = siblingAnchor;
+      } else if (siblingAnchor) {
+        await discardPreviousCa(caPreviousCertFile);
+      }
+      await writeFileAtomic(caKeyFile, certResult.keyPem, 0o600);
+      await writeFileAtomic(caPubFile, certResult.certPem);
+      await writeFileAtomic(caCertFile, certResult.certPem);
     }
     let installedNew = false;
     if (caTrustInstaller && !installerCalled) {
@@ -531,29 +603,28 @@ export function createRequestBodyTrustController(
       installerCalled = true;
       installedNew = true;
     }
-    if (installedNew && previous) {
-      const currentFingerprint = sha1Fingerprint(
-        await readFile(caCertFile, "utf8"),
-      );
-      const distinct =
-        currentFingerprint !== undefined &&
-        currentFingerprint !== previous.fingerprint;
-      if (distinct && caTrustAnchorRemover) {
-        try {
-          await caTrustAnchorRemover(previous.fingerprint, previous.pem);
-        } catch {
-          anchorRemovalWarning = "previous-anchor-not-removed";
-          console.error("[rogatio] previous CA trust anchor was not removed");
-        }
+    if (reusable && siblingAnchor && (installedNew || !caTrustInstaller)) {
+      if (liveAnchor && siblingAnchor.fingerprint === liveAnchor.fingerprint) {
         await discardPreviousCa(caPreviousCertFile);
-      } else if (currentFingerprint === previous.fingerprint) {
-        // The saved copy is the certificate just installed.
+      } else {
+        await retireAnchor(siblingAnchor);
+        await discardPreviousCa(caPreviousCertFile);
+      }
+    }
+    if (!reusable && installedNew && preserved) {
+      const current = await readPreviousRogatioCa(caCertFile);
+      if (current && current.fingerprint === preserved.fingerprint) {
+        await discardPreviousCa(caPreviousCertFile);
+      } else if (current && current.fingerprint !== preserved.fingerprint) {
+        await retireAnchor(preserved);
         await discardPreviousCa(caPreviousCertFile);
       }
     }
   }
 
   async function removeCa(): Promise<void> {
+    const saved = await readPreviousRogatioCa(caPreviousCertFile);
+    const live = await readPreviousRogatioCa(caCertFile);
     const caWasPresent = await existsFile(caKeyFile);
     await rm(caKeyFile, { force: true });
     await rm(caPubFile, { force: true });
@@ -561,6 +632,16 @@ export function createRequestBodyTrustController(
     if (caWasPresent && caTrustRemover) {
       await caTrustRemover();
     }
+    if (!saved) return;
+    if (!caWasPresent || saved.fingerprint !== live?.fingerprint) {
+      if (!caTrustAnchorRemover) {
+        throw new TrustError("trust.internal", "previous-anchor-not-removed", [
+          "previous-anchor-not-removed",
+        ]);
+      }
+      await caTrustAnchorRemover(saved.fingerprint, saved.pem);
+    }
+    await rm(caPreviousCertFile, { force: true });
   }
 
   async function uninstall(): Promise<TrustResult> {
