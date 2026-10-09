@@ -1,4 +1,4 @@
-import { createPrivateKey, X509Certificate } from "node:crypto";
+import { createPrivateKey, sign, verify, X509Certificate } from "node:crypto";
 import {
   chmod,
   lstat,
@@ -188,6 +188,10 @@ export interface RequestBodyTrustControllerOptions {
     | Promise<TrustCapabilities>;
   readonly caTrustInstaller?: (certPem: string) => Promise<void> | void;
   readonly caTrustRemover?: () => Promise<void> | void;
+  /** Removes one previously trusted CA by SHA-1 fingerprint. Argv-only. */
+  readonly caTrustAnchorRemover?: (
+    fingerprintSha1: string,
+  ) => Promise<void> | void;
 }
 
 /** Platform default install root for the trust material (capability-configurable). */
@@ -239,10 +243,11 @@ async function writeFileAtomic(
   }
 }
 
+const CA_POSSESSION_PAYLOAD = Buffer.from("rogatio-ca-possession");
+
 /**
  * A stored pair is reusable only when the certificate is a CA and the key
- * file is the matching private key. A public key, the certificate itself, or
- * any other PEM returns false.
+ * file can sign as that certificate's private key.
  */
 function caCertificateMatchesPrivateKey(
   certPem: string,
@@ -252,9 +257,28 @@ function caCertificateMatchesPrivateKey(
     if (!isInstallableCaCertificate(certPem)) return false;
     const certificate = new X509Certificate(certPem);
     if (!certificate.ca) return false;
-    return certificate.checkPrivateKey(createPrivateKey(keyPem));
+    const privateKey = createPrivateKey(keyPem);
+    if (privateKey.type !== "private") return false;
+    const signature = sign("sha256", CA_POSSESSION_PAYLOAD, privateKey);
+    return verify(
+      "sha256",
+      CA_POSSESSION_PAYLOAD,
+      certificate.publicKey,
+      signature,
+    );
   } catch {
     return false;
+  }
+}
+
+function sha1Fingerprint(certPem: string): string | undefined {
+  try {
+    const hex = new X509Certificate(certPem).fingerprint
+      .replaceAll(":", "")
+      .toLowerCase();
+    return /^[0-9a-f]{40}$/.test(hex) ? hex : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -299,6 +323,8 @@ export function createRequestBodyTrustController(
   const detect = options.detectCapabilities ?? detectTrustCapabilities;
   const caTrustInstaller = options.caTrustInstaller;
   const caTrustRemover = options.caTrustRemover;
+  const caTrustAnchorRemover = options.caTrustAnchorRemover;
+  let anchorRemovalWarning: string | undefined;
 
   const caCertFile = join(
     installRoot,
@@ -376,7 +402,9 @@ export function createRequestBodyTrustController(
       installerCalled = false;
       return trustResult;
     }
-    return { ok: true, state: "installed" };
+    return trustResult.reasons
+      ? { ok: true, state: "installed", reasons: trustResult.reasons }
+      : { ok: true, state: "installed" };
   }
 
   async function reusableCaMaterial(): Promise<boolean> {
@@ -410,9 +438,18 @@ export function createRequestBodyTrustController(
         caps.reasons,
       );
     }
-    // Reuse a device-local CA only when the certificate matches the key and
-    // the key file is a regular mode-0600 file owned by this user.
+    // Reuse a device-local CA only when the key proves possession and the
+    // key file is a regular mode-0600 file owned by this user.
+    anchorRemovalWarning = undefined;
+    let previousFingerprint: string | undefined;
     if (!(await reusableCaMaterial())) {
+      try {
+        previousFingerprint = sha1Fingerprint(
+          await readFile(caCertFile, "utf8"),
+        );
+      } catch {
+        previousFingerprint = undefined;
+      }
       const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
       const certResult = await createCertificate(
         "CN=Rogatio Request-Body CA",
@@ -426,9 +463,24 @@ export function createRequestBodyTrustController(
       await writeFileAtomic(caPubFile, certPem);
       await writeFileAtomic(caCertFile, certPem);
     }
+    let installedNew = false;
     if (caTrustInstaller && !installerCalled) {
       await caTrustInstaller(await readFile(caCertFile, "utf8"));
       installerCalled = true;
+      installedNew = true;
+    }
+    if (installedNew && previousFingerprint && caTrustAnchorRemover) {
+      const currentFingerprint = sha1Fingerprint(
+        await readFile(caCertFile, "utf8"),
+      );
+      if (currentFingerprint && currentFingerprint !== previousFingerprint) {
+        try {
+          await caTrustAnchorRemover(previousFingerprint);
+        } catch {
+          anchorRemovalWarning = "previous-anchor-not-removed";
+          console.error("[rogatio] previous CA trust anchor was not removed");
+        }
+      }
     }
   }
 
@@ -467,7 +519,9 @@ export function createRequestBodyTrustController(
         reasons: [codeOf(error, "trust.internal")],
       };
     }
-    return { ok: true, state: "trusted" };
+    return anchorRemovalWarning
+      ? { ok: true, state: "trusted", reasons: [anchorRemovalWarning] }
+      : { ok: true, state: "trusted" };
   }
 
   async function status(): Promise<TrustStatus> {

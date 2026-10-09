@@ -1,6 +1,8 @@
 import {
   createPrivateKey,
   createPublicKey,
+  sign,
+  verify,
   X509Certificate,
 } from "node:crypto";
 import {
@@ -693,6 +695,186 @@ describe(" trust controller lifecycle", () => {
       new X509Certificate(certPem).checkPrivateKey(createPrivateKey(keyPem)),
     ).toBe(true);
   });
+
+  it("regenerates a CA when the private key matches public fields but cannot sign", async () => {
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const plantedKey = pkcs8WithInconsistentPrivateMaterial(material.keyPem);
+    const planted = createPrivateKey(plantedKey);
+    const plantedCert = new X509Certificate(material.certPem);
+    expect(plantedCert.checkPrivateKey(planted)).toBe(true);
+    const payload = Buffer.from("rogatio-ca-possession");
+    let possessed = true;
+    try {
+      const signature = sign("sha256", payload, planted);
+      possessed = verify("sha256", payload, plantedCert.publicKey, signature);
+    } catch {
+      possessed = false;
+    }
+    expect(possessed).toBe(false);
+    await writeCaFiles(root, material.certPem, plantedKey, 0o600);
+    expect((await lstat(join(root, ".rogatio-ca.key"))).mode & 0o777).toBe(
+      0o600,
+    );
+    const installer = vi.fn(async (pem: string) => {
+      expect(pem).not.toBe(material.certPem);
+    });
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    const certPem = await readFile(join(root, ".rogatio-ca.crt"), "utf8");
+    const keyPem = await readFile(join(root, ".rogatio-ca.key"), "utf8");
+    expect(certPem).not.toBe(material.certPem);
+    expect(keyPem).not.toBe(plantedKey);
+    expect(installer).toHaveBeenCalledTimes(1);
+    expect(installer).toHaveBeenCalledWith(certPem);
+  });
+
+  it("removes the previous trust anchor after a regenerated CA is installed", async () => {
+    const unused = generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey;
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const other = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, planted.certPem, other.keyPem, 0o600);
+    const previous = sha1Of(planted.certPem);
+    const events: string[] = [];
+    const installer = vi.fn(async (pem: string) => {
+      events.push(pem === planted.certPem ? "install-old" : "install-new");
+    });
+    const anchorRemover = vi.fn(async (fingerprint: string) => {
+      events.push(`remove:${fingerprint}`);
+    });
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+      caTrustAnchorRemover: anchorRemover,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    expect(events).toEqual(["install-new", `remove:${previous}`]);
+    expect(await readFile(join(root, ".rogatio-ca.crt"), "utf8")).not.toBe(
+      planted.certPem,
+    );
+    expect(await readFile(join(root, ".rogatio-ca.key"), "utf8")).not.toBe(
+      other.keyPem,
+    );
+  });
+
+  it("reports a previous-anchor removal failure without failing install", async () => {
+    const unused = generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey;
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const other = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, planted.certPem, other.keyPem, 0o600);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const controller = createRequestBodyTrustController({
+        installRoot: root,
+        manifestDir: root,
+        hostPath: join(root, "runtime-host"),
+        detectCapabilities: capable,
+        caTrustInstaller: async () => {},
+        caTrustAnchorRemover: async () => {
+          throw new Error("anchor store unavailable");
+        },
+      });
+
+      const result = await controller.install(
+        "abcdefghijklmnopabcdefghijklmnop",
+      );
+      expect(result.ok).toBe(true);
+      expect(result.state).toBe("installed");
+      expect(result.reasons).toEqual(["previous-anchor-not-removed"]);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[rogatio] previous CA trust anchor was not removed",
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("does not remove an anchor when the stored CA is reused", async () => {
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, material.certPem, material.keyPem, 0o600);
+    const anchorRemover = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+      caTrustAnchorRemover: anchorRemover,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    expect(anchorRemover).not.toHaveBeenCalled();
+    expect(await readFile(join(root, ".rogatio-ca.crt"), "utf8")).toBe(
+      material.certPem,
+    );
+  });
+
+  it("does not remove the previous anchor when the new install fails", async () => {
+    const unused = generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey;
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const other = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, planted.certPem, other.keyPem, 0o600);
+    const anchorRemover = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {
+        throw new Error("install failed");
+      },
+      caTrustAnchorRemover: anchorRemover,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(false);
+    expect(anchorRemover).not.toHaveBeenCalled();
+  });
 });
 
 describe("verify allowed_origins", () => {
@@ -763,6 +945,82 @@ async function fileExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function sha1Of(certPem: string): string {
+  return new X509Certificate(certPem).fingerprint
+    .replaceAll(":", "")
+    .toLowerCase();
+}
+
+function readDerLength(
+  buf: Buffer,
+  offset: number,
+): { length: number; next: number } {
+  const first = buf[offset] ?? 0;
+  if (first < 0x80) return { length: first, next: offset + 1 };
+  const count = first & 0x7f;
+  let length = 0;
+  for (let index = 0; index < count; index += 1) {
+    length = (length << 8) | (buf[offset + 1 + index] ?? 0);
+  }
+  return { length, next: offset + 1 + count };
+}
+
+function readTlv(
+  buf: Buffer,
+  offset: number,
+): { tag: number; valueStart: number; valueEnd: number; end: number } {
+  const tag = buf[offset] ?? 0;
+  const { length, next } = readDerLength(buf, offset + 1);
+  return { tag, valueStart: next, valueEnd: next + length, end: next + length };
+}
+
+function sequenceFields(
+  buf: Buffer,
+  valueStart: number,
+  valueEnd: number,
+): { tag: number; valueStart: number; valueEnd: number; end: number }[] {
+  const fields = [];
+  let offset = valueStart;
+  while (offset < valueEnd) {
+    const field = readTlv(buf, offset);
+    fields.push(field);
+    offset = field.end;
+  }
+  return fields;
+}
+
+/** PKCS#8 whose public modulus matches, but the private coefficient does not. */
+function pkcs8WithInconsistentPrivateMaterial(privateKeyPem: string): string {
+  const der = Buffer.from(
+    createPrivateKey(privateKeyPem).export({ format: "der", type: "pkcs8" }),
+  );
+  const outer = readTlv(der, 0);
+  const pkcs8Fields = sequenceFields(der, outer.valueStart, outer.valueEnd);
+  const octet = pkcs8Fields[2];
+  if (octet?.tag !== 0x04) {
+    throw new Error("expected a PKCS#8 private key");
+  }
+  const rsa = readTlv(der, octet.valueStart);
+  const rsaFields = sequenceFields(der, rsa.valueStart, rsa.valueEnd);
+  const coefficient = rsaFields[8];
+  if (coefficient?.tag !== 0x02) {
+    throw new Error("expected an RSA private coefficient");
+  }
+  const copy = Buffer.from(der);
+  for (
+    let index = coefficient.valueStart;
+    index < coefficient.valueEnd;
+    index += 1
+  ) {
+    copy[index] = 0x11;
+  }
+  const encoded = copy
+    .toString("base64")
+    .replaceAll(/(.{64})/g, "$1\n")
+    .replace(/\n$/, "");
+  return `-----BEGIN PRIVATE KEY-----\n${encoded}\n-----END PRIVATE KEY-----\n`;
 }
 
 function spkiPem(privateKeyPem: string): string {

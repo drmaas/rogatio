@@ -146,4 +146,34 @@ describe("win32 CA installer/remover", () => {
 
     expect(mockSpawn).toHaveBeenCalledTimes(2);
   });
+
+  it("caTrustAnchorRemover deletes the Root store entry by SHA-1", async () => {
+    mockSpawn.mockReturnValue({
+      stderr: { on: vi.fn() },
+      on: (_event: string, cb: (code: number) => void) => {
+        if (_event === "close") cb(0);
+      },
+    });
+    const fingerprint = "cd".repeat(20);
+    const adapter = selectTrustPlatformAdapter("win32");
+    await adapter.caTrustAnchorRemover(fingerprint);
+
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    expect(mockSpawn.mock.calls[0]?.[0]).toBe("certutil");
+    expect(mockSpawn.mock.calls[0]?.[1]).toEqual([
+      "-delstore",
+      "Root",
+      fingerprint,
+    ]);
+    expect(mockSpawn.mock.calls[0]?.[1]).not.toContain("sh");
+    expect(mockSpawn.mock.calls[0]?.[1]).not.toContain("-c");
+  });
+
+  it("caTrustAnchorRemover rejects a fingerprint that is not SHA-1 hex", async () => {
+    const adapter = selectTrustPlatformAdapter("win32");
+    await expect(adapter.caTrustAnchorRemover("../cert")).rejects.toThrow(
+      TrustError,
+    );
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
 });

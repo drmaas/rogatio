@@ -23,5 +23,7 @@ export function createInstalledTrustController() {
     detectCapabilities: () => adapter.detect(),
     caTrustInstaller: (cert) => adapter.caTrustInstaller(cert),
     caTrustRemover: () => adapter.caTrustRemover(),
+    caTrustAnchorRemover: (fingerprint) =>
+      adapter.caTrustAnchorRemover(fingerprint),
   });
 }

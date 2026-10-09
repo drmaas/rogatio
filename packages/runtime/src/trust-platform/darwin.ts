@@ -132,6 +132,38 @@ const darwinAdapter: TrustPlatformAdapter = {
       }
     }
   },
+  async caTrustAnchorRemover(fingerprintSha1: string): Promise<void> {
+    if (!/^[0-9a-f]{40}$/.test(fingerprintSha1)) {
+      throw new TrustError("trust.internal", "invalid-ca-certificate", [
+        "invalid-ca-certificate",
+      ]);
+    }
+    const keychain = this.defaultCaInstallPath();
+    const result = await new Promise<{ code: number; stderr: string }>(
+      (resolve) => {
+        const child = spawn("security", [
+          "delete-certificate",
+          "-Z",
+          fingerprintSha1,
+          keychain,
+        ]);
+        let stderr = "";
+        child.stderr?.on("data", (data) => {
+          stderr += data.toString();
+        });
+        child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
+        child.on("error", (err) => resolve({ code: 1, stderr: err.message }));
+      },
+    );
+    if (result.code !== 0) {
+      const stderr = result.stderr.toLowerCase();
+      if (!stderr.includes("not found") && !stderr.includes("does not exist")) {
+        throw new TrustError("trust.internal", "keychain-unwritable", [
+          "keychain-unwritable",
+        ]);
+      }
+    }
+  },
 };
 
 export default darwinAdapter;

@@ -203,4 +203,12 @@ describe("linux CA installer/remover", () => {
     expect(mockSpawn).toHaveBeenCalledTimes(4);
     expectNoShell();
   });
+
+  it("caTrustAnchorRemover does not spawn; the bundle rebuild replaces the file", async () => {
+    const adapter = selectTrustPlatformAdapter("linux");
+    await expect(
+      adapter.caTrustAnchorRemover("ab".repeat(20)),
+    ).resolves.toBeUndefined();
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
 });

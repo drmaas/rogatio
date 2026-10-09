@@ -152,4 +152,35 @@ describe("darwin CA installer/remover", () => {
     // Both calls should complete without throwing
     expect(mockSpawn).toHaveBeenCalledTimes(2);
   });
+
+  it("caTrustAnchorRemover deletes by SHA-1 with argv only", async () => {
+    mockSpawn.mockReturnValue({
+      stderr: { on: vi.fn() },
+      on: (_event: string, cb: (code: number) => void) => {
+        if (_event === "close") cb(0);
+      },
+    });
+    const fingerprint = "ab".repeat(20);
+    const adapter = selectTrustPlatformAdapter("darwin");
+    await adapter.caTrustAnchorRemover(fingerprint);
+
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    expect(mockSpawn.mock.calls[0]?.[0]).toBe("security");
+    expect(mockSpawn.mock.calls[0]?.[1]).toEqual([
+      "delete-certificate",
+      "-Z",
+      fingerprint,
+      "/Users/test/Library/Keychains/login.keychain-db",
+    ]);
+    expect(mockSpawn.mock.calls[0]?.[1]).not.toContain("sh");
+    expect(mockSpawn.mock.calls[0]?.[1]).not.toContain("-c");
+  });
+
+  it("caTrustAnchorRemover rejects a fingerprint that is not SHA-1 hex", async () => {
+    const adapter = selectTrustPlatformAdapter("darwin");
+    await expect(adapter.caTrustAnchorRemover("EOF")).rejects.toThrow(
+      TrustError,
+    );
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
 });
