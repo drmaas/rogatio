@@ -1456,6 +1456,137 @@ describe(" trust controller lifecycle", () => {
     expect(await fileExists(join(root, ".rogatio-ca.key"))).toBe(false);
   });
 
+  it.skipIf(process.platform === "win32")(
+    "does not replace an unreadable certificate",
+    async () => {
+      const planted = await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+        TRUST_LIMITS.caValidityDays,
+      );
+      const certPath = join(root, ".rogatio-ca.crt");
+      await writeFile(certPath, planted.certPem, "utf8");
+      await chmod(certPath, 0o000);
+      const installer = vi.fn(async () => {});
+      try {
+        const controller = createRequestBodyTrustController({
+          installRoot: root,
+          manifestDir: root,
+          hostPath: join(root, "runtime-host"),
+          detectCapabilities: capable,
+          caTrustInstaller: installer,
+        });
+
+        const result = await controller.install(
+          "abcdefghijklmnopabcdefghijklmnop",
+        );
+        expect(result.ok).toBe(false);
+        expect(result.reasons).toContain("trust.write-failed");
+        expect(installer).not.toHaveBeenCalled();
+        expect(await fileExists(join(root, ".rogatio-ca.key"))).toBe(false);
+        expect(await fileExists(join(root, ".rogatio-ca.pub"))).toBe(false);
+      } finally {
+        await chmod(certPath, 0o600);
+      }
+      expect(await readFile(certPath, "utf8")).toBe(planted.certPem);
+    },
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "does not retire a previous CA when the key cannot be read",
+    async () => {
+      const unused = generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey;
+      const live = await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        unused,
+        TRUST_LIMITS.caValidityDays,
+      );
+      const previous = await createCertificate(
+        "CN=Rogatio Request-Body CA",
+        unused,
+        TRUST_LIMITS.caValidityDays,
+      );
+      const certPath = join(root, ".rogatio-ca.crt");
+      const keyPath = join(root, ".rogatio-ca.key");
+      const sibling = join(root, ".rogatio-ca.previous.crt");
+      await writeFile(certPath, live.certPem, "utf8");
+      await writeFile(join(root, ".rogatio-ca.pub"), live.certPem, "utf8");
+      await writeFile(keyPath, live.keyPem, "utf8");
+      await writeFile(sibling, previous.certPem, "utf8");
+      await chmod(keyPath, 0o000);
+      const installer = vi.fn(async () => {});
+      const anchorRemover = vi.fn(async () => {});
+      try {
+        const controller = createRequestBodyTrustController({
+          installRoot: root,
+          manifestDir: root,
+          hostPath: join(root, "runtime-host"),
+          detectCapabilities: capable,
+          caTrustInstaller: installer,
+          caTrustAnchorRemover: anchorRemover,
+        });
+
+        const result = await controller.install(
+          "abcdefghijklmnopabcdefghijklmnop",
+        );
+        expect(result.ok).toBe(false);
+        expect(result.reasons).toContain("trust.write-failed");
+        expect(installer).not.toHaveBeenCalled();
+        expect(anchorRemover).not.toHaveBeenCalled();
+        expect(await readFile(sibling, "utf8")).toBe(previous.certPem);
+        expect(await readFile(certPath, "utf8")).toBe(live.certPem);
+      } finally {
+        await chmod(keyPath, 0o600);
+      }
+      expect(await readFile(keyPath, "utf8")).toBe(live.keyPem);
+    },
+  );
+
+  it("restores the key when a sibling replacement never writes the new certificate", async () => {
+    const previous = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const leaf = await signCertificate(
+      "leaf.example",
+      previous.certPem,
+      previous.keyPem,
+      TRUST_LIMITS.caValidityDays,
+    );
+    expect(new X509Certificate(leaf).ca).toBe(false);
+    const certPath = join(root, ".rogatio-ca.crt");
+    const keyPath = join(root, ".rogatio-ca.key");
+    const pubPath = join(root, ".rogatio-ca.pub");
+    const sibling = join(root, ".rogatio-ca.previous.crt");
+    await writeFile(sibling, previous.certPem, "utf8");
+    await writeFile(certPath, leaf, "utf8");
+    await writeFile(keyPath, "ORIGINAL-KEY", "utf8");
+    await writeFile(pubPath, "ORIGINAL-PUB", "utf8");
+    const sink = join(root, "cert-sink");
+    await writeFile(sink, "SINK", "utf8");
+    const certTmp = join(root, `..rogatio-ca.crt.${process.pid}.tmp`);
+    await symlink(sink, certTmp);
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(false);
+    expect(installer).not.toHaveBeenCalled();
+    expect(await readFile(sink, "utf8")).toBe("SINK");
+    expect(await readFile(keyPath, "utf8")).toBe("ORIGINAL-KEY");
+    expect(await readFile(pubPath, "utf8")).toBe("ORIGINAL-PUB");
+    expect(await readFile(certPath, "utf8")).toBe(leaf);
+    expect(await readFile(sibling, "utf8")).toBe(previous.certPem);
+    expectPosixFileMode((await lstat(keyPath)).mode, 0o600);
+  });
+
   it("keeps the live CA when the previous-CA path is a directory", async () => {
     const planted = await createCertificate(
       "CN=Rogatio Request-Body CA",

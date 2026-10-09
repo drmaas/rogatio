@@ -593,10 +593,10 @@ export function createRequestBodyTrustController(
    * Leave either the previous key, public certificate, and certificate, or
    * only the files this attempt finished writing. A reusable CA is left as it
    * was. A fresh install removes a file only after that write resolves. A
-   * replacement removes the files it wrote when the saved copy matches and
-   * the live certificate changed. When the live certificate is still the
-   * previous one, a saved key or public certificate is written back, and a
-   * file written without a saved copy is removed.
+   * replacement removes the files it wrote only when the new certificate
+   * write finished and the live certificate changed. When that write did not
+   * finish, a saved key or public certificate is written back, and a file
+   * written without a saved copy is removed.
    */
   async function rollbackReplacedCa(): Promise<void> {
     if (reusedExisting) return;
@@ -610,11 +610,11 @@ export function createRequestBodyTrustController(
       rememberedFingerprint !== undefined &&
       saved?.fingerprint === rememberedFingerprint;
     const liveDiffers = live?.fingerprint !== rememberedFingerprint;
-    if (copyKept && liveDiffers) {
+    if (copyKept && replacedCert && liveDiffers) {
       await removeReplacedCaFiles();
       return;
     }
-    if (copyKept && !liveDiffers) {
+    if (copyKept && !replacedCert) {
       await restoreOrDrop(caKeyFile, previousKeyPem, replacedKey, 0o600);
       await restoreOrDrop(caPubFile, previousPubPem, replacedPub);
     }
@@ -646,6 +646,15 @@ export function createRequestBodyTrustController(
     const siblingAnchor = await readPreviousRogatioCa(caPreviousCertFile);
     let preserved: { fingerprint: string; pem: string } | undefined;
     if (!reusable) {
+      // Refuse to overwrite an unreadable regular file before any trust-store
+      // edit or sibling write. A readable non-CA certificate still has bytes
+      // here, so it is replaced below.
+      const rawCert = await readNoFollowRegularFile(caCertFile);
+      previousKeyPem = await readNoFollowRegularFile(caKeyFile);
+      previousPubPem = await readNoFollowRegularFile(caPubFile);
+      await assertReadableIfRegular(caCertFile, rawCert);
+      await assertReadableIfRegular(caKeyFile, previousKeyPem);
+      await assertReadableIfRegular(caPubFile, previousPubPem);
       replacingPrevious =
         liveAnchor !== undefined || siblingAnchor !== undefined;
       const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
@@ -684,10 +693,6 @@ export function createRequestBodyTrustController(
       } else if (siblingAnchor) {
         await discardPreviousCa(caPreviousCertFile);
       }
-      previousKeyPem = await readNoFollowRegularFile(caKeyFile);
-      previousPubPem = await readNoFollowRegularFile(caPubFile);
-      await assertReadableIfRegular(caKeyFile, previousKeyPem);
-      await assertReadableIfRegular(caPubFile, previousPubPem);
       await writeFileAtomic(caKeyFile, certResult.keyPem, 0o600);
       replacedKey = true;
       await writeFileAtomic(caPubFile, certResult.certPem);

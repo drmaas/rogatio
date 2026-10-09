@@ -44,16 +44,19 @@ and Windows removes it with argv-only `certutil -delstore`. Linux replaces the
 certificate file and rebuilds the bundle. The previous certificate is saved as
 `.rogatio-ca.previous.crt` before the live file is replaced, and that copy is kept
 when an install is cancelled so the next successful install can remove the old
-anchor. The new CA files are removed on failure only when that copy still validates
-and the live certificate differs, and only the files whose writes finished. A fresh
-install removes only the CA files whose writes completed. A stored CA is reused when
-the certificate and key are regular files and the key can sign as that certificate.
-POSIX also requires the key mode to be 0600 and the file to be owned by the current
-user. Windows skips those checks, because it has no POSIX mode bits or uid. A reusable
-CA is left unchanged when installation fails. If replacement stops before the new
-certificate is written, a saved key or public certificate is written back, and a file
-this attempt replaced without a saved copy is removed. A regular file that could not
-be read is not overwritten. A saved certificate that differs from the one left
+anchor. The new CA files are removed on failure only when that copy still validates,
+the new certificate write finished, and the live certificate differs. A fresh install
+removes only the CA files whose writes completed. A stored CA is reused when the
+certificate and key are regular files and the key can sign as that certificate. POSIX
+also requires the key mode to be 0600 and the file to be owned by the current user.
+Windows skips those checks, because it has no POSIX mode bits or uid. A reusable CA is
+left unchanged when installation fails. If the new certificate is not written,
+including when the live file is not that CA, a saved key or public certificate is
+written back, and a file this attempt replaced without a saved copy is removed.
+Before any previous anchor is removed or that saved copy is written, a regular
+certificate, key, or public file that could not be read is left in place. A readable
+certificate that is not the Rogatio CA is still replaced. A saved certificate that
+differs from the one left
 installed is removed first, including when the existing CA is reused. Uninstall
 removes that saved anchor when the private key is already gone. A failure to remove
 the previous anchor during install is reported and does not fail the install.
