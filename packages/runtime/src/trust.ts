@@ -294,23 +294,40 @@ function caCertificateMatchesPrivateKey(
 }
 
 /**
+ * Read a regular file without following a symlink. Returns undefined when
+ * the path is missing, not a regular file, or cannot be opened.
+ */
+async function readNoFollowRegularFile(
+  path: string,
+): Promise<string | undefined> {
+  let handle: FileHandle | undefined;
+  try {
+    const info = await lstat(path);
+    if (!info.isFile()) return undefined;
+    handle = await open(
+      path,
+      fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),
+    );
+    const opened = await handle.stat();
+    if (!opened.isFile()) return undefined;
+    return await handle.readFile({ encoding: "utf8" });
+  } catch {
+    return undefined;
+  } finally {
+    await handle?.close().catch(() => undefined);
+  }
+}
+
+/**
  * The previous anchor is removable only when the cert path is a regular file
  * and the bytes are the Rogatio Request-Body CA. Symlinks are not followed.
  */
 async function readPreviousRogatioCa(
   caCertFile: string,
 ): Promise<{ fingerprint: string; pem: string } | undefined> {
-  let handle: FileHandle | undefined;
+  const pem = await readNoFollowRegularFile(caCertFile);
+  if (pem === undefined) return undefined;
   try {
-    const info = await lstat(caCertFile);
-    if (!info.isFile()) return undefined;
-    handle = await open(
-      caCertFile,
-      fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),
-    );
-    const opened = await handle.stat();
-    if (!opened.isFile()) return undefined;
-    const pem = await handle.readFile({ encoding: "utf8" });
     const certificate = new X509Certificate(pem);
     if (!certificate.ca) return undefined;
     if (certificate.subject !== ROGATIO_REQUEST_BODY_CA_SUBJECT) {
@@ -321,8 +338,6 @@ async function readPreviousRogatioCa(
     return { fingerprint, pem };
   } catch {
     return undefined;
-  } finally {
-    await handle?.close().catch(() => undefined);
   }
 }
 
@@ -392,6 +407,11 @@ export function createRequestBodyTrustController(
   let rememberedFingerprint: string | undefined;
   /** True when this attempt is replacing an existing Rogatio CA. */
   let replacingPrevious = false;
+  /** True when the on-disk pair was already reusable, so failure must not delete it. */
+  let reusedExisting = false;
+  /** Key and public certificate bytes from before a replacement write. */
+  let previousKeyPem: string | undefined;
+  let previousPubPem: string | undefined;
 
   const caCertFile = join(
     installRoot,
@@ -511,16 +531,24 @@ export function createRequestBodyTrustController(
     }
   }
 
+  async function removeLiveCaFiles(): Promise<void> {
+    await rm(caKeyFile, { force: true });
+    await rm(caPubFile, { force: true });
+    await rm(caCertFile, { force: true });
+  }
+
   /**
-   * Drop the new key and certificate only when the previous CA was saved
-   * and the live file is no longer that certificate. A missing copy leaves
-   * the live files in place.
+   * Leave either the previous key, public certificate, and certificate, or
+   * none of the files this attempt created. A reusable CA is left as it was.
+   * A fresh install removes the files it created. A replacement removes them
+   * only when the saved copy matches and the live certificate changed; when
+   * the live certificate is still the previous one, the key and public
+   * certificate are restored.
    */
   async function rollbackReplacedCa(): Promise<void> {
+    if (reusedExisting) return;
     if (!replacingPrevious) {
-      await rm(caKeyFile, { force: true });
-      await rm(caPubFile, { force: true });
-      await rm(caCertFile, { force: true });
+      await removeLiveCaFiles();
       return;
     }
     const saved = await readPreviousRogatioCa(caPreviousCertFile);
@@ -530,9 +558,16 @@ export function createRequestBodyTrustController(
       saved?.fingerprint === rememberedFingerprint;
     const liveDiffers = live?.fingerprint !== rememberedFingerprint;
     if (copyKept && liveDiffers) {
-      await rm(caKeyFile, { force: true });
-      await rm(caPubFile, { force: true });
-      await rm(caCertFile, { force: true });
+      await removeLiveCaFiles();
+      return;
+    }
+    if (copyKept && !liveDiffers) {
+      if (previousKeyPem !== undefined) {
+        await writeFileAtomic(caKeyFile, previousKeyPem, 0o600);
+      }
+      if (previousPubPem !== undefined) {
+        await writeFileAtomic(caPubFile, previousPubPem);
+      }
     }
   }
 
@@ -550,7 +585,11 @@ export function createRequestBodyTrustController(
     anchorRemovalWarning = undefined;
     rememberedFingerprint = undefined;
     replacingPrevious = false;
+    reusedExisting = false;
+    previousKeyPem = undefined;
+    previousPubPem = undefined;
     const reusable = await reusableCaMaterial();
+    reusedExisting = reusable;
     const liveAnchor = await readPreviousRogatioCa(caCertFile);
     const siblingAnchor = await readPreviousRogatioCa(caPreviousCertFile);
     let preserved: { fingerprint: string; pem: string } | undefined;
@@ -593,6 +632,8 @@ export function createRequestBodyTrustController(
       } else if (siblingAnchor) {
         await discardPreviousCa(caPreviousCertFile);
       }
+      previousKeyPem = await readNoFollowRegularFile(caKeyFile);
+      previousPubPem = await readNoFollowRegularFile(caPubFile);
       await writeFileAtomic(caKeyFile, certResult.keyPem, 0o600);
       await writeFileAtomic(caPubFile, certResult.certPem);
       await writeFileAtomic(caCertFile, certResult.certPem);
