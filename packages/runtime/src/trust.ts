@@ -348,6 +348,26 @@ async function readPreviousRogatioCa(
   }
 }
 
+/**
+ * A regular file that could not be read must not be overwritten. A missing
+ * path or a non-regular file, such as a symlink, has no bytes to keep.
+ */
+async function assertReadableIfRegular(
+  path: string,
+  snapshot: string | undefined,
+): Promise<void> {
+  if (snapshot !== undefined) return;
+  try {
+    const info = await lstat(path);
+    if (!info.isFile()) return;
+  } catch {
+    return;
+  }
+  throw new TrustError("trust.write-failed", "CA file could not be read", [
+    "trust.write-failed",
+  ]);
+}
+
 async function discardPreviousCa(caPreviousCertFile: string): Promise<void> {
   try {
     await rm(caPreviousCertFile, { force: true });
@@ -419,6 +439,10 @@ export function createRequestBodyTrustController(
   /** Key and public certificate bytes from before a replacement write. */
   let previousKeyPem: string | undefined;
   let previousPubPem: string | undefined;
+  /** True only after that file's writeFileAtomic resolves during this attempt. */
+  let replacedKey = false;
+  let replacedPub = false;
+  let replacedCert = false;
 
   const caCertFile = join(
     installRoot,
@@ -541,24 +565,43 @@ export function createRequestBodyTrustController(
     }
   }
 
-  async function removeLiveCaFiles(): Promise<void> {
-    await rm(caKeyFile, { force: true });
-    await rm(caPubFile, { force: true });
-    await rm(caCertFile, { force: true });
+  async function removeReplacedCaFiles(): Promise<void> {
+    if (replacedKey) await rm(caKeyFile, { force: true });
+    if (replacedPub) await rm(caPubFile, { force: true });
+    if (replacedCert) await rm(caCertFile, { force: true });
+  }
+
+  /**
+   * Write the snapshot back when this attempt has one. When the snapshot is
+   * missing and the write completed, remove the new file so it is not left
+   * beside the previous certificate.
+   */
+  async function restoreOrDrop(
+    path: string,
+    snapshot: string | undefined,
+    replaced: boolean,
+    mode?: number,
+  ): Promise<void> {
+    if (snapshot !== undefined) {
+      await writeFileAtomic(path, snapshot, mode);
+      return;
+    }
+    if (replaced) await rm(path, { force: true });
   }
 
   /**
    * Leave either the previous key, public certificate, and certificate, or
-   * none of the files this attempt created. A reusable CA is left as it was.
-   * A fresh install removes the files it created. A replacement removes them
-   * only when the saved copy matches and the live certificate changed; when
-   * the live certificate is still the previous one, the key and public
-   * certificate are restored.
+   * only the files this attempt finished writing. A reusable CA is left as it
+   * was. A fresh install removes a file only after that write resolves. A
+   * replacement removes the files it wrote when the saved copy matches and
+   * the live certificate changed. When the live certificate is still the
+   * previous one, a saved key or public certificate is written back, and a
+   * file written without a saved copy is removed.
    */
   async function rollbackReplacedCa(): Promise<void> {
     if (reusedExisting) return;
     if (!replacingPrevious) {
-      await removeLiveCaFiles();
+      await removeReplacedCaFiles();
       return;
     }
     const saved = await readPreviousRogatioCa(caPreviousCertFile);
@@ -568,16 +611,12 @@ export function createRequestBodyTrustController(
       saved?.fingerprint === rememberedFingerprint;
     const liveDiffers = live?.fingerprint !== rememberedFingerprint;
     if (copyKept && liveDiffers) {
-      await removeLiveCaFiles();
+      await removeReplacedCaFiles();
       return;
     }
     if (copyKept && !liveDiffers) {
-      if (previousKeyPem !== undefined) {
-        await writeFileAtomic(caKeyFile, previousKeyPem, 0o600);
-      }
-      if (previousPubPem !== undefined) {
-        await writeFileAtomic(caPubFile, previousPubPem);
-      }
+      await restoreOrDrop(caKeyFile, previousKeyPem, replacedKey, 0o600);
+      await restoreOrDrop(caPubFile, previousPubPem, replacedPub);
     }
   }
 
@@ -598,6 +637,9 @@ export function createRequestBodyTrustController(
     reusedExisting = false;
     previousKeyPem = undefined;
     previousPubPem = undefined;
+    replacedKey = false;
+    replacedPub = false;
+    replacedCert = false;
     const reusable = await reusableCaMaterial();
     reusedExisting = reusable;
     const liveAnchor = await readPreviousRogatioCa(caCertFile);
@@ -644,9 +686,14 @@ export function createRequestBodyTrustController(
       }
       previousKeyPem = await readNoFollowRegularFile(caKeyFile);
       previousPubPem = await readNoFollowRegularFile(caPubFile);
+      await assertReadableIfRegular(caKeyFile, previousKeyPem);
+      await assertReadableIfRegular(caPubFile, previousPubPem);
       await writeFileAtomic(caKeyFile, certResult.keyPem, 0o600);
+      replacedKey = true;
       await writeFileAtomic(caPubFile, certResult.certPem);
+      replacedPub = true;
       await writeFileAtomic(caCertFile, certResult.certPem);
+      replacedCert = true;
     }
     let installedNew = false;
     if (caTrustInstaller && !installerCalled) {
