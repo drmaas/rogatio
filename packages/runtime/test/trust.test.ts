@@ -1,4 +1,13 @@
-import { access, chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createPrivateKey, X509Certificate } from "node:crypto";
+import {
+  access,
+  chmod,
+  lstat,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,6 +20,7 @@ import {
   TRUST_LIMITS,
   TrustError,
 } from "../src/index.js";
+import { createCertificate, generateCaKeyPair } from "../src/x509.js";
 
 const ORIGIN = "chrome-extension://abcdefghijklmnopabcdefghijklmnop/";
 const ORIGIN_B = "chrome-extension://abcdefghijklmnopponmlkjihgfedcba/";
@@ -459,6 +469,138 @@ describe(" trust controller lifecycle", () => {
       ["install", "status", "uninstall", "verify"].sort(),
     );
   });
+
+  it("reuses a stored CA when the certificate public key matches the private key", async () => {
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, material.certPem, material.keyPem, 0o600);
+    const installer = vi.fn(async () => {});
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    expect(installer).toHaveBeenCalledTimes(1);
+    expect(installer).toHaveBeenCalledWith(material.certPem);
+    expect(await readFile(join(root, ".rogatio-ca.crt"), "utf8")).toBe(
+      material.certPem,
+    );
+    expect(await readFile(join(root, ".rogatio-ca.key"), "utf8")).toBe(
+      material.keyPem,
+    );
+  });
+
+  it("regenerates a CA when the stored certificate does not match the private key", async () => {
+    const unused = generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey;
+    const planted = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    const other = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      unused,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, planted.certPem, other.keyPem, 0o600);
+    const installer = vi.fn(async (pem: string) => {
+      expect(pem).not.toBe(planted.certPem);
+    });
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    expect(installer).toHaveBeenCalledTimes(1);
+    const certPem = await readFile(join(root, ".rogatio-ca.crt"), "utf8");
+    const keyPem = await readFile(join(root, ".rogatio-ca.key"), "utf8");
+    expect(certPem).toBe(installer.mock.calls[0]?.[0]);
+    expect(certPem).not.toBe(planted.certPem);
+    expect(keyPem).not.toBe(other.keyPem);
+    const certificate = new X509Certificate(certPem);
+    expect(certificate.ca).toBe(true);
+    expect(certificate.checkPrivateKey(createPrivateKey(keyPem))).toBe(true);
+    expect((await lstat(join(root, ".rogatio-ca.key"))).mode & 0o777).toBe(
+      0o600,
+    );
+  });
+
+  it("regenerates a CA when the stored certificate has trailing text", async () => {
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(
+      root,
+      `${material.certPem}\nEOF\n`,
+      material.keyPem,
+      0o600,
+    );
+    const installer = vi.fn(async (certPem: string) => {
+      expect(certPem).not.toContain("\nEOF\n");
+      expect(certPem).not.toBe(`${material.certPem}\nEOF\n`);
+    });
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    const certPem = await readFile(join(root, ".rogatio-ca.crt"), "utf8");
+    const keyPem = await readFile(join(root, ".rogatio-ca.key"), "utf8");
+    expect(
+      new X509Certificate(certPem).checkPrivateKey(createPrivateKey(keyPem)),
+    ).toBe(true);
+  });
+
+  it("regenerates a CA when the private key is not mode 0600", async () => {
+    const material = await createCertificate(
+      "CN=Rogatio Request-Body CA",
+      generateCaKeyPair(TRUST_LIMITS.caKeyBits).privateKey,
+      TRUST_LIMITS.caValidityDays,
+    );
+    await writeCaFiles(root, material.certPem, material.keyPem, 0o644);
+    const installer = vi.fn(async (certPem: string) => {
+      expect(certPem).not.toBe(material.certPem);
+    });
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: installer,
+    });
+
+    const result = await controller.install("abcdefghijklmnopabcdefghijklmnop");
+    expect(result.ok).toBe(true);
+    expect(installer).toHaveBeenCalledTimes(1);
+    expect((await lstat(join(root, ".rogatio-ca.key"))).mode & 0o777).toBe(
+      0o600,
+    );
+    const certPem = await readFile(join(root, ".rogatio-ca.crt"), "utf8");
+    const keyPem = await readFile(join(root, ".rogatio-ca.key"), "utf8");
+    expect(
+      new X509Certificate(certPem).checkPrivateKey(createPrivateKey(keyPem)),
+    ).toBe(true);
+  });
 });
 
 describe("verify allowed_origins", () => {
@@ -529,4 +671,16 @@ async function fileExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function writeCaFiles(
+  dir: string,
+  certPem: string,
+  keyPem: string,
+  keyMode: number,
+): Promise<void> {
+  await writeFile(join(dir, ".rogatio-ca.crt"), certPem, "utf8");
+  await writeFile(join(dir, ".rogatio-ca.pub"), certPem, "utf8");
+  await writeFile(join(dir, ".rogatio-ca.key"), keyPem, "utf8");
+  await chmod(join(dir, ".rogatio-ca.key"), keyMode);
 }

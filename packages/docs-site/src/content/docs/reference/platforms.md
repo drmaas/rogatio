@@ -34,7 +34,8 @@ supported browser.
   `rogatio runtime host <path>` (normally browser-launched).
 
 CA trust adapters exist for all three supported operating systems; each needs different
-privilege. Linux shells out to `sudo update-ca-certificates`, macOS uses
+privilege. Linux writes the CA certificate with argv-only `sudo tee` (PEM on standard
+input, stdout discarded) and then runs argv-only `sudo update-ca-certificates`. macOS uses
 `security add-trusted-cert` against the login keychain, and Windows uses
 `certutil -addstore` into `Cert:\CurrentUser\Root`.
 

@@ -1,5 +1,21 @@
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import {
+  createPublicKey,
+  type KeyObject,
+  timingSafeEqual,
+  X509Certificate,
+} from "node:crypto";
+import {
+  chmod,
+  lstat,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
+import { isInstallableCaCertificate } from "./trust-platform/ca-pem.js";
 import { createCertificate, generateCaKeyPair } from "./x509.js";
 
 /** Immutable  trust-limit profile (spec REQ-021). */
@@ -202,12 +218,64 @@ function isWellFormedManifest(
   );
 }
 
-async function writeFileAtomic(path: string, data: string): Promise<void> {
+async function writeFileAtomic(
+  path: string,
+  data: string,
+  mode?: number,
+): Promise<void> {
   const dir = dirname(path);
   await mkdir(dir, { recursive: true });
   const tmp = join(dir, `.${basename(path)}.${process.pid}.tmp`);
-  await writeFile(tmp, data, "utf8");
-  await rename(tmp, path);
+  try {
+    if (mode === undefined) {
+      await writeFile(tmp, data, "utf8");
+    } else {
+      await writeFile(tmp, data, { encoding: "utf8", mode });
+      await chmod(tmp, mode);
+    }
+    await rename(tmp, path);
+  } catch (error) {
+    try {
+      await rm(tmp, { force: true });
+    } catch {
+      // best-effort cleanup of the temp file
+    }
+    throw error;
+  }
+}
+
+function spkiDer(key: KeyObject): Buffer {
+  const exported = key.export({ format: "der", type: "spki" });
+  return Buffer.isBuffer(exported) ? exported : Buffer.from(exported);
+}
+
+/**
+ * A stored pair is reusable only when the PEM is one CA certificate and its
+ * public key is the public half of the private key.
+ */
+function caCertificateMatchesPrivateKey(
+  certPem: string,
+  keyPem: string,
+): boolean {
+  try {
+    if (!isInstallableCaCertificate(certPem)) return false;
+    const certificate = new X509Certificate(certPem);
+    if (!certificate.ca) return false;
+    const certificatePublic = createPublicKey({
+      key: certificate.publicKey.export({ format: "der", type: "spki" }),
+      format: "der",
+      type: "spki",
+    });
+    const privatePublic = createPublicKey(keyPem);
+    const fromCertificate = spkiDer(certificatePublic);
+    const fromPrivate = spkiDer(privatePublic);
+    return (
+      fromCertificate.length === fromPrivate.length &&
+      timingSafeEqual(fromCertificate, fromPrivate)
+    );
+  } catch {
+    return false;
+  }
 }
 
 async function existsFile(path: string): Promise<boolean> {
@@ -331,6 +399,28 @@ export function createRequestBodyTrustController(
     return { ok: true, state: "installed" };
   }
 
+  async function reusableCaMaterial(): Promise<boolean> {
+    try {
+      const [keyStat, certStat] = await Promise.all([
+        lstat(caKeyFile),
+        lstat(caCertFile),
+      ]);
+      if (!keyStat.isFile() || !certStat.isFile()) return false;
+      if (process.platform !== "win32") {
+        if ((keyStat.mode & 0o777) !== 0o600) return false;
+        const uid = process.getuid?.();
+        if (uid !== undefined && keyStat.uid !== uid) return false;
+      }
+      const [certPem, keyPem] = await Promise.all([
+        readFile(caCertFile, "utf8"),
+        readFile(caKeyFile, "utf8"),
+      ]);
+      return caCertificateMatchesPrivateKey(certPem, keyPem);
+    } catch {
+      return false;
+    }
+  }
+
   async function runCaTrust(): Promise<void> {
     const caps = await detect();
     if (!caps.caTrust) {
@@ -340,10 +430,10 @@ export function createRequestBodyTrustController(
         caps.reasons,
       );
     }
-    if (!(await existsFile(caKeyFile)) || !(await existsFile(caCertFile))) {
+    // Reuse a device-local CA only when the certificate matches the key and
+    // the key file is a regular mode-0600 file owned by this user.
+    if (!(await reusableCaMaterial())) {
       const { privateKey } = generateCaKeyPair(TRUST_LIMITS.caKeyBits);
-
-      // Generate self-signed X.509 CA certificate
       const certResult = await createCertificate(
         "CN=Rogatio Request-Body CA",
         privateKey,
@@ -352,8 +442,8 @@ export function createRequestBodyTrustController(
       const certPem = certResult.certPem;
       const certKeyPem = certResult.keyPem;
 
-      await writeFileAtomic(caKeyFile, certKeyPem);
-      await writeFileAtomic(caPubFile, certPem); // Store cert as public key for compatibility
+      await writeFileAtomic(caKeyFile, certKeyPem, 0o600);
+      await writeFileAtomic(caPubFile, certPem);
       await writeFileAtomic(caCertFile, certPem);
     }
     if (caTrustInstaller && !installerCalled) {
