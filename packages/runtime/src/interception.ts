@@ -93,7 +93,10 @@ export async function startInterception(
 
   let proxy: ProxyEndpoint;
   try {
-    const started = await registeredProvider.start(activation);
+    const started = await registeredProvider.start({
+      ...activation,
+      localOrigins: targetPolicy.localOrigins,
+    });
     if (
       started &&
       typeof started === "object" &&

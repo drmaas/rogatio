@@ -13,6 +13,8 @@ import {
 import { parseEnvelope, serializeEnvelope } from "./envelope.js";
 import {
   type InterceptProxyHandle,
+  type InterceptProxyPolicy,
+  localOriginsFromProject,
   startInterceptProxy,
 } from "./intercept-proxy.js";
 import {
@@ -21,7 +23,10 @@ import {
   type PlatformInterceptionAdapter,
   registerInterceptionProvider,
 } from "./interception.js";
-import { createNativeRuntimeController } from "./lifecycle.js";
+import {
+  createNativeRuntimeController,
+  type RuntimeActivation,
+} from "./lifecycle.js";
 import {
   decodeNativeFrame,
   encodeNativeFrame,
@@ -147,6 +152,29 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
   });
 
   let interceptProxy: InterceptProxyHandle | null = null;
+
+  function policyForProxy(
+    activation: Pick<RuntimeActivation, "localOrigins">,
+  ): InterceptProxyPolicy | null {
+    const policy = controller.getActivePolicy();
+    if (!policy) return null;
+    const fromProject = localOriginsFromProject(policy.project);
+    const fromSession = activation.localOrigins ?? [];
+    const localOrigins: string[] = [];
+    const seen = new Set<string>();
+    for (const origin of [...fromProject, ...fromSession]) {
+      if (seen.has(origin)) continue;
+      seen.add(origin);
+      localOrigins.push(origin);
+    }
+    return {
+      project: policy.project,
+      operations: policy.operations,
+      presetDigest: policy.presetDigest,
+      localOrigins,
+    };
+  }
+
   let outboundWrite: ((frame: Uint8Array) => void) | null = null;
   let hostRequestCounter = 0;
   const pendingHost = new Map<
@@ -231,20 +259,13 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
         // Best-effort clear.
       }
     },
-    async startTlsProxy() {
+    async startTlsProxy(activation) {
       if (interceptProxy) {
         await interceptProxy.stop();
         interceptProxy = null;
       }
-      const policy = controller.getActivePolicy();
       interceptProxy = await startInterceptProxy({
-        policy: policy
-          ? {
-              project: policy.project,
-              operations: policy.operations,
-              presetDigest: policy.presetDigest,
-            }
-          : null,
+        policy: policyForProxy(activation),
         serveMock: (request) =>
           controller.serveMock(request.token, {
             method: request.method,
@@ -275,16 +296,7 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
       const routes =
         pendingRoutes.length > 0 ? pendingRoutes : activation.pacRoutes;
       const endpoint = await platformProvider.start(activation, routes);
-      const policy = controller.getActivePolicy();
-      interceptProxy?.setPolicy(
-        policy
-          ? {
-              project: policy.project,
-              operations: policy.operations,
-              presetDigest: policy.presetDigest,
-            }
-          : null,
-      );
+      interceptProxy?.setPolicy(policyForProxy(activation));
       return endpoint;
     },
     async stop() {

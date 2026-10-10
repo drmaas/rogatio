@@ -2,7 +2,7 @@
 
 > Code is the source of truth for current behavior. Links to `docs/specs/`, `docs/plans/`, and `docs/workflows/` point to frozen decision records; see `AGENTS.md` "Source-of-truth priority".
 
-**Status:** F23 unified native-host runtime direction approved and implemented for the extension Start/Stop runtime control surface (issue #170). Response-body rules match in the browser as a declarativeNetRequest redirect to the loopback listener, which rechecks the rule and performs its own credential-free GET. Request-body rules are not DNR rules: PAC steers `scheme://literal-host/*` and the runtime checks the path regex. Request-body HTTPS CONNECT remains a blind tunnel; CA trust applies only to that HTTPS path.
+**Status:** F23 unified native-host runtime direction approved and implemented for the extension Start/Stop runtime control surface (issue #170). Response-body rules match in the browser as a declarativeNetRequest redirect to the loopback listener, which rechecks the rule and performs its own credential-free GET. Request-body rules are not DNR rules: PAC steers `scheme://literal-host/*` and the runtime checks the path regex. Request-body HTTPS CONNECT remains a blind tunnel: the proxy does not decrypt TLS, and it still accepts only port 443 and one pinned address. CA trust applies only to that HTTPS path.
 
 ## F23 Unified Native-Host Runtime Direction
 
@@ -974,7 +974,8 @@ authority. It rejects arbitrary CONNECT, ambient proxy environment settings, red
 HTTP/2, HTTP/3, and ALPN other than `http/1.1`. DNS resolves all A/AAAA answers, rejects
 mixed public and non-public results, then pins one validated numeric address without
 re-resolution, racing, or retrying another address. The original hostname remains HTTP
-authority and HTTPS SNI.
+authority and HTTPS SNI. CONNECT is blind because bytes are spliced without TLS
+decryption; the destination is still that pinned address.
 
 Eligible requests require one valid decimal `Content-Length` at most 4 MiB. The runtime
 counts received bytes and requires an exact match. It rejects transfer encoding,

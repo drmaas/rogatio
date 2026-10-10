@@ -1,3 +1,4 @@
+import { lookup as dnsLookup } from "node:dns/promises";
 import {
   createServer,
   type IncomingMessage,
@@ -10,6 +11,11 @@ import type {
   RogatioOperation,
 } from "@rogatio/compiler";
 import { sourceMatches } from "@rogatio/compiler";
+import { normalizeSiteOrigin } from "@rogatio/schema";
+import {
+  classifyAddress,
+  validateResolvedAddresses,
+} from "./address-policy.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import type { RenderedMock } from "./mock.js";
 import { MOCK_LISTENER_PREFIX, parseMockRedirect } from "./mock-listener.js";
@@ -20,7 +26,12 @@ import {
 } from "./response-body.js";
 import { parseResponseBodyRedirect } from "./response-body-listener.js";
 import { revalidateAuthority } from "./revalidate.js";
-import type { PresetDigest, RuntimeResult } from "./types.js";
+import type {
+  OutboundResolver,
+  PresetDigest,
+  ResolvedAddress,
+  RuntimeResult,
+} from "./types.js";
 import { canonicalizeOutboundTarget } from "./url.js";
 
 export interface ProxyEndpoint {
@@ -32,6 +43,8 @@ export interface InterceptProxyPolicy {
   readonly project: unknown;
   readonly operations: readonly RogatioOperation[];
   readonly presetDigest?: string;
+  /** Exact normalized origins that may use a non-public address. */
+  readonly localOrigins?: readonly string[];
 }
 
 export interface MockServeRequest {
@@ -40,11 +53,17 @@ export interface MockServeRequest {
   readonly signal: AbortSignal;
 }
 
+export type InterceptDial = (port: number, address: string) => Socket;
+
 export interface InterceptProxyOptions {
   readonly policy?: InterceptProxyPolicy | null;
   readonly serveMock?: (
     request: MockServeRequest,
   ) => Promise<RuntimeResult<RenderedMock>>;
+  /** Resolves every A/AAAA answer. Defaults to `dns.lookup`. */
+  readonly resolver?: OutboundResolver;
+  /** Opens the pinned numeric address. Defaults to `net.connect`. */
+  readonly dial?: InterceptDial;
 }
 
 export interface InterceptProxyHandle {
@@ -174,6 +193,185 @@ function forwardRequestHeaders(
   return out;
 }
 
+const defaultResolver: OutboundResolver = {
+  async lookup(hostname, signal) {
+    if (signal?.aborted) throw new Error("aborted");
+    const addresses = await dnsLookup(hostname, { all: true });
+    return addresses.map((address) => ({
+      address: address.address,
+      family: address.family === 6 ? 6 : 4,
+    }));
+  },
+};
+
+const defaultDial: InterceptDial = (port, address) => connect(port, address);
+
+interface UpstreamDeps {
+  readonly resolver: OutboundResolver;
+  readonly dial: InterceptDial;
+  readonly localOrigins: ReadonlySet<string>;
+}
+
+type UpstreamHttpResult =
+  | {
+      ok: true;
+      status: number;
+      statusMessage: string;
+      headers: Record<string, string | string[]>;
+      body: Buffer;
+    }
+  | { ok: false; status: 403 };
+
+export function localOriginsFromProject(project: unknown): readonly string[] {
+  if (project === null || typeof project !== "object") return [];
+  const policy = (project as { requestBodyPolicy?: unknown }).requestBodyPolicy;
+  if (policy === null || typeof policy !== "object") return [];
+  const origins = (policy as { localOrigins?: unknown }).localOrigins;
+  if (!Array.isArray(origins)) return [];
+  return origins.filter(
+    (origin): origin is string => typeof origin === "string",
+  );
+}
+
+function effectiveLocalOrigins(
+  policy: InterceptProxyPolicy | null,
+): ReadonlySet<string> {
+  if (policy === null) return new Set();
+  const raw = policy.localOrigins ?? localOriginsFromProject(policy.project);
+  const origins = new Set<string>();
+  for (const origin of raw) {
+    const normalized = normalizeSiteOrigin(origin);
+    if (normalized !== null) origins.add(normalized);
+  }
+  return origins;
+}
+
+function compareAddresses(
+  left: ResolvedAddress,
+  right: ResolvedAddress,
+): number {
+  return (
+    left.family - right.family ||
+    (left.address < right.address ? -1 : left.address > right.address ? 1 : 0)
+  );
+}
+
+function selectPinnedAddress(
+  addresses: readonly ResolvedAddress[],
+  allowNonPublic: boolean,
+): ResolvedAddress | null {
+  const publicOnly = validateResolvedAddresses(
+    addresses,
+    RUNTIME_LIMITS.maxDnsAddresses,
+  );
+  if (publicOnly !== null) return publicOnly[0] ?? null;
+  if (!allowNonPublic) return null;
+  if (
+    addresses.length === 0 ||
+    addresses.length > RUNTIME_LIMITS.maxDnsAddresses
+  ) {
+    return null;
+  }
+  const checked: ResolvedAddress[] = [];
+  for (const address of addresses) {
+    if (address.family !== 4 && address.family !== 6) return null;
+    const classification = classifyAddress(address.address);
+    if (classification === "invalid" || classification === "public") {
+      return null;
+    }
+    checked.push({ address: address.address, family: address.family });
+  }
+  checked.sort(compareAddresses);
+  return checked[0] ?? null;
+}
+
+async function pinHostname(
+  hostname: string,
+  origin: string,
+  deps: UpstreamDeps,
+): Promise<ResolvedAddress | null> {
+  if (hostname.length === 0) return null;
+  let resolved: readonly ResolvedAddress[];
+  try {
+    resolved = await deps.resolver.lookup(hostname);
+  } catch {
+    return null;
+  }
+  const normalized = normalizeSiteOrigin(origin);
+  const allowNonPublic =
+    normalized !== null && deps.localOrigins.has(normalized);
+  return selectPinnedAddress(resolved, allowNonPublic);
+}
+
+function httpUpstreamPort(target: URL): number | null {
+  if (target.protocol !== "http:") return null;
+  if (target.username.length > 0 || target.password.length > 0) return null;
+  if (target.port.length === 0 || target.port === "80") return 80;
+  return null;
+}
+
+function formatUpstreamRequest(
+  method: string,
+  path: string,
+  headers: Readonly<Record<string, string>>,
+): string | null {
+  const lines: string[] = [];
+  for (const [name, value] of Object.entries(headers)) {
+    if (
+      name.includes("\r") ||
+      name.includes("\n") ||
+      value.includes("\r") ||
+      value.includes("\n")
+    ) {
+      return null;
+    }
+    lines.push(`${name}: ${value}`);
+  }
+  return `${method} ${path} HTTP/1.1\r\n${lines.join("\r\n")}\r\n\r\n`;
+}
+
+function httpsOrigin(host: string): string | null {
+  const authority =
+    host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+  try {
+    return new URL(`https://${authority}`).origin;
+  } catch {
+    return null;
+  }
+}
+
+function parseConnectAuthority(
+  authority: string,
+): { host: string; port: number } | null {
+  if (authority.length === 0) return null;
+  let host: string;
+  let portText: string;
+  if (authority.startsWith("[")) {
+    const end = authority.indexOf("]");
+    if (end <= 1) return null;
+    host = authority.slice(1, end);
+    const rest = authority.slice(end + 1);
+    if (!rest.startsWith(":")) return null;
+    portText = rest.slice(1);
+  } else {
+    const colon = authority.lastIndexOf(":");
+    if (colon <= 0) return null;
+    host = authority.slice(0, colon);
+    portText = authority.slice(colon + 1);
+  }
+  if (host.length === 0 || !/^\d+$/.test(portText)) return null;
+  const port = Number(portText);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) return null;
+  return { host, port };
+}
+
+function endConnect(socket: Socket, status: number, reason: string): void {
+  if (socket.destroyed || socket.writableEnded) return;
+  socket.end(
+    `HTTP/1.1 ${status} ${reason}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`,
+  );
+}
+
 function pipeSockets(a: Socket, b: Socket): void {
   a.pipe(b);
   b.pipe(a);
@@ -187,21 +385,22 @@ function pipeSockets(a: Socket, b: Socket): void {
   b.on("close", () => a.destroy());
 }
 
-async function upstreamHttp(
+export async function upstreamHttp(
   method: string,
   target: URL,
   headers: Record<string, string>,
   body: Buffer,
-): Promise<{
-  status: number;
-  statusMessage: string;
-  headers: Record<string, string | string[]>;
-  body: Buffer;
-}> {
-  const port = target.port ? Number(target.port) : 80;
+  deps: UpstreamDeps,
+): Promise<UpstreamHttpResult> {
+  const port = httpUpstreamPort(target);
+  if (port === null) return { ok: false, status: 403 };
   const path = `${target.pathname}${target.search}`;
+  const head = formatUpstreamRequest(method, path, headers);
+  if (head === null) return { ok: false, status: 403 };
+  const pinned = await pinHostname(target.hostname, target.origin, deps);
+  if (pinned === null) return { ok: false, status: 403 };
   return new Promise((resolve, reject) => {
-    const socket = connect(port, target.hostname);
+    const socket = deps.dial(port, pinned.address);
     let buf = Buffer.alloc(0);
     let settled = false;
     const fail = (err: Error) => {
@@ -214,10 +413,7 @@ async function upstreamHttp(
     socket.on("timeout", () => fail(new Error("upstream timeout")));
     socket.on("error", (err) => fail(err));
     socket.on("connect", () => {
-      const lines = Object.entries(headers)
-        .map(([k, v]) => `${k}: ${v}`)
-        .join("\r\n");
-      socket.write(`${method} ${path} HTTP/1.1\r\n${lines}\r\n\r\n`);
+      socket.write(head);
       if (body.byteLength > 0) socket.write(body);
     });
     socket.on("data", (chunk) => {
@@ -261,6 +457,7 @@ async function upstreamHttp(
         settled = true;
         socket.destroy();
         resolve({
+          ok: true,
           status,
           statusMessage,
           headers: headerMap,
@@ -306,6 +503,7 @@ async function upstreamHttp(
       }
       settled = true;
       resolve({
+        ok: true,
         status: Number(statusMatch[1]),
         statusMessage: statusMatch[2]?.trim() ?? "",
         headers: headerMap,
@@ -404,13 +602,16 @@ function authorizeOp(
  * Loopback listener for body-rule rewrite.
  * Response-body redirects arrive as origin-form `/.rogatio/body/...` and are
  * revalidated, then fetched with a credential-free GET.
- * Request-body HTTP arrives as absolute-form. CONNECT stays a blind tunnel.
+ * Absolute-form HTTP is port 80 only. CONNECT is port 443 only and stays a
+ * blind tunnel: bytes are spliced with no TLS decryption, to the pinned address.
  */
 export async function startInterceptProxy(
   options: InterceptProxyOptions = {},
 ): Promise<InterceptProxyHandle> {
   let policy: InterceptProxyPolicy | null = options.policy ?? null;
   const serveMock = options.serveMock;
+  const resolver = options.resolver ?? defaultResolver;
+  const dial = options.dial ?? defaultDial;
   let activeMocks = 0;
   const mockAborts = new Set<AbortController>();
   let stopped = false;
@@ -526,7 +727,23 @@ export async function startInterceptProxy(
         target,
         forwardHeaders,
         requestBody,
+        {
+          resolver,
+          dial,
+          localOrigins: effectiveLocalOrigins(active),
+        },
       );
+      if (!upstream.ok) {
+        if (!res.headersSent) {
+          res.writeHead(upstream.status, {
+            "cache-control": "no-store",
+            "content-length": "0",
+            connection: "close",
+          });
+          res.end();
+        }
+        return;
+      }
 
       let responseBody = upstream.body;
       if (responseOp !== null && active !== null) {
@@ -782,25 +999,57 @@ export async function startInterceptProxy(
     clientSocket: Socket,
     head: Buffer,
   ): void {
-    const authority = req.url ?? "";
-    const [host, portText] = authority.split(":");
-    const port = Number(portText);
-    if (!host || !Number.isInteger(port) || port <= 0) {
-      clientSocket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
-      clientSocket.destroy();
+    void tunnelConnect(req, clientSocket, head);
+  }
+
+  async function tunnelConnect(
+    req: IncomingMessage,
+    clientSocket: Socket,
+    head: Buffer,
+  ): Promise<void> {
+    let upstream: Socket | undefined;
+    clientSocket.on("error", () => upstream?.destroy());
+    const parsed = parseConnectAuthority(req.url ?? "");
+    if (parsed === null) {
+      endConnect(clientSocket, 400, "Bad Request");
       return;
     }
-    const upstream = connect(port, host);
-    upstream.on("connect", () => {
+    if (parsed.port !== 443) {
+      endConnect(clientSocket, 403, "Forbidden");
+      return;
+    }
+    const pinned = await pinHostname(
+      parsed.host,
+      httpsOrigin(parsed.host) ?? "",
+      {
+        resolver,
+        dial,
+        localOrigins: effectiveLocalOrigins(policy),
+      },
+    );
+    if (pinned === null || clientSocket.destroyed) {
+      endConnect(clientSocket, 403, "Forbidden");
+      return;
+    }
+    let upstreamSocket: Socket;
+    try {
+      upstreamSocket = dial(443, pinned.address);
+    } catch {
+      endConnect(clientSocket, 502, "Bad Gateway");
+      return;
+    }
+    upstream = upstreamSocket;
+    upstreamSocket.on("connect", () => {
       clientSocket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
-      if (head.byteLength > 0) upstream.write(head);
-      pipeSockets(clientSocket, upstream);
+      if (head.byteLength > 0) upstreamSocket.write(head);
+      pipeSockets(clientSocket, upstreamSocket);
     });
-    upstream.on("error", () => {
-      clientSocket.write("HTTP/1.1 502 Bad Gateway\r\n\r\n");
-      clientSocket.destroy();
+    upstreamSocket.on("error", () => {
+      if (!clientSocket.destroyed && !clientSocket.writableEnded) {
+        endConnect(clientSocket, 502, "Bad Gateway");
+      }
+      upstreamSocket.destroy();
     });
-    clientSocket.on("error", () => upstream.destroy());
   }
 
   const endpoint = await new Promise<ProxyEndpoint>((resolve, reject) => {
