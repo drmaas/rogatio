@@ -57,6 +57,8 @@ export interface RuntimeActivation {
   readonly presetDigest: PresetDigest;
   readonly pacRoutes: readonly string[];
   readonly proxy?: { readonly host: string; readonly port: number };
+  /** Exact local origins supplied when interception starts. */
+  readonly localOrigins?: readonly string[];
 }
 
 export interface CapabilityProfile {

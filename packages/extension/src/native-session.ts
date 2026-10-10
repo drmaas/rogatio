@@ -185,6 +185,17 @@ export interface NativeRuntimeConfig {
   };
 }
 
+function localOriginsFromProjectData(data: unknown): readonly string[] {
+  if (data === null || typeof data !== "object") return [];
+  const policy = (data as { requestBodyPolicy?: unknown }).requestBodyPolicy;
+  if (policy === null || typeof policy !== "object") return [];
+  const origins = (policy as { localOrigins?: unknown }).localOrigins;
+  if (!Array.isArray(origins)) return [];
+  return origins.filter(
+    (origin): origin is string => typeof origin === "string",
+  );
+}
+
 export async function buildNativePolicy(
   projectData: unknown,
   enabledGroupIds: readonly string[],
@@ -306,10 +317,11 @@ export async function startNativeSession(
   }
 
   console.log("[rogatio] building native policy");
+  const localOrigins = localOriginsFromProjectData(project.data);
   const policyResult = await buildNativePolicy(
     project.data,
     project.enabledGroupIds,
-    [],
+    localOrigins,
     options.extensionId,
   );
   if (!policyResult.ok) {
@@ -397,7 +409,7 @@ export async function startNativeSession(
     extensionId: options.extensionId,
     pacRoutes,
     contentListener,
-    targetPolicy: { publicAllowed: true, localOrigins: [] },
+    targetPolicy: { publicAllowed: true, localOrigins },
   };
 
   const startResult = await options.nativeRuntime.start(config);
