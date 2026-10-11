@@ -16,10 +16,12 @@ Rogatio is local-first by design.
 ## What body rules may use (still local)
 
 When you start the local runtime for response-body or request-body rules, Rogatio may use
-Chrome native messaging, a loopback-only proxy, and a device-local CA for TLS
-interception. Those capabilities are confined to `127.0.0.1`, capability/digest pairing,
-exact rule authorization, and the extension Start/Stop session — they are not a general
-network middlebox.
+Chrome native messaging, a loopback-only proxy, and a device-local CA that gates
+request-body PAC routing. The proxy does not decrypt TLS: it rewrites cleartext HTTP
+absolute-form request bodies, and HTTPS `CONNECT` is tunneled without decryption. Those
+capabilities are confined to `127.0.0.1`, capability/digest pairing, exact rule
+authorization, and the extension Start/Stop session — they are not a general network
+middlebox.
 
 ## Boundaries
 

@@ -4,8 +4,9 @@ description: Replace or modify eligible POST/PUT/PATCH request bodies via the lo
 ---
 
 Request-body rules replace a complete body or apply bounded global ECMAScript regular
-expression replacement to eligible POST, PUT, or PATCH XHR requests. They use the
-runtime-owned TLS proxy.
+expression replacement to eligible POST, PUT, or PATCH XHR requests. Body rewrite applies
+to cleartext HTTP absolute-form requests on port 80. HTTPS `CONNECT` is tunneled without
+decryption, so those request bodies are not rewritten.
 
 ## Behavior
 
@@ -29,12 +30,13 @@ captures from the body regex. The two capture namespaces are not mixed.
   That flag is only for development (a local unpacked build without the release
   key) and for forks. Without a started session, enabled granted
   request-body rules report `needs runtime`.
-- Request-body interception is **capability-based**: it needs a trusted device-local CA
-  and non-colliding Chrome PAC routing, excludes private browsing, and cannot compose with
-  another controlling proxy, PAC, extension, or enterprise policy.
+- Request-body PAC routing is **capability-based**: it needs a trusted device-local CA
+  and non-colliding Chrome proxy settings, excludes private browsing, and cannot compose
+  with another controlling proxy, PAC, extension, or enterprise policy. The CA is a
+  startup gate for that routing and is not used to decrypt TLS.
 - Where those capabilities are absent, request-body activation reports `unsupported`;
   Linux and Windows may still verify, edit, import, export, and dry-run request-body rules.
-  The host can still start for response-body rules.
+  Response-body rules do not need the CA. The host can still start for them.
 - CA trust is installed by the same `rogatio runtime install` command.
   Elevation: Linux (`sudo`), macOS (keychain authorization), Windows (Administrator). When
   elevation or any required capability is unavailable, that command is transactional and
