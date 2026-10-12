@@ -312,7 +312,11 @@ export function createAIAssistPanel(
 
       const addDetail = (label: string, value: string) => {
         const detail = document.createElement("div");
-        detail.innerHTML = `<span style="color:#666;">${label}:</span> ${value}`;
+        const labelEl = document.createElement("span");
+        labelEl.style.color = "#666";
+        labelEl.textContent = `${label}:`;
+        detail.appendChild(labelEl);
+        detail.appendChild(document.createTextNode(` ${value}`));
         ruleDetails.appendChild(detail);
       };
 

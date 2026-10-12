@@ -521,6 +521,60 @@ describe("@rogatio/editor AI Assist wire", () => {
     await flush();
   });
 
+  it("renders AI Assist proposal details as text", async () => {
+    const markup = `<img src=x onerror="document.body.dataset.xss='1'">`;
+    delete document.body.dataset.xss;
+
+    mountEditor(async () => ({
+      proposal: {
+        explanation: "Shown as text",
+        rules: [
+          {
+            kind: "redirect",
+            groupId: "group-one",
+            name: "Literal rule",
+            source: sourceRegex(markup),
+            resourceTypes: [markup],
+            method: markup,
+            action: { destination: "https://mock.example/" },
+          },
+        ],
+      },
+    }));
+
+    const { panel, textarea, send } = openAssistPanel();
+    textarea.value = "show details";
+    send.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flush();
+
+    const detailRow = (label: string): HTMLElement => {
+      const row = Array.from(panel.querySelectorAll("div")).find((el) => {
+        const span = el.firstElementChild;
+        return span?.tagName === "SPAN" && span.textContent === `${label}:`;
+      });
+      expect(row).toBeInstanceOf(HTMLElement);
+      return row as HTMLElement;
+    };
+
+    for (const label of ["Source", "Types", "Method"]) {
+      const row = detailRow(label);
+      const valueNode = row.childNodes[1];
+      expect(valueNode?.nodeType).toBe(Node.TEXT_NODE);
+      expect(valueNode?.textContent).toContain(markup);
+      expect(row.querySelector("img")).toBeNull();
+    }
+
+    expect(document.querySelectorAll("img")).toHaveLength(0);
+    expect(document.body.dataset.xss).toBeUndefined();
+    expect(panel.textContent).toContain("Literal rule");
+    expect(panel.textContent).toContain("redirect");
+    expect(panel.textContent).toContain("Shown as text");
+    expect(panel.textContent).toContain("AI Assist");
+    expect(panel.querySelector(".ai-close-btn")).toBeInstanceOf(
+      HTMLButtonElement,
+    );
+  });
+
   it("surfaces handler throws as panel system errors", async () => {
     mountEditor(async () => {
       throw new Error("boom from host");
