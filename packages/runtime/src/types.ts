@@ -226,8 +226,6 @@ export type RuntimeErrorCode =
   | "runtime.request-body-marker-expired"
   | "runtime.request-body-upstream-failed"
   | "runtime.request-body-timeout"
-  | "runtime.tls-ca-not-loaded"
-  | "runtime.tls-leaf-generation-failed"
   | "runtime.mock-unknown"
   | "runtime.url-capture-mismatch";
 
