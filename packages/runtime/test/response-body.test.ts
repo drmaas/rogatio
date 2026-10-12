@@ -45,6 +45,84 @@ describe(" response-body transformation", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("produces the same output as a direct global unicode replace", async () => {
+    const source = '{"n":"x1","m":"x2","price":"5"}';
+    const replacements = [
+      { pattern: "x(\\d)", replacement: "y$1" },
+      { pattern: "5", replacement: "$$5" },
+    ];
+    let expected = source;
+    for (const entry of replacements) {
+      expected = expected.replace(
+        new RegExp(entry.pattern, "gu"),
+        entry.replacement,
+      );
+    }
+    const result = await rewriteResponseBody(
+      {
+        contentType: "application/json",
+        body: new TextEncoder().encode(source),
+      },
+      replacements,
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(new TextDecoder().decode(result.value.body)).toBe(expected);
+    }
+  });
+
+  it("rejects an invalid pattern with the canonical-value error", async () => {
+    const result = await rewriteResponseBody(
+      {
+        contentType: "text/plain",
+        body: new TextEncoder().encode("hello"),
+      },
+      [{ pattern: "(", replacement: "x" }],
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "runtime.invalid-canonical-value" },
+    });
+  });
+
+  it("returns within the regex deadline and fails closed", async () => {
+    const warmup = await rewriteResponseBody(
+      {
+        contentType: "text/plain",
+        body: new TextEncoder().encode("ab"),
+      },
+      [{ pattern: "a", replacement: "b" }],
+    );
+    expect(warmup.ok).toBe(true);
+
+    const body = `${"a".repeat(28)}!`;
+    const start = Date.now();
+    const result = await rewriteResponseBody(
+      {
+        contentType: "text/plain",
+        body: new TextEncoder().encode(body),
+      },
+      [{ pattern: "(a+)+$", replacement: "b" }],
+    );
+    expect(Date.now() - start).toBeLessThan(1000);
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "runtime.invalid-canonical-value" },
+    });
+
+    const after = await rewriteResponseBody(
+      {
+        contentType: "text/plain",
+        body: new TextEncoder().encode("hello"),
+      },
+      [{ pattern: "h", replacement: "j" }],
+    );
+    expect(after.ok).toBe(true);
+    if (after.ok) {
+      expect(new TextDecoder().decode(after.value.body)).toBe("jello");
+    }
+  });
+
   it("fetches only an authorized GET and rewrites the response in-process", async () => {
     const normalized = normalizeRuntimePreset(
       makePresetInput({ grants: [makeGrant()] }),

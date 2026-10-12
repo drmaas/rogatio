@@ -8,6 +8,7 @@ import {
 import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { fetchAuthorized } from "./outbound.js";
+import { runRegexReplace } from "./regex-replace.js";
 import type {
   AuthorizedOperation,
   OutboundOptions,
@@ -127,8 +128,12 @@ export async function rewriteResponseBody(
         entry.replacement.length > LIMITS.maxResponseBodyReplacementLength
       )
         return failure("runtime.size-limit");
-      const regex = new RegExp(entry.pattern, "gu");
-      text = text.replace(regex, entry.replacement);
+      text = await runRegexReplace(
+        text,
+        entry.pattern,
+        entry.replacement,
+        RUNTIME_LIMITS.maxRegexDeadlineMs,
+      );
       if (
         new TextEncoder().encode(text).byteLength >
         RUNTIME_LIMITS.maxResponseBodyBytes
