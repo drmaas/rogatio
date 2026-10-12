@@ -43,7 +43,6 @@ export {
 } from "./response-body.js";
 export * from "./revalidate.js";
 export * from "./target.js";
-export * from "./tls.js";
 export * from "./trust.js";
 export { selectTrustPlatformAdapter } from "./trust-platform/index.js";
 export type {
