@@ -10,12 +10,12 @@ import type {
   ResponseBodyOperation,
   RogatioOperation,
 } from "@rogatio/compiler";
-import { sourceMatches } from "@rogatio/compiler";
 import { normalizeSiteOrigin } from "@rogatio/schema";
 import {
   classifyAddress,
   validateResolvedAddresses,
 } from "./address-policy.js";
+import { sourceMatchesWithinDeadline } from "./deadline-match.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import type { RenderedMock } from "./mock.js";
 import { MOCK_LISTENER_PREFIX, parseMockRedirect } from "./mock-listener.js";
@@ -78,12 +78,15 @@ function isBodyOp(op: RogatioOperation): op is BodyOperation {
   return op.kind === "request-body" || op.kind === "response-body";
 }
 
-function matcherMatches(
+async function matcherMatches(
   op: BodyOperation,
   url: string,
   method: string,
-): boolean {
-  if (!sourceMatches(op.matcher.source, url)) return false;
+): Promise<boolean> {
+  // Source regexes run on the deadline worker. A deadline is a non-match,
+  // which leaves the request unchanged.
+  if (!(await sourceMatchesWithinDeadline(op.matcher.source, url)))
+    return false;
   if (
     op.matcher.method !== undefined &&
     op.matcher.method !== method.toUpperCase()
@@ -93,16 +96,16 @@ function matcherMatches(
   return true;
 }
 
-function pickHighest(
+async function pickHighest(
   operations: readonly RogatioOperation[],
   kind: BodyOperation["kind"],
   url: string,
   method: string,
-): BodyOperation | null {
+): Promise<BodyOperation | null> {
   let best: BodyOperation | null = null;
   for (const op of operations) {
     if (!isBodyOp(op) || op.kind !== kind) continue;
-    if (!matcherMatches(op, url, method)) continue;
+    if (!(await matcherMatches(op, url, method))) continue;
     if (
       best === null ||
       op.matcher.priority > best.matcher.priority ||
@@ -578,23 +581,27 @@ function initiatorFromHeaders(
   }
 }
 
-function authorizeOp(
+async function authorizeOp(
   policy: InterceptProxyPolicy,
   op: BodyOperation,
   url: string,
   method: string,
   headers: IncomingMessage["headers"],
-): boolean {
+): Promise<boolean> {
   const resourceType = op.matcher.resourceTypes[0];
   const initiator = initiatorFromHeaders(headers, url);
-  const decision = revalidateAuthority(policy.project, policy.operations, {
-    groupId: op.groupId,
-    ruleId: op.ruleId,
-    url,
-    method,
-    ...(initiator !== undefined ? { initiator } : {}),
-    ...(resourceType !== undefined ? { resourceType } : {}),
-  });
+  const decision = await revalidateAuthority(
+    policy.project,
+    policy.operations,
+    {
+      groupId: op.groupId,
+      ruleId: op.ruleId,
+      url,
+      method,
+      ...(initiator !== undefined ? { initiator } : {}),
+      ...(resourceType !== undefined ? { resourceType } : {}),
+    },
+  );
   return decision.allowed;
 }
 
@@ -662,21 +669,21 @@ export async function startInterceptProxy(
       const requestOp =
         active === null
           ? null
-          : (pickHighest(
+          : ((await pickHighest(
               active.operations,
               "request-body",
               targetUrl,
               method,
-            ) as RequestBodyOperation | null);
+            )) as RequestBodyOperation | null);
       const responseOp =
         active === null
           ? null
-          : (pickHighest(
+          : ((await pickHighest(
               active.operations,
               "response-body",
               targetUrl,
               method,
-            ) as ResponseBodyOperation | null);
+            )) as ResponseBodyOperation | null);
 
       const needsRequestBody = requestOp !== null;
       const bodyResult = await readBoundedBody(
@@ -694,7 +701,15 @@ export async function startInterceptProxy(
       let requestBody = bodyResult.body;
 
       if (needsRequestBody && requestOp !== null && active !== null) {
-        if (!authorizeOp(active, requestOp, targetUrl, method, req.headers)) {
+        if (
+          !(await authorizeOp(
+            active,
+            requestOp,
+            targetUrl,
+            method,
+            req.headers,
+          ))
+        ) {
           // Denied: pass through original body.
         } else {
           const rewritten = await rewriteRequestBody(
@@ -750,7 +765,13 @@ export async function startInterceptProxy(
         if (responseBody.byteLength > RUNTIME_LIMITS.maxResponseBodyBytes) {
           // Oversized: pass through untouched.
         } else if (
-          !authorizeOp(active, responseOp, targetUrl, method, req.headers)
+          !(await authorizeOp(
+            active,
+            responseOp,
+            targetUrl,
+            method,
+            req.headers,
+          ))
         ) {
           // Denied: pass through.
         } else {
@@ -915,7 +936,10 @@ export async function startInterceptProxy(
     );
     if (
       operation === undefined ||
-      !sourceMatches(operation.matcher.source, parsed.originalUrl)
+      !(await sourceMatchesWithinDeadline(
+        operation.matcher.source,
+        parsed.originalUrl,
+      ))
     ) {
       res.writeHead(404);
       res.end();
@@ -935,17 +959,21 @@ export async function startInterceptProxy(
       res.end();
       return;
     }
-    const allowed = revalidateAuthority(active.project, active.operations, {
-      groupId: operation.groupId,
-      ruleId: operation.ruleId,
-      url: parsed.originalUrl,
-      target,
-      method: "GET",
-      initiator:
-        initiatorFromHeaders(req.headers, parsed.originalUrl) ??
-        new URL(target).origin,
-      resourceType: operation.matcher.resourceTypes[0],
-    });
+    const allowed = await revalidateAuthority(
+      active.project,
+      active.operations,
+      {
+        groupId: operation.groupId,
+        ruleId: operation.ruleId,
+        url: parsed.originalUrl,
+        target,
+        method: "GET",
+        initiator:
+          initiatorFromHeaders(req.headers, parsed.originalUrl) ??
+          new URL(target).origin,
+        resourceType: operation.matcher.resourceTypes[0],
+      },
+    );
     if (!allowed.allowed) {
       res.writeHead(403);
       res.end();

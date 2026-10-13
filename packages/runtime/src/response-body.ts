@@ -1,10 +1,10 @@
 import {
   LIMITS,
-  matchUrlCaptures,
   type ResponseBodyAction,
   type ResponseBodyReplaceAction,
   substituteUrlCaptures,
 } from "@rogatio/schema";
+import { matchUrlCapturesWithinDeadline } from "./deadline-match.js";
 import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { fetchAuthorized } from "./outbound.js";
@@ -111,7 +111,7 @@ export async function rewriteResponseBody(
     if (captureContext === undefined) {
       text = replaceAction.body;
     } else {
-      const captures = matchUrlCaptures(
+      const captures = await matchUrlCapturesWithinDeadline(
         captureContext.urlRegex,
         captureContext.url,
       );
@@ -154,15 +154,18 @@ export async function rewriteResponseBody(
   };
 }
 
-function replaceResponseBody(
+async function replaceResponseBody(
   body: string,
   contentType: string | undefined,
   captureContext?: UrlCaptureContext,
-): RuntimeResult<ResponseBodyOutput> {
+): Promise<RuntimeResult<ResponseBodyOutput>> {
   const captures =
     captureContext === undefined
       ? []
-      : matchUrlCaptures(captureContext.urlRegex, captureContext.url);
+      : await matchUrlCapturesWithinDeadline(
+          captureContext.urlRegex,
+          captureContext.url,
+        );
   if (captureContext !== undefined && captures === null) {
     return failure("runtime.url-capture-mismatch");
   }
@@ -195,7 +198,7 @@ export async function fetchAndRewriteAuthorizedResponse(
 
   const contentType = responseHeader(response.value.headers, "content-type");
   const transformed = isReplaceAction(action)
-    ? replaceResponseBody(
+    ? await replaceResponseBody(
         action.body,
         contentType,
         operation.sourceValue === undefined

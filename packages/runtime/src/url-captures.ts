@@ -1,8 +1,8 @@
 import {
-  matchUrlCaptures,
   type RogatioQueryAction,
   substituteUrlCaptures,
 } from "@rogatio/schema";
+import { matchUrlCapturesWithinDeadline } from "./deadline-match.js";
 import { failure } from "./errors.js";
 import type { RuntimeResult } from "./types.js";
 
@@ -17,20 +17,23 @@ export interface HeaderCaptureAction {
   readonly value: string;
 }
 
-function capturesFor(
+async function capturesFor(
   context: UrlCaptureTransformContext,
-): RuntimeResult<readonly (string | undefined)[]> {
-  const captures = matchUrlCaptures(context.urlRegex, context.url);
+): Promise<RuntimeResult<readonly (string | undefined)[]>> {
+  const captures = await matchUrlCapturesWithinDeadline(
+    context.urlRegex,
+    context.url,
+  );
   return captures === null
     ? failure("runtime.url-capture-mismatch")
     : { ok: true, value: captures };
 }
 
-export function rewriteQueryWithUrlCaptures(
+export async function rewriteQueryWithUrlCaptures(
   context: UrlCaptureTransformContext,
   action: RogatioQueryAction,
-): RuntimeResult<string> {
-  const captures = capturesFor(context);
+): Promise<RuntimeResult<string>> {
+  const captures = await capturesFor(context);
   if (!captures.ok) return captures;
   let parsed: URL;
   try {
@@ -52,12 +55,12 @@ export function rewriteQueryWithUrlCaptures(
   return { ok: true, value: parsed.toString() };
 }
 
-export function rewriteHeadersWithUrlCaptures(
+export async function rewriteHeadersWithUrlCaptures(
   context: UrlCaptureTransformContext,
   headers: Readonly<Record<string, string>>,
   actions: readonly HeaderCaptureAction[],
-): RuntimeResult<Record<string, string>> {
-  const captures = capturesFor(context);
+): Promise<RuntimeResult<Record<string, string>>> {
+  const captures = await capturesFor(context);
   if (!captures.ok) return captures;
   const output: Record<string, string> = { ...headers };
   for (const action of actions) {

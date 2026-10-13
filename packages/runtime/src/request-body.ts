@@ -1,9 +1,9 @@
 import {
   hasLoneSurrogate,
   LIMITS,
-  matchUrlCaptures,
   substituteUrlCaptures,
 } from "@rogatio/schema";
+import { matchUrlCapturesWithinDeadline } from "./deadline-match.js";
 import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import { runRegexReplace } from "./regex-replace.js";
@@ -89,7 +89,7 @@ export async function rewriteRequestBody(
     }
     outputText = action.body;
     if (captureContext !== undefined) {
-      const captures = matchUrlCaptures(
+      const captures = await matchUrlCapturesWithinDeadline(
         captureContext.urlRegex,
         captureContext.url,
       );

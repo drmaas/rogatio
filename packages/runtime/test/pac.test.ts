@@ -140,4 +140,28 @@ describe("pacRoutesFromSources", () => {
       }),
     ).toBe(true);
   });
+
+  it("refuses a quantified group whose body contains alternation", () => {
+    expect(
+      isPacSafeSource({
+        key: "url",
+        operator: "regex",
+        value: "(a|aa)+",
+      }),
+    ).toBe(false);
+    expect(
+      isPacSafeSource({
+        key: "url",
+        operator: "regex",
+        value: "^http://example\\.com/(a|aa)+$",
+      }),
+    ).toBe(false);
+    expect(
+      isPacSafeSource({
+        key: "url",
+        operator: "regex",
+        value: "^https://example\\.com/(a|b)$",
+      }),
+    ).toBe(true);
+  });
 });

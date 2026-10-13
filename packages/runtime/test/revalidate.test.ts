@@ -76,8 +76,8 @@ const baseRequest = {
 };
 
 describe("revalidateAuthority", () => {
-  it("allows a matching request derived from the canonical project", () => {
-    const decision = revalidateAuthority(
+  it("allows a matching request derived from the canonical project", async () => {
+    const decision = await revalidateAuthority(
       buildProject(),
       compile(buildProject()),
       baseRequest,
@@ -90,8 +90,8 @@ describe("revalidateAuthority", () => {
     });
   });
 
-  it("denies when the url does not match the rule regex", () => {
-    const decision = revalidateAuthority(
+  it("denies when the url does not match the rule regex", async () => {
+    const decision = await revalidateAuthority(
       buildProject(),
       compile(buildProject()),
       { ...baseRequest, url: "https://other.com/x" },
@@ -99,8 +99,8 @@ describe("revalidateAuthority", () => {
     expect(decision).toEqual({ allowed: false, reason: "url-mismatch" });
   });
 
-  it("denies when the target origin is not same-origin", () => {
-    const decision = revalidateAuthority(
+  it("denies when the target origin is not same-origin", async () => {
+    const decision = await revalidateAuthority(
       buildProject(),
       compile(buildProject()),
       { ...baseRequest, target: "https://evil.com" },
@@ -108,8 +108,8 @@ describe("revalidateAuthority", () => {
     expect(decision).toEqual({ allowed: false, reason: "target-unauthorized" });
   });
 
-  it("allows absent target when the URL matches source", () => {
-    const decision = revalidateAuthority(
+  it("allows absent target when the URL matches source", async () => {
+    const decision = await revalidateAuthority(
       buildProject(),
       compile(buildProject()),
       { ...baseRequest, target: undefined },
@@ -117,8 +117,8 @@ describe("revalidateAuthority", () => {
     expect(decision.allowed).toBe(true);
   });
 
-  it("denies missing initiator for a body operation", () => {
-    const decision = revalidateAuthority(
+  it("denies missing initiator for a body operation", async () => {
+    const decision = await revalidateAuthority(
       buildBodyProject(),
       compile(buildBodyProject()),
       {
@@ -135,8 +135,8 @@ describe("revalidateAuthority", () => {
     });
   });
 
-  it("denies body transforms when the URL no longer matches source", () => {
-    const decision = revalidateAuthority(
+  it("denies body transforms when the URL no longer matches source", async () => {
+    const decision = await revalidateAuthority(
       buildBodyProject(),
       compile(buildBodyProject()),
       {
@@ -151,8 +151,8 @@ describe("revalidateAuthority", () => {
     expect(decision).toEqual({ allowed: false, reason: "url-mismatch" });
   });
 
-  it("allows http(s) initiator for body ops without an origins list", () => {
-    const decision = revalidateAuthority(
+  it("allows http(s) initiator for body ops without an origins list", async () => {
+    const decision = await revalidateAuthority(
       buildBodyProject(),
       compile(buildBodyProject()),
       {
@@ -167,8 +167,8 @@ describe("revalidateAuthority", () => {
     expect(decision.allowed).toBe(true);
   });
 
-  it("denies when the method does not match", () => {
-    const decision = revalidateAuthority(
+  it("denies when the method does not match", async () => {
+    const decision = await revalidateAuthority(
       buildProject(),
       compile(buildProject()),
       { ...baseRequest, method: "POST" },
@@ -176,8 +176,8 @@ describe("revalidateAuthority", () => {
     expect(decision).toEqual({ allowed: false, reason: "method-mismatch" });
   });
 
-  it("denies when the resource type is not authorized", () => {
-    const decision = revalidateAuthority(
+  it("denies when the resource type is not authorized", async () => {
+    const decision = await revalidateAuthority(
       buildProject(),
       compile(buildProject()),
       { ...baseRequest, resourceType: "script" },
@@ -188,8 +188,8 @@ describe("revalidateAuthority", () => {
     });
   });
 
-  it("denies an unknown operation", () => {
-    const decision = revalidateAuthority(
+  it("denies an unknown operation", async () => {
+    const decision = await revalidateAuthority(
       buildProject(),
       compile(buildProject()),
       {
@@ -200,22 +200,26 @@ describe("revalidateAuthority", () => {
     expect(decision).toEqual({ allowed: false, reason: "operation-unknown" });
   });
 
-  it("denies when the project is inconsistent with the operations", () => {
+  it("denies when the project is inconsistent with the operations", async () => {
     const operations = compile(buildProject());
     const stripped = buildProject({
       groups: [{ id: "g1", name: "g", rules: [] }],
     });
-    const decision = revalidateAuthority(stripped, operations, baseRequest);
+    const decision = await revalidateAuthority(
+      stripped,
+      operations,
+      baseRequest,
+    );
     expect(decision).toEqual({
       allowed: false,
       reason: "project-inconsistent",
     });
   });
 
-  it("rejects hostile project shapes (cycle) as project-invalid", () => {
+  it("rejects hostile project shapes (cycle) as project-invalid", async () => {
     const cycle: Record<string, unknown> = {};
     cycle.self = cycle;
-    const decision = revalidateAuthority(
+    const decision = await revalidateAuthority(
       cycle,
       compile(buildProject()),
       baseRequest,
@@ -223,10 +227,10 @@ describe("revalidateAuthority", () => {
     expect(decision).toEqual({ allowed: false, reason: "project-invalid" });
   });
 
-  it("rejects symbol-keyed project shapes as project-invalid", () => {
+  it("rejects symbol-keyed project shapes as project-invalid", async () => {
     const hostile = Object.create(null);
     Object.defineProperty(hostile, Symbol("x"), { value: 1, enumerable: true });
-    const decision = revalidateAuthority(
+    const decision = await revalidateAuthority(
       hostile,
       compile(buildProject()),
       baseRequest,

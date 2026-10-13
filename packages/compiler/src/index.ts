@@ -28,6 +28,7 @@ export {
   type SteeredOrigin,
   sameOrigin,
   sourceMatches,
+  sourceMatchText,
   steeredRequestOrigin,
 } from "./source-match.js";
 export type {

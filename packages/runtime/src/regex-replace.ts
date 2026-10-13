@@ -2,8 +2,10 @@ import { Worker } from "node:worker_threads";
 
 // The worker script announces readiness, acknowledges each job before running
 // it, then posts the result. The ack lets the caller start the execution
-// deadline only when the replace actually begins, so slow worker boot (for
+// deadline only when the regex actually begins, so slow worker boot (for
 // example on cold CI runners) can never consume the regex deadline.
+// `replace` is a global unicode substitution. `test` and `exec` are flagless,
+// matching URL source matching and capture expansion.
 const REGEX_WORKER_SOURCE = `
 const workerThreads =
   typeof process.getBuiltinModule === "function"
@@ -12,11 +14,35 @@ const workerThreads =
 const { parentPort } = workerThreads;
 parentPort.postMessage({ type: "ready" });
 parentPort.on("message", (msg) => {
-  if (msg.type !== "replace") return;
+  if (msg.type !== "replace" && msg.type !== "test" && msg.type !== "exec") return;
   parentPort.postMessage({ id: msg.id, type: "ack" });
   try {
-    const out = msg.text.replace(new RegExp(msg.pattern, "gu"), msg.replacement);
-    parentPort.postMessage({ id: msg.id, type: "result", ok: true, out });
+    if (msg.type === "replace") {
+      const out = msg.text.replace(new RegExp(msg.pattern, "gu"), msg.replacement);
+      parentPort.postMessage({ id: msg.id, type: "result", ok: true, out });
+      return;
+    }
+    const regex = new RegExp(msg.pattern);
+    if (msg.type === "test") {
+      parentPort.postMessage({
+        id: msg.id,
+        type: "result",
+        ok: true,
+        matched: regex.test(msg.text),
+      });
+      return;
+    }
+    const match = regex.exec(msg.text);
+    const captures =
+      match === null
+        ? null
+        : match.slice(1).map((part) => (part === undefined ? null : part));
+    parentPort.postMessage({
+      id: msg.id,
+      type: "result",
+      ok: true,
+      captures,
+    });
   } catch (err) {
     parentPort.postMessage({
       id: msg.id,
@@ -132,15 +158,24 @@ function bootRegexWorker(): Promise<Worker> {
   return boot;
 }
 
+type RegexJobType = "replace" | "test" | "exec";
+
+interface RegexJobResult {
+  readonly out?: string;
+  readonly matched?: boolean;
+  readonly captures?: readonly (string | null)[] | null;
+}
+
 function runOnRegexWorker(
   worker: Worker,
   id: number,
+  type: RegexJobType,
   text: string,
   pattern: string,
-  replacement: string,
+  replacement: string | undefined,
   deadlineMs: number,
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
+): Promise<RegexJobResult> {
+  return new Promise<RegexJobResult>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const cleanup = () => {
       if (timer !== null) clearTimeout(timer);
@@ -153,6 +188,8 @@ function runOnRegexWorker(
       type?: string;
       ok?: boolean;
       out?: string;
+      matched?: boolean;
+      captures?: readonly (string | null)[] | null;
       error?: string;
     }) => {
       if (msg.id !== id) return;
@@ -168,8 +205,15 @@ function runOnRegexWorker(
       }
       if (msg.type === "result") {
         cleanup();
-        if (msg.ok && typeof msg.out === "string") resolve(msg.out);
-        else reject(new Error(msg.error || "regex-invalid"));
+        if (!msg.ok) {
+          reject(new Error(msg.error || "regex-invalid"));
+          return;
+        }
+        resolve({
+          ...(typeof msg.out === "string" ? { out: msg.out } : {}),
+          ...(typeof msg.matched === "boolean" ? { matched: msg.matched } : {}),
+          ...(msg.captures !== undefined ? { captures: msg.captures } : {}),
+        });
       }
     };
     const onError = (error: Error) => {
@@ -183,8 +227,20 @@ function runOnRegexWorker(
     worker.on("message", onMessage);
     worker.once("error", onError);
     worker.once("exit", onExit);
-    worker.postMessage({ id, type: "replace", text, pattern, replacement });
+    worker.postMessage({
+      id,
+      type,
+      text,
+      pattern,
+      ...(replacement !== undefined ? { replacement } : {}),
+    });
   });
+}
+
+function nextJobId(): number {
+  const id = nextRegexJobId;
+  nextRegexJobId += 1;
+  return id;
 }
 
 export function runRegexReplace(
@@ -193,20 +249,108 @@ export function runRegexReplace(
   replacement: string,
   deadlineMs: number,
 ): Promise<string> {
-  const id = nextRegexJobId;
-  nextRegexJobId += 1;
+  const id = nextJobId();
   return bootRegexWorker().then(
     (worker) =>
-      runOnRegexWorker(worker, id, text, pattern, replacement, deadlineMs),
+      runOnRegexWorker(
+        worker,
+        id,
+        "replace",
+        text,
+        pattern,
+        replacement,
+        deadlineMs,
+      ).then((result) => {
+        if (typeof result.out !== "string") throw new Error("regex-invalid");
+        return result.out;
+      }),
     () => {
       // Only boot unavailability falls back to an inline replace; a job that
       // dies with the worker (deadline kill, crash) must fail closed instead
-      // of running an untrusted regex unprotected on the main thread.
+      // of running the regex on the caller thread.
       try {
         return text.replace(new RegExp(pattern, "gu"), replacement);
       } catch {
         throw new Error("regex-invalid");
       }
     },
+  );
+}
+
+// URL source test/exec share the replace worker and its execution deadline.
+// A deadline or a worker failure is a non-match so the caller leaves the
+// request unchanged. Only worker-boot failure falls back to an inline call.
+function inlineRegexTest(pattern: string, text: string): boolean {
+  try {
+    return new RegExp(pattern).test(text);
+  } catch {
+    return false;
+  }
+}
+
+function inlineRegexExec(
+  pattern: string,
+  text: string,
+): readonly (string | undefined)[] | null {
+  try {
+    const match = new RegExp(pattern).exec(text);
+    return match === null ? null : match.slice(1);
+  } catch {
+    return null;
+  }
+}
+
+function capturesFromWorker(
+  captures: readonly (string | null)[] | null | undefined,
+): readonly (string | undefined)[] | null {
+  if (captures === null || captures === undefined) return null;
+  return captures.map((part) => (part === null ? undefined : part));
+}
+
+export function runRegexTest(
+  text: string,
+  pattern: string,
+  deadlineMs: number,
+): Promise<boolean> {
+  const id = nextJobId();
+  return bootRegexWorker().then(
+    (worker) =>
+      runOnRegexWorker(
+        worker,
+        id,
+        "test",
+        text,
+        pattern,
+        undefined,
+        deadlineMs,
+      ).then(
+        (result) => result.matched === true,
+        () => false,
+      ),
+    () => inlineRegexTest(pattern, text),
+  );
+}
+
+export function runRegexExec(
+  text: string,
+  pattern: string,
+  deadlineMs: number,
+): Promise<readonly (string | undefined)[] | null> {
+  const id = nextJobId();
+  return bootRegexWorker().then(
+    (worker) =>
+      runOnRegexWorker(
+        worker,
+        id,
+        "exec",
+        text,
+        pattern,
+        undefined,
+        deadlineMs,
+      ).then(
+        (result) => capturesFromWorker(result.captures),
+        () => null,
+      ),
+    () => inlineRegexExec(pattern, text),
   );
 }
