@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  type AddressClassification,
   authorizeExact,
   classifyAddress,
   fetchAuthorized,
@@ -40,7 +41,56 @@ function fakeTransport(
   };
 }
 
+const addressClassifications = [
+  ["0.0.0.0", "unspecified"],
+  ["10.0.0.1", "private"],
+  ["172.16.0.1", "private"],
+  ["172.31.255.255", "private"],
+  ["172.32.0.1", "public"],
+  ["192.168.1.1", "private"],
+  ["127.0.0.1", "loopback"],
+  ["169.254.1.1", "link-local"],
+  ["100.64.0.1", "carrier-grade"],
+  ["100.127.255.255", "carrier-grade"],
+  ["100.128.0.1", "public"],
+  ["192.0.0.1", "reserved"],
+  ["192.0.2.1", "reserved"],
+  ["192.88.99.1", "reserved"],
+  ["198.18.0.1", "benchmarking"],
+  ["198.51.100.1", "documentation"],
+  ["203.0.113.1", "documentation"],
+  ["224.0.0.1", "multicast"],
+  ["240.0.0.1", "multicast"],
+  ["::", "unspecified"],
+  ["::1", "loopback"],
+  ["::ffff:127.0.0.1", "loopback"],
+  ["::ffff:10.0.0.1", "private"],
+  ["::ffff:100.64.0.1", "carrier-grade"],
+  ["::ffff:8.8.8.8", "public"],
+  ["fc00::1", "private"],
+  ["fd00::1", "private"],
+  ["fe80::1", "link-local"],
+  ["ff02::1", "multicast"],
+  ["2001:db8::1", "documentation"],
+  ["2001::1", "reserved"],
+  ["2001:2::1", "benchmarking"],
+  ["2001:10::1", "reserved"],
+  ["64:ff9b::1", "reserved"],
+  ["64:ff9b::10.0.0.1", "reserved"],
+  ["100::1", "reserved"],
+  ["93.184.216.34", "public"],
+  ["2001:4860:4860::8888", "public"],
+] as const satisfies readonly (readonly [string, AddressClassification])[];
+
 describe("F6 outbound address and transport policy", () => {
+  it.each(addressClassifications)(
+    "classifies %s as %s",
+    (address, classification) => {
+      expect(classifyAddress(address)).toBe(classification);
+      expect(isPublicAddress(address)).toBe(classification === "public");
+    },
+  );
+
   it("classifies loopback, private, special-use, mapped, and public addresses", () => {
     const unsafe = [
       "0.0.0.0",
@@ -105,6 +155,39 @@ describe("F6 outbound address and transport policy", () => {
     });
     expect(calls).toHaveLength(0);
   });
+
+  it.each([
+    ["64:ff9b::1", 6],
+    ["192.0.0.1", 4],
+  ] as const)(
+    "denies a resolver answer of only %s before transport",
+    async (address, family) => {
+      const calls: unknown[] = [];
+      const result = await fetchAuthorized(networkOperation(), {
+        resolver: {
+          async lookup(): Promise<readonly ResolvedAddress[]> {
+            return [{ address, family }];
+          },
+        },
+        transport: fakeTransport(
+          {
+            status: 200,
+            headers: [],
+            body: (async function* () {
+              yield new Uint8Array([1]);
+            })(),
+          },
+          calls,
+        ),
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        error: { code: "runtime.address-denied" },
+      });
+      expect(calls).toHaveLength(0);
+    },
+  );
 
   it("pins one deterministic public address and strips caller credentials", async () => {
     const calls: unknown[] = [];
