@@ -4,8 +4,10 @@ const SCAN_LIMIT = 4096;
 
 /**
  * Refuse a quantified group that contains an unbounded quantifier (`*`, `+`,
- * or `{n,}`). A group such as `([^/]+)` is safe: the `+` is inside the group,
- * and the group itself is not quantified. Inconclusive patterns (lookaround,
+ * or `{n,}`), and a quantified group (`?`, `*`, `+`, or `{...}`) whose body
+ * contains `|`. Either form can take unbounded time to decide a non-match.
+ * A group such as `([^/]+)` is safe: the `+` is inside the group, and the
+ * group itself is not quantified. Inconclusive patterns (lookaround,
  * backreference, scan overflow) are unsafe.
  */
 export function isPacSafeSource(source: SourceCondition): boolean {
@@ -40,6 +42,9 @@ function scanPacSafety(pattern: string): SafetyScan {
       const inner = scanPacSafety(groupBody);
       if (!inner.safe) return { safe: false };
       const quantifier = quantifierAt(pattern, groupEnd + 1);
+      if (quantifier !== null && containsAlternation(groupBody)) {
+        return { safe: false };
+      }
       if (
         quantifier === "unbounded" &&
         containsUnboundedQuantifier(groupBody)
@@ -63,6 +68,7 @@ function quantifierAt(
 ): "bounded" | "unbounded" | null {
   const char = pattern[index];
   if (char === "*" || char === "+") return "unbounded";
+  if (char === "?") return "bounded";
   if (char !== "{") return null;
   const close = pattern.indexOf("}", index);
   if (close === -1) return "unbounded";
@@ -73,7 +79,7 @@ function quantifierAt(
 
 function skipQuantifier(pattern: string, index: number): number {
   const char = pattern[index];
-  if (char === "*" || char === "+") return index + 1;
+  if (char === "*" || char === "+" || char === "?") return index + 1;
   if (char !== "{") return index;
   const close = pattern.indexOf("}", index);
   return close === -1 ? pattern.length : close + 1;
@@ -120,6 +126,24 @@ function skipGroup(pattern: string, openIndex: number): number {
     index += 1;
   }
   return pattern.length;
+}
+
+function containsAlternation(groupBody: string): boolean {
+  let index = 0;
+  while (index < groupBody.length) {
+    const char = groupBody[index];
+    if (char === "\\") {
+      index += 2;
+      continue;
+    }
+    if (char === "[") {
+      index = skipCharacterClass(groupBody, index + 1);
+      continue;
+    }
+    if (char === "|") return true;
+    index += 1;
+  }
+  return false;
 }
 
 function containsUnboundedQuantifier(groupBody: string): boolean {

@@ -3,6 +3,7 @@ import { connect, type Socket } from "node:net";
 import { compileProject, type RogatioOperation } from "@rogatio/compiler";
 import type { RogatioProject } from "@rogatio/schema";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { sourceMatchesWithinDeadline } from "../src/deadline-match.js";
 import {
   type InterceptProxyHandle,
   startInterceptProxy,
@@ -277,6 +278,48 @@ describe("intercept-proxy data path", () => {
     expect(result.status).toBe(200);
     expect(seen).toBe('{"replaced":true}');
     expect(JSON.parse(result.body).receivedBody).toBe('{"replaced":true}');
+  });
+
+  it("leaves a non-matching nested URL pattern unchanged without blocking", async () => {
+    let seen = "";
+    const up = await listen((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => {
+        seen = Buffer.concat(chunks).toString("utf8");
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end('{"ok":true}');
+      });
+    });
+    upstream = up.server;
+    const project = buildProject(up.origin, [
+      {
+        id: "r-slow",
+        name: "slow",
+        urlRegex: "^http://example\\.com/(a|aa)+$",
+        origins: [],
+        resourceTypes: ["xmlhttprequest"],
+        priority: 10,
+        method: "POST",
+        type: "request-body",
+        requestBody: { mode: "replace", body: '{"replaced":true}' },
+      },
+    ]);
+    proxy = await startDataProxy(up.port, project);
+    await sourceMatchesWithinDeadline(
+      { key: "url", operator: "regex", value: "^https://example\\.com/$" },
+      "https://example.com/",
+    );
+    const url = `http://example.com/${"a".repeat(60)}!`;
+    const start = Date.now();
+    const result = await proxyFetch(proxy.endpoint, url, {
+      method: "POST",
+      body: '{"original":true}',
+    });
+    expect(Date.now() - start).toBeLessThan(2000);
+    expect(result.status).toBe(200);
+    expect(result.body).toContain('"ok":true');
+    expect(seen).toBe('{"original":true}');
   });
 
   it("passes non-matching traffic through untouched", async () => {

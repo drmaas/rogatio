@@ -2,22 +2,37 @@ import type { SourceCondition } from "@rogatio/schema";
 import { compileUrlRegex } from "@rogatio/schema";
 
 /**
+ * Text a source regex is applied to.
+ * `key: "url"` — the full URL string.
+ * `key: "host"` — `URL.hostname` only (no scheme, no port).
+ * Returns null when a host-key URL cannot be parsed.
+ */
+export function sourceMatchText(
+  source: SourceCondition,
+  url: string,
+): string | null {
+  if (source.key === "url") return url;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Match a request URL against a rule source condition.
  * `key: "url"` — flagless regex on the full URL string.
  * `key: "host"` — flagless regex on `URL.hostname` only (no scheme, no port).
+ *
+ * Runs the regex on the caller thread. The native host matches through the
+ * deadline worker instead, and treats an elapsed deadline as a non-match.
  */
 export function sourceMatches(source: SourceCondition, url: string): boolean {
   const regex = compileUrlRegex(source.value);
   if (regex === null) return false;
-  if (source.key === "url") {
-    return regex.test(url);
-  }
-  try {
-    const hostname = new URL(url).hostname;
-    return regex.test(hostname);
-  } catch {
-    return false;
-  }
+  const text = sourceMatchText(source, url);
+  if (text === null) return false;
+  return regex.test(text);
 }
 
 /**

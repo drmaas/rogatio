@@ -2,8 +2,10 @@ import { Worker } from "node:worker_threads";
 
 // The worker script announces readiness, acknowledges each job before running
 // it, then posts the result. The ack lets the caller start the execution
-// deadline only when the replace actually begins, so slow worker boot (for
+// deadline only when the regex actually begins, so slow worker boot (for
 // example on cold CI runners) can never consume the regex deadline.
+// `replace` is a global unicode substitution. `test` and `exec` are flagless,
+// matching URL source matching and capture expansion.
 const REGEX_WORKER_SOURCE = `
 const workerThreads =
   typeof process.getBuiltinModule === "function"
@@ -12,11 +14,35 @@ const workerThreads =
 const { parentPort } = workerThreads;
 parentPort.postMessage({ type: "ready" });
 parentPort.on("message", (msg) => {
-  if (msg.type !== "replace") return;
+  if (msg.type !== "replace" && msg.type !== "test" && msg.type !== "exec") return;
   parentPort.postMessage({ id: msg.id, type: "ack" });
   try {
-    const out = msg.text.replace(new RegExp(msg.pattern, "gu"), msg.replacement);
-    parentPort.postMessage({ id: msg.id, type: "result", ok: true, out });
+    if (msg.type === "replace") {
+      const out = msg.text.replace(new RegExp(msg.pattern, "gu"), msg.replacement);
+      parentPort.postMessage({ id: msg.id, type: "result", ok: true, out });
+      return;
+    }
+    const regex = new RegExp(msg.pattern);
+    if (msg.type === "test") {
+      parentPort.postMessage({
+        id: msg.id,
+        type: "result",
+        ok: true,
+        matched: regex.test(msg.text),
+      });
+      return;
+    }
+    const match = regex.exec(msg.text);
+    const captures =
+      match === null
+        ? null
+        : match.slice(1).map((part) => (part === undefined ? null : part));
+    parentPort.postMessage({
+      id: msg.id,
+      type: "result",
+      ok: true,
+      captures,
+    });
   } catch (err) {
     parentPort.postMessage({
       id: msg.id,
@@ -40,6 +66,9 @@ let nextRegexJobId = 1;
 // __resetRegexWorkerForTests). Consumed by a single boot, then reset to zero.
 let regexWorkerBootDelayForTestsMs = 0;
 
+// Test-only: the next bootRegexWorker() call rejects once, then clears.
+let failNextRegexWorkerBootForTests = false;
+
 // Test-only: discards any warm worker and delays the next boot so tests on
 // fast machines can simulate cold CI runners. Pass 0 to only reset state.
 export function __resetRegexWorkerForTests(bootDelayMs = 0): void {
@@ -47,7 +76,14 @@ export function __resetRegexWorkerForTests(bootDelayMs = 0): void {
   regexWorker = null;
   regexWorkerBoot = null;
   regexWorkerBootDelayForTestsMs = bootDelayMs;
+  failNextRegexWorkerBootForTests = false;
   if (worker !== null) worker.terminate().catch(() => {});
+}
+
+// Test-only: the next boot rejects without starting a worker.
+export function __failNextRegexWorkerBootForTests(): void {
+  __resetRegexWorkerForTests(0);
+  failNextRegexWorkerBootForTests = true;
 }
 
 function discardRegexWorker(worker: Worker): void {
@@ -59,6 +95,10 @@ function discardRegexWorker(worker: Worker): void {
 }
 
 function bootRegexWorker(): Promise<Worker> {
+  if (failNextRegexWorkerBootForTests) {
+    failNextRegexWorkerBootForTests = false;
+    return Promise.reject(new Error("regex-worker-boot-failed"));
+  }
   if (regexWorker !== null) return Promise.resolve(regexWorker);
   if (regexWorkerBoot !== null) return regexWorkerBoot;
   const boot = new Promise<Worker>((resolve, reject) => {
@@ -124,23 +164,32 @@ function bootRegexWorker(): Promise<Worker> {
     }
   });
   regexWorkerBoot = boot;
-  // Never cache a rejected boot: a transient failure must not silently
-  // downgrade every future regex replace to the unprotected inline path.
+  // Never cache a rejected boot. A transient failure must not fail every
+  // later regex job.
   void boot.catch(() => {
     if (regexWorkerBoot === boot) regexWorkerBoot = null;
   });
   return boot;
 }
 
+type RegexJobType = "replace" | "test" | "exec";
+
+interface RegexJobResult {
+  readonly out?: string;
+  readonly matched?: boolean;
+  readonly captures?: readonly (string | null)[] | null;
+}
+
 function runOnRegexWorker(
   worker: Worker,
   id: number,
+  type: RegexJobType,
   text: string,
   pattern: string,
-  replacement: string,
+  replacement: string | undefined,
   deadlineMs: number,
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
+): Promise<RegexJobResult> {
+  return new Promise<RegexJobResult>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const cleanup = () => {
       if (timer !== null) clearTimeout(timer);
@@ -153,6 +202,8 @@ function runOnRegexWorker(
       type?: string;
       ok?: boolean;
       out?: string;
+      matched?: boolean;
+      captures?: readonly (string | null)[] | null;
       error?: string;
     }) => {
       if (msg.id !== id) return;
@@ -168,8 +219,15 @@ function runOnRegexWorker(
       }
       if (msg.type === "result") {
         cleanup();
-        if (msg.ok && typeof msg.out === "string") resolve(msg.out);
-        else reject(new Error(msg.error || "regex-invalid"));
+        if (!msg.ok) {
+          reject(new Error(msg.error || "regex-invalid"));
+          return;
+        }
+        resolve({
+          ...(typeof msg.out === "string" ? { out: msg.out } : {}),
+          ...(typeof msg.matched === "boolean" ? { matched: msg.matched } : {}),
+          ...(msg.captures !== undefined ? { captures: msg.captures } : {}),
+        });
       }
     };
     const onError = (error: Error) => {
@@ -183,8 +241,20 @@ function runOnRegexWorker(
     worker.on("message", onMessage);
     worker.once("error", onError);
     worker.once("exit", onExit);
-    worker.postMessage({ id, type: "replace", text, pattern, replacement });
+    worker.postMessage({
+      id,
+      type,
+      text,
+      pattern,
+      ...(replacement !== undefined ? { replacement } : {}),
+    });
   });
+}
+
+function nextJobId(): number {
+  const id = nextRegexJobId;
+  nextRegexJobId += 1;
+  return id;
 }
 
 export function runRegexReplace(
@@ -193,20 +263,80 @@ export function runRegexReplace(
   replacement: string,
   deadlineMs: number,
 ): Promise<string> {
-  const id = nextRegexJobId;
-  nextRegexJobId += 1;
+  const id = nextJobId();
+  // Boot failure rejects. Callers leave the body unchanged. The regex never
+  // runs on the caller thread.
+  return bootRegexWorker().then((worker) =>
+    runOnRegexWorker(
+      worker,
+      id,
+      "replace",
+      text,
+      pattern,
+      replacement,
+      deadlineMs,
+    ).then((result) => {
+      if (typeof result.out !== "string") throw new Error("regex-invalid");
+      return result.out;
+    }),
+  );
+}
+
+// URL source test/exec share the replace worker and its execution deadline.
+// A deadline, a worker crash, or a worker-boot failure is a non-match so the
+// caller leaves the request unchanged. The regex never runs on the caller thread.
+
+function capturesFromWorker(
+  captures: readonly (string | null)[] | null | undefined,
+): readonly (string | undefined)[] | null {
+  if (captures === null || captures === undefined) return null;
+  return captures.map((part) => (part === null ? undefined : part));
+}
+
+export function runRegexTest(
+  text: string,
+  pattern: string,
+  deadlineMs: number,
+): Promise<boolean> {
+  const id = nextJobId();
   return bootRegexWorker().then(
     (worker) =>
-      runOnRegexWorker(worker, id, text, pattern, replacement, deadlineMs),
-    () => {
-      // Only boot unavailability falls back to an inline replace; a job that
-      // dies with the worker (deadline kill, crash) must fail closed instead
-      // of running an untrusted regex unprotected on the main thread.
-      try {
-        return text.replace(new RegExp(pattern, "gu"), replacement);
-      } catch {
-        throw new Error("regex-invalid");
-      }
-    },
+      runOnRegexWorker(
+        worker,
+        id,
+        "test",
+        text,
+        pattern,
+        undefined,
+        deadlineMs,
+      ).then(
+        (result) => result.matched === true,
+        () => false,
+      ),
+    () => false,
+  );
+}
+
+export function runRegexExec(
+  text: string,
+  pattern: string,
+  deadlineMs: number,
+): Promise<readonly (string | undefined)[] | null> {
+  const id = nextJobId();
+  return bootRegexWorker().then(
+    (worker) =>
+      runOnRegexWorker(
+        worker,
+        id,
+        "exec",
+        text,
+        pattern,
+        undefined,
+        deadlineMs,
+      ).then(
+        (result) => capturesFromWorker(result.captures),
+        () => null,
+      ),
+    () => null,
   );
 }

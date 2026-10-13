@@ -1,6 +1,7 @@
 import type { RogatioOperation } from "@rogatio/compiler";
-import { sameOrigin, sourceMatches } from "@rogatio/compiler";
+import { sameOrigin } from "@rogatio/compiler";
 import { normalizeSiteOrigin, type ResourceType } from "@rogatio/schema";
+import { sourceMatchesWithinDeadline } from "./deadline-match.js";
 import { snapshotOwnData } from "./snapshot.js";
 import type {
   AuthorityDecision,
@@ -43,11 +44,11 @@ function isBodyOperation(operation: RogatioOperation): boolean {
  * Re-derive request authority from the canonical project plus the compiled
  * operations. Never reads a browser-supplied grant boolean (spec REQ-014..REQ-023).
  */
-export function revalidateAuthority(
+export async function revalidateAuthority(
   project: unknown,
   operations: readonly RogatioOperation[],
   request: RevalidationRequest,
-): AuthorityDecision {
+): Promise<AuthorityDecision> {
   const projectSnap = snapshotOwnData(project);
   if (!projectSnap.valid) return { allowed: false, reason: "project-invalid" };
   const opsSnap = snapshotOwnData(operations);
@@ -76,7 +77,7 @@ export function revalidateAuthority(
   }
 
   const matcher = operation.matcher;
-  if (!sourceMatches(matcher.source, request.url)) {
+  if (!(await sourceMatchesWithinDeadline(matcher.source, request.url))) {
     return { allowed: false, reason: "url-mismatch" };
   }
 

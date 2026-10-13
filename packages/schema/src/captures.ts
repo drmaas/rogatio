@@ -141,7 +141,11 @@ export function substituteUrlCaptures(
   return output;
 }
 
-/** Return URL regex captures for a complete request URL. */
+/**
+ * Return URL regex captures for a complete request URL.
+ * Runs exec on the caller thread. The native host uses the deadline worker
+ * and treats an elapsed deadline as a non-match.
+ */
 export function matchUrlCaptures(
   urlRegex: string,
   url: string,

@@ -10,8 +10,8 @@ describe("runtime URL action captures", () => {
     urlRegex: "^https://example\\.com/users/([^?]+)",
   };
 
-  it("rewrites query set/remove values from URL captures", () => {
-    const result = rewriteQueryWithUrlCaptures(context, {
+  it("rewrites query set/remove values from URL captures", async () => {
+    const result = await rewriteQueryWithUrlCaptures(context, {
       type: "query",
       params: [
         { name: "user", value: "$1" },
@@ -24,8 +24,8 @@ describe("runtime URL action captures", () => {
     });
   });
 
-  it("rewrites and appends header values from URL captures", () => {
-    const result = rewriteHeadersWithUrlCaptures(
+  it("rewrites and appends header values from URL captures", async () => {
+    const result = await rewriteHeadersWithUrlCaptures(
       { ...context, url: "https://example.com/users/alice" },
       { "X-User": "existing" },
       [
