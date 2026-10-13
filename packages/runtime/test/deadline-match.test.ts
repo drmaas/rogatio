@@ -3,6 +3,12 @@ import {
   matchUrlCapturesWithinDeadline,
   sourceMatchesWithinDeadline,
 } from "../src/deadline-match.js";
+import {
+  __failNextRegexWorkerBootForTests,
+  __resetRegexWorkerForTests,
+  runRegexExec,
+  runRegexTest,
+} from "../src/regex-replace.js";
 
 describe("deadline-bound URL source matching", () => {
   it("matches ordinary literal and linear URL and host patterns", async () => {
@@ -101,5 +107,30 @@ describe("deadline-bound URL source matching", () => {
         "https://example.com/api",
       ),
     ).resolves.toBe(true);
+  });
+
+  it("returns a non-match promptly when the worker fails to boot", async () => {
+    const pattern = "^(a+)+$";
+    const text = `${"a".repeat(30)}!`;
+
+    __failNextRegexWorkerBootForTests();
+    try {
+      const start = Date.now();
+      await expect(runRegexTest(text, pattern, 250)).resolves.toBe(false);
+      expect(Date.now() - start).toBeLessThan(1000);
+    } finally {
+      __resetRegexWorkerForTests();
+    }
+
+    __failNextRegexWorkerBootForTests();
+    try {
+      const start = Date.now();
+      await expect(runRegexExec(text, pattern, 250)).resolves.toBeNull();
+      expect(Date.now() - start).toBeLessThan(1000);
+    } finally {
+      __resetRegexWorkerForTests();
+    }
+
+    await expect(runRegexTest("abc", "^ab", 250)).resolves.toBe(true);
   });
 });

@@ -7,6 +7,10 @@ import {
   rewriteResponseBody,
 } from "../src/index.js";
 import { RUNTIME_LIMITS } from "../src/limits.js";
+import {
+  __failNextRegexWorkerBootForTests,
+  __resetRegexWorkerForTests,
+} from "../src/regex-replace.js";
 import { makeGrant, makePresetInput } from "./helpers.js";
 
 describe(" response-body transformation", () => {
@@ -120,6 +124,27 @@ describe(" response-body transformation", () => {
     expect(after.ok).toBe(true);
     if (after.ok) {
       expect(new TextDecoder().decode(after.value.body)).toBe("jello");
+    }
+  });
+
+  it("fails closed promptly when the worker fails to boot", async () => {
+    __failNextRegexWorkerBootForTests();
+    try {
+      const start = Date.now();
+      const result = await rewriteResponseBody(
+        {
+          contentType: "text/plain",
+          body: new TextEncoder().encode(`${"a".repeat(30)}!`),
+        },
+        [{ pattern: "(a+)+$", replacement: "b" }],
+      );
+      expect(Date.now() - start).toBeLessThan(1000);
+      expect(result).toEqual({
+        ok: false,
+        error: { code: "runtime.invalid-canonical-value" },
+      });
+    } finally {
+      __resetRegexWorkerForTests();
     }
   });
 

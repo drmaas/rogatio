@@ -311,7 +311,7 @@ The macOS native-messaging runtime is the single native host that response-body 
 Four owned layers:
 
 - **Lifecycle controller:** explicit `activate` / `deactivate` / `status` with guarded states `stopped → starting → started → stopping → stopped`, idempotent `deactivate()`, and a capability-based activation gate that reports `unsupported` only when a trusted device-local CA cannot be provisioned or Chrome PAC routing would collide with an existing controlling proxy/PAC/extension/enterprise policy.
-- **Revalidation core:** `revalidateAuthority(context)` independently re-derives authority from the validated schema project and compiled compiler operation for an incoming request. It does not trust browser host access or any client-supplied grant flag; the AND of rule existence, **source condition** match (URL or host key), method match, resource-type match, initiator scope, and same-origin constraints must all hold before any body work. The host runs that source regex `test` on the shared regex deadline worker (`maxRegexDeadlineMs`, 250 ms). An elapsed deadline is a non-match, so the request is left unchanged. URL-capture `exec` uses the same worker and the same non-match result.
+- **Revalidation core:** `revalidateAuthority(context)` independently re-derives authority from the validated schema project and compiled compiler operation for an incoming request. It does not trust browser host access or any client-supplied grant flag; the AND of rule existence, **source condition** match (URL or host key), method match, resource-type match, initiator scope, and same-origin constraints must all hold before any body work. The host runs that source regex `test` on the shared regex deadline worker (`maxRegexDeadlineMs`, 250 ms). An elapsed deadline or a worker-boot failure is a non-match, so the request is left unchanged. URL-capture `exec` uses the same worker and the same non-match result. The regex does not run on the caller thread.
 - **Control envelope:** a versioned `f14-v1` JSON channel (`start`, `stop`, `status`, `authorize`, `transform-request-meta`, `transform-response-meta`) carrying metadata only. Bodies never cross the envelope; a structural test proves it.
 - **Interception gate (capability-based):** scoped Chrome PAC generation as a deterministic pure function, plus an ephemeral TLS proxy / device-local CA module reachable only after a successful capability-based activation. When the required capabilities are absent, it returns `runtime.unsupported` and performs no socket or certificate work, regardless of OS.
 
@@ -990,8 +990,9 @@ Accepted media types are `application/json`, valid `application/*+json`,
 body before discarding it. Regex mode decodes strict UTF-8, constructs one ECMAScript
 `gu` regular expression, and uses standard `String.replace` replacement expansion.
 Output is UTF-8 and bounded to 4 MiB. Regex execution runs in an independently
-terminable boundary with a 250 ms deadline plus the complete operation timeout. Failure
-blocks before upstream and emits only a stable redacted error code.
+terminable boundary with a 250 ms deadline plus the complete operation timeout. A worker
+that fails to boot fails the operation closed and does not run the regex on the caller
+thread. Failure blocks before upstream and emits only a stable redacted error code.
 
 Cookie and Authorization headers are preserved unchanged when the request otherwise
 passes. Host/authority and Content-Length are reconstructed. Hop-by-hop, proxy,

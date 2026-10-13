@@ -66,6 +66,9 @@ let nextRegexJobId = 1;
 // __resetRegexWorkerForTests). Consumed by a single boot, then reset to zero.
 let regexWorkerBootDelayForTestsMs = 0;
 
+// Test-only: the next bootRegexWorker() call rejects once, then clears.
+let failNextRegexWorkerBootForTests = false;
+
 // Test-only: discards any warm worker and delays the next boot so tests on
 // fast machines can simulate cold CI runners. Pass 0 to only reset state.
 export function __resetRegexWorkerForTests(bootDelayMs = 0): void {
@@ -73,7 +76,14 @@ export function __resetRegexWorkerForTests(bootDelayMs = 0): void {
   regexWorker = null;
   regexWorkerBoot = null;
   regexWorkerBootDelayForTestsMs = bootDelayMs;
+  failNextRegexWorkerBootForTests = false;
   if (worker !== null) worker.terminate().catch(() => {});
+}
+
+// Test-only: the next boot rejects without starting a worker.
+export function __failNextRegexWorkerBootForTests(): void {
+  __resetRegexWorkerForTests(0);
+  failNextRegexWorkerBootForTests = true;
 }
 
 function discardRegexWorker(worker: Worker): void {
@@ -85,6 +95,10 @@ function discardRegexWorker(worker: Worker): void {
 }
 
 function bootRegexWorker(): Promise<Worker> {
+  if (failNextRegexWorkerBootForTests) {
+    failNextRegexWorkerBootForTests = false;
+    return Promise.reject(new Error("regex-worker-boot-failed"));
+  }
   if (regexWorker !== null) return Promise.resolve(regexWorker);
   if (regexWorkerBoot !== null) return regexWorkerBoot;
   const boot = new Promise<Worker>((resolve, reject) => {
@@ -150,8 +164,8 @@ function bootRegexWorker(): Promise<Worker> {
     }
   });
   regexWorkerBoot = boot;
-  // Never cache a rejected boot: a transient failure must not silently
-  // downgrade every future regex replace to the unprotected inline path.
+  // Never cache a rejected boot. A transient failure must not fail every
+  // later regex job.
   void boot.catch(() => {
     if (regexWorkerBoot === boot) regexWorkerBoot = null;
   });
@@ -250,55 +264,27 @@ export function runRegexReplace(
   deadlineMs: number,
 ): Promise<string> {
   const id = nextJobId();
-  return bootRegexWorker().then(
-    (worker) =>
-      runOnRegexWorker(
-        worker,
-        id,
-        "replace",
-        text,
-        pattern,
-        replacement,
-        deadlineMs,
-      ).then((result) => {
-        if (typeof result.out !== "string") throw new Error("regex-invalid");
-        return result.out;
-      }),
-    () => {
-      // Only boot unavailability falls back to an inline replace; a job that
-      // dies with the worker (deadline kill, crash) must fail closed instead
-      // of running the regex on the caller thread.
-      try {
-        return text.replace(new RegExp(pattern, "gu"), replacement);
-      } catch {
-        throw new Error("regex-invalid");
-      }
-    },
+  // Boot failure rejects. Callers leave the body unchanged. The regex never
+  // runs on the caller thread.
+  return bootRegexWorker().then((worker) =>
+    runOnRegexWorker(
+      worker,
+      id,
+      "replace",
+      text,
+      pattern,
+      replacement,
+      deadlineMs,
+    ).then((result) => {
+      if (typeof result.out !== "string") throw new Error("regex-invalid");
+      return result.out;
+    }),
   );
 }
 
 // URL source test/exec share the replace worker and its execution deadline.
-// A deadline or a worker failure is a non-match so the caller leaves the
-// request unchanged. Only worker-boot failure falls back to an inline call.
-function inlineRegexTest(pattern: string, text: string): boolean {
-  try {
-    return new RegExp(pattern).test(text);
-  } catch {
-    return false;
-  }
-}
-
-function inlineRegexExec(
-  pattern: string,
-  text: string,
-): readonly (string | undefined)[] | null {
-  try {
-    const match = new RegExp(pattern).exec(text);
-    return match === null ? null : match.slice(1);
-  } catch {
-    return null;
-  }
-}
+// A deadline, a worker crash, or a worker-boot failure is a non-match so the
+// caller leaves the request unchanged. The regex never runs on the caller thread.
 
 function capturesFromWorker(
   captures: readonly (string | null)[] | null | undefined,
@@ -327,7 +313,7 @@ export function runRegexTest(
         (result) => result.matched === true,
         () => false,
       ),
-    () => inlineRegexTest(pattern, text),
+    () => false,
   );
 }
 
@@ -351,6 +337,6 @@ export function runRegexExec(
         (result) => capturesFromWorker(result.captures),
         () => null,
       ),
-    () => inlineRegexExec(pattern, text),
+    () => null,
   );
 }
