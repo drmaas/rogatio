@@ -18,7 +18,7 @@ export const SAMPLE_GROUP_ID = "grp-sample";
 
 const EXAMPLE_ORIGIN = "https://example.com";
 
-export type SourceCondition = {
+type SourceCondition = {
   key: "url" | "host";
   operator: "regex";
   value: string;

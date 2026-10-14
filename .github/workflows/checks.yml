@@ -38,8 +38,12 @@ jobs:
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
+      - name: Knip
+        run: pnpm knip
       - name: Build
         run: pnpm build
+      - name: Package exports
+        run: pnpm check:exports
       - name: Vitest
         run: pnpm test
 

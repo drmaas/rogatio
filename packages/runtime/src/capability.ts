@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { isSha256Digest } from "@rogatio/schema";
-import { failure, runtimeError } from "./errors.js";
+import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import type {
   NormalizedRuntimePreset,
@@ -48,7 +48,7 @@ function digestToken(value: string): Buffer {
   return createHash("sha256").update(value, "utf8").digest();
 }
 
-export function isToken(value: unknown): value is string {
+function isToken(value: unknown): value is string {
   if (typeof value !== "string" || value.length !== TOKEN_LENGTH) return false;
   if (!/^[A-Za-z0-9_-]+$/.test(value)) return false;
   try {
@@ -164,8 +164,4 @@ export function closeCapabilityState(state: CapabilityState): void {
   state.consumed = true;
   state.sessions.length = 0;
   state.bootstrapDigest.fill(0);
-}
-
-export function capabilityError(): ReturnType<typeof runtimeError> {
-  return runtimeError("runtime.pairing-denied");
 }

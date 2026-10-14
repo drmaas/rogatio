@@ -6,9 +6,7 @@ import { createRequestBodyRuleType } from "./request-body.js";
 import { createResponseBodyRuleType } from "./response-body.js";
 
 export {
-  createHeaderRuleType,
   createMockRuleType,
-  createRedirectRuleType,
   createRequestBodyRuleType,
   createResponseBodyRuleType,
   queryRuleType,

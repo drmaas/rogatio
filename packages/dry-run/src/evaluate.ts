@@ -9,10 +9,7 @@ import type {
   RuleMatchResult,
 } from "./types.js";
 
-export function buildDimension(
-  state: MatchState,
-  detail: string,
-): MatchDimension {
+function buildDimension(state: MatchState, detail: string): MatchDimension {
   return {
     state,
     matched: state === "not-applicable" ? null : state === "matched",
@@ -88,7 +85,7 @@ export function resourceTypeDimension(
   );
 }
 
-export function safePreview(
+function safePreview(
   fn: PreviewActionFn,
   operation: RogatioOperation,
   url: string,

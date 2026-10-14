@@ -1147,7 +1147,10 @@ packed tarballs, and the real extension service worker.
    in the `cross-platform` CI job. The published `@rogatio/cli` is self-contained: esbuild
    fully inlines `@rogatio/schema`, `@rogatio/compiler`, `@rogatio/dry-run`, `@rogatio/editor`,
    and `@rogatio/runtime` into a single ESM bundle with no `workspace:*` leakage; the only
-   declared runtime dep is `ajv`. The bundled editor assets (JS, CSS, woff2 fonts) are
+   declared runtime dep is `ajv`. The published package ships
+   `dist/node/index.d.ts` for the `cli()` export (`main` and `exports["."].types`).
+   The package is ESM-only, so node10, node16 ESM, and bundler resolution see that
+   declaration, and node16 CJS is dynamic-import only. The bundled editor assets (JS, CSS, woff2 fonts) are
    mirrored into `packages/cli/dist/editor/` at build time so the published tarball is
    installable via `npm`, `pnpm`, `bun`, or `vp` without any pnpm workspace machinery.
 

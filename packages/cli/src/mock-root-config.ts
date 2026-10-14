@@ -3,14 +3,12 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
 /** Device-local map of canonical project path to mock file root. */
-export function mockRootConfigPath(
-  env: NodeJS.ProcessEnv = process.env,
-): string {
+function mockRootConfigPath(env: NodeJS.ProcessEnv = process.env): string {
   const base = env.ROGATIO_CONFIG_DIR ?? join(homedir(), ".config", "rogatio");
   return join(base, "mock-roots.json");
 }
 
-export async function canonicalProjectPath(filePath: string): Promise<string> {
+async function canonicalProjectPath(filePath: string): Promise<string> {
   const absolute = resolve(filePath);
   try {
     return await realpath(absolute);

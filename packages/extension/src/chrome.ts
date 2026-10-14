@@ -35,7 +35,7 @@ export interface ChromeRuntime {
   };
 }
 
-export interface ChromeDynamicRule {
+interface ChromeDynamicRule {
   readonly id: number;
 }
 
@@ -50,7 +50,7 @@ export interface ChromeRuleMatchedDebugInfo {
   };
 }
 
-export interface ChromeDeclarativeNetRequest {
+interface ChromeDeclarativeNetRequest {
   getDynamicRules(): Promise<Array<ChromeDynamicRule>>;
   updateDynamicRules(details: {
     removeRuleIds: number[];
@@ -75,7 +75,7 @@ export interface ChromeScripting {
   }): Promise<unknown>;
 }
 
-export interface ChromeProxySettings {
+interface ChromeProxySettings {
   get(
     details: { incognito?: boolean },
     callback: (config: {
@@ -110,18 +110,18 @@ export interface ChromeProxySettings {
   ): void;
 }
 
-export interface ChromePermissions {
+interface ChromePermissions {
   contains(
     permission: { origins?: string[] },
     callback: (result: boolean) => void,
   ): void;
 }
 
-export interface ChromeExtensionInfo {
+interface ChromeExtensionInfo {
   isAllowedIncognitoAccess(callback: (allowed: boolean) => void): void;
 }
 
-export interface ChromeTabs {
+interface ChromeTabs {
   query(
     queryInfo: { active?: boolean; currentWindow?: boolean },
     callback: (tabs: { url?: string }[]) => void,
@@ -145,7 +145,7 @@ declare global {
   var chrome: ChromeApi;
 }
 
-export function chromeApi(): ChromeApi {
+function chromeApi(): ChromeApi {
   if (typeof chrome === "undefined")
     throw new Error("extension.chrome-unavailable");
   return chrome;
@@ -206,7 +206,7 @@ export async function setBadge(
   });
 }
 
-export type ProxyCollisionReason =
+type ProxyCollisionReason =
   | "controlling-proxy"
   | "controlling-pac"
   | "controlled_by_other"

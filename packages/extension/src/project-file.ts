@@ -10,9 +10,9 @@ import {
 export const DEFAULT_EXPORT_FILENAME = ".rogatio.json";
 
 /** Prefix for a file that parsed but is not a Rogatio project. */
-export const PROJECT_IMPORT_ERROR_PREFIX = "not a Rogatio project: ";
+const PROJECT_IMPORT_ERROR_PREFIX = "not a Rogatio project: ";
 
-export interface SaveFilePickerType {
+interface SaveFilePickerType {
   readonly description?: string;
   readonly accept: Readonly<Record<string, readonly string[]>>;
 }
@@ -23,7 +23,7 @@ export interface SaveFilePickerOptions {
   readonly excludeAcceptAllOption?: boolean;
 }
 
-export interface FileSystemWritable {
+interface FileSystemWritable {
   write(data: string): Promise<void>;
   close(): Promise<void>;
 }

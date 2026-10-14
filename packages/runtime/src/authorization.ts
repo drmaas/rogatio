@@ -124,13 +124,3 @@ export function authorizeExact(
   }
   return failure("runtime.authorization-denied");
 }
-
-export function normalizeAuthorizationDescriptor(
-  value: unknown,
-): RuntimeResult<RuntimeGrant> {
-  const descriptor = exactDescriptor(value);
-  if (descriptor === null) return failure("runtime.request-malformed");
-  const target = canonicalTarget(descriptor.kind, descriptor.target);
-  if (target === null) return failure("runtime.request-malformed");
-  return { ok: true, value: { ...descriptor, target } };
-}

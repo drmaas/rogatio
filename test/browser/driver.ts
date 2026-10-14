@@ -6,13 +6,13 @@ import chrome from "selenium-webdriver/chrome.js";
 export const BASE_URL = "http://127.0.0.1:4173";
 
 /** Written by `scripts/install-browser.ts` for cross-platform binary resolution. */
-export const CHROME_PATH_MARKER = join(
+const CHROME_PATH_MARKER = join(
   process.cwd(),
   ".browser-cache",
   "chrome-path.txt",
 );
 
-export const CHROMEDRIVER_PATH_MARKER = join(
+const CHROMEDRIVER_PATH_MARKER = join(
   process.cwd(),
   ".browser-cache",
   "chromedriver-path.txt",
@@ -50,7 +50,7 @@ function readMarker(path: string): string | undefined {
  * `/usr/bin/google-chrome` do not override the installed CfT binary.
  * @see https://developer.chrome.com/docs/automation-and-testing/download-test-binaries
  */
-export function resolveChromeBinary(): string {
+function resolveChromeBinary(): string {
   const explicit =
     process.env.ROGATIO_CHROME_PATH ?? process.env.ROGATIO_CHROMIUM_PATH;
   if (explicit) {
@@ -133,7 +133,7 @@ export function resolveChromeBinary(): string {
   );
 }
 
-export function resolveChromeDriverBinary(): string | undefined {
+function resolveChromeDriverBinary(): string | undefined {
   const envPath =
     process.env.CHROMEDRIVER_PATH ?? process.env.ROGATIO_CHROMEDRIVER_PATH;
   if (envPath) {

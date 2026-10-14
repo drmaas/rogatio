@@ -16,7 +16,7 @@ import {
 import { diagnoseProject } from "./commands/diagnose.js";
 import { ProjectStorageError } from "./utils/file.js";
 
-export const EDITOR_UI_CHECK_IDS = [
+const EDITOR_UI_CHECK_IDS = [
   "editor.server",
   "editor.session",
   "editor.project",
@@ -24,10 +24,10 @@ export const EDITOR_UI_CHECK_IDS = [
   "editor.mockRoot",
 ] as const;
 
-export type EditorUiCheckId = (typeof EDITOR_UI_CHECK_IDS)[number];
-export type DoctorStatus = "pass" | "warn" | "fail";
+type EditorUiCheckId = (typeof EDITOR_UI_CHECK_IDS)[number];
+type DoctorStatus = "pass" | "warn" | "fail";
 
-export const EDITOR_CHECK_TITLES: Record<EditorUiCheckId, string> = {
+const EDITOR_CHECK_TITLES: Record<EditorUiCheckId, string> = {
   "editor.server": "Editor server",
   "editor.session": "Editor session",
   "editor.project": "Draft",
@@ -36,33 +36,32 @@ export const EDITOR_CHECK_TITLES: Record<EditorUiCheckId, string> = {
 };
 
 export const EDITOR_SERVER_STOPPED_SUMMARY = "The editor server stopped.";
-export const EDITOR_SERVER_PASS_SUMMARY = "The editor server answered.";
+const EDITOR_SERVER_PASS_SUMMARY = "The editor server answered.";
 export const EDITOR_SERVER_REJECTED_SUMMARY =
   "The editor server could not finish doctor.";
-export const EDITOR_SERVER_REJECTED_FIX = "rogatio doctor";
+const EDITOR_SERVER_REJECTED_FIX = "rogatio doctor";
 export const EDITOR_SESSION_STALE_SUMMARY =
   "This tab is stale. Its editor token was rejected.";
-export const EDITOR_SESSION_STALE_FIX = "Reload this tab";
-export const EDITOR_SESSION_PASS_SUMMARY = "The editor token was accepted.";
+const EDITOR_SESSION_STALE_FIX = "Reload this tab";
+const EDITOR_SESSION_PASS_SUMMARY = "The editor token was accepted.";
 export const EDITOR_PROJECT_INVALID_SUMMARY = "The draft is invalid.";
 export const EDITOR_PROJECT_NOT_JSON_SUMMARY = "The draft is not JSON.";
-export const EDITOR_PROJECT_VALID_SUMMARY = "The draft is valid.";
-export const EDITOR_AI_NONE_SUMMARY = "Optional. No AI provider is configured.";
-export const EDITOR_AI_NONE_FIX = "rogatio ai setup";
+const EDITOR_PROJECT_VALID_SUMMARY = "The draft is valid.";
+const EDITOR_AI_NONE_SUMMARY = "Optional. No AI provider is configured.";
+const EDITOR_AI_NONE_FIX = "rogatio ai setup";
 export const EDITOR_AI_AFTER_START_SUMMARY =
   "AI Assist was configured after this editor started.";
 export const EDITOR_AI_AFTER_START_FIX = "Restart rogatio edit";
-export const EDITOR_AI_PASS_SUMMARY = "AI Assist is available in this page.";
-export const EDITOR_AI_REMOVED_SUMMARY = "AI Assist is no longer configured.";
-export const EDITOR_MOCK_SAVED_SUMMARY = "A mock file root is saved.";
-export const EDITOR_MOCK_MISSING_SUMMARY =
-  "Mock rules have no saved mock file root.";
-export const EDITOR_MOCK_MISSING_FIX = "Set mock file root";
+const EDITOR_AI_PASS_SUMMARY = "AI Assist is available in this page.";
+const EDITOR_AI_REMOVED_SUMMARY = "AI Assist is no longer configured.";
+const EDITOR_MOCK_SAVED_SUMMARY = "A mock file root is saved.";
+const EDITOR_MOCK_MISSING_SUMMARY = "Mock rules have no saved mock file root.";
+const EDITOR_MOCK_MISSING_FIX = "Set mock file root";
 
 const MAX_DIAGNOSTICS = 20;
 const MAX_DIAGNOSTIC_FIELD = 200;
 
-export interface UiDoctorCheck {
+interface UiDoctorCheck {
   readonly id: string;
   readonly status: DoctorStatus;
   readonly optional: boolean;
@@ -109,7 +108,7 @@ function combined(
  * quotes. Other platforms keep `quoteDoctorArg`. The host report still uses
  * `quoteDoctorArg` on every platform.
  */
-export function quoteEditorArg(
+function quoteEditorArg(
   value: string,
   platform: NodeJS.Platform = process.platform,
 ): string {
@@ -276,7 +275,7 @@ function aiCheck(assistInPage: boolean, configuredNow: boolean): UiDoctorCheck {
   );
 }
 
-export function draftHasMockRule(draft: unknown): boolean {
+function draftHasMockRule(draft: unknown): boolean {
   if (draft === null || typeof draft !== "object" || Array.isArray(draft)) {
     return false;
   }

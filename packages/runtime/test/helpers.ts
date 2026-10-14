@@ -57,15 +57,4 @@ export function cloneLimits(): RuntimeLimits {
   return { ...RUNTIME_LIMITS };
 }
 
-export function descriptorBody(grant: RuntimeGrant = makeGrant()): string {
-  return JSON.stringify({
-    groupId: grant.groupId,
-    ruleId: grant.ruleId,
-    operationId: grant.operationId,
-    kind: grant.kind,
-    target: grant.target,
-    method: grant.method,
-  });
-}
-
 export const DEFAULT_REQUEST_URL = "https://example.com/page";

@@ -42,13 +42,13 @@ export interface DryRunTestCase {
   readonly resourceType?: ResourceType;
 }
 
-export interface DryRunMatchDimension {
+interface DryRunMatchDimension {
   readonly state: "matched" | "unmatched" | "not-applicable";
   readonly matched: boolean | null;
   readonly detail: string;
 }
 
-export interface DryRunActionPreview {
+interface DryRunActionPreview {
   readonly kind: string;
   readonly summary: string;
 }
@@ -63,19 +63,19 @@ export interface DryRunRuleMatchResult {
   readonly actionPreview: DryRunActionPreview | null;
 }
 
-export interface DryRunUrlResult {
+interface DryRunUrlResult {
   readonly url: string;
   readonly rules: readonly DryRunRuleMatchResult[];
   readonly matchedRuleCount: number;
 }
 
-export interface DryRunError {
+interface DryRunError {
   readonly code: string;
   readonly message: string;
   readonly index?: number;
 }
 
-export interface DryRunSummary {
+interface DryRunSummary {
   readonly caseCount: number;
   readonly urlCount: number;
   readonly matchedUrlCount: number;
@@ -105,7 +105,7 @@ export interface EditorDryRunDiagnosticBody {
   readonly diagnostics: readonly EditorDiagnostic[];
 }
 
-export type EditorDryRunHandler = (
+type EditorDryRunHandler = (
   project: EditorProjectSnapshot,
   cases: readonly DryRunTestCase[],
   options?: { maxCases?: number },
@@ -139,7 +139,7 @@ export interface AIProposal {
   readonly explanation: string;
 }
 
-export interface SourceProposal {
+interface SourceProposal {
   readonly key: SourceKey;
   readonly operator: SourceOperator;
   readonly value: string;
@@ -293,4 +293,4 @@ export class EditorInitializationError extends Error {
   }
 }
 
-export type { HttpMethod, ResourceType };
+export type { ResourceType };

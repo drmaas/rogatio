@@ -64,8 +64,8 @@ export interface MockAction {
   file?: string;
 }
 
-export type HeaderDirection = "request" | "response";
-export type HeaderOperationKind = "set" | "append" | "remove";
+type HeaderDirection = "request" | "response";
+type HeaderOperationKind = "set" | "append" | "remove";
 
 export interface RedirectAction {
   /** Absolute http(s) URL. May contain \1..\9 backreferences to urlRegex capture groups. */

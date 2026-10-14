@@ -23,7 +23,7 @@ export interface DnrHeaderRule {
   };
 }
 
-export interface DnrHeaderAction {
+interface DnrHeaderAction {
   readonly header: string;
   readonly operation: "set" | "append" | "remove";
   readonly value?: string;

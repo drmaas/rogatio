@@ -5,7 +5,7 @@ import { createDriver } from "./driver.js";
 import { expect, Page, request } from "./page.js";
 
 export type { Page };
-export { expect, request };
+export { expect };
 
 type TestFixtures = {
   page: Page;

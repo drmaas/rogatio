@@ -11,7 +11,7 @@ import {
   runtimeInstallCommand,
 } from "./extension-id.js";
 
-export const EXTENSION_UI_CHECK_IDS = [
+const EXTENSION_UI_CHECK_IDS = [
   "ext.worker",
   "ext.native",
   "ext.id",
@@ -25,7 +25,7 @@ export const EXTENSION_UI_CHECK_IDS = [
 
 export type ExtensionUiCheckId = (typeof EXTENSION_UI_CHECK_IDS)[number];
 
-export type DoctorStatus = "pass" | "warn" | "fail";
+type DoctorStatus = "pass" | "warn" | "fail";
 
 export const EXTENSION_UI_TITLES: Record<ExtensionUiCheckId, string> = {
   "ext.worker": "Service worker",
@@ -42,7 +42,7 @@ export const EXTENSION_UI_TITLES: Record<ExtensionUiCheckId, string> = {
 export const EXT_WORKER_FAIL_SUMMARY =
   "The extension service worker did not answer.";
 export const EXT_WORKER_FIX = "Reload the extension at chrome://extensions";
-export const EXT_WORKER_PASS_SUMMARY = "The extension service worker answered.";
+const EXT_WORKER_PASS_SUMMARY = "The extension service worker answered.";
 
 export const EXT_NATIVE_MISSING_SUMMARY =
   "Native host manifest was not found. Reload the extension after installing the host.";
@@ -50,13 +50,13 @@ export const EXT_NATIVE_ORIGIN_SUMMARY =
   "This extension ID is not in the native host manifest allowed_origins. Reload the extension after installing the host.";
 export const EXT_NATIVE_TIMEOUT_SUMMARY =
   "The native host did not answer within 25000ms.";
-export const EXT_NATIVE_DISCONNECTED_SUMMARY =
+const EXT_NATIVE_DISCONNECTED_SUMMARY =
   "The native host disconnected before answering.";
-export const EXT_NATIVE_UNREADABLE_SUMMARY =
+const EXT_NATIVE_UNREADABLE_SUMMARY =
   "The native host reply could not be read.";
-export const EXT_NATIVE_PASS_SUMMARY = "The native host answered.";
-export const EXT_NATIVE_DOCTOR_FIX = "rogatio doctor";
-export const EXT_NATIVE_TIMEOUT_MESSAGE =
+const EXT_NATIVE_PASS_SUMMARY = "The native host answered.";
+const EXT_NATIVE_DOCTOR_FIX = "rogatio doctor";
+const EXT_NATIVE_TIMEOUT_MESSAGE =
   "Native messaging host timed out before responding.";
 
 export const EXT_PROXY_OTHER_SUMMARY = "Another extension controls the proxy.";
@@ -72,45 +72,39 @@ export const EXT_PROXY_STALE_SUMMARY =
 export const EXT_PROXY_STALE_FIX = "Click Start runtime, then Stop runtime.";
 export const EXT_PROXY_CLEAR_SUMMARY =
   "Chrome proxy settings do not block Rogatio.";
-export const EXT_PROXY_UNAVAILABLE_SUMMARY =
+const EXT_PROXY_UNAVAILABLE_SUMMARY =
   "Chrome proxy settings could not be read.";
 
-export const EXT_ACCESS_PASS_SUMMARY = "Site access includes all sites.";
-export const EXT_ACCESS_NARROW_SUMMARY =
-  "Site access is narrower than all sites.";
-export const EXT_ACCESS_FIX =
+const EXT_ACCESS_PASS_SUMMARY = "Site access includes all sites.";
+const EXT_ACCESS_NARROW_SUMMARY = "Site access is narrower than all sites.";
+const EXT_ACCESS_FIX =
   "chrome://extensions → Rogatio → Site access → On all sites";
-export const EXT_ACCESS_UNKNOWN_SUMMARY = "Site access could not be checked.";
+const EXT_ACCESS_UNKNOWN_SUMMARY = "Site access could not be checked.";
 
-export const EXT_INCOGNITO_PASS_SUMMARY = "Incognito access is allowed.";
-export const EXT_INCOGNITO_WARN_SUMMARY =
+const EXT_INCOGNITO_PASS_SUMMARY = "Incognito access is allowed.";
+const EXT_INCOGNITO_WARN_SUMMARY =
   "Incognito windows are not covered. The PAC is installed for regular windows only.";
-export const EXT_INCOGNITO_FIX =
-  "chrome://extensions → Rogatio → Allow in Incognito";
-export const EXT_INCOGNITO_UNKNOWN_SUMMARY =
-  "Incognito access could not be checked.";
+const EXT_INCOGNITO_FIX = "chrome://extensions → Rogatio → Allow in Incognito";
+const EXT_INCOGNITO_UNKNOWN_SUMMARY = "Incognito access could not be checked.";
 
-export const EXT_RULES_NONE_SUMMARY = "No active project is loaded.";
-export const EXT_RULES_UNREADABLE_SUMMARY = "Rule statuses could not be read.";
-export const EXT_RULES_NO_GROUPS_SUMMARY =
-  "The active project has no enabled groups.";
-export const EXT_RULES_NO_GROUPS_FIX = "Enable a group.";
-export const EXT_RULES_OK_SUMMARY = "Enabled rules have no attention status.";
+const EXT_RULES_NONE_SUMMARY = "No active project is loaded.";
+const EXT_RULES_UNREADABLE_SUMMARY = "Rule statuses could not be read.";
+const EXT_RULES_NO_GROUPS_SUMMARY = "The active project has no enabled groups.";
+const EXT_RULES_NO_GROUPS_FIX = "Enable a group.";
+const EXT_RULES_OK_SUMMARY = "Enabled rules have no attention status.";
 export const EXT_RULES_ERROR_FIX = "Open the rule and read its error.";
 export const EXT_RULES_RUNTIME_FIX = "Click Start runtime.";
 export const EXT_RULES_UNROUTABLE_FIX = "This rule's source can't be routed.";
 export const EXT_RULES_ROOT_FIX = "Set mock file root.";
-export const EXT_RULES_UNSUPPORTED_FIX =
-  "This rule is unsupported in this browser.";
+const EXT_RULES_UNSUPPORTED_FIX = "This rule is unsupported in this browser.";
 
-export const EXT_TAB_NO_URL_SUMMARY =
+const EXT_TAB_NO_URL_SUMMARY =
   "The current tab has no URL this extension can read.";
-export const EXT_TAB_UNCHECKED_SUMMARY =
-  "The current tab could not be checked.";
-export const EXT_TAB_EMPTY_SUMMARY = "No rules to compare with this tab.";
+const EXT_TAB_UNCHECKED_SUMMARY = "The current tab could not be checked.";
+const EXT_TAB_EMPTY_SUMMARY = "No rules to compare with this tab.";
 
 export const EXT_VERSION_UNAVAILABLE_SUMMARY = "CLI version is unavailable.";
-export const EXT_VERSION_UNCOMPARED_SUMMARY =
+const EXT_VERSION_UNCOMPARED_SUMMARY =
   "Extension and CLI versions could not be compared.";
 
 const EXTENSION_ID_RE = /^[a-p]{32}$/;
@@ -151,9 +145,9 @@ export interface ProxySnapshot {
   readonly mode: ProxyMode | null;
 }
 
-export type MatchStateWord = "matched" | "unmatched" | "not-applicable";
+type MatchStateWord = "matched" | "unmatched" | "not-applicable";
 
-export interface TabRuleFact {
+interface TabRuleFact {
   readonly ruleId: string;
   readonly matched: boolean;
   readonly source: MatchStateWord;
@@ -207,7 +201,7 @@ export interface CombinedDiagnostics {
   readonly host: DoctorReport | null;
 }
 
-export function exactDoctorVersion(value: string): string | null {
+function exactDoctorVersion(value: string): string | null {
   return EXACT_VERSION_RE.test(value) ? value : null;
 }
 

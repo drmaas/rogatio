@@ -29,7 +29,7 @@ function isBodyMarkerOperation(
   );
 }
 
-export function filterBodyOpsForMarkers(
+function filterBodyOpsForMarkers(
   operations: readonly RogatioOperation[],
   gates: BodyMarkerProbeGates = DEFAULT_BODY_MARKER_PROBE_GATES,
 ): BodyMarkerOperation[] {

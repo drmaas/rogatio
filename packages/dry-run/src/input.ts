@@ -5,7 +5,7 @@ import type { DryRunError, DryRunTestCase, PreviewActionFn } from "./types.js";
 
 export const DEFAULT_MAX_CASES = 256;
 
-export function ownPropertyNames(value: object): string[] | null {
+function ownPropertyNames(value: object): string[] | null {
   try {
     const names = Object.getOwnPropertyNames(value);
     const symbols = Object.getOwnPropertySymbols(value);
@@ -15,7 +15,7 @@ export function ownPropertyNames(value: object): string[] | null {
   }
 }
 
-export function dataProperty(
+function dataProperty(
   value: object,
   key: string,
 ): { present: boolean; value?: unknown; valid: boolean } {

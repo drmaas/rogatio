@@ -6,7 +6,7 @@ import {
 import { ownString } from "./record.js";
 import { acceptRegex, escapeRegex, isRequestlyRegexLiteral } from "./source.js";
 
-export interface ReplaceRedirect {
+interface ReplaceRedirect {
   readonly source: SourceCondition;
   readonly destination: string;
   readonly nameSuffix: string;

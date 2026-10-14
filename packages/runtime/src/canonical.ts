@@ -79,21 +79,19 @@ function mockValue(mock: RuntimeMockConfig): string {
   return `{"ruleId":${stringValue(mock.ruleId)},"status":${String(mock.status)}${headers}${delay}${body}${file}}`;
 }
 
-export function sortMocks(
-  mocks: readonly RuntimeMockConfig[],
-): RuntimeMockConfig[] {
+function sortMocks(mocks: readonly RuntimeMockConfig[]): RuntimeMockConfig[] {
   return [...mocks].sort((left, right) =>
     compareStrings(left.ruleId, right.ruleId),
   );
 }
 
-export function compareStrings(left: string, right: string): number {
+function compareStrings(left: string, right: string): number {
   if (left < right) return -1;
   if (left > right) return 1;
   return 0;
 }
 
-export function sortGrants(grants: readonly RuntimeGrant[]): RuntimeGrant[] {
+function sortGrants(grants: readonly RuntimeGrant[]): RuntimeGrant[] {
   return [...grants].sort(
     (left, right) =>
       compareStrings(left.groupId, right.groupId) ||
@@ -120,15 +118,4 @@ export function canonicalPresetBytes(
 
 export function digestBytes(bytes: Uint8Array): PresetDigest {
   return formatSha256(createHash("sha256").update(bytes).digest("hex"));
-}
-
-export function canonicalDescriptor(value: {
-  readonly groupId: string;
-  readonly ruleId: string;
-  readonly operationId: string;
-  readonly kind: string;
-  readonly target: string;
-  readonly method: string;
-}): string {
-  return `{"groupId":${stringValue(value.groupId)},"ruleId":${stringValue(value.ruleId)},"operationId":${stringValue(value.operationId)},"kind":${stringValue(value.kind)},"target":${stringValue(value.target)},"method":${stringValue(value.method)}}`;
 }

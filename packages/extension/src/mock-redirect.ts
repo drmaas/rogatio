@@ -16,11 +16,7 @@ export {
   MOCK_REDIRECT_ID_MIN,
 } from "./mock-redirect-ids.js";
 
-export function mockRedirectUrl(
-  port: number,
-  token: string,
-  digest: string,
-): string {
+function mockRedirectUrl(port: number, token: string, digest: string): string {
   return `http://127.0.0.1:${port}${MOCK_LISTENER_PREFIX}${encodeURIComponent(token)}/${encodeURIComponent(digest)}`;
 }
 

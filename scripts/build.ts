@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   access,
@@ -5,6 +6,7 @@ import {
   mkdir,
   readdir,
   readFile,
+  rm,
   writeFile,
 } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -336,6 +338,46 @@ for (const file of fontFiles) {
   );
 }
 
+await emitCliDeclarations();
+
 console.log(
   `Built ${targets.length} ESM artifact(s); manifest: build-manifest.json`,
 );
+
+// The published CLI is one bundled ESM file. Ship a self-contained declaration
+// for `cli()` so node10, node16, and bundler resolution all see types. Other
+// emitted declarations import workspace packages that are not published.
+async function emitCliDeclarations(): Promise<void> {
+  const tsc = resolve(root, "node_modules/typescript/bin/tsc");
+  const result = spawnSync(
+    process.execPath,
+    [tsc, "-p", "packages/cli/tsconfig.declarations.json"],
+    { cwd: root, stdio: "inherit" },
+  );
+  if (result.error)
+    throw new Error(
+      `CLI declaration emit could not start: ${result.error.message}`,
+    );
+  if (result.status !== 0) throw new Error("CLI declaration emit failed");
+  const emitted = await readFile(
+    resolve(root, "packages/cli/dist/types/index.d.ts"),
+    "utf8",
+  );
+  const declaration = emitted.replace(/^#![^\n]*\n/, "");
+  if (!declaration.startsWith("export declare function cli(")) {
+    throw new Error("CLI declaration did not match the public cli() export");
+  }
+  if (/\b(?:import|export)\s+[^;]*\sfrom\s+["']/.test(declaration)) {
+    throw new Error("CLI declaration must stay self-contained");
+  }
+  const destination = resolve(root, "packages/cli/dist/node/index.d.ts");
+  await mkdir(resolve(destination, ".."), { recursive: true });
+  await writeFile(
+    destination,
+    declaration.endsWith("\n") ? declaration : `${declaration}\n`,
+  );
+  await rm(resolve(root, "packages/cli/dist/types"), {
+    recursive: true,
+    force: true,
+  });
+}

@@ -17,12 +17,12 @@ export interface RequestBodyInput {
   readonly body: Uint8Array;
 }
 
-export interface RequestBodyReplaceAction {
+interface RequestBodyReplaceAction {
   readonly mode: "replace";
   readonly body: string;
 }
 
-export interface RequestBodyRegexAction {
+interface RequestBodyRegexAction {
   readonly mode: "regex";
   readonly pattern: string;
   readonly replacement: string;

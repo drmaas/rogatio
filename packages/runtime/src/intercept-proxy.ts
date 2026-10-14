@@ -34,7 +34,7 @@ import type {
 } from "./types.js";
 import { canonicalizeOutboundTarget } from "./url.js";
 
-export interface ProxyEndpoint {
+interface ProxyEndpoint {
   readonly host: string;
   readonly port: number;
 }
@@ -47,13 +47,13 @@ export interface InterceptProxyPolicy {
   readonly localOrigins?: readonly string[];
 }
 
-export interface MockServeRequest {
+interface MockServeRequest {
   readonly token: string;
   readonly method: string;
   readonly signal: AbortSignal;
 }
 
-export type InterceptDial = (port: number, address: string) => Socket;
+type InterceptDial = (port: number, address: string) => Socket;
 
 export interface InterceptProxyOptions {
   readonly policy?: InterceptProxyPolicy | null;
