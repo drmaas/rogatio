@@ -4,7 +4,7 @@ function repeat(char: string, count: number): string {
   return char.repeat(count);
 }
 
-export function mockRule(overrides: Record<string, unknown> = {}) {
+function mockRule(overrides: Record<string, unknown> = {}) {
   return {
     id: "rule-mock",
     name: "Mock rule",
@@ -17,7 +17,7 @@ export function mockRule(overrides: Record<string, unknown> = {}) {
   };
 }
 
-export function projectWith(rule: Record<string, unknown>): RogatioProject {
+function projectWith(rule: Record<string, unknown>): RogatioProject {
   return {
     version: 2,
     name: "Example project",

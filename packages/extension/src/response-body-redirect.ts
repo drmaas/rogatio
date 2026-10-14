@@ -11,7 +11,7 @@ export const RESPONSE_BODY_REDIRECT_ID_MIN = 4_000_001;
 export const RESPONSE_BODY_REDIRECT_ID_MAX = 5_000_000;
 
 /** Keep in sync with the runtime listener prefix. */
-export const RESPONSE_BODY_LISTENER_PREFIX = "/.rogatio/body/";
+const RESPONSE_BODY_LISTENER_PREFIX = "/.rogatio/body/";
 
 export function isResponseBodyRedirectId(id: number): boolean {
   return (
@@ -21,7 +21,7 @@ export function isResponseBodyRedirectId(id: number): boolean {
   );
 }
 
-export function responseBodyRedirectSubstitution(
+function responseBodyRedirectSubstitution(
   port: number,
   ruleId: string,
   digest: string,
@@ -29,7 +29,7 @@ export function responseBodyRedirectSubstitution(
   return `http://127.0.0.1:${port}${RESPONSE_BODY_LISTENER_PREFIX}${encodeURIComponent(ruleId)}/${encodeURIComponent(digest)}/\\0`;
 }
 
-export function buildResponseBodyRedirectRule(
+function buildResponseBodyRedirectRule(
   operation: ResponseBodyOperation,
   id: number,
   port: number,

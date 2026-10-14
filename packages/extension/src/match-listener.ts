@@ -17,7 +17,7 @@ export { MATCH_LOGGING_ENABLED_KEY };
 export const MAIN_FRAME_INJECT_RETRY_DELAYS_MS = [50, 150, 350] as const;
 
 /** Live request fields passed to the post-lookup append seam. */
-export interface MatchAppendLiveFields {
+interface MatchAppendLiveFields {
   readonly tabId: number;
   readonly url?: string;
   readonly method?: string;

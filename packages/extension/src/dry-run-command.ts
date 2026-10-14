@@ -8,7 +8,7 @@ import {
 } from "@rogatio/dry-run";
 import { validateProjectDetailed } from "./browser-schema.js";
 
-export interface FieldDiagnostic {
+interface FieldDiagnostic {
   readonly code: string;
   readonly severity: "error";
   readonly path: string;

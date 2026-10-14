@@ -20,9 +20,11 @@
   "files": [
     "dist"
   ],
+  "main": "./dist/node/index.js",
+  "types": "./dist/node/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./dist/node/index.d.ts",
       "import": "./dist/node/index.js"
     }
   },

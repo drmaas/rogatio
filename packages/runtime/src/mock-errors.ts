@@ -13,7 +13,7 @@ export interface MockFileErrorEntry {
   readonly code: string;
 }
 
-export function isMockFileError(code: string): boolean {
+function isMockFileError(code: string): boolean {
   return FILE_ERROR_CODES.has(code);
 }
 

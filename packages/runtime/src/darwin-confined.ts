@@ -54,7 +54,7 @@ function decodePath(value: unknown): string | null {
  * component from a held directory descriptor, and read that descriptor's path.
  * A failed load means the platform cannot prove confinement.
  */
-export function loadDarwinConfined(): DarwinBinding {
+function loadDarwinConfined(): DarwinBinding {
   if (binding) return binding;
   const koffi = loadKoffi();
   const lib = koffi.load(LIB_SYSTEM);
@@ -105,7 +105,7 @@ function isSingleComponent(component: string): boolean {
   );
 }
 
-export function handleFromFd(fd: number): ConfinedHandle {
+function handleFromFd(fd: number): ConfinedHandle {
   let closed = false;
   return {
     fd,

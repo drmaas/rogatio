@@ -3,13 +3,13 @@
  * Mirrors runtime merge semantics without importing @rogatio/runtime.
  */
 
-export interface ExtensionSourceProposal {
+interface ExtensionSourceProposal {
   readonly key: "url" | "host";
   readonly operator: "regex";
   readonly value: string;
 }
 
-export interface ExtensionRuleProposal {
+interface ExtensionRuleProposal {
   readonly kind:
     | "redirect"
     | "query"
@@ -152,7 +152,7 @@ export function parseAIProposal(value: unknown): ExtensionAIProposal | null {
   return { rules, explanation: value.explanation };
 }
 
-export function ruleFromProposal(
+function ruleFromProposal(
   proposal: ExtensionRuleProposal,
   ruleId: string,
 ): Record<string, unknown> {
@@ -221,7 +221,7 @@ export function ruleFromProposal(
 const RULE_PATH_PATTERN =
   /^\/groups\/(0|[1-9][0-9]*)\/rules\/(0|[1-9][0-9]*)(?:\/|$)/;
 
-export interface ExtensionRepairTarget {
+interface ExtensionRepairTarget {
   readonly groupIndex: number;
   readonly ruleIndex: number;
 }
@@ -230,7 +230,7 @@ export interface ExtensionRepairTarget {
  * Rule-level repair targets from editor diagnostics (JSON-pointer rule paths),
  * sorted by path position and de-duplicated. Mirrors the runtime helper.
  */
-export function repairTargetsFromDiagnostics(
+function repairTargetsFromDiagnostics(
   diagnostics: readonly unknown[] | undefined,
 ): ExtensionRepairTarget[] {
   if (!Array.isArray(diagnostics)) return [];

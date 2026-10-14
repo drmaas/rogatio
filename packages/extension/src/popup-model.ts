@@ -15,18 +15,18 @@ export interface PopupRuleStatus {
   readonly diagnostics?: readonly unknown[];
 }
 
-export interface PopupProjectRule {
+interface PopupProjectRule {
   readonly id?: unknown;
   readonly name?: unknown;
 }
 
-export interface PopupProjectGroup {
+interface PopupProjectGroup {
   readonly id: string;
   readonly name: string;
   readonly rules: readonly PopupProjectRule[];
 }
 
-export interface PopupProject {
+interface PopupProject {
   readonly data: { readonly groups: readonly PopupProjectGroup[] };
   readonly enabledGroupIds: readonly string[];
   readonly name?: string;
@@ -39,7 +39,7 @@ export interface PopupEnvelope {
   readonly badge?: { readonly text: string; readonly attention: boolean };
 }
 
-export interface PopupRuleRow {
+interface PopupRuleRow {
   readonly id: string;
   readonly groupId: string;
   readonly name: string;
@@ -47,7 +47,7 @@ export interface PopupRuleRow {
   readonly enabled: boolean;
 }
 
-export interface PopupGroupRow {
+interface PopupGroupRow {
   readonly id: string;
   readonly name: string;
   readonly enabled: boolean;
@@ -55,13 +55,13 @@ export interface PopupGroupRow {
   readonly ruleCount: number;
 }
 
-export interface ExtensionResponse {
+interface ExtensionResponse {
   readonly ok?: boolean;
   readonly value?: unknown;
   readonly diagnostic?: { readonly code?: string };
 }
 
-export type PopupSend = (
+type PopupSend = (
   message: Record<string, unknown>,
 ) => Promise<ExtensionResponse>;
 

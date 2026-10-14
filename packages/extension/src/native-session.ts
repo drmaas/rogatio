@@ -72,20 +72,6 @@ export interface AICompleteRequest {
   };
 }
 
-export interface AIStreamChunkRequest {
-  readonly protocol: "v1";
-  readonly type: "ai.stream.chunk";
-  readonly requestId: string;
-  readonly metadata: {
-    readonly messages: readonly {
-      readonly role: "system" | "user" | "assistant" | "tool";
-      readonly content: string;
-    }[];
-    readonly model: string;
-    readonly temperature?: number;
-  };
-}
-
 export interface AICompleteResponse {
   readonly protocol: "v1";
   readonly type: "ai.complete";
@@ -99,7 +85,7 @@ export interface AICompleteResponse {
   };
 }
 
-export interface AIStreamChunkResponse {
+interface AIStreamChunkResponse {
   readonly protocol: "v1";
   readonly type: "ai.stream.chunk";
   readonly requestId: string;
@@ -110,17 +96,6 @@ export interface AIStreamChunkResponse {
       readonly promptTokens: number;
       readonly completionTokens: number;
     };
-  };
-}
-
-export interface AIErrorResponse {
-  readonly protocol: "v1";
-  readonly type: "ai.error";
-  readonly requestId: string;
-  readonly metadata: {
-    readonly code: string;
-    readonly message: string;
-    readonly retryable: boolean;
   };
 }
 

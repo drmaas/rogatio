@@ -63,7 +63,7 @@ function headerValue(value: string | string[] | undefined): string | undefined {
 }
 
 /** Exact Host allowlist for the loopback editor server. */
-export function isAllowedEditorHost(
+function isAllowedEditorHost(
   host: string | undefined,
   boundPort: number,
 ): boolean {
@@ -75,7 +75,7 @@ export function isAllowedEditorHost(
 }
 
 /** Exact Origin allowlist when Origin is present on a state-changing request. */
-export function isAllowedEditorOrigin(
+function isAllowedEditorOrigin(
   origin: string | undefined,
   boundPort: number,
 ): boolean {

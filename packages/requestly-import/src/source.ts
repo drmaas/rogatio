@@ -15,7 +15,7 @@ const LITERAL_HOSTNAME =
 const RESOURCE_SET = new Set<string>(RESOURCE_TYPES);
 const METHOD_SET = new Set<string>(HTTP_METHODS);
 
-export const SOURCE_CHANGE = {
+const SOURCE_CHANGE = {
   caseInsensitive:
     "The case-insensitive match flag was dropped. Rogatio regular expressions are case-sensitive.",
   hostPort:
@@ -39,7 +39,7 @@ export const HOST_AUTHORITY_META_SKIP_REASON =
 /** Characters that must not appear literally in host Contains / Wildcard values. */
 const HOST_AUTHORITY_META = /[/?#@\\]/;
 
-export interface ConvertedSource {
+interface ConvertedSource {
   readonly source: SourceCondition;
   readonly changes: readonly string[];
 }
@@ -284,7 +284,7 @@ function finish(
   return { ok: true, converted: { source, changes } };
 }
 
-export function parseRequestlyRegex(value: string):
+function parseRequestlyRegex(value: string):
   | {
       readonly ok: true;
       readonly source: string;
@@ -309,7 +309,7 @@ export function parseRequestlyRegex(value: string):
   return { ok: true, source, caseInsensitive: flags.includes("i") };
 }
 
-export function wildcardBody(pattern: string): string {
+function wildcardBody(pattern: string): string {
   return pattern
     .split("*")
     .map((part) => escapeRegex(part))
@@ -320,7 +320,7 @@ export function wildcardBody(pattern: string): string {
  * Host Wildcard_Matches body: same capture count as {@link wildcardBody}, but
  * each `*` is confined to authority characters (no `/`, `?`, `#`, or `@`).
  */
-export function hostWildcardBody(pattern: string): string {
+function hostWildcardBody(pattern: string): string {
   return pattern
     .split("*")
     .map((part) => escapeRegex(part))

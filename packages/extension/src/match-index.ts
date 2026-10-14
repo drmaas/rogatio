@@ -20,7 +20,7 @@ import {
 
 export const MATCH_LOGGING_INDEX_KEY = "rogatio.matchLogging.index";
 
-export interface RedirectIntent {
+interface RedirectIntent {
   readonly destination: string;
 }
 
@@ -55,7 +55,7 @@ export type MockIntent =
   | { readonly source: "file"; readonly file: string }
   | { readonly source: "inline" };
 
-export type MatchIndexIntent =
+type MatchIndexIntent =
   | RedirectIntent
   | QueryIntent
   | HeaderIntent

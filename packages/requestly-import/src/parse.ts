@@ -9,7 +9,7 @@ export interface ParsedRule {
   readonly groupId: string;
 }
 
-export interface ParsedGroup {
+interface ParsedGroup {
   readonly id: string;
   readonly name: string;
   readonly status: string | undefined;
@@ -20,7 +20,7 @@ export interface ParsedUnknown {
   readonly type: string;
 }
 
-export interface ParsedExport {
+interface ParsedExport {
   readonly groups: readonly ParsedGroup[];
   readonly rules: readonly ParsedRule[];
   readonly unknown: readonly ParsedUnknown[];

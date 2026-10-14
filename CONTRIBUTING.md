@@ -31,7 +31,8 @@ Verify your environment with the full validation sequence:
 pnpm validate
 ```
 
-`pnpm validate` runs formatting, linting, typechecking, the build, the unit suite, and the
+`pnpm validate` runs formatting, linting, typechecking, `pnpm knip`, the build,
+`pnpm check:exports` (publint and attw for publishable packages), the unit suite, and the
 browser smoke journey in a fail-fast order, including negative fixtures. It is the same
 sequence CI runs, so a green local `pnpm validate` is a strong signal your change will pass.
 

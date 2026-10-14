@@ -107,24 +107,6 @@ export async function signCertificate(
 }
 
 /**
- * Verifies that a certificate is issued by the given CA.
- */
-export async function verifyCertificate(
-  certPem: string,
-  caCertPem: string,
-): Promise<boolean> {
-  const cert = new X509Certificate(certPem);
-  const caCert = new X509Certificate(caCertPem);
-
-  try {
-    await cert.verify({ publicKey: caCert.publicKey });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Generates a new CA key pair.
  */
 export function generateCaKeyPair(bits: number = 2048): {
@@ -132,45 +114,4 @@ export function generateCaKeyPair(bits: number = 2048): {
   publicKey: KeyObject;
 } {
   return generateKeyPairSync("rsa", { modulusLength: bits });
-}
-
-/**
- * Exports a private key to PKCS#8 PEM format.
- */
-export function exportPrivateKey(key: KeyObject): string {
-  return key.export({ type: "pkcs8", format: "pem" }) as string;
-}
-
-/**
- * Exports a public key to SPKI PEM format.
- */
-export function exportPublicKey(key: KeyObject): string {
-  return key.export({ type: "spki", format: "pem" }) as string;
-}
-
-/**
- * Exports a certificate to PEM format.
- */
-export function exportCertificate(cert: X509Certificate): string {
-  return PemConverter.encode(cert.rawData, "CERTIFICATE");
-}
-
-/**
- * Imports a certificate from PEM format.
- */
-export function importCertificate(pem: string): X509Certificate {
-  return new X509Certificate(pem);
-}
-
-/**
- * Imports a private key from PKCS#8 PEM format.
- */
-export async function importPrivateKey(pem: string): Promise<KeyObject> {
-  return crypto.importKey(
-    "pkcs8",
-    PemConverter.decodeFirst(pem),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"],
-  ) as unknown as KeyObject;
 }

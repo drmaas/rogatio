@@ -15,7 +15,7 @@ import {
 import { extensionDiagnostic } from "./diagnostics.js";
 import { projectSourceCondition } from "./source-projection.js";
 
-export interface DnrRule {
+interface DnrRule {
   readonly id: number;
   readonly priority: number;
   readonly condition: {
@@ -57,8 +57,6 @@ export interface HeaderProjection {
   };
   readonly installable: true;
 }
-
-export type InstallableProjection = HeaderProjection;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);

@@ -11,7 +11,7 @@ import { projectSourceCondition } from "./source-projection.js";
  * (1–1_000_000) and header (2_000_001+) bands are a separate store.
  */
 export const BODY_MARKER_ID_MIN = 3_000_001;
-export const BODY_MARKER_ID_MAX = 4_000_000;
+const BODY_MARKER_ID_MAX = 4_000_000;
 
 /** Reserved request header name for logging-only markers (runtime strips). */
 export const BODY_MARKER_HEADER_NAME = "X-Rogatio-Dispatch-BodyMatch";
@@ -52,7 +52,7 @@ export function bodyMarkerIdForIndex(index: number): number {
 }
 
 /** Opaque match-log sentinel — never capability / digest / rewrite auth. */
-export function inertMarkerValue(id: number): string {
+function inertMarkerValue(id: number): string {
   return String(id);
 }
 
@@ -105,7 +105,7 @@ function removeIdsForBodyBand(live: ReadonlyArray<{ id: number }>): number[] {
   return live.map((rule) => rule.id).filter(isBodyMarkerBandId);
 }
 
-export type BodyMarkerInstallResult =
+type BodyMarkerInstallResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly reason: string };
 

@@ -1,10 +1,8 @@
 export {
   createJsonFileProjectStorage,
   ProjectFileError,
-  type ProjectRef,
   type ProjectStorage,
   ProjectStorageError,
-  type ProjectStorageErrorCode,
 } from "./project-storage.js";
 
 import {

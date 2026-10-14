@@ -1,4 +1,1 @@
-export {
-  isValidMockLogicalPath,
-  normalizeLogicalPath,
-} from "@rogatio/schema";
+export { normalizeLogicalPath } from "@rogatio/schema";

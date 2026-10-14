@@ -5,7 +5,7 @@ import {
   steeredRequestOrigin,
 } from "@rogatio/compiler";
 
-export interface ProjectedSourceCondition {
+interface ProjectedSourceCondition {
   readonly regexFilter: string;
   readonly requestDomains?: readonly string[];
 }

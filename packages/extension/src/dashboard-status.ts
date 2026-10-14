@@ -24,7 +24,7 @@ import {
 } from "./status-cards.js";
 import type { CombinedDiagnostics } from "./ui-doctor.js";
 
-export type DashboardAiProvider = AiProviderDisplay;
+type DashboardAiProvider = AiProviderDisplay;
 
 export interface DashboardStatusInput {
   readonly phase: string | undefined;

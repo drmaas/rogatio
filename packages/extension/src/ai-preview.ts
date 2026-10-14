@@ -7,7 +7,7 @@
  * Proxy throws, and bounded output for large or hostile values.
  */
 
-export interface AiPreviewRuleSummary {
+interface AiPreviewRuleSummary {
   readonly id: string;
   readonly name: string;
   readonly type: string;
@@ -18,7 +18,7 @@ export interface AiPreviewRuleSummary {
   readonly action: string;
 }
 
-export interface AiPreviewGroupSummary {
+interface AiPreviewGroupSummary {
   readonly id: string;
   readonly name: string;
   readonly rules: readonly AiPreviewRuleSummary[];

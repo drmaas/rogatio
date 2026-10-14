@@ -9,7 +9,7 @@ export type DirectoryPick =
   | { readonly ok: true; readonly path: string | null }
   | { readonly ok: false; readonly code: "runtime.picker-unavailable" };
 
-export interface DialogRunResult {
+interface DialogRunResult {
   readonly code: number | null;
   readonly stdout: string;
   readonly errorCode?: string;

@@ -445,7 +445,9 @@ async function checkBoundaries(): Promise<void> {
 run("format", pnpm, ["format:check"]);
 run("lint", pnpm, ["lint"]);
 run("typecheck", pnpm, ["typecheck"]);
+run("knip", pnpm, ["knip"]);
 run("build", pnpm, ["build"]);
+run("exports", pnpm, ["check:exports"]);
 run("vitest", pnpm, ["exec", "vitest", "run"]);
 await checkArtifacts();
 await checkEmittedModules();

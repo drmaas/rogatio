@@ -1,6 +1,6 @@
 import type { RogatioQueryAction } from "@rogatio/schema";
 
-export interface DnrQueryParam {
+interface DnrQueryParam {
   /** Chrome Declarative Net Request QueryKeyValue.key */
   readonly key: string;
   readonly value: string;

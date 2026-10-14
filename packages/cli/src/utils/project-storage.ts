@@ -58,7 +58,7 @@ export class ProjectFileError extends ProjectStorageError {
   }
 }
 
-export interface ProjectRef {
+interface ProjectRef {
   readonly id: string;
   readonly name: string;
 }

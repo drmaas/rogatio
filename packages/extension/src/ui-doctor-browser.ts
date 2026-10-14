@@ -100,7 +100,7 @@ export async function readProxySnapshot(
   return { available: true, levelOfControl: level, mode };
 }
 
-export async function readSiteAccess(
+async function readSiteAccess(
   api: ChromeApi | undefined,
 ): Promise<boolean | null> {
   const contains = api?.permissions?.contains;
@@ -113,7 +113,7 @@ export async function readSiteAccess(
   return allowed;
 }
 
-export async function readIncognito(
+async function readIncognito(
   api: ChromeApi | undefined,
 ): Promise<boolean | null> {
   const ask = api?.extension?.isAllowedIncognitoAccess;
@@ -126,9 +126,7 @@ export async function readIncognito(
   return allowed;
 }
 
-export function readExtensionVersion(
-  api: ChromeApi | undefined,
-): string | null {
+function readExtensionVersion(api: ChromeApi | undefined): string | null {
   const version = api?.runtime?.getManifest?.().version;
   return typeof version === "string" ? version : null;
 }

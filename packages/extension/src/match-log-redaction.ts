@@ -48,7 +48,7 @@ export function truncateLogString(value: string): string {
   return `${cut}...`;
 }
 
-export function isDenyListedQueryKey(key: string): boolean {
+function isDenyListedQueryKey(key: string): boolean {
   const lower = key.toLowerCase();
   return QUERY_KEY_DENY_SUBSTRINGS.some((fragment) => lower.includes(fragment));
 }
@@ -75,7 +75,7 @@ function stripUrlUserinfoAndFragment(url: string): string {
   }
 }
 
-export function redactUrlQueryValues(url: string): string {
+function redactUrlQueryValues(url: string): string {
   const queryStart = url.indexOf("?");
   if (queryStart === -1) return url;
 
@@ -141,13 +141,6 @@ export function sanitizeDestinationForLog(
   redactSensitive: boolean,
 ): string {
   return redactUrl(destination, { redactSensitive });
-}
-
-export function sanitizeInitiatorForLog(
-  initiator: string,
-  redactSensitive: boolean,
-): string {
-  return redactUrl(initiator, { redactSensitive });
 }
 
 /** Intended body rewrite from rule config — never live body bytes. */

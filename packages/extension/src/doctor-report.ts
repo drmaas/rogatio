@@ -4,7 +4,7 @@
  * `docs/decisions/doctor/spec.md`.
  */
 
-export const DOCTOR_CHECK_IDS = [
+const DOCTOR_CHECK_IDS = [
   "node",
   "project",
   "host",
@@ -14,7 +14,7 @@ export const DOCTOR_CHECK_IDS = [
 ] as const;
 
 export type DoctorCheckId = (typeof DOCTOR_CHECK_IDS)[number];
-export type DoctorStatus = "pass" | "warn" | "fail";
+type DoctorStatus = "pass" | "warn" | "fail";
 
 /** Titles match the CLI report. */
 export function doctorCheckTitle(id: DoctorCheckId): string {
@@ -27,14 +27,13 @@ export function doctorCheckTitle(id: DoctorCheckId): string {
 }
 
 /** Shown when connectNative never reaches the shared doctor implementation. */
-export const DOCTOR_HOST_UNREACHABLE_SUMMARY =
-  "Could not reach the native host.";
-export const DOCTOR_HOST_UNREACHABLE_FIX = "rogatio runtime install";
+const DOCTOR_HOST_UNREACHABLE_SUMMARY = "Could not reach the native host.";
+const DOCTOR_HOST_UNREACHABLE_FIX = "rogatio runtime install";
 
 /** Leave room for the envelope framing around the project. */
 const DOCTOR_PROJECT_BUDGET = 48 * 1024;
 
-export interface DoctorCheck {
+interface DoctorCheck {
   readonly id: DoctorCheckId;
   readonly status: DoctorStatus;
   readonly optional: boolean;
@@ -47,23 +46,6 @@ export interface DoctorReport {
   readonly ok: boolean;
   readonly exitCode: 0 | 1;
   readonly checks: readonly DoctorCheck[];
-}
-
-export function unreachableDoctorReport(): DoctorReport {
-  return {
-    version: 1,
-    ok: false,
-    exitCode: 1,
-    checks: [
-      {
-        id: "host",
-        status: "fail",
-        optional: false,
-        summary: DOCTOR_HOST_UNREACHABLE_SUMMARY,
-        fix: DOCTOR_HOST_UNREACHABLE_FIX,
-      },
-    ],
-  };
 }
 
 function isStatus(value: unknown): value is DoctorStatus {

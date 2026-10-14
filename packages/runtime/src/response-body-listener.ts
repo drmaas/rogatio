@@ -1,5 +1,5 @@
 /** Keep in sync with the extension redirect prefix. */
-export const RESPONSE_BODY_LISTENER_PREFIX = "/.rogatio/body/";
+const RESPONSE_BODY_LISTENER_PREFIX = "/.rogatio/body/";
 
 export interface ResponseBodyRedirectTarget {
   readonly ruleId: string;

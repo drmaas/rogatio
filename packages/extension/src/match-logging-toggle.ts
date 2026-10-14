@@ -2,7 +2,7 @@ import type { ChromeApi } from "./chrome.js";
 import { MATCH_LOGGING_ENABLED_KEY } from "./match-logging-enabled.js";
 
 /** Accessible name shared by the popup and the management sidebar. */
-export const MATCH_LOGGING_LABEL = "Match logging";
+const MATCH_LOGGING_LABEL = "Match logging";
 
 /**
  * Labelled checkbox for the console match-logging flag. Both surfaces build the
