@@ -49,8 +49,17 @@ function installedManifestDirs(): string[] {
       const appData = process.env.APPDATA ?? join(home, "AppData", "Roaming");
       return [join(appData, "Google", "Chrome", "NativeMessagingHosts")];
     }
-    default:
-      return [join(home, ".config", "google-chrome", "NativeMessagingHosts")];
+    default: {
+      const configHome = process.env.XDG_CONFIG_HOME;
+      const base =
+        typeof configHome === "string" && configHome.startsWith("/")
+          ? configHome
+          : join(home, ".config");
+      return [
+        join(base, "google-chrome", "NativeMessagingHosts"),
+        join(base, "chromium", "NativeMessagingHosts"),
+      ];
+    }
   }
 }
 

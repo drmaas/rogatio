@@ -181,6 +181,12 @@ export interface RequestBodyTrustControllerOptions {
   readonly allowedOrigins?: readonly string[];
   readonly installRoot?: string;
   readonly manifestDir?: string;
+  /**
+   * Native-messaging directories to write on install. When set, install
+   * records this list and later status, verify, and uninstall use the
+   * recorded list instead of a fresh directory scan.
+   */
+  readonly manifestDirs?: readonly string[];
   readonly caKeyFileName?: string;
   readonly caPubFileName?: string;
   readonly caCertFileName?: string;
@@ -206,6 +212,20 @@ export function defaultTrustInstallRoot(platform: string): string {
     return join(process.env.LOCALAPPDATA ?? "", "Rogatio");
   }
   return join(process.env.HOME ?? "", ".local", "share", "rogatio");
+}
+
+const MANIFEST_DIR_RECORD = "native-messaging-dirs.json";
+
+function isSafeManifestDir(dir: string): boolean {
+  if (!isAbsolute(dir) || dir.includes("\0")) return false;
+  const parts = dir.split(/[\\/]/).filter((part) => part.length > 0);
+  if (parts.includes("..") || parts.length < 2) return false;
+  const browser = parts[parts.length - 2];
+  const leaf = parts[parts.length - 1];
+  return (
+    leaf === "NativeMessagingHosts" &&
+    (browser === "google-chrome" || browser === "chromium")
+  );
 }
 
 function isWellFormedManifest(
@@ -448,12 +468,140 @@ export function createRequestBodyTrustController(
     installRoot,
     options.caCertFileName ?? ".rogatio-ca.crt",
   );
+  const storePendingPath = join(
+    dirname(caKeyFile),
+    ".rogatio-ca-store-pending",
+  );
   const caPreviousCertFile = join(
     dirname(caCertFile),
     ".rogatio-ca.previous.crt",
   );
-  const manifestPath = (): string => join(manifestDir, `${hostName}.json`);
+  const configuredManifestDirs =
+    options.manifestDirs && options.manifestDirs.length > 0
+      ? [...options.manifestDirs]
+      : [manifestDir];
+  const recordsManifestDirs =
+    options.manifestDirs !== undefined && options.manifestDirs.length > 0;
+  const manifestRecordPath = join(installRoot, MANIFEST_DIR_RECORD);
   let installerCalled = false;
+
+  type ManifestSnapshot = {
+    path: string;
+    previous: string | undefined;
+    written: boolean;
+  };
+
+  function parseRecordedDirs(raw: string): string[] | undefined {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 8) {
+      return undefined;
+    }
+    const dirs: string[] = [];
+    const seen = new Set<string>();
+    for (const entry of parsed) {
+      if (
+        typeof entry !== "string" ||
+        seen.has(entry) ||
+        !isSafeManifestDir(entry)
+      ) {
+        return undefined;
+      }
+      seen.add(entry);
+      dirs.push(entry);
+    }
+    return dirs;
+  }
+
+  async function readRecordedDirs(): Promise<string[] | undefined> {
+    if (!recordsManifestDirs) return undefined;
+    try {
+      return parseRecordedDirs(await readFile(manifestRecordPath, "utf8"));
+    } catch {
+      return undefined;
+    }
+  }
+
+  async function activeManifestDirs(): Promise<string[]> {
+    const recorded = await readRecordedDirs();
+    if (recorded) return recorded;
+    if (!recordsManifestDirs) return configuredManifestDirs;
+    // An install from before this record only wrote the browsers that
+    // existed then. Do not fail verify for a config directory that has
+    // no manifest yet.
+    const present: string[] = [];
+    for (const dir of configuredManifestDirs) {
+      if (await existsFile(join(dir, `${hostName}.json`))) present.push(dir);
+    }
+    return present.length > 0 ? present : configuredManifestDirs;
+  }
+
+  async function snapshotFile(path: string): Promise<ManifestSnapshot> {
+    let previous: string | undefined;
+    try {
+      previous = await readFile(path, "utf8");
+    } catch {
+      previous = undefined;
+    }
+    return { path, previous, written: false };
+  }
+
+  async function restoreSnapshot(snap: ManifestSnapshot): Promise<void> {
+    if (!snap.written) return;
+    if (snap.previous !== undefined) {
+      await writeFileAtomic(snap.path, snap.previous);
+      return;
+    }
+    await rm(snap.path, { force: true });
+  }
+
+  async function rollbackWritten(
+    snaps: readonly ManifestSnapshot[],
+  ): Promise<void> {
+    for (const snap of snaps) {
+      try {
+        await restoreSnapshot(snap);
+      } catch {
+        // best-effort rollback
+      }
+    }
+  }
+
+  async function writeManifestFiles(
+    data: string,
+  ): Promise<
+    { ok: true; snaps: ManifestSnapshot[] } | { ok: false; reason: string }
+  > {
+    const snaps: ManifestSnapshot[] = [];
+    try {
+      for (const dir of configuredManifestDirs) {
+        if (recordsManifestDirs && !isSafeManifestDir(dir)) {
+          throw new Error("trust.write-failed");
+        }
+        const snap = await snapshotFile(join(dir, `${hostName}.json`));
+        snaps.push(snap);
+        await writeFileAtomic(snap.path, data);
+        snap.written = true;
+      }
+      if (recordsManifestDirs) {
+        const recordSnap = await snapshotFile(manifestRecordPath);
+        snaps.push(recordSnap);
+        await writeFileAtomic(
+          manifestRecordPath,
+          `${JSON.stringify(configuredManifestDirs)}\n`,
+        );
+        recordSnap.written = true;
+      }
+      return { ok: true, snaps };
+    } catch (error) {
+      await rollbackWritten(snaps);
+      return { ok: false, reason: codeOf(error, "trust.write-failed") };
+    }
+  }
 
   async function install(extensionId: string): Promise<TrustResult> {
     if (!extensionId || !/^[a-p]{32}$/.test(extensionId)) {
@@ -489,22 +637,17 @@ export function createRequestBodyTrustController(
     }
     const caps = await detect();
     if (!caps.manifest) return unsupportedResult(caps);
-    try {
-      await writeFileAtomic(manifestPath(), data);
-    } catch (error) {
+    const written = await writeManifestFiles(data);
+    if (!written.ok) {
       return {
         ok: false,
         state: "unsupported",
-        reasons: [codeOf(error, "trust.write-failed")],
+        reasons: [written.reason],
       };
     }
     const caTrustCaps = await detect();
     if (!caTrustCaps.caTrust) {
-      try {
-        await rm(manifestPath(), { force: true });
-      } catch {
-        // best-effort rollback; original capability reason still wins
-      }
+      await rollbackWritten(written.snaps);
       return unsupportedResult(caTrustCaps);
     }
     const trustResult = await trust();
@@ -514,14 +657,11 @@ export function createRequestBodyTrustController(
       } catch {
         // best-effort rollback; original error code still wins
       }
-      try {
-        await rm(manifestPath(), { force: true });
-      } catch {
-        // best-effort rollback
-      }
+      await rollbackWritten(written.snaps);
       installerCalled = false;
       return trustResult;
     }
+    await rm(storePendingPath, { force: true });
     return trustResult.reasons
       ? { ok: true, state: "installed", reasons: trustResult.reasons }
       : { ok: true, state: "installed" };
@@ -702,8 +842,8 @@ export function createRequestBodyTrustController(
     }
     let installedNew = false;
     if (caTrustInstaller && !installerCalled) {
-      await caTrustInstaller(await readFile(caCertFile, "utf8"));
       installerCalled = true;
+      await caTrustInstaller(await readFile(caCertFile, "utf8"));
       installedNew = true;
     }
     if (reusable && siblingAnchor && (installedNew || !caTrustInstaller)) {
@@ -729,11 +869,18 @@ export function createRequestBodyTrustController(
     const saved = await readPreviousRogatioCa(caPreviousCertFile);
     const live = await readPreviousRogatioCa(caCertFile);
     const caWasPresent = await existsFile(caKeyFile);
+    // The local key is removed even when store removal throws. A marker
+    // keeps the next uninstall calling the remover, so a failed p11-kit
+    // refresh cannot report success while the CA stays trusted.
+    if (caWasPresent && caTrustRemover) {
+      await writeFileAtomic(storePendingPath, "1\n", 0o600);
+    }
     await rm(caKeyFile, { force: true });
     await rm(caPubFile, { force: true });
     await rm(caCertFile, { force: true });
-    if (caWasPresent && caTrustRemover) {
+    if (caTrustRemover && (await existsFile(storePendingPath))) {
       await caTrustRemover();
+      await rm(storePendingPath, { force: true });
     }
     if (!saved) return;
     if (!caWasPresent || saved.fingerprint !== live?.fingerprint) {
@@ -749,14 +896,24 @@ export function createRequestBodyTrustController(
 
   async function uninstall(): Promise<TrustResult> {
     try {
-      await rm(manifestPath(), { force: true });
+      const dirs = await activeManifestDirs();
+      for (const dir of dirs) {
+        await rm(join(dir, `${hostName}.json`), { force: true });
+      }
+      if (recordsManifestDirs) await rm(manifestRecordPath, { force: true });
       await removeCa();
       installerCalled = false;
     } catch (error) {
+      const reason =
+        error instanceof TrustError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : String(error);
       return {
         ok: false,
         state: "unsupported",
-        reasons: [error instanceof Error ? error.message : String(error)],
+        reasons: [reason],
       };
     }
     return { ok: true, state: "uninstalled" };
@@ -777,13 +934,39 @@ export function createRequestBodyTrustController(
       : { ok: true, state: "trusted" };
   }
 
+  function manifestAcceptable(parsed: NativeMessagingManifest): boolean {
+    if (!recordsManifestDirs) return true;
+    return (
+      parsed.name === hostName &&
+      parsed.path === hostPath &&
+      parsed.type === "stdio"
+    );
+  }
+
+  function sameOrigins(
+    left: readonly string[],
+    right: readonly string[],
+  ): boolean {
+    if (left.length !== right.length) return false;
+    for (let index = 0; index < left.length; index += 1) {
+      if (left[index] !== right[index]) return false;
+    }
+    return true;
+  }
+
   async function status(): Promise<TrustStatus> {
-    let installed = false;
-    try {
-      const raw = await readFile(manifestPath(), "utf8");
-      installed = isWellFormedManifest(JSON.parse(raw) as unknown);
-    } catch {
-      installed = false;
+    const dirs = await activeManifestDirs();
+    let installed = dirs.length > 0;
+    for (const dir of dirs) {
+      try {
+        const raw = await readFile(join(dir, `${hostName}.json`), "utf8");
+        const parsed = JSON.parse(raw) as unknown;
+        if (!isWellFormedManifest(parsed) || !manifestAcceptable(parsed)) {
+          installed = false;
+        }
+      } catch {
+        installed = false;
+      }
     }
     // Check actual trust: both CA key and certificate must exist
     const trusted =
@@ -799,37 +982,56 @@ export function createRequestBodyTrustController(
 
   async function verify(): Promise<VerifyResult> {
     const reasons: string[] = [];
-    let manifestExists = false;
-    let manifestValid = false;
+    const pushReason = (reason: string) => {
+      if (!reasons.includes(reason)) reasons.push(reason);
+    };
+    const dirs = await activeManifestDirs();
+    let manifestExists = dirs.length > 0;
+    let manifestValid = dirs.length > 0;
     let binaryExists = false;
     let binaryExecutable = false;
     let allowedOrigins: readonly string[] = [];
-    try {
-      const raw = await readFile(manifestPath(), "utf8");
-      manifestExists = true;
-      const parsed = JSON.parse(raw) as unknown;
-      if (isWellFormedManifest(parsed)) {
-        manifestValid = true;
-        allowedOrigins = [...parsed.allowed_origins];
-        try {
-          const fileStat = await stat(parsed.path);
-          binaryExists = fileStat.isFile();
-          // Node never sets the Unix execute bit on Windows. A regular file
-          // there is the wrapper Chrome will launch.
-          binaryExecutable =
-            platform === "win32" ? binaryExists : (fileStat.mode & 0o111) !== 0;
-          if (!binaryExists) reasons.push("binary-not-found");
-          if (!binaryExecutable) reasons.push("binary-not-executable");
-        } catch {
-          binaryExists = false;
-          reasons.push("binary-not-found");
+    let binaryPath: string | undefined;
+    for (const dir of dirs) {
+      try {
+        const raw = await readFile(join(dir, `${hostName}.json`), "utf8");
+        const parsed = JSON.parse(raw) as unknown;
+        if (!isWellFormedManifest(parsed) || !manifestAcceptable(parsed)) {
+          manifestValid = false;
+          pushReason("manifest-invalid");
+          continue;
         }
-        if (allowedOrigins.length === 0) reasons.push("no-allowed-origins");
-      } else {
-        reasons.push("manifest-invalid");
+        if (binaryPath === undefined) {
+          binaryPath = parsed.path;
+          allowedOrigins = [...parsed.allowed_origins];
+        } else if (
+          parsed.path !== binaryPath ||
+          !sameOrigins(parsed.allowed_origins, allowedOrigins)
+        ) {
+          manifestValid = false;
+          pushReason("manifest-invalid");
+        }
+      } catch {
+        manifestExists = false;
+        manifestValid = false;
+        pushReason("manifest-not-found");
       }
-    } catch {
-      reasons.push("manifest-not-found");
+    }
+    if (binaryPath !== undefined) {
+      try {
+        const fileStat = await stat(binaryPath);
+        binaryExists = fileStat.isFile();
+        // Node never sets the Unix execute bit on Windows. A regular file
+        // there is the wrapper Chrome will launch.
+        binaryExecutable =
+          platform === "win32" ? binaryExists : (fileStat.mode & 0o111) !== 0;
+        if (!binaryExists) pushReason("binary-not-found");
+        if (!binaryExecutable) pushReason("binary-not-executable");
+      } catch {
+        binaryExists = false;
+        pushReason("binary-not-found");
+      }
+      if (allowedOrigins.length === 0) pushReason("no-allowed-origins");
     }
     const caTrusted =
       (await existsFile(caKeyFile)) && (await existsFile(caCertFile));

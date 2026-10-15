@@ -17,6 +17,7 @@ describe("TrustPlatformAdapter detect()", () => {
   beforeEach(() => {
     vi.stubEnv("HOME", "/home/test");
     vi.stubEnv("APPDATA", "/home/test/AppData/Roaming");
+    vi.stubEnv("XDG_CONFIG_HOME", "");
     mockSpawnSync.mockReset();
     mockAccessSync.mockReset();
     mockSpawnSync.mockReturnValue({ status: 0 });
@@ -112,7 +113,7 @@ describe("TrustPlatformAdapter detect()", () => {
       expect(result.reasons).toEqual([]);
     });
 
-    it("returns tooling-missing when update-ca-certificates not found", () => {
+    it("returns tooling-missing when no CA trust tool is on PATH", () => {
       mockSpawnSync.mockImplementation((cmd: string, _args?: string[]) => {
         if (cmd === "which") return { status: 1 };
         return { status: 0 };
@@ -142,6 +143,7 @@ describe("TrustPlatformAdapter detect()", () => {
       expect(result.manifest).toBe(false);
       expect(result.caTrust).toBe(true); // caTrust not affected by manifest-dir-unwritable
       expect(result.reasons).toContain("manifest-dir-unwritable");
+      expect(adapter.manifestDirs?.()).toEqual([]);
     });
 
     it("returns elevation-required when ca dir not writable and no sudo", () => {
@@ -225,6 +227,139 @@ describe("TrustPlatformAdapter detect()", () => {
       expect(result.manifest).toBe(true);
       expect(result.caTrust).toBe(false);
       expect(result.reasons).toContain("elevation-required");
+    });
+
+    it("accepts update-ca-trust when the Arch anchors tree exists", () => {
+      mockSpawnSync.mockImplementation((cmd: string, args?: string[]) => {
+        if (cmd === "which" && args?.[0] === "update-ca-certificates") {
+          return { status: 1 };
+        }
+        return { status: 0 };
+      });
+      mockAccessSync.mockImplementation((path) => {
+        const p = String(path);
+        if (p.startsWith("/etc/pki/ca-trust")) {
+          const err = new Error("ENOENT") as NodeJS.ErrnoException;
+          err.code = "ENOENT";
+          throw err;
+        }
+      });
+
+      const result = selectTrustPlatformAdapter("linux").detect();
+
+      expect(result.manifest).toBe(true);
+      expect(result.caTrust).toBe(true);
+      expect(result.reasons).toEqual([]);
+    });
+
+    it("reports ca-store-unwritable when both anchors trees exist", () => {
+      mockSpawnSync.mockImplementation((cmd: string, args?: string[]) => {
+        if (cmd === "which" && args?.[0] === "update-ca-certificates") {
+          return { status: 1 };
+        }
+        return { status: 0 };
+      });
+
+      const result = selectTrustPlatformAdapter("linux").detect();
+
+      expect(result.caTrust).toBe(false);
+      expect(result.reasons).toContain("ca-store-unwritable");
+      expect(result.reasons).not.toContain("tooling-missing");
+    });
+
+    it("reports ca-store-unwritable when update-ca-trust has no anchors tree", () => {
+      mockSpawnSync.mockImplementation((cmd: string, args?: string[]) => {
+        if (cmd === "which" && args?.[0] === "update-ca-certificates") {
+          return { status: 1 };
+        }
+        if (cmd === "which" && args?.[0] === "update-ca-trust")
+          return { status: 0 };
+        if (cmd === "which" && args?.[0] === "sudo") return { status: 0 };
+        if (cmd === "which") return { status: 1 };
+        return { status: 0 };
+      });
+      mockAccessSync.mockImplementation((path) => {
+        const p = String(path);
+        if (
+          p.startsWith("/etc/ca-certificates/trust-source") ||
+          p.startsWith("/etc/pki/ca-trust")
+        ) {
+          const err = new Error("ENOENT") as NodeJS.ErrnoException;
+          err.code = "ENOENT";
+          throw err;
+        }
+      });
+
+      const result = selectTrustPlatformAdapter("linux").detect();
+
+      expect(result.caTrust).toBe(false);
+      expect(result.reasons).toContain("ca-store-unwritable");
+    });
+
+    it("returns elevation-required when Arch anchors are not writable and sudo is absent", () => {
+      mockSpawnSync.mockImplementation((cmd: string, args?: string[]) => {
+        if (cmd === "which" && args?.[0] === "update-ca-certificates") {
+          return { status: 1 };
+        }
+        if (cmd === "which" && args?.[0] === "sudo") return { status: 1 };
+        if (cmd === "which" && args?.[0] === "update-ca-trust")
+          return { status: 0 };
+        return { status: 0 };
+      });
+      mockAccessSync.mockImplementation((path) => {
+        const p = String(path);
+        if (p.startsWith("/etc/pki/ca-trust")) {
+          const err = new Error("ENOENT") as NodeJS.ErrnoException;
+          err.code = "ENOENT";
+          throw err;
+        }
+        if (p === "/etc/ca-certificates/trust-source/anchors") {
+          throw new Error("EACCES");
+        }
+      });
+
+      const result = selectTrustPlatformAdapter("linux").detect();
+
+      expect(result.caTrust).toBe(false);
+      expect(result.reasons).toContain("elevation-required");
+    });
+
+    it("includes Chromium when that config parent is writable and Chrome is absent", () => {
+      mockAccessSync.mockImplementation((path) => {
+        const p = String(path);
+        if (
+          p === "/home/test/.config/google-chrome" ||
+          p === "/home/test/.config/google-chrome/NativeMessagingHosts" ||
+          p === "/home/test/.config/chromium/NativeMessagingHosts"
+        ) {
+          const err = new Error("ENOENT") as NodeJS.ErrnoException;
+          err.code = "ENOENT";
+          throw err;
+        }
+      });
+
+      const adapter = selectTrustPlatformAdapter("linux");
+
+      expect(adapter.manifestDirs?.()).toEqual([
+        "/home/test/.config/chromium/NativeMessagingHosts",
+      ]);
+      expect(adapter.detect().manifest).toBe(true);
+      expect(adapter.detect().reasons).not.toContain("manifest-dir-unwritable");
+    });
+
+    it("honors an absolute XDG_CONFIG_HOME and ignores a relative one", () => {
+      vi.stubEnv("XDG_CONFIG_HOME", "/xdg");
+      const adapter = selectTrustPlatformAdapter("linux");
+      expect(adapter.manifestDirs?.()).toEqual([
+        "/xdg/google-chrome/NativeMessagingHosts",
+        "/xdg/chromium/NativeMessagingHosts",
+      ]);
+
+      vi.stubEnv("XDG_CONFIG_HOME", "relative");
+      expect(selectTrustPlatformAdapter("linux").manifestDirs?.()).toEqual([
+        "/home/test/.config/google-chrome/NativeMessagingHosts",
+        "/home/test/.config/chromium/NativeMessagingHosts",
+      ]);
     });
   });
 

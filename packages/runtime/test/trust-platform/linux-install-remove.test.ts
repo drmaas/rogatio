@@ -1,3 +1,4 @@
+import { accessSync } from "node:fs";
 import {
   afterEach,
   beforeAll,
@@ -31,6 +32,14 @@ vi.mock("node:fs", () => ({
 }));
 
 const CERT_PATH = "/usr/local/share/ca-certificates/rogatio-ca.crt";
+const ARCH_ANCHORS = "/etc/ca-certificates/trust-source/anchors";
+const FEDORA_ANCHORS = "/etc/pki/ca-trust/source/anchors";
+
+function enoent(): never {
+  const err = new Error("ENOENT") as NodeJS.ErrnoException;
+  err.code = "ENOENT";
+  throw err;
+}
 
 function createChild(code: number, stderrText = "") {
   return {
@@ -76,6 +85,15 @@ describe("linux CA installer/remover", () => {
     mockSpawnSync.mockReset();
     mockSpawnSync.mockReturnValue({ status: 0 });
     mockSpawn.mockImplementation(() => createChild(0));
+    vi.mocked(accessSync).mockImplementation((path) => {
+      const target = String(path);
+      if (
+        target.startsWith("/etc/ca-certificates/trust-source") ||
+        target.startsWith("/etc/pki/ca-trust")
+      ) {
+        enoent();
+      }
+    });
   });
 
   afterEach(() => {
@@ -201,6 +219,142 @@ describe("linux CA installer/remover", () => {
     await adapter.caTrustInstaller(caPem);
 
     expect(mockSpawn).toHaveBeenCalledTimes(4);
+    expectNoShell();
+  });
+
+  it("drops the cert into the Arch anchors directory and runs update-ca-trust", async () => {
+    mockSpawnSync.mockImplementation((cmd: string, args?: string[]) => {
+      if (cmd === "which" && args?.[0] === "update-ca-certificates") {
+        return { status: 1 };
+      }
+      return { status: 0 };
+    });
+    vi.mocked(accessSync).mockImplementation((path) => {
+      if (String(path).startsWith("/etc/pki/ca-trust")) enoent();
+    });
+
+    const adapter = selectTrustPlatformAdapter("linux");
+    await adapter.caTrustInstaller(caPem);
+
+    expect(mockSpawn.mock.calls.map((call) => call[1])).toEqual([
+      ["mkdir", "-p", ARCH_ANCHORS],
+      ["tee", `${ARCH_ANCHORS}/rogatio-ca.crt`],
+      ["update-ca-trust"],
+    ]);
+    const writer = mockSpawn.mock.results[1]?.value as ReturnType<
+      typeof createChild
+    >;
+    expect(writer.stdin.end).toHaveBeenCalledWith(caPem);
+    expectNoShell();
+    for (const call of mockSpawn.mock.calls) {
+      const args = call[1] as readonly string[];
+      expect(args).not.toContain("--store");
+      expect(args).not.toContain("--remove");
+      expect(args[0]).not.toBe("trust");
+    }
+  });
+
+  it("drops the cert into the Fedora anchors directory when the Arch tree is absent", async () => {
+    mockSpawnSync.mockImplementation((cmd: string, args?: string[]) => {
+      if (cmd === "which" && args?.[0] === "update-ca-certificates") {
+        return { status: 1 };
+      }
+      return { status: 0 };
+    });
+    vi.mocked(accessSync).mockImplementation((path) => {
+      if (String(path).startsWith("/etc/ca-certificates/trust-source"))
+        enoent();
+    });
+
+    const adapter = selectTrustPlatformAdapter("linux");
+    await adapter.caTrustInstaller(caPem);
+
+    expect(mockSpawn.mock.calls[1]?.[1]).toEqual([
+      "tee",
+      `${FEDORA_ANCHORS}/rogatio-ca.crt`,
+    ]);
+    expect(mockSpawn.mock.calls[2]?.[1]).toEqual(["update-ca-trust"]);
+    expectNoShell();
+  });
+
+  it("removes the Arch anchor when update-ca-trust fails", async () => {
+    mockSpawnSync.mockImplementation((cmd: string, args?: string[]) => {
+      if (cmd === "which" && args?.[0] === "update-ca-certificates") {
+        return { status: 1 };
+      }
+      return { status: 0 };
+    });
+    vi.mocked(accessSync).mockImplementation((path) => {
+      if (String(path).startsWith("/etc/pki/ca-trust")) enoent();
+    });
+    const codes = [0, 0, 1, 0, 0];
+    let index = 0;
+    mockSpawn.mockImplementation(() => createChild(codes[index++] ?? 1));
+
+    const adapter = selectTrustPlatformAdapter("linux");
+    await expect(adapter.caTrustInstaller(caPem)).rejects.toBeInstanceOf(
+      TrustError,
+    );
+    expect(mockSpawn.mock.calls.map((call) => call[1])).toEqual([
+      ["mkdir", "-p", ARCH_ANCHORS],
+      ["tee", `${ARCH_ANCHORS}/rogatio-ca.crt`],
+      ["update-ca-trust"],
+      ["rm", "-f", `${ARCH_ANCHORS}/rogatio-ca.crt`],
+      ["update-ca-trust"],
+    ]);
+    expectNoShell();
+  });
+
+  it("removes an Arch anchor with sudo rm and update-ca-trust", async () => {
+    mockSpawnSync.mockImplementation((cmd: string, args?: string[]) => {
+      if (cmd === "which" && args?.[0] === "update-ca-certificates") {
+        return { status: 1 };
+      }
+      return { status: 0 };
+    });
+    vi.mocked(accessSync).mockImplementation((path) => {
+      const target = String(path);
+      if (target === `${ARCH_ANCHORS}/rogatio-ca.crt`) return;
+      if (
+        target.startsWith("/etc/ca-certificates/trust-source") ||
+        target.startsWith("/etc/pki/ca-trust")
+      ) {
+        enoent();
+      }
+    });
+
+    const adapter = selectTrustPlatformAdapter("linux");
+    await adapter.caTrustRemover();
+
+    expect(mockSpawn.mock.calls.map((call) => call[1])).toEqual([
+      ["rm", "-f", `${ARCH_ANCHORS}/rogatio-ca.crt`],
+      ["update-ca-trust"],
+    ]);
+    expectNoShell();
+  });
+
+  it("refreshes p11-kit trust when the anchor file is already gone", async () => {
+    mockSpawnSync.mockImplementation((cmd: string, args?: string[]) => {
+      if (cmd === "which" && args?.[0] === "update-ca-certificates") {
+        return { status: 1 };
+      }
+      return { status: 0 };
+    });
+    vi.mocked(accessSync).mockImplementation((path) => {
+      if (
+        String(path).startsWith("/etc/ca-certificates/trust-source") ||
+        String(path).startsWith("/etc/pki/ca-trust")
+      ) {
+        enoent();
+      }
+    });
+
+    const adapter = selectTrustPlatformAdapter("linux");
+    await adapter.caTrustRemover();
+
+    expect(mockSpawn.mock.calls.map((call) => call[1])).toEqual([
+      ["update-ca-trust"],
+    ]);
     expectNoShell();
   });
 

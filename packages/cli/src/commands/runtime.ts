@@ -88,13 +88,13 @@ function reportTrust(
     // Platform-specific remediation hints
     const hints: Record<string, string> = {
       "tooling-missing":
-        "Hint: install required tooling (macOS: security; Linux: update-ca-certificates; Windows: certutil is built-in)",
+        "Hint: install required tooling (macOS: security; Linux: update-ca-certificates or update-ca-trust; Windows: certutil is built-in)",
       "manifest-dir-unwritable":
-        "Hint: check permissions on Chrome NativeMessagingHosts directory or run with appropriate access",
+        "Hint: check permissions on the browser NativeMessagingHosts directory (Google Chrome or Chromium) or run with appropriate access",
       "keychain-unwritable":
         "Hint: macOS login keychain not writable; try running with appropriate keychain access or use sudo for system keychain",
       "ca-store-unwritable":
-        "Hint: /usr/local/share/ca-certificates not writable; check directory permissions",
+        "Hint: the CA trust store is not writable, or this system has no supported anchors directory. Debian uses /usr/local/share/ca-certificates. Arch uses /etc/ca-certificates/trust-source/anchors. Fedora and RHEL use /etc/pki/ca-trust/source/anchors",
       "elevation-required":
         "Hint: device-local CA trust requires root (Linux: sudo, macOS: keychain password, Windows: Administrator). Re-run with elevated privileges",
     };
