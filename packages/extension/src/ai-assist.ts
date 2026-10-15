@@ -108,15 +108,55 @@ function proposalAction(
   return undefined;
 }
 
-export function parseAIProposal(value: unknown): ExtensionAIProposal | null {
+/**
+ * Group that receives a proposal rule when the model omits `groupId`.
+ * Prefers the editor's active group when that id exists. Otherwise the first
+ * group. An empty group list uses `ai-group`, which merge creates.
+ */
+export function defaultAssistGroupId(
+  project: unknown,
+  activeGroupId?: string,
+): string | undefined {
+  if (!isRecord(project) || !Array.isArray(project.groups)) return undefined;
+  const ids: string[] = [];
+  for (const group of project.groups) {
+    if (!isRecord(group) || !Object.hasOwn(group, "id")) continue;
+    const id = group.id;
+    if (typeof id === "string" && id.length > 0) ids.push(id);
+  }
+  if (
+    activeGroupId !== undefined &&
+    activeGroupId.length > 0 &&
+    ids.includes(activeGroupId)
+  ) {
+    return activeGroupId;
+  }
+  return ids[0] ?? "ai-group";
+}
+
+function ownGroupId(entry: Record<string, unknown>): string | undefined {
+  if (!Object.hasOwn(entry, "groupId")) return undefined;
+  const value = entry.groupId;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+export function parseAIProposal(
+  value: unknown,
+  fallbackGroupId?: string,
+): ExtensionAIProposal | null {
   if (!isRecord(value) || typeof value.explanation !== "string") return null;
   if (!Array.isArray(value.rules)) return null;
+  const fallback =
+    typeof fallbackGroupId === "string" && fallbackGroupId.length > 0
+      ? fallbackGroupId
+      : undefined;
   const rules: ExtensionRuleProposal[] = [];
   for (const entry of value.rules) {
     if (!isRecord(entry)) return null;
     const kind = proposalKind(entry);
     if (kind === null) return null;
-    if (typeof entry.groupId !== "string" || typeof entry.name !== "string") {
+    const groupId = ownGroupId(entry) ?? fallback;
+    if (groupId === undefined || typeof entry.name !== "string") {
       return null;
     }
     const action = proposalAction(entry, kind);
@@ -132,7 +172,7 @@ export function parseAIProposal(value: unknown): ExtensionAIProposal | null {
     }
     rules.push({
       kind,
-      groupId: entry.groupId,
+      groupId,
       name: entry.name,
       source: {
         key: source.key,
@@ -358,18 +398,25 @@ export function mergeProposalIntoProject(
   return { ...project, groups };
 }
 
-export function buildAssistSystemPrompt(project: unknown): string {
+export function buildAssistSystemPrompt(
+  project: unknown,
+  activeGroupId?: string,
+): string {
   let projectJson = "{}";
   try {
     projectJson = JSON.stringify(project);
   } catch {
     projectJson = "{}";
   }
+  const fallback = defaultAssistGroupId(project, activeGroupId);
   return [
     "You are an expert Rogatio rule author.",
     'Return ONLY valid JSON: {"rules":[...],"explanation":string}.',
     'Each rule kind is exactly "redirect", "query", "header", "response-body", or "request-body".',
     'Required: kind, groupId, name, source { key "url"|"host", operator "regex", value }, action. Optional: resourceTypes, priority, method.',
+    fallback
+      ? `If groupId is omitted, the rule is placed in "${fallback}".`
+      : "groupId must name the group that receives the rule.",
     "redirect action: {destination} (http/https absolute URL; $1-$9 for captures).",
     'header action: {headerDirection:"request"|"response", headerOperation:"set"|"append"|"remove", headerName, headerValue}. Use headerOperation "set" when assigning a header value.',
     "query action: query parameter ops; body rules: replace or regex modes.",

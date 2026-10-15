@@ -10,6 +10,7 @@ import {
 import { compileProject, type RogatioOperation } from "@rogatio/compiler";
 import {
   buildAssistSystemPrompt,
+  defaultAssistGroupId,
   MAX_AI_ASSIST_ENVELOPE_BYTES,
   mergeProposalIntoProject,
   parseAIProposal,
@@ -811,7 +812,12 @@ export function createExtensionApplication(
         return failure("extension.ai-invalid-prompt");
       }
       const project = (context as { project: Record<string, unknown> }).project;
-      const systemPrompt = buildAssistSystemPrompt(project);
+      const contextRecord = context as Record<string, unknown>;
+      const activeGroupId = Object.hasOwn(contextRecord, "activeGroupId")
+        ? stringValue(contextRecord.activeGroupId)
+        : undefined;
+      const fallbackGroupId = defaultAssistGroupId(project, activeGroupId);
+      const systemPrompt = buildAssistSystemPrompt(project, activeGroupId);
       const diagnostics = (context as { diagnostics?: unknown }).diagnostics;
       let userContent = prompt;
       if (kind === "fix" && Array.isArray(diagnostics)) {
@@ -857,7 +863,7 @@ export function createExtensionApplication(
       } catch {
         return failure("extension.ai-invalid-response");
       }
-      const proposal = parseAIProposal(parsed);
+      const proposal = parseAIProposal(parsed, fallbackGroupId);
       if (!proposal) return failure("extension.ai-invalid-response");
       // Fix requests validate the repaired project (the offending rules are
       // replaced by the proposal); other requests validate the append merge.

@@ -1,6 +1,10 @@
 import type { RogatioOperation } from "@rogatio/compiler";
 import { describe, expect, it, vi } from "vitest";
-import { buildAssistSystemPrompt } from "../src/ai-assist.js";
+import {
+  buildAssistSystemPrompt,
+  defaultAssistGroupId,
+  parseAIProposal,
+} from "../src/ai-assist.js";
 import type {
   NativeEnvelope,
   NativeEnvelopeInput,
@@ -263,6 +267,137 @@ describe("extension AI Assist", () => {
       'Each rule kind is exactly "redirect", "query", "header", "response-body", or "request-body".',
     );
     expect(prompt).toContain('headerOperation "set"');
+    expect(prompt).toContain(
+      'If groupId is omitted, the rule is placed in "group-a".',
+    );
+  });
+
+  it("places an omitted groupId in the active group, else the first group", () => {
+    expect(defaultAssistGroupId(project)).toBe("group-a");
+    expect(defaultAssistGroupId(project, "missing")).toBe("group-a");
+    expect(
+      defaultAssistGroupId(
+        {
+          groups: [{ id: "group-a" }, { id: "group-b" }],
+        },
+        "group-b",
+      ),
+    ).toBe("group-b");
+    expect(defaultAssistGroupId({ groups: [] })).toBe("ai-group");
+    expect(defaultAssistGroupId(null)).toBeUndefined();
+    expect(
+      buildAssistSystemPrompt(
+        { groups: [{ id: "group-a" }, { id: "group-b" }] },
+        "group-b",
+      ),
+    ).toContain('placed in "group-b"');
+  });
+
+  it("accepts a generate proposal that omits groupId", async () => {
+    const { rules, ...rest } = proposal;
+    const omitted = {
+      ...rest,
+      rules: rules.map((rule) => {
+        const { groupId: _groupId, ...ruleRest } = rule;
+        return ruleRest;
+      }),
+    };
+    const { app } = harness({
+      protocol: "v1",
+      type: "ai.complete",
+      metadata: { content: JSON.stringify(omitted) },
+    });
+    await start(app);
+
+    const result = await app.handle({
+      version: 1,
+      command: "ai-assist",
+      kind: "generate",
+      prompt: "can you add a new rule",
+      context: { project },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        proposal: {
+          rules: [
+            { groupId: "group-a", kind: "redirect", name: "Redirect old" },
+          ],
+        },
+      },
+    });
+  });
+
+  it("places an omitted groupId in the active group", async () => {
+    const { rules, ...rest } = proposal;
+    const omitted = {
+      ...rest,
+      rules: rules.map((rule) => {
+        const { groupId: _groupId, ...ruleRest } = rule;
+        return ruleRest;
+      }),
+    };
+    const twoGroups = {
+      ...project,
+      groups: [
+        ...project.groups,
+        { id: "group-b", name: "Group B", rules: [] },
+      ],
+    };
+    const { app, send } = harness({
+      protocol: "v1",
+      type: "ai.complete",
+      metadata: { content: JSON.stringify(omitted) },
+    });
+    await start(app);
+
+    const result = await app.handle({
+      version: 1,
+      command: "ai-assist",
+      kind: "generate",
+      prompt: "can you add a new rule",
+      context: { project: twoGroups, activeGroupId: "group-b" },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { proposal: { rules: [{ groupId: "group-b" }] } },
+    });
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "ai.complete",
+        metadata: expect.objectContaining({
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              role: "system",
+              content: expect.stringContaining('placed in "group-b"'),
+            }),
+          ]),
+        }),
+      }),
+    );
+  });
+
+  it("ignores an inherited groupId", () => {
+    const entry: Record<string, unknown> = Object.assign(
+      Object.create({ groupId: "stolen" }),
+      {
+        kind: "redirect",
+        name: "Redirect old",
+        source: {
+          key: "url",
+          operator: "regex",
+          value: "^https://example\\.com/old$",
+        },
+        action: { destination: "https://example.com/new" },
+      },
+    );
+    const parsed = parseAIProposal(
+      { rules: [entry], explanation: "Redirects old to new" },
+      "group-a",
+    );
+    expect(parsed?.rules[0]?.groupId).toBe("group-a");
   });
 
   it("rejects schema-invalid proposals", async () => {
