@@ -13,13 +13,15 @@ export function createInstalledTrustController() {
   const platform = process.platform;
   const adapter = selectTrustPlatformAdapter(platform);
   const installRoot = defaultTrustInstallRoot(platform);
+  const manifestDirs = adapter.manifestDirs?.() ?? [];
   return createRequestBodyTrustController({
     platform,
     installRoot,
     hostPath: join(installRoot, "runtime-host"),
     hostName: "com.rogatio.runtime",
     allowedOrigins: [],
-    manifestDir: adapter.defaultManifestDir(),
+    manifestDir: manifestDirs[0] ?? adapter.defaultManifestDir(),
+    ...(manifestDirs.length > 0 ? { manifestDirs } : {}),
     detectCapabilities: () => adapter.detect(),
     caTrustInstaller: (cert) => adapter.caTrustInstaller(cert),
     caTrustRemover: () => adapter.caTrustRemover(),

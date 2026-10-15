@@ -458,6 +458,37 @@ describe(" trust controller lifecycle", () => {
     expect(await fileExists(join(root, ".rogatio-ca.crt"))).toBe(false);
   });
 
+  it("retries store removal after the key is already gone", async () => {
+    let fail = true;
+    const remover = vi.fn(() => {
+      if (fail) throw new Error("store-removal-failed");
+    });
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: root,
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+      caTrustRemover: remover,
+    });
+    await controller.install("abcdefghijklmnopabcdefghijklmnop");
+
+    const failed = await controller.uninstall();
+    expect(failed.ok).toBe(false);
+    expect(await fileExists(join(root, ".rogatio-ca.key"))).toBe(false);
+    expect(await fileExists(join(root, ".rogatio-ca-store-pending"))).toBe(
+      true,
+    );
+
+    fail = false;
+    const retried = await controller.uninstall();
+    expect(retried.ok).toBe(true);
+    expect(remover).toHaveBeenCalledTimes(2);
+    expect(await fileExists(join(root, ".rogatio-ca-store-pending"))).toBe(
+      false,
+    );
+  });
+
   it("unified uninstall: status non-leakage + public surface narrowing (AC-5)", async () => {
     const controller = createRequestBodyTrustController({
       installRoot: root,
@@ -1882,6 +1913,159 @@ describe("verify allowed_origins", () => {
 
     const other = "bcdefghijklmnopabcdefghijklmnopa";
     expect(extensionOriginListed(other, checked.allowedOrigins)).toBe(false);
+  });
+});
+
+describe(" linux manifest directories", () => {
+  const extensionId = "abcdefghijklmnopabcdefghijklmnop";
+
+  function dirs() {
+    const chrome = join(root, "google-chrome", "NativeMessagingHosts");
+    const chromium = join(root, "chromium", "NativeMessagingHosts");
+    return { chrome, chromium };
+  }
+
+  it("rolls back every manifest and restores a previous file when CA trust is absent", async () => {
+    const { chrome, chromium } = dirs();
+    await mkdir(chrome, { recursive: true });
+    const previous = '{"keep":true}\n';
+    await writeFile(join(chrome, "com.rogatio.runtime.json"), previous, "utf8");
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: chrome,
+      manifestDirs: [chrome, chromium],
+      hostPath: join(root, "runtime-host"),
+      detectCapabilities: () => ({
+        manifest: true,
+        caTrust: false,
+        reasons: ["elevation-required"],
+      }),
+    });
+
+    const result = await controller.install(extensionId);
+
+    expect(result.ok).toBe(false);
+    expect(
+      await readFile(join(chrome, "com.rogatio.runtime.json"), "utf8"),
+    ).toBe(previous);
+    expect(await fileExists(join(chromium, "com.rogatio.runtime.json"))).toBe(
+      false,
+    );
+    expect(await fileExists(join(root, "native-messaging-dirs.json"))).toBe(
+      false,
+    );
+  });
+
+  it("writes each recorded manifest and verify ignores a browser added later", async () => {
+    const { chrome, chromium } = dirs();
+    const hostPath = join(root, "runtime-host");
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: chrome,
+      manifestDirs: [chrome, chromium],
+      hostPath,
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+    });
+
+    const installed = await controller.install(extensionId);
+    expect(installed.ok).toBe(true);
+    const chromeBody = await readFile(
+      join(chrome, "com.rogatio.runtime.json"),
+      "utf8",
+    );
+    const chromiumBody = await readFile(
+      join(chromium, "com.rogatio.runtime.json"),
+      "utf8",
+    );
+    expect(chromiumBody).toBe(chromeBody);
+    expect(JSON.parse(chromeBody).path).toBe(hostPath);
+    const recorded = JSON.parse(
+      await readFile(join(root, "native-messaging-dirs.json"), "utf8"),
+    ) as unknown;
+    expect(recorded).toEqual([chrome, chromium]);
+
+    const tampered = {
+      ...(JSON.parse(chromeBody) as object),
+      path: "/tmp/not-the-host",
+    };
+    await writeFile(
+      join(chromium, "com.rogatio.runtime.json"),
+      JSON.stringify(tampered),
+      "utf8",
+    );
+    const bad = await controller.verify();
+    expect(bad.ok).toBe(false);
+    expect(bad.reasons).toContain("manifest-invalid");
+
+    await writeFile(
+      join(chromium, "com.rogatio.runtime.json"),
+      chromeBody,
+      "utf8",
+    );
+    await writeFile(hostPath, "#!/bin/sh\nexit 0\n", "utf8");
+    await chmod(hostPath, 0o755);
+    const extra = join(root, "later", "chromium", "NativeMessagingHosts");
+    const later = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: chrome,
+      manifestDirs: [chrome, chromium, extra],
+      hostPath,
+      detectCapabilities: capable,
+      caTrustInstaller: async () => {},
+    });
+    const checked = await later.verify();
+    expect(checked.ok).toBe(true);
+    expect(await fileExists(join(extra, "com.rogatio.runtime.json"))).toBe(
+      false,
+    );
+
+    const removed = await later.uninstall();
+    expect(removed.ok).toBe(true);
+    expect(await fileExists(join(chrome, "com.rogatio.runtime.json"))).toBe(
+      false,
+    );
+    expect(await fileExists(join(chromium, "com.rogatio.runtime.json"))).toBe(
+      false,
+    );
+    expect(await fileExists(join(root, "native-messaging-dirs.json"))).toBe(
+      false,
+    );
+  });
+
+  it("does not require a manifest an older install never wrote", async () => {
+    const { chrome, chromium } = dirs();
+    await mkdir(chrome, { recursive: true });
+    const hostPath = join(root, "runtime-host");
+    const manifest = generateNativeMessagingManifest(
+      hostPath,
+      "com.rogatio.runtime",
+      [ORIGIN],
+      root,
+    );
+    await writeFile(
+      join(chrome, "com.rogatio.runtime.json"),
+      JSON.stringify(manifest, null, 2),
+      "utf8",
+    );
+    await writeFile(hostPath, "#!/bin/sh\nexit 0\n", "utf8");
+    await chmod(hostPath, 0o755);
+    const controller = createRequestBodyTrustController({
+      installRoot: root,
+      manifestDir: chrome,
+      manifestDirs: [chrome, chromium],
+      hostPath,
+      detectCapabilities: capable,
+    });
+
+    expect((await controller.status()).installed).toBe(true);
+    const checked = await controller.verify();
+    expect(checked.manifestExists).toBe(true);
+    expect(checked.manifestValid).toBe(true);
+    expect(checked.reasons).not.toContain("manifest-not-found");
+    expect(await fileExists(join(chromium, "com.rogatio.runtime.json"))).toBe(
+      false,
+    );
   });
 });
 

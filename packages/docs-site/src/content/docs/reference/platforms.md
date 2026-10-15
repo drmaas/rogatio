@@ -5,8 +5,9 @@ description: Supported operating systems, browsers, and capability-based activat
 
 ## Operating systems
 
-Supported operating systems are **Linux, Windows, and macOS**. Chrome is the currently
-supported browser.
+Supported operating systems are **Linux, Windows, and macOS**. Google Chrome is the
+supported browser. On Linux, `rogatio runtime install` also registers the native host
+for Chromium when that browser's config directory exists.
 
 ## Where rules run
 
@@ -35,7 +36,11 @@ supported browser.
 
 CA trust adapters exist for all three supported operating systems; each needs different
 privilege. Linux writes the CA certificate with argv-only `sudo tee` (PEM on standard
-input, stdout discarded) and then runs argv-only `sudo update-ca-certificates`. macOS uses
+input, stdout discarded). Debian and Ubuntu then run argv-only `sudo update-ca-certificates`
+after writing `/usr/local/share/ca-certificates/rogatio-ca.crt`. Arch, Fedora, and RHEL
+run argv-only `sudo update-ca-trust` after writing `rogatio-ca.crt` into the anchors
+directory that tool reads. The host manifest is registered for Google Chrome and
+Chromium when that browser's config directory is present. macOS uses
 `security add-trusted-cert` against the login keychain, and Windows uses
 `certutil -addstore` into `Cert:\CurrentUser\Root`. When a new CA replaces an older
 Rogatio Request-Body CA stored as a regular file, macOS removes the previous anchor

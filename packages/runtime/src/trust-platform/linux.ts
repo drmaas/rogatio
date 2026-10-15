@@ -8,11 +8,121 @@ import { isInstallableCaCertificate } from "./ca-pem.js";
 import type { TrustPlatformAdapter } from "./types.js";
 
 const CA_DIR = "/usr/local/share/ca-certificates";
-const CERT_PATH = posixJoin(CA_DIR, "rogatio-ca.crt");
+const CERT_NAME = "rogatio-ca.crt";
+const DEBIAN_CERT = posixJoin(CA_DIR, CERT_NAME);
+const ARCH_TRUST_SOURCE = "/etc/ca-certificates/trust-source";
+const FEDORA_TRUST_SOURCE = "/etc/pki/ca-trust/source";
+const ARCH_ANCHORS = "/etc/ca-certificates/trust-source/anchors";
+const FEDORA_ANCHORS = "/etc/pki/ca-trust/source/anchors";
+const P11_CERTS = [
+  posixJoin(ARCH_ANCHORS, CERT_NAME),
+  posixJoin(FEDORA_ANCHORS, CERT_NAME),
+] as const;
+const BROWSERS = ["google-chrome", "chromium"] as const;
 
-function hasSudo(): boolean {
-  const result = spawnSync("which", ["sudo"], { timeout: 1000 });
-  return result.status === 0;
+function nodeCode(err: unknown): string {
+  const code = (err as NodeJS.ErrnoException | undefined)?.code;
+  return typeof code === "string" && code.length > 0 ? code : "EACCES";
+}
+
+function exists(path: string): boolean {
+  try {
+    accessSync(path);
+    return true;
+  } catch (err: unknown) {
+    return nodeCode(err) !== "ENOENT";
+  }
+}
+
+function writable(path: string): boolean {
+  try {
+    accessSync(path, constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `which` is a separate package on some Linux installs. When that binary is
+ * missing, walk PATH. A non-zero `which` result still means the tool is absent.
+ */
+function toolOnPath(name: string): boolean {
+  const result = spawnSync("which", [name], { timeout: 1000 });
+  if (result.status === 0) return true;
+  const code = (result.error as NodeJS.ErrnoException | undefined)?.code;
+  if (code !== "ENOENT") return false;
+  const pathEnv = process.env.PATH ?? "";
+  for (const dir of pathEnv.split(":")) {
+    if (dir.length === 0) continue;
+    try {
+      accessSync(posixJoin(dir, name));
+      return true;
+    } catch {
+      // Keep scanning PATH.
+    }
+  }
+  return false;
+}
+
+function caBackend(): "debian" | "p11kit" | undefined {
+  if (toolOnPath("update-ca-certificates")) return "debian";
+  if (toolOnPath("update-ca-trust")) return "p11kit";
+  return undefined;
+}
+
+/**
+ * The anchors directory the installed `update-ca-trust` reads.
+ * Arch scans `/etc/ca-certificates/trust-source`. Fedora and RHEL scan
+ * `/etc/pki/ca-trust/source`. If both trees exist, or neither does, there is
+ * no safe directory to choose.
+ */
+function p11kitAnchorsDir(): string | undefined {
+  const arch = exists(ARCH_TRUST_SOURCE);
+  const fedora = exists(FEDORA_TRUST_SOURCE);
+  if (arch && !fedora) return ARCH_ANCHORS;
+  if (fedora && !arch) return FEDORA_ANCHORS;
+  return undefined;
+}
+
+function needsElevation(dir: string): boolean {
+  if (writable(dir)) return false;
+  try {
+    accessSync(dir, constants.W_OK);
+  } catch (err: unknown) {
+    if (nodeCode(err) === "ENOENT" && writable(dirname(dir))) return false;
+  }
+  return !toolOnPath("sudo");
+}
+
+function configHome(): string {
+  const xdg = process.env.XDG_CONFIG_HOME;
+  if (typeof xdg === "string" && xdg.startsWith("/")) return xdg;
+  const home = process.env.HOME ?? "";
+  return posixJoin(home, ".config");
+}
+
+function manifestDirFor(browser: (typeof BROWSERS)[number]): string {
+  return posixJoin(configHome(), browser, "NativeMessagingHosts");
+}
+
+function canHostManifest(dir: string): boolean {
+  try {
+    accessSync(dir, constants.W_OK);
+    return true;
+  } catch (err: unknown) {
+    if (nodeCode(err) !== "ENOENT") return false;
+  }
+  try {
+    accessSync(dirname(dir), constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function installableManifestDirs(): string[] {
+  return BROWSERS.map(manifestDirFor).filter(canHostManifest);
 }
 
 function installFailureReason(
@@ -72,49 +182,37 @@ function runSudo(
   });
 }
 
+async function sudoOrThrow(
+  args: readonly string[],
+  stdin?: string,
+): Promise<void> {
+  const result = await runSudo(args, stdin);
+  if (result.code === 0) return;
+  const reason = installFailureReason(result.stderr);
+  throw new TrustError("trust.internal", reason, [reason]);
+}
+
 const linuxAdapter: TrustPlatformAdapter = {
   platform: "linux",
   defaultManifestDir: () => {
     const home = process.env.HOME ?? "";
     return posixJoin(home, ".config/google-chrome/NativeMessagingHosts");
   },
+  manifestDirs: () => installableManifestDirs(),
   defaultCaInstallPath: () => CA_DIR,
   detect(): TrustCapabilities {
     const reasons: string[] = [];
-    const manifestDir = this.defaultManifestDir();
-
-    const updateCa = spawnSync("which", ["update-ca-certificates"], {
-      timeout: 1000,
-    });
-    if (updateCa.status !== 0) {
-      reasons.push("tooling-missing");
-    }
-
-    try {
-      accessSync(manifestDir, constants.W_OK);
-    } catch {
+    const backend = caBackend();
+    if (!backend) reasons.push("tooling-missing");
+    if (installableManifestDirs().length === 0) {
       reasons.push("manifest-dir-unwritable");
     }
-
-    // The system CA dir (/usr/local/share/ca-certificates) requires root to
-    // write.  Check whether it is directly writable; if not, check whether
-    // sudo is installed.  If neither, report elevation-required.
-    try {
-      accessSync(CA_DIR, constants.W_OK);
-    } catch (err: unknown) {
-      if ((err as NodeJS.ErrnoException)?.code === "ENOENT") {
-        // Directory doesn't exist yet — check if the parent is writable
-        // so mkdirSync({ recursive: true }) in the installer can create it.
-        try {
-          accessSync(dirname(CA_DIR), constants.W_OK);
-        } catch {
-          if (!hasSudo()) {
-            reasons.push("elevation-required");
-          }
-        }
-      } else if (!hasSudo()) {
-        reasons.push("elevation-required");
-      }
+    if (backend === "debian") {
+      if (needsElevation(CA_DIR)) reasons.push("elevation-required");
+    } else if (backend === "p11kit") {
+      const anchors = p11kitAnchorsDir();
+      if (!anchors) reasons.push("ca-store-unwritable");
+      else if (needsElevation(anchors)) reasons.push("elevation-required");
     }
 
     const manifest =
@@ -122,7 +220,8 @@ const linuxAdapter: TrustPlatformAdapter = {
       !reasons.includes("manifest-dir-unwritable");
     const caTrust =
       !reasons.includes("tooling-missing") &&
-      !reasons.includes("elevation-required");
+      !reasons.includes("elevation-required") &&
+      !reasons.includes("ca-store-unwritable");
 
     return {
       manifest,
@@ -136,42 +235,68 @@ const linuxAdapter: TrustPlatformAdapter = {
         "invalid-ca-certificate",
       ]);
     }
-    try {
-      mkdirSync(CA_DIR, { recursive: true });
-    } catch {
+    if (caBackend() === "debian") {
+      try {
+        mkdirSync(CA_DIR, { recursive: true });
+      } catch {
+        throw new TrustError("trust.internal", "ca-store-unwritable", [
+          "ca-store-unwritable",
+        ]);
+      }
+      await sudoOrThrow(["tee", DEBIAN_CERT], certPem);
+      await sudoOrThrow(["update-ca-certificates"]);
+      return;
+    }
+    if (caBackend() !== "p11kit") {
+      throw new TrustError("trust.internal", "tooling-missing", [
+        "tooling-missing",
+      ]);
+    }
+    const anchors = p11kitAnchorsDir();
+    if (!anchors) {
       throw new TrustError("trust.internal", "ca-store-unwritable", [
         "ca-store-unwritable",
       ]);
     }
-
-    const certResult = await runSudo(["tee", CERT_PATH], certPem);
-    if (certResult.code !== 0) {
-      const reason = installFailureReason(certResult.stderr);
+    const certPath = posixJoin(anchors, CERT_NAME);
+    await sudoOrThrow(["mkdir", "-p", anchors]);
+    await sudoOrThrow(["tee", certPath], certPem);
+    const refresh = await runSudo(["update-ca-trust"]);
+    if (refresh.code === 0) return;
+    await sudoOrThrow(["rm", "-f", certPath]);
+    const rebuilt = await runSudo(["update-ca-trust"]);
+    if (rebuilt.code !== 0) {
+      const reason = installFailureReason(rebuilt.stderr);
       throw new TrustError("trust.internal", reason, [reason]);
     }
-
-    const result = await runSudo(["update-ca-certificates"]);
-    if (result.code !== 0) {
-      const reason = installFailureReason(result.stderr);
-      throw new TrustError("trust.internal", reason, [reason]);
-    }
+    const reason = installFailureReason(refresh.stderr);
+    throw new TrustError("trust.internal", reason, [reason]);
   },
   async caTrustRemover(): Promise<void> {
     try {
-      unlinkSync(CERT_PATH);
+      unlinkSync(DEBIAN_CERT);
     } catch {
-      // Ignore "not found" errors
+      // Ignore "not found" errors. Debian removal does not run
+      // update-ca-certificates.
     }
-
-    // Idempotent removal: we intentionally do not run update-ca-certificates
-    // as it's not strictly necessary for removing trust and avoids permission issues
+    if (!toolOnPath("update-ca-trust")) return;
+    const present = P11_CERTS.filter((path) => exists(path));
+    // Debian hosts refresh only when an anchors file is actually present.
+    // A p11-kit host must refresh even after the file is gone: `sudo rm`
+    // can succeed and `update-ca-trust` can fail, and the next retry would
+    // otherwise leave the extracted bundle trusting the CA.
+    if (caBackend() !== "p11kit" && present.length === 0) return;
+    for (const certPath of present) {
+      await sudoOrThrow(["rm", "-f", certPath]);
+    }
+    await sudoOrThrow(["update-ca-trust"]);
   },
   async caTrustAnchorRemover(
     fingerprintSha1: string,
     certPem: string,
   ): Promise<void> {
-    // The installer replaces rogatio-ca.crt and update-ca-certificates rebuilds
-    // the bundle, so there is no separate anchor to delete.
+    // Debian rebuilds the bundle from rogatio-ca.crt. p11-kit refresh does
+    // the same from the anchors file. There is no separate anchor to delete.
     void fingerprintSha1;
     void certPem;
   },
