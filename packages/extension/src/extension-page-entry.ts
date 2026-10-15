@@ -884,8 +884,8 @@ function renderTopbar(shell: HTMLElement): void {
   tabs.className = "rogatio-tabs";
   const destinations = [
     ["dashboard", "Dashboard"],
-    ["history", "Match history"],
     ["workspace", "Workspace"],
+    ["history", "Match history"],
   ] as const;
   for (const [tab, label] of destinations) {
     const tabButton = document.createElement("button");
