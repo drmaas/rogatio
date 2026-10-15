@@ -17,6 +17,7 @@ describe("TrustPlatformAdapter detect()", () => {
   beforeEach(() => {
     vi.stubEnv("HOME", "/home/test");
     vi.stubEnv("APPDATA", "/home/test/AppData/Roaming");
+    vi.stubEnv("XDG_CONFIG_HOME", "");
     mockSpawnSync.mockReset();
     mockAccessSync.mockReset();
     mockSpawnSync.mockReturnValue({ status: 0 });
