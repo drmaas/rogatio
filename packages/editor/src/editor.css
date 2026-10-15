@@ -157,6 +157,10 @@
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
 }
+/* Author `display` rules would otherwise beat the hidden attribute. */
+.rogatio-editor [hidden] {
+  display: none !important;
+}
 .rogatio-editor [data-desktop-route-rail] {
   position: sticky;
   top: 0;

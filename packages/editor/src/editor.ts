@@ -4527,8 +4527,10 @@ class EditorControllerImpl implements EditorController {
     this.rail.hidden = page;
     this.header.hidden = page;
     this.status.hidden = page;
-    this.summary.hidden = page;
     this.form.hidden = page;
+    // The summary sets its own hidden state from the error list. Only force it
+    // closed while the console page is covering the editor.
+    if (page) this.summary.hidden = true;
   }
 
   private openTestConsole(): void {
