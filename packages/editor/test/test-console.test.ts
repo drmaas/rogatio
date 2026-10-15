@@ -78,7 +78,7 @@ function dimension(
 function openTest(root: HTMLElement): void {
   root
     .querySelector<HTMLButtonElement>(
-      '[data-editor-command-bar] button[data-route="test"]',
+      '[data-rail-tools] button[data-route="test"]',
     )
     ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 }
@@ -122,8 +122,9 @@ describe("test console", () => {
     });
     openTest(root);
     expect(root.querySelectorAll('[data-command="test:run"]')).toHaveLength(1);
+    expect(root.querySelector("[data-editor-command-bar]")).toBeNull();
     expect(
-      root.querySelector("[data-editor-command-bar]")?.textContent,
+      root.querySelector("[data-editor-header]")?.textContent,
     ).not.toContain("Run test");
     expect(root.querySelector("[data-test-description]")?.textContent).toBe(
       "Check whether these URLs match your rules. Nothing is contacted, and nothing is saved.",
@@ -366,5 +367,136 @@ describe("test console", () => {
     expect(
       root.querySelector<HTMLTextAreaElement>("[data-test-urls]")?.value,
     ).toBe("https://example.com/old");
+  });
+
+  it("keeps editor status out of the dialog", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const editor = createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      dryRun: () => result([]),
+    });
+    editor.validate();
+    openTest(root);
+    expect(root.querySelector("[data-editor-status]")?.textContent).toBe(
+      "Project is valid.",
+    );
+    expect(root.querySelector("[data-test-dialog]")?.textContent).not.toContain(
+      "Project is valid.",
+    );
+    root
+      .querySelector<HTMLButtonElement>('[data-command="test:run"]')
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-test-status]")?.textContent).toBe(
+      "Please enter at least one URL to test.",
+    );
+    expect(root.querySelector("[data-editor-status]")?.textContent).toBe(
+      "Project is valid.",
+    );
+    root
+      .querySelector("[data-test-console]")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-test-dialog]")).toBeNull();
+    expect(document.activeElement).toBe(
+      root.querySelector("[data-rail-tools] [data-route='test']"),
+    );
+  });
+
+  it("cycles tab past a collapsed miss list and returns focus on Escape", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      dryRun: () =>
+        result([
+          {
+            groupId: "ads",
+            ruleId: "post-only",
+            matched: false,
+            source: dimension("unmatched", "miss"),
+            method: dimension("unmatched", "POST"),
+            resourceType: dimension("matched", "page"),
+            actionPreview: null,
+          },
+        ]),
+    });
+    openTest(root);
+    typeUrl(root, "https://example.com/old");
+    await clickRun(root);
+    const summary = root.querySelector<HTMLElement>(
+      "[data-test-misses] summary",
+    );
+    const hidden = root.querySelector("[data-test-misses] button");
+    summary?.focus();
+    const forward = new KeyboardEvent("keydown", {
+      key: "Tab",
+      bubbles: true,
+      cancelable: true,
+    });
+    summary?.dispatchEvent(forward);
+    expect(forward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(
+      root.querySelector("[data-command='close-test-console']"),
+    );
+    expect(document.activeElement).not.toBe(hidden);
+    const back = new KeyboardEvent("keydown", {
+      key: "Tab",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.activeElement?.dispatchEvent(back);
+    expect(document.activeElement).toBe(summary);
+    root
+      .querySelector(".rogatio-editor")
+      ?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    expect(root.querySelector("[data-test-dialog]")).toBeNull();
+    expect(document.activeElement).toBe(
+      root.querySelector("[data-rail-tools] [data-route='test']"),
+    );
+  });
+
+  it("ignores a run that finishes after the dialog closes", async () => {
+    let release: ((value: DryRunResult) => void) | undefined;
+    const pending = new Promise<DryRunResult>((resolve) => {
+      release = resolve;
+    });
+    const root = document.createElement("div");
+    document.body.append(root);
+    createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      dryRun: () => pending,
+    });
+    openTest(root);
+    typeUrl(root, "https://example.com/old");
+    await clickRun(root);
+    expect(root.querySelector("[data-test-pending]")?.textContent).toBe(
+      "Checking URLs...",
+    );
+    expect(root.querySelector("[data-editor-status]")?.textContent).toBe("");
+    root
+      .querySelector<HTMLButtonElement>("[data-command='close-test-console']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-test-dialog]")).toBeNull();
+    expect(root.querySelector("[data-editor-status]")?.textContent).toBe("");
+    release?.(result([]));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(root.querySelector("[data-editor-status]")?.textContent).toBe("");
+    expect(root.querySelector("[data-test-dialog]")).toBeNull();
+    openTest(root);
+    expect(root.querySelector("[data-test-status]")).toBeNull();
+    expect(root.querySelector("[data-test-pending]")).toBeNull();
   });
 });

@@ -683,7 +683,7 @@ describe("workspace action layout", () => {
     expect(headingActions?.querySelector("[data-group-enable]")).toBeNull();
     expect(
       root.querySelector(
-        "[data-editor-command-bar] [data-action-cluster='commit'] [data-command='save']",
+        "[data-editor-header] [data-action-cluster='commit'] [data-command='save']",
       ),
     ).not.toBeNull();
 
@@ -716,9 +716,7 @@ describe("workspace action layout", () => {
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(root.querySelector("[data-action-dock]")).toBeNull();
     expect(
-      root.querySelector(
-        '[data-editor-command-bar] [data-command="add-group"]',
-      ),
+      root.querySelector('[data-editor-header] [data-command="add-group"]'),
     ).toBeNull();
     const addGroup = root.querySelector(
       '[data-group-list-section] [data-section-heading] [data-command="add-group"]',
@@ -793,12 +791,19 @@ describe("workspace breadcrumb and group picker", () => {
     );
     expect(groups?.textContent).toBe("Groups");
     expect(groups?.getAttribute("aria-current")).toBeNull();
+    const tools = root.querySelector("[data-rail-tools]");
+    expect(tools?.firstElementChild?.getAttribute("data-route")).toBe("test");
     expect(
-      root.querySelector("[data-editor-command-bar] [data-route='test']"),
-    ).not.toBeNull();
+      tools?.firstElementChild?.nextElementSibling?.hasAttribute(
+        "data-search-wrap",
+      ),
+    ).toBe(true);
+    expect(root.querySelector("[data-editor-command-bar]")).toBeNull();
     expect(
-      root.querySelector("[data-desktop-route-rail] [data-route='test']"),
-    ).toBeNull();
+      Array.from(
+        root.querySelectorAll("[data-editor-header-actions] button"),
+      ).map((button) => button.textContent),
+    ).toEqual(["Validate", "Cancel", "Save"]);
 
     groups?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const dialog = root.querySelector("[data-group-picker] [role='dialog']");
@@ -969,16 +974,28 @@ describe("workspace breadcrumb and group picker", () => {
     expect(two?.textContent).toContain("Disabled");
     expect(two?.textContent).toContain("No rules");
 
-    root
-      .querySelector<HTMLButtonElement>(
-        "[data-editor-command-bar] [data-route='test']",
-      )
-      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const consoleButton = root.querySelector<HTMLButtonElement>(
+      "[data-rail-tools] [data-route='test']",
+    );
+    consoleButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(
       root
-        .querySelector("[data-editor-command-bar] [data-route='test']")
-        ?.getAttribute("aria-current"),
-    ).toBe("page");
+        .querySelector("[data-rail-tools] [data-route='test']")
+        ?.getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(root.querySelector("[data-test-dialog]")).not.toBeNull();
+    expect(root.querySelector("[data-editor-form] h2")?.textContent).toBe(
+      "Project",
+    );
+    root
+      .querySelector<HTMLButtonElement>("[data-command='close-test-console']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(root.querySelector("[data-test-dialog]")).toBeNull();
+    expect(
+      root
+        .querySelector("[data-rail-tools] [data-route='test']")
+        ?.getAttribute("aria-expanded"),
+    ).toBe("false");
     root
       .querySelector<HTMLButtonElement>(
         "[data-route-breadcrumb] [data-route='project']",

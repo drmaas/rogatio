@@ -186,10 +186,7 @@ type RenameTarget = {
   namePath: string;
   value: string;
 };
-type Route =
-  | { kind: "project" }
-  | { kind: "group"; groupId: string }
-  | { kind: "test" };
+type Route = { kind: "project" } | { kind: "group"; groupId: string };
 type Confirmation =
   | { kind: "cancel" }
   | { kind: "remove-group"; groupId: string; name: string }
@@ -845,12 +842,12 @@ class EditorControllerImpl implements EditorController {
   private readonly extensions: readonly RuleTypeFieldExtension[];
   private readonly instanceId: string;
   private readonly host: HTMLDivElement;
+  private readonly layout: HTMLElement;
   private readonly rail: HTMLElement;
   private readonly main: HTMLElement;
   private readonly header: HTMLElement;
   private readonly status: HTMLElement;
   private readonly summary: HTMLElement;
-  private readonly commandBar: HTMLElement;
   private readonly form: HTMLFormElement;
   private readonly searchResults: HTMLElement;
   private draft: DraftProject;
@@ -868,6 +865,7 @@ class EditorControllerImpl implements EditorController {
   private extensionCleanups: Array<() => void> = [];
   private confirmation: Confirmation | undefined;
   private groupPickerOpen = false;
+  private testConsoleOpen = false;
   private readonly projectActions: readonly EditorProjectAction[];
   private focusRequest: string | undefined;
   private saving = false;
@@ -881,6 +879,7 @@ class EditorControllerImpl implements EditorController {
   private testResourceType: ResourceType | "" = "main_frame";
   private testResult: DryRunResult | undefined = undefined;
   private testRunning = false;
+  private testNotice = "";
   private testRequestId = 0;
   private aiAssistPanel: ReturnType<typeof createAIAssistPanel> | null = null;
   private aiAssistInFlight = false;
@@ -938,8 +937,8 @@ class EditorControllerImpl implements EditorController {
     this.host.className = "rogatio-editor";
     this.host.dataset.rogatioEditor = "true";
 
-    const layout = this.document.createElement("div");
-    layout.dataset.editorLayout = "true";
+    this.layout = this.document.createElement("div");
+    this.layout.dataset.editorLayout = "true";
     this.rail = this.document.createElement("nav");
     this.rail.dataset.desktopRouteRail = "true";
     this.rail.setAttribute("aria-label", "Project sections");
@@ -954,10 +953,6 @@ class EditorControllerImpl implements EditorController {
     this.summary = this.document.createElement("section");
     this.summary.dataset.editorSummary = "true";
     this.summary.setAttribute("role", "alert");
-    this.commandBar = this.document.createElement("div");
-    this.commandBar.dataset.editorCommandBar = "true";
-    this.commandBar.setAttribute("role", "toolbar");
-    this.commandBar.setAttribute("aria-label", "Project actions");
     this.form = this.document.createElement("form");
     this.form.dataset.editorForm = "true";
     this.form.noValidate = true;
@@ -974,15 +969,9 @@ class EditorControllerImpl implements EditorController {
       this.render();
     });
 
-    this.main.append(
-      this.header,
-      this.status,
-      this.summary,
-      this.commandBar,
-      this.form,
-    );
-    layout.append(this.rail, this.main);
-    this.host.append(layout);
+    this.main.append(this.header, this.status, this.summary, this.form);
+    this.layout.append(this.rail, this.main);
+    this.host.append(this.layout);
     this.root.append(this.host);
 
     this.host.addEventListener("click", this.handleClick);
@@ -1042,6 +1031,15 @@ class EditorControllerImpl implements EditorController {
     if (this.destroyed) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
+    if (
+      this.testConsoleOpen &&
+      target instanceof HTMLElement &&
+      target.dataset.testConsole !== undefined &&
+      event.target === target
+    ) {
+      this.closeTestConsole();
+      return;
+    }
     if (
       this.groupPickerOpen &&
       target instanceof HTMLElement &&
@@ -1212,6 +1210,14 @@ class EditorControllerImpl implements EditorController {
       this.closeGroupPicker();
       return;
     }
+    if (event.key === "Escape" && this.testConsoleOpen) {
+      event.preventDefault();
+      this.closeTestConsole();
+      return;
+    }
+    if (event.key === "Tab" && this.testConsoleOpen && !this.confirmation) {
+      this.trapTestConsoleFocus(event);
+    }
     const target = event.target;
     const inRenameInput =
       target instanceof HTMLElement && target.dataset.renameInput !== undefined;
@@ -1369,6 +1375,7 @@ class EditorControllerImpl implements EditorController {
       return;
     }
     if (command === "test:open-rule") {
+      this.testConsoleOpen = false;
       this.navigateToRule(element.dataset.groupId, element.dataset.ruleId);
       return;
     }
@@ -1386,6 +1393,10 @@ class EditorControllerImpl implements EditorController {
     }
     if (command === "close-group-picker") {
       this.closeGroupPicker();
+      return;
+    }
+    if (command === "close-test-console") {
+      this.closeTestConsole();
     }
   }
 
@@ -2245,6 +2256,7 @@ class EditorControllerImpl implements EditorController {
   ): void {
     this.testResult = undefined;
     this.testRunning = false;
+    this.testNotice = "";
     this.errors = [...diagnostics];
     const count = diagnostics.length;
     this.statusMessage =
@@ -2253,6 +2265,7 @@ class EditorControllerImpl implements EditorController {
         : `${count} validation error${count === 1 ? "" : "s"} found.`;
     const first = diagnostics[0];
     if (first) {
+      this.testConsoleOpen = false;
       this.navigateToPath(first.path);
       return;
     }
@@ -2261,28 +2274,27 @@ class EditorControllerImpl implements EditorController {
 
   private async runTest(): Promise<void> {
     if (!this.options.dryRun) {
-      this.statusMessage =
-        "Dry-run is not configured for this editor instance.";
+      this.testNotice = "Dry-run is not configured for this editor instance.";
       this.render();
       return;
     }
     if (this.ruleCount() === 0) {
       this.testResult = undefined;
       this.testRunning = false;
-      this.statusMessage = "This project has no rules to test.";
+      this.testNotice = "";
       this.render();
       return;
     }
     const lines = this.testLines();
     if (lines.length === 0) {
-      this.statusMessage = "Please enter at least one URL to test.";
+      this.testNotice = "Please enter at least one URL to test.";
       this.render();
       return;
     }
     if (lines.length > TEST_CASE_LIMIT) {
       this.testResult = undefined;
       this.testRunning = false;
-      this.statusMessage = "Only 256 URLs can be checked at once.";
+      this.testNotice = "Only 256 URLs can be checked at once.";
       this.render();
       return;
     }
@@ -2302,7 +2314,7 @@ class EditorControllerImpl implements EditorController {
 
     const requestId = ++this.testRequestId;
     this.testRunning = true;
-    this.statusMessage = "Checking URLs...";
+    this.testNotice = "";
     this.render();
 
     try {
@@ -2312,7 +2324,7 @@ class EditorControllerImpl implements EditorController {
       if (isDryRunResult(outcome)) {
         this.testResult = outcome;
         const checked = outcome.summary.urlCount;
-        this.statusMessage =
+        this.testNotice =
           outcome.errors.length > 0
             ? `Checked ${checked} URL${checked === 1 ? "" : "s"}. Some lines are not http(s) URLs.`
             : `Checked ${checked} URL${checked === 1 ? "" : "s"}.`;
@@ -2328,13 +2340,16 @@ class EditorControllerImpl implements EditorController {
       this.testResult = undefined;
       this.testRunning = false;
       const message = e instanceof Error ? e.message : "Test failed";
-      this.statusMessage = `Test error: ${message}`;
+      this.testNotice = `Test error: ${message}`;
       this.render();
     }
   }
 
-  private renderTestResults(result: DryRunResult): void {
-    const resultsSection = this.host.querySelector<HTMLElement>(
+  private renderTestResults(
+    result: DryRunResult,
+    scope: ParentNode = this.host,
+  ): void {
+    const resultsSection = scope.querySelector<HTMLElement>(
       "[data-test-results]",
     );
     if (!resultsSection || !isDryRunResult(result)) return;
@@ -2550,16 +2565,19 @@ class EditorControllerImpl implements EditorController {
   }
 
   private navigate(route: string, groupId: string | undefined): void {
+    if (route === "test") {
+      this.openTestConsole();
+      return;
+    }
     const returnFocusToGroups = this.groupPickerOpen;
     if (route === "project") {
       this.route = { kind: "project" };
-    } else if (route === "test") {
-      this.route = { kind: "test" };
     } else if (route === "group" && groupId && this.groupById(groupId)) {
       this.route = { kind: "group", groupId };
     } else {
       return;
     }
+    this.testConsoleOpen = false;
     this.groupPickerOpen = false;
     if (returnFocusToGroups) this.focusRequest = "route:groups";
     this.closeRenameOnLeave();
@@ -2592,6 +2610,7 @@ class EditorControllerImpl implements EditorController {
 
   navigateToGroup(groupId: string | null | undefined): void {
     this.groupPickerOpen = false;
+    this.testConsoleOpen = false;
     const groupIds = new Set(
       this.draft.groups
         .map((group) => (typeof group.id === "string" ? group.id : ""))
@@ -2683,6 +2702,7 @@ class EditorControllerImpl implements EditorController {
 
   private navigateToSearchResult(path: string): void {
     this.groupPickerOpen = false;
+    this.testConsoleOpen = false;
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
       this.route = { kind: "project" };
@@ -2709,6 +2729,7 @@ class EditorControllerImpl implements EditorController {
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
       this.route = { kind: "project" };
+      this.testConsoleOpen = false;
       this.focusRequest = path;
       this.render();
       return;
@@ -2718,6 +2739,7 @@ class EditorControllerImpl implements EditorController {
     const group = this.draft.groups[groupIndex];
     if (!group || typeof group.id !== "string") return;
     this.route = { kind: "group", groupId: group.id };
+    this.testConsoleOpen = false;
     // A diagnostic naming an entity rather than its `name` property still means
     // "this name needs fixing": the schema reports a missing required property at
     // the property's own path, but a host adapter is not obliged to.
@@ -2781,12 +2803,9 @@ class EditorControllerImpl implements EditorController {
     }
     this.renderHeader();
     this.renderRail();
-    this.renderCommandBar();
     this.form.replaceChildren();
     if (this.route.kind === "project") {
       this.renderProject();
-    } else if (this.route.kind === "test") {
-      this.renderTest();
     } else {
       this.renderGroup(this.route.groupId);
     }
@@ -2798,6 +2817,7 @@ class EditorControllerImpl implements EditorController {
     if (this.confirmation) this.groupPickerOpen = false;
     this.renderConfirmation();
     this.renderGroupPicker();
+    this.renderTestConsole();
     this.restoreFocus();
     this.focusRequest = undefined;
   }
@@ -2813,7 +2833,13 @@ class EditorControllerImpl implements EditorController {
       ? "Unsaved changes"
       : "All changes saved";
     titleBlock.append(title, dirty);
-    this.header.append(titleBlock);
+    const actions = this.document.createElement("div");
+    actions.dataset.editorHeaderActions = "true";
+    actions.setAttribute("role", "toolbar");
+    actions.setAttribute("aria-label", "Project actions");
+    actions.setAttribute("aria-busy", this.saving ? "true" : "false");
+    this.appendProjectActions(actions);
+    this.header.append(titleBlock, actions);
     this.status.textContent = this.statusMessage;
     this.status.setAttribute("aria-busy", this.saving ? "true" : "false");
   }
@@ -2877,13 +2903,25 @@ class EditorControllerImpl implements EditorController {
     search.setAttribute("aria-controls", "rogatio-search-results");
     searchLabel.append(search);
     searchWrap.append(searchLabel, this.searchResults);
-    this.rail.append(searchWrap);
+    const railTools = this.document.createElement("div");
+    railTools.dataset.railTools = "true";
+    const testBtn = this.createButton("Console", "route:test");
+    testBtn.dataset.route = "test";
+    testBtn.dataset.editorKey = "route:test";
+    testBtn.dataset.btn = "secondary";
+    testBtn.disabled = this.saving;
+    testBtn.setAttribute("aria-label", "Test console");
+    testBtn.setAttribute("aria-haspopup", "dialog");
+    testBtn.setAttribute(
+      "aria-expanded",
+      this.testConsoleOpen ? "true" : "false",
+    );
+    testBtn.setAttribute("aria-controls", `${this.instanceId}-test-console`);
+    railTools.append(testBtn, searchWrap);
+    this.rail.append(railTools);
   }
 
-  private renderCommandBar(): void {
-    this.commandBar.replaceChildren();
-    this.commandBar.setAttribute("aria-busy", this.saving ? "true" : "false");
-    this.commandBar.setAttribute("aria-label", "Project actions");
+  private appendProjectActions(actions: HTMLElement): void {
     const tools = this.document.createElement("div");
     tools.dataset.actionCluster = "tools";
     if (this.aiAssistPanel) {
@@ -2891,18 +2929,7 @@ class EditorControllerImpl implements EditorController {
         this.createCommandButton("AI Assist", "ai-assist", this.saving),
       );
     }
-    const testBtn = this.createButton("Test console", "route:test");
-    testBtn.dataset.route = "test";
-    testBtn.dataset.editorKey = "route:test";
-    testBtn.dataset.btn = "secondary";
-    testBtn.disabled = this.saving;
-    if (this.route.kind === "test") {
-      testBtn.setAttribute("aria-current", "page");
-    }
-    tools.append(
-      testBtn,
-      this.createCommandButton("Validate", "validate", this.saving),
-    );
+    tools.append(this.createCommandButton("Validate", "validate", this.saving));
     const commit = this.document.createElement("div");
     commit.dataset.actionCluster = "commit";
     commit.append(
@@ -2915,7 +2942,7 @@ class EditorControllerImpl implements EditorController {
         "primary",
       ),
     );
-    this.commandBar.append(tools, commit);
+    actions.append(tools, commit);
   }
 
   private createGroupEnableButton(
@@ -2993,27 +3020,7 @@ class EditorControllerImpl implements EditorController {
 
   private createProjectActionRow(): HTMLElement {
     const actions = this.document.createElement("div");
-    const tools = this.document.createElement("div");
-    tools.dataset.actionCluster = "tools";
-    if (this.aiAssistPanel) {
-      tools.append(
-        this.createCommandButton("AI Assist", "ai-assist", this.saving),
-      );
-    }
-    tools.append(this.createCommandButton("Validate", "validate", this.saving));
-    const commit = this.document.createElement("div");
-    commit.dataset.actionCluster = "commit";
-    commit.append(
-      this.createCommandButton("Cancel", "cancel", this.saving),
-      this.createCommandButton(
-        "Save",
-        "save",
-        this.saving || !this.isDirty(),
-        {},
-        "primary",
-      ),
-    );
-    actions.append(tools, commit);
+    this.appendProjectActions(actions);
     return actions;
   }
 
@@ -3033,9 +3040,9 @@ class EditorControllerImpl implements EditorController {
   }
 
   /**
-   * Repeats the actions a long page would otherwise hide: under the last rule
-   * on a group page, or under the test results. The project page stays short,
-   * so Add group lives on the Groups heading and that route has no ledger.
+   * Repeats the actions a long group page would otherwise hide, under the last
+   * rule. The project page stays short, so Add group lives on the Groups
+   * heading and that route has no ledger.
    */
   private renderActionDock(): void {
     if (this.route.kind === "project") return;
@@ -3219,17 +3226,7 @@ class EditorControllerImpl implements EditorController {
     this.form.append(rulesSection);
   }
 
-  private renderTest(): void {
-    const heading = this.document.createElement("h2");
-    heading.textContent = "Test console";
-    this.form.append(heading);
-
-    const description = this.document.createElement("p");
-    description.dataset.testDescription = "true";
-    description.textContent =
-      "Check whether these URLs match your rules. Nothing is contacted, and nothing is saved.";
-    this.form.append(description);
-
+  private renderTestBody(parent: HTMLElement): void {
     const panel = this.document.createElement("div");
     panel.dataset.testPanel = "true";
 
@@ -3318,28 +3315,39 @@ class EditorControllerImpl implements EditorController {
     );
     runBtn.dataset.testRun = "true";
     panel.append(runBtn);
+    parent.append(panel);
 
-    this.form.append(panel);
+    if (
+      this.testNotice.length > 0 &&
+      !this.testRunning &&
+      this.testNotice !== "Only 256 URLs can be checked at once."
+    ) {
+      const note = this.document.createElement("p");
+      note.dataset.testStatus = "true";
+      note.setAttribute("role", "status");
+      note.textContent = this.testNotice;
+      parent.append(note);
+    }
 
     const resultsSection = this.document.createElement("section");
     resultsSection.dataset.testResults = "true";
-    this.form.append(resultsSection);
+    parent.append(resultsSection);
     if (this.ruleCount() === 0) {
       const empty = this.document.createElement("p");
       empty.dataset.testEmpty = "true";
       empty.textContent = "This project has no rules to test.";
       resultsSection.append(empty);
     } else if (this.testResult) {
-      this.renderTestResults(this.testResult);
+      this.renderTestResults(this.testResult, parent);
     } else if (this.testRunning) {
       const pending = this.document.createElement("p");
       pending.dataset.testPending = "true";
       pending.textContent = "Checking URLs...";
       resultsSection.append(pending);
-    } else if (this.statusMessage === "Only 256 URLs can be checked at once.") {
+    } else if (this.testNotice === "Only 256 URLs can be checked at once.") {
       const limit = this.document.createElement("p");
       limit.dataset.testLimit = "true";
-      limit.textContent = this.statusMessage;
+      limit.textContent = this.testNotice;
       resultsSection.append(limit);
     }
   }
@@ -4471,7 +4479,113 @@ class EditorControllerImpl implements EditorController {
     fields.append(group);
   }
 
+  private openTestConsole(): void {
+    this.groupPickerOpen = false;
+    this.testConsoleOpen = true;
+    this.focusRequest = "test-urls";
+    this.render();
+  }
+
+  private closeTestConsole(): void {
+    if (this.testRunning) {
+      this.testRequestId += 1;
+      this.testRunning = false;
+      this.testNotice = "";
+    }
+    this.testConsoleOpen = false;
+    this.focusRequest = "route:test";
+    this.render();
+  }
+
+  private trapTestConsoleFocus(event: KeyboardEvent): void {
+    const dialog = this.host.querySelector("[data-test-dialog]");
+    if (!(dialog instanceof HTMLElement)) return;
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(
+        "button, input, select, textarea, summary, a[href]",
+      ),
+    ).filter((element) => {
+      if (element.hidden) return false;
+      const closedDetails = element.closest("details:not([open])");
+      if (closedDetails && element !== closedDetails.querySelector("summary")) {
+        return false;
+      }
+      if (
+        element instanceof HTMLButtonElement ||
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLSelectElement ||
+        element instanceof HTMLTextAreaElement
+      ) {
+        return !element.disabled;
+      }
+      return true;
+    });
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) return;
+    const active = this.document.activeElement;
+    const inside = active instanceof Node && dialog.contains(active);
+    if (!inside) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+      return;
+    }
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+    if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  private renderTestConsole(): void {
+    this.host.querySelector("[data-test-console]")?.remove();
+    if ("inert" in this.layout) this.layout.inert = this.testConsoleOpen;
+    if (!this.testConsoleOpen) return;
+
+    const overlay = this.document.createElement("div");
+    overlay.dataset.testConsole = "true";
+    overlay.setAttribute("role", "presentation");
+    const dialog = this.document.createElement("section");
+    dialog.dataset.testDialog = "true";
+    dialog.id = `${this.instanceId}-test-console`;
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+
+    const head = this.document.createElement("div");
+    head.dataset.testDialogHead = "true";
+    const titles = this.document.createElement("div");
+    const kicker = this.document.createElement("p");
+    kicker.dataset.testKicker = "true";
+    kicker.textContent = "Offline match";
+    const heading = this.document.createElement("h2");
+    heading.id = `${this.instanceId}-test-console-title`;
+    heading.textContent = "Test console";
+    dialog.setAttribute("aria-labelledby", heading.id);
+    const description = this.document.createElement("p");
+    description.dataset.testDescription = "true";
+    description.textContent =
+      "Check whether these URLs match your rules. Nothing is contacted, and nothing is saved.";
+    titles.append(kicker, heading, description);
+    const close = this.createButton("Close", "test-console-close");
+    close.dataset.command = "close-test-console";
+    close.dataset.editorKey = "test-console-close";
+    close.dataset.btn = "secondary";
+    head.append(titles, close);
+
+    const body = this.document.createElement("div");
+    body.dataset.testDialogBody = "true";
+    this.renderTestBody(body);
+    dialog.append(head, body);
+    overlay.append(dialog);
+    this.host.append(overlay);
+  }
+
   private openGroupPicker(): void {
+    this.testConsoleOpen = false;
     this.groupPickerOpen = true;
     this.focusRequest =
       this.draft.groups.length > 0

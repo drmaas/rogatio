@@ -186,7 +186,7 @@ The config file has `600` permissions (owner read/write only). The API key never
 ### Using AI in the Editor
 
 1. Run `rogatio edit` to open the editor
-2. Click **AI Assist** in the command bar (or use the mobile nav)
+2. Click **AI Assist** on the project title row
 3. Type a natural language prompt like:
    - "Create a redirect rule for api.example.com to staging.example.com"
    - "Add a response-body replace rule that returns {'status': 'ok'}"

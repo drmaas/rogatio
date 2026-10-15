@@ -26,7 +26,7 @@ anchored regular expression.
 
 ## 3. Test it offline
 
-Open **Test console**. The page says “Check whether these URLs match your rules. Nothing
+Open **Console** in the top bar. The dialog says “Check whether these URLs match your rules. Nothing
 is contacted, and nothing is saved.” Paste one URL per line and click **Run test**. The
 case is a page load (GET). A match names the group and the rule and says where the browser
 would go. See [Offline dry-run](/guides/dry-run/).

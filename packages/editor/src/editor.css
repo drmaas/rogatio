@@ -214,8 +214,8 @@
   font-weight: 600;
 }
 .rogatio-editor [data-search-wrap] {
-  margin-left: auto;
-  flex: 0 0 auto;
+  position: relative;
+  flex: 0 1 18rem;
   width: min(18rem, 100%);
   min-width: 0;
 }
@@ -224,11 +224,20 @@
   padding: 1rem clamp(1rem, 3vw, 3rem) 3rem;
 }
 .rogatio-editor [data-editor-header] {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1rem;
-  align-items: end;
-  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.rogatio-editor [data-editor-header-actions] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 0.65rem;
+  margin-left: auto;
 }
 .rogatio-editor [data-editor-header] h1,
 .rogatio-editor [data-editor-form] h2,
@@ -303,28 +312,11 @@
   text-align: left;
   text-decoration: underline;
 }
-.rogatio-editor [data-editor-command-bar] button[aria-current="page"] {
-  border-color: rgba(59, 158, 255, 0.45);
-  background: var(--rogatio-primary-bg);
-  font-weight: 700;
-}
 .rogatio-editor [data-project-actions] {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.75rem;
-}
-.rogatio-editor [data-editor-command-bar] {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem 1rem;
-  margin-block: 1rem;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid var(--rogatio-border);
-  border-radius: var(--rogatio-radius);
-  background: var(--rogatio-surface-raised);
 }
 .rogatio-editor [data-action-cluster] {
   display: flex;
@@ -716,6 +708,25 @@
 .rogatio-editor [data-search-wrap] {
   position: relative;
 }
+.rogatio-editor [data-rail-tools] {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-left: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.rogatio-editor [data-rail-tools] [data-route="test"] {
+  flex: none;
+  margin-bottom: 0.05rem;
+}
+.rogatio-editor [data-rail-tools] [data-route="test"][aria-expanded="true"] {
+  border-color: rgba(46, 196, 182, 0.55);
+  background: rgba(46, 196, 182, 0.14);
+  color: var(--rogatio-text);
+}
 .rogatio-editor [data-search-label] {
   display: flex;
   flex-direction: column;
@@ -763,7 +774,10 @@
     display: block;
   }
   .rogatio-editor [data-editor-header] {
-    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+  .rogatio-editor [data-editor-header-actions] {
+    width: 100%;
   }
   .rogatio-editor [data-rule-heading],
   .rogatio-editor [data-group-heading],
@@ -813,7 +827,8 @@
   .rogatio-editor [data-group-row],
   .rogatio-editor [data-editor-check-group],
   .rogatio-editor [data-action-dock],
-  .rogatio-editor [data-action-cluster="danger"] {
+  .rogatio-editor [data-action-cluster="danger"],
+  .rogatio-editor [data-test-dialog] {
     border-color: ButtonText;
     background: Canvas;
   }
@@ -836,7 +851,82 @@
     transition: none;
   }
 }
-.rogatio-editor [data-test-description],
+.rogatio-editor [data-editor-confirmation] {
+  z-index: 4;
+}
+.rogatio-editor [data-test-console] {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: clamp(0.75rem, 3vw, 2rem);
+  background: rgb(6 8 12 / 72%);
+  backdrop-filter: blur(8px);
+}
+.rogatio-editor [data-test-dialog] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(68rem, 100%);
+  max-height: min(86vh, 52rem);
+  overflow: hidden;
+  border: 1px solid var(--rogatio-border);
+  border-top: 3px solid var(--rogatio-card-rule-edge);
+  border-radius: var(--rogatio-radius);
+  background:
+    linear-gradient(180deg, rgba(46, 196, 182, 0.08) 0%, transparent 4.5rem),
+    var(--rogatio-surface-raised);
+  box-shadow: 0 28px 80px rgb(0 0 0 / 55%);
+}
+.rogatio-editor [data-test-dialog-head] {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem 0.9rem;
+  border-bottom: 1px solid var(--rogatio-border);
+}
+.rogatio-editor [data-test-dialog-head] h2 {
+  margin: 0;
+  font-size: 1.65rem;
+  letter-spacing: -0.03em;
+}
+.rogatio-editor [data-test-kicker] {
+  margin: 0 0 0.2rem;
+  color: var(--rogatio-card-rule-edge);
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.rogatio-editor [data-test-dialog] [data-test-description] {
+  margin: 0.35rem 0 0;
+  max-width: 40rem;
+  color: var(--rogatio-muted);
+}
+.rogatio-editor [data-test-dialog-body] {
+  overflow: auto;
+  padding: 1.1rem 1.25rem 1.35rem;
+}
+.rogatio-editor [data-test-status] {
+  margin: 0;
+  color: var(--rogatio-muted);
+}
+@media (min-width: 52rem) {
+  .rogatio-editor [data-test-dialog] [data-test-panel] {
+    grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.7fr);
+    align-items: start;
+  }
+  .rogatio-editor [data-test-dialog] [data-test-panel] > fieldset {
+    grid-row: 1 / span 3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rogatio-editor [data-test-console] {
+    backdrop-filter: none;
+  }
+}
 .rogatio-editor [data-test-checking] {
   color: var(--rogatio-muted);
   margin-block: 0 1rem;

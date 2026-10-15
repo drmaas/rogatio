@@ -388,7 +388,7 @@ if (AI_LIVE) {
         await openWithAISupport(page, extensionId, profile);
 
         await page
-          .locator("[data-editor-command-bar]")
+          .locator("[data-editor-header]")
           .getByRole("button", { name: "AI Assist", exact: true })
           .click();
         const panel = page.locator(".ai-assist-panel");
@@ -412,7 +412,7 @@ if (AI_LIVE) {
         );
 
         await page
-          .locator("[data-editor-command-bar]")
+          .locator("[data-editor-header]")
           .getByRole("button", { name: "Save", exact: true })
           .click();
         await waitForPersisted(
@@ -474,7 +474,7 @@ if (AI_LIVE) {
           .click();
 
         await page
-          .locator("[data-editor-command-bar]")
+          .locator("[data-editor-header]")
           .getByRole("button", { name: "AI Assist", exact: true })
           .click();
         const panel = page.locator(".ai-assist-panel");
@@ -492,7 +492,7 @@ if (AI_LIVE) {
         );
 
         await page
-          .locator("[data-editor-command-bar]")
+          .locator("[data-editor-header]")
           .getByRole("button", { name: "Save", exact: true })
           .click();
         await waitForPersisted(
@@ -582,13 +582,13 @@ if (AI_LIVE) {
         });
         await urlRegexField.fill("([");
         await page
-          .locator("[data-editor-command-bar]")
+          .locator("[data-editor-header]")
           .getByRole("button", { name: "Validate", exact: true })
           .click();
         await expect(urlRegexField).toHaveAttribute("aria-invalid", "true");
 
         await page
-          .locator("[data-editor-command-bar]")
+          .locator("[data-editor-header]")
           .getByRole("button", { name: "AI Assist", exact: true })
           .click();
         const panel = page.locator(".ai-assist-panel");
@@ -613,7 +613,7 @@ if (AI_LIVE) {
         );
 
         await page
-          .locator("[data-editor-command-bar]")
+          .locator("[data-editor-header]")
           .getByRole("button", { name: "Save", exact: true })
           .click();
         await waitForPersisted(
