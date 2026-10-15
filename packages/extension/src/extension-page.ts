@@ -1,8 +1,8 @@
 /** Management-page top bar, left to right. Console is the right-most destination. */
 export const MANAGEMENT_TABS = [
   ["dashboard", "Dashboard"],
-  ["history", "Match history"],
   ["workspace", "Workspace"],
+  ["history", "Match history"],
   ["console", "Console"],
 ] as const;
 

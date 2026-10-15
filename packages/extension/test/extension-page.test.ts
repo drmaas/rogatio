@@ -9,8 +9,8 @@ describe("management page destinations", () => {
   it("puts Console last in the top bar", () => {
     expect(MANAGEMENT_TABS.map(([tab, label]) => [tab, label])).toEqual([
       ["dashboard", "Dashboard"],
-      ["history", "Match history"],
       ["workspace", "Workspace"],
+      ["history", "Match history"],
       ["console", "Console"],
     ]);
     expect(MANAGEMENT_TABS.at(-1)?.[0]).toBe("console");

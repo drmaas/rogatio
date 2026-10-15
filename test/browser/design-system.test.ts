@@ -340,12 +340,23 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   await expect(
     page.getByRole("button", { name: "Console", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".rogatio-tabs button")).toHaveText([
+  const tabButtons = page.locator(".rogatio-tabs button");
+  await expect(tabButtons).toHaveCount(4);
+  const tabLayout = await tabButtons.evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      label: button.textContent,
+      left: button.getBoundingClientRect().left,
+    })),
+  );
+  expect(tabLayout.map((tab) => tab.label)).toEqual([
     "Dashboard",
-    "Match history",
     "Workspace",
+    "Match history",
     "Console",
   ]);
+  expect(tabLayout[0]?.left ?? 0).toBeLessThan(tabLayout[1]?.left ?? 0);
+  expect(tabLayout[1]?.left ?? 0).toBeLessThan(tabLayout[2]?.left ?? 0);
+  expect(tabLayout[2]?.left ?? 0).toBeLessThan(tabLayout[3]?.left ?? 0);
 
   const overview = page.locator("[data-overview]");
   await expect(overview).toBeVisible();

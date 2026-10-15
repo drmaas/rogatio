@@ -23,7 +23,7 @@ pencil that opens the management page on that group. The popup also has **Match 
 **Import project** (a file picker that accepts any filename), and **Run checks**. **Run checks** in the popup also compares the current tab with enabled rules. The tab URL is not stored or sent. The popup has no editor, search, proxy, permission,
 or rule-authoring controls.
 
-The management page uses a **Dashboard** overview, a **Match history** feed, a **Workspace** editor shell, and a **Console** page. **Console** is the right-most item in the top bar. It opens the Test console as a full page and keeps the draft you were editing in Workspace. The
+The management page uses a **Dashboard** overview, a **Workspace** editor shell, a **Match history** feed, and a **Console** page. **Console** is the right-most item in the top bar, after **Match history**. It opens the Test console as a full page and keeps the draft you were editing in Workspace. The
 Workspace breadcrumb is the editor's project name and group link. The group link opens a
 picker. **Refresh**, **Export project**, and **Remove project** sit on Project details.
 **Mock files** sits there too. **Choose folder** opens a system directory dialog through the runtime host, and a pasted path must be a full path to an existing folder. A relative path is rejected next to the field.
@@ -98,7 +98,7 @@ service worker terminated and does not wake it are dropped; no keepalive is used
 
 ## Match history
 
-**Match history** sits next to **Dashboard** on the management page. It lists recent
+**Match history** sits after **Workspace** and before **Console** on the management page. It lists recent
 Rogatio rule matches from this browser session. Only matched rules appear (redirect,
 query, header, and body rules on the same match pipeline as console logging, plus mock
 when a mock redirect is installed). Unmatched network traffic is not listed. Matcher
