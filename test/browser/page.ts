@@ -813,6 +813,12 @@ export class Page {
     await this.drainPageErrors();
   }
 
+  /** Browser Forward, for in-page history entries such as deep-link pushState. */
+  async goForward(): Promise<void> {
+    await this.driver.navigate().forward();
+    await this.drainPageErrors();
+  }
+
   async url(): Promise<string> {
     return this.driver.getCurrentUrl();
   }

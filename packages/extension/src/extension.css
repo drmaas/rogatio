@@ -160,6 +160,7 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 1rem;
+  min-width: 0;
   border-bottom: 1px solid var(--rogatio-border);
   background: var(--rogatio-tertiary);
   padding: 0.7rem 1rem;
@@ -172,7 +173,10 @@ body {
 }
 .rogatio-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
 }
 .rogatio-tabs button {
   border: 1px solid transparent;
@@ -587,8 +591,12 @@ body {
   color: var(--rogatio-muted);
 }
 .rogatio-layout[data-view="dashboard"],
-.rogatio-layout[data-view="history"] {
+.rogatio-layout[data-view="history"],
+.rogatio-layout[data-view="console"] {
   grid-template-columns: minmax(0, 1fr);
+}
+.rogatio-layout[data-view="console"] [data-runtime-guidance] {
+  display: none;
 }
 .rogatio-match-history {
   width: 100%;
@@ -1106,6 +1114,11 @@ body {
   }
 }
 @media (max-width: 26rem) {
+  /* Four destinations no longer fit one row, so the tab group takes the full
+     bar and wraps instead of widening the page. */
+  .rogatio-tabs {
+    flex-basis: 100%;
+  }
   /* Below ~416px a right-aligned status column squeezes the identity too far to
      stay readable, so the row becomes a two-line stack. */
   .rogatio-sidebar .rogatio-rule-row {

@@ -251,6 +251,25 @@ export interface EditorOptions {
    * The editor does not read or save what the host mounts here.
    */
   readonly mountProjectDetails?: (parent: HTMLElement) => void;
+  /**
+   * Where the Test console is drawn.
+   * - `"dialog"` (default): the rail button opens a dialog over the current
+   *   page. `rogatio edit` uses this.
+   * - `"page"`: the host owns the button. `setConsolePage` shows the same
+   *   console as the editor's page, with no dialog and no rail button. The
+   *   extension management page uses this.
+   */
+  readonly consoleSurface?: "dialog" | "page";
+  /**
+   * Called after a page-surface console navigates to a rule or a field.
+   * The host shows Workspace. Not called when the host closes the page.
+   * `groupId` and `ruleId` are the destination already on screen (`null` when
+   * that part of the URL is absent).
+   */
+  readonly onLeaveConsole?: (destination: {
+    readonly groupId: string | null;
+    readonly ruleId: string | null;
+  }) => void;
 }
 
 export interface EditorController {
@@ -260,6 +279,17 @@ export interface EditorController {
   destroy(): void;
   /** Deep-link the editor to a group's destination, falling back to Overview. */
   navigateToGroup(groupId: string | null | undefined): void;
+  /**
+   * Point the mounted draft at a history destination without closing the
+   * console page and without `onLeaveConsole`.
+   *
+   * An empty `groupId` is the project page, which is what a history entry
+   * with no `group` parameter means. A group the editor already shows is left
+   * untouched, so revealing Workspace does not scroll a rule back into view.
+   * While the console page is open, the route is stored and the page stays
+   * up; the next render shows it.
+   */
+  syncRoute(groupId: string | null | undefined): void;
   /**
    * Refresh heading Enable/Disable labels without re-rendering the draft.
    * Used when a dirty Workspace must keep unsaved edits mounted.
@@ -274,6 +304,11 @@ export interface EditorController {
     groupId: string | null | undefined,
     ruleId: string | null | undefined,
   ): void;
+  /**
+   * Show or hide the Test console page. No-op unless `consoleSurface` is
+   * `"page"`. URLs, method, resource type, and results stay on this instance.
+   */
+  setConsolePage(open: boolean): void;
 }
 
 export type UrlConversionResult =

@@ -500,3 +500,254 @@ describe("test console", () => {
     expect(root.querySelector("[data-test-pending]")).toBeNull();
   });
 });
+
+describe("test console page", () => {
+  it("fills the editor page and keeps urls, method, and results", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    let left = 0;
+    const editor = createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      consoleSurface: "page",
+      onLeaveConsole() {
+        left += 1;
+      },
+      dryRun: () =>
+        result([
+          {
+            groupId: "ads",
+            ruleId: "old-path",
+            matched: true,
+            source: dimension("matched", "url"),
+            method: dimension("matched", "GET"),
+            resourceType: dimension("matched", "main_frame"),
+            actionPreview: {
+              kind: "redirect",
+              summary: "https://example.com/new",
+            },
+          },
+        ]),
+    });
+    expect(root.querySelector("[data-route='test']")).toBeNull();
+    expect(root.querySelector("[data-test-dialog]")).toBeNull();
+    editor.setConsolePage(true);
+    expect(root.querySelector("[data-test-page]")).not.toBeNull();
+    expect(root.querySelector("[data-test-dialog]")).toBeNull();
+    expect(root.querySelector("[data-test-console]")).toBeNull();
+    expect(
+      root.querySelector("[data-command='close-test-console']"),
+    ).toBeNull();
+    expect(root.querySelector("[data-test-description]")?.textContent).toBe(
+      "Check whether these URLs match your rules. Nothing is contacted, and nothing is saved.",
+    );
+    expect(root.querySelectorAll('[data-command="test:run"]')).toHaveLength(1);
+    expect(root.querySelector("[data-desktop-route-rail]")).toHaveProperty(
+      "hidden",
+      true,
+    );
+    typeUrl(root, "https://example.com/old");
+    await clickRun(root);
+    expect(root.textContent).toContain(
+      "https://example.com/old matches Redirect in Ads / ",
+    );
+    expect(left).toBe(0);
+    editor.setConsolePage(false);
+    expect(left).toBe(0);
+    expect(root.querySelector("[data-test-page]")).toBeNull();
+    expect(root.querySelector("[data-route-breadcrumb]")).not.toBeNull();
+    editor.setConsolePage(true);
+    expect(
+      root.querySelector<HTMLTextAreaElement>("[data-test-urls]")?.value,
+    ).toBe("https://example.com/old");
+    expect(root.textContent).toContain("The browser would go to");
+    root
+      .querySelector(".rogatio-editor")
+      ?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    expect(root.querySelector("[data-test-page]")).not.toBeNull();
+    root
+      .querySelector<HTMLButtonElement>("[data-command='test:open-rule']")
+      ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(left).toBe(1);
+    expect(root.querySelector("[data-test-page]")).toBeNull();
+    expect(root.querySelector("[data-rule-card]")).not.toBeNull();
+    editor.destroy();
+  });
+
+  it("leaves the page when a draft fails validation", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    let left = 0;
+    const editor = createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      consoleSurface: "page",
+      onLeaveConsole() {
+        left += 1;
+      },
+      dryRun: () => ({
+        ok: false as const,
+        diagnostics: [
+          {
+            code: "schema.required",
+            severity: "error" as const,
+            path: "/groups/0/rules/0/source/value",
+            message: "Enter a valid regular expression.",
+          },
+        ],
+      }),
+    });
+    editor.validate();
+    editor.setConsolePage(true);
+    expect(root.querySelector("[data-test-page]")?.textContent).not.toContain(
+      "Project is valid.",
+    );
+    expect(root.querySelector("[data-editor-status]")?.textContent).toBe(
+      "Project is valid.",
+    );
+    typeUrl(root, "https://example.com/old");
+    await clickRun(root);
+    expect(left).toBe(1);
+    expect(root.querySelector("[data-test-page]")).toBeNull();
+    expect(root.textContent).toContain("Enter a valid regular expression.");
+    expect(document.activeElement).toBe(
+      root.querySelector('[data-path="/groups/0/rules/0/source/value"]'),
+    );
+    editor.destroy();
+  });
+
+  it("follows a history entry with no group without leaving the page", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    let left = 0;
+    const editor = createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      consoleSurface: "page",
+      onLeaveConsole() {
+        left += 1;
+      },
+    });
+    const name = root.querySelector<HTMLInputElement>("[data-path='/name']");
+    if (!name) throw new Error("missing project name");
+    name.value = "Draft name";
+    name.dispatchEvent(new Event("input", { bubbles: true }));
+    editor.navigateToRule("ads", "old-path");
+    editor.setConsolePage(true);
+    typeUrl(root, "https://example.com/old");
+    editor.syncRoute(null);
+    expect(left).toBe(0);
+    expect(root.querySelector("[data-test-page]")).not.toBeNull();
+    expect(
+      root.querySelector<HTMLTextAreaElement>("[data-test-urls]")?.value,
+    ).toBe("https://example.com/old");
+    editor.setConsolePage(false);
+    expect(left).toBe(0);
+    expect(root.querySelector("[data-test-page]")).toBeNull();
+    expect(root.querySelector("[data-rule-card]")).toBeNull();
+    expect(
+      root.querySelector<HTMLInputElement>("[data-path='/name']")?.value,
+    ).toBe("Draft name");
+    expect(
+      root.querySelector("[data-command='open-group-picker']")?.textContent,
+    ).toBe("Groups");
+    editor.destroy();
+  });
+
+  it("does not scroll a rule the editor is already showing", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    let left = 0;
+    const scrolls: string[] = [];
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function scrollIntoViewStub() {
+      scrolls.push(this.id);
+    };
+    try {
+      const editor = createEditor({
+        root,
+        initialProject: project,
+        validate: () => [],
+        save: () => ({ ok: true }),
+        consoleSurface: "page",
+        onLeaveConsole() {
+          left += 1;
+        },
+      });
+      editor.navigateToRule("ads", "old-path");
+      scrolls.length = 0;
+      editor.setConsolePage(true);
+      editor.syncRoute("ads");
+      editor.setConsolePage(false);
+      expect(left).toBe(0);
+      expect(scrolls).toEqual([]);
+      const card = root.querySelector("[data-rule-card]");
+      expect(card?.getAttribute("data-rule-id")).toBe("old-path");
+      expect(document.activeElement).not.toBe(card);
+      editor.destroy();
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+  });
+
+  it("reports the rule and the field when leaving the console page", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const destinations: Array<{
+      groupId: string | null;
+      ruleId: string | null;
+    }> = [];
+    const editor = createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      consoleSurface: "page",
+      onLeaveConsole(destination) {
+        destinations.push(destination);
+      },
+      dryRun: () => ({
+        ok: false as const,
+        diagnostics: [
+          {
+            code: "schema.required",
+            severity: "error" as const,
+            path: "/groups/0/rules/0/source/value",
+            message: "Enter a valid regular expression.",
+          },
+        ],
+      }),
+    });
+    editor.setConsolePage(true);
+    const open = document.createElement("button");
+    open.dataset.command = "test:open-rule";
+    open.dataset.groupId = "ads";
+    open.dataset.ruleId = "old-path";
+    root.querySelector(".rogatio-editor")?.append(open);
+    open.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(destinations).toEqual([{ groupId: "ads", ruleId: "old-path" }]);
+    expect(
+      root.querySelector("[data-rule-card]")?.getAttribute("data-rule-id"),
+    ).toBe("old-path");
+
+    editor.setConsolePage(true);
+    typeUrl(root, "https://example.com/old");
+    await clickRun(root);
+    expect(destinations.at(-1)).toEqual({
+      groupId: "ads",
+      ruleId: "old-path",
+    });
+    expect(document.activeElement).toBe(
+      root.querySelector('[data-path="/groups/0/rules/0/source/value"]'),
+    );
+    editor.destroy();
+  });
+});
