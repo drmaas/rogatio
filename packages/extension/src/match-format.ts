@@ -138,6 +138,12 @@ function formatIntendedAction(
   return "";
 }
 
+/** Intended action text. Same redaction and field bounds as the console line. */
+export function formatMatchAction(entry: MatchIndexEntry): string {
+  const redactSensitive = readProperty(entry, "redactSensitiveInLogs") === true;
+  return formatIntendedAction(entry, redactSensitive);
+}
+
 export function formatMatchRecord(
   event: MatchFormatEvent,
   entry: MatchIndexEntry,
@@ -151,7 +157,7 @@ export function formatMatchRecord(
   const ruleId = logString(readString(entry, "ruleId"));
   const displayName = logString(readString(entry, "name"));
   const kind = logString(readString(entry, "kind"));
-  const action = formatIntendedAction(entry, redactSensitive);
+  const action = formatMatchAction(entry);
   const initiatorUrl = logUrl(optionalString(event.initiator), redactSensitive);
 
   const live = [

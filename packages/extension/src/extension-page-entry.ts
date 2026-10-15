@@ -14,6 +14,11 @@ import {
   nativeHostOriginMismatchMessage,
   runtimeInstallCommand,
 } from "./extension-id.js";
+import { type MatchHistoryEntry, readMatchHistory } from "./match-history.js";
+import {
+  bindMatchHistoryFeed,
+  createMatchHistoryPanel,
+} from "./match-history-view.js";
 import {
   MATCH_LOGGING_ENABLED_KEY,
   readMatchLoggingEnabledFromStorageResult,
@@ -162,7 +167,8 @@ const client: MessageClient = {
 
 let state: Envelope = { projects: {}, activeProjectId: null };
 let pendingProjectId: string | null = null;
-let activeTab: "dashboard" | "workspace" = "dashboard";
+let activeTab: "dashboard" | "workspace" | "history" = "dashboard";
+let matchHistoryEntries: readonly MatchHistoryEntry[] = [];
 let editor: EditorController | undefined;
 /** True once an editor has been mounted, to tell navigation from a rebuild. */
 let editorHasMounted = false;
@@ -876,10 +882,15 @@ function renderTopbar(shell: HTMLElement): void {
 
   const tabs = document.createElement("div");
   tabs.className = "rogatio-tabs";
-  for (const tab of ["dashboard", "workspace"] as const) {
+  const destinations = [
+    ["dashboard", "Dashboard"],
+    ["history", "Match history"],
+    ["workspace", "Workspace"],
+  ] as const;
+  for (const [tab, label] of destinations) {
     const tabButton = document.createElement("button");
     tabButton.type = "button";
-    tabButton.textContent = tab === "dashboard" ? "Dashboard" : "Workspace";
+    tabButton.textContent = label;
     tabButton.dataset.tab = tab;
     if (activeTab === tab) tabButton.setAttribute("aria-current", "true");
     tabs.append(tabButton);
@@ -1392,6 +1403,20 @@ function renderOverview(shell: HTMLElement): void {
   shell.append(overview);
 }
 
+function historyPanel(): HTMLElement {
+  return createMatchHistoryPanel({
+    loggingEnabled: matchLoggingEnabled,
+    entries: matchHistoryEntries,
+    onClear: () => {
+      void clearShownMatchHistory();
+    },
+  });
+}
+
+function renderMatchHistory(shell: HTMLElement): void {
+  shell.append(historyPanel());
+}
+
 function renderShell(): void {
   // Both rebuild paths restore focus: `renderShell` for a clean editor and
   // `patchWorkspaceEnablementChrome` for a dirty one. Without this the focused
@@ -1462,6 +1487,8 @@ function renderShell(): void {
 
   if (activeTab === "dashboard") {
     renderOverview(main);
+  } else if (activeTab === "history") {
+    renderMatchHistory(main);
   } else {
     const editorRoot = document.createElement("div");
     editorRoot.dataset.editorRoot = "true";
@@ -1510,7 +1537,7 @@ function renderShell(): void {
       return;
     }
     const tab = target.dataset.tab;
-    if (tab === "dashboard" || tab === "workspace") {
+    if (tab === "dashboard" || tab === "workspace" || tab === "history") {
       activeTab = tab;
       renderShell();
       return;
@@ -2211,6 +2238,32 @@ function renderDiagnosticsModal(container: HTMLElement): void {
   copyBtn.addEventListener("click", () => void copyDiagnostics());
 }
 
+async function loadMatchHistory(): Promise<void> {
+  try {
+    matchHistoryEntries = await readMatchHistory(chrome);
+  } catch {
+    matchHistoryEntries = [];
+  }
+}
+
+async function clearShownMatchHistory(): Promise<void> {
+  const response = await client.send({
+    version: 1,
+    command: "clear-match-history",
+  });
+  const status = document.querySelector(".rogatio-status");
+  if (response?.ok !== true) {
+    statusMessage = "Match history could not be cleared.";
+    if (status) status.textContent = statusMessage;
+    return;
+  }
+  matchHistoryEntries = [];
+  statusMessage = "";
+  if (status) status.textContent = "";
+  const host = document.querySelector<HTMLElement>("[data-match-history-root]");
+  if (host) host.replaceWith(historyPanel());
+}
+
 async function loadMatchLoggingEnabled(): Promise<void> {
   try {
     const result = await chrome.storage.local.get(MATCH_LOGGING_ENABLED_KEY);
@@ -2224,6 +2277,7 @@ async function refresh(
   options: { readonly remountEditor?: boolean } = {},
 ): Promise<void> {
   await loadMatchLoggingEnabled();
+  await loadMatchHistory();
   const response = await client.send({ version: 1, command: "refresh" });
   if (response?.ok !== true || !response.value) {
     statusMessage = "The project state could not be refreshed.";
@@ -2477,6 +2531,27 @@ window.addEventListener("popstate", () => {
     return;
   }
   navigateToRuleDeepLink(link.groupId, link.ruleId, { push: false });
+});
+
+bindMatchHistoryFeed({
+  api: chrome,
+  getHost: () =>
+    document.querySelector<HTMLElement>("[data-match-history-root]"),
+  getLoggingEnabled: () => matchLoggingEnabled,
+  setLoggingEnabled: (enabled) => {
+    matchLoggingEnabled = enabled;
+    const input = document.querySelector<HTMLInputElement>(
+      'aside input[data-match-logging-toggle="true"]',
+    );
+    if (input) input.checked = enabled;
+  },
+  getEntries: () => matchHistoryEntries,
+  setEntries: (entries) => {
+    matchHistoryEntries = entries;
+  },
+  onClear: () => {
+    void clearShownMatchHistory();
+  },
 });
 
 void refresh();

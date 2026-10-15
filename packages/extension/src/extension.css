@@ -586,8 +586,58 @@ body {
   margin: 0 0 1rem;
   color: var(--rogatio-muted);
 }
-.rogatio-layout[data-view="dashboard"] {
+.rogatio-layout[data-view="dashboard"],
+.rogatio-layout[data-view="history"] {
   grid-template-columns: minmax(0, 1fr);
+}
+.rogatio-match-history {
+  width: 100%;
+  max-width: 96rem;
+  margin: 0 auto;
+}
+.rogatio-match-history h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.rogatio-match-history-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 1rem;
+}
+.rogatio-match-history-count,
+.rogatio-match-history-empty {
+  margin: 0 0 1rem;
+  color: var(--rogatio-muted);
+}
+.rogatio-match-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.rogatio-match-history-row {
+  display: grid;
+  gap: 0.25rem;
+  border: 1px solid var(--rogatio-border);
+  border-radius: var(--rogatio-radius);
+  background: rgba(22, 27, 34, 0.82);
+  padding: 0.75rem 1rem;
+}
+.rogatio-match-history-row p {
+  margin: 0;
+}
+.rogatio-match-history-url,
+.rogatio-match-history-action {
+  overflow-wrap: anywhere;
+  font-family: var(--rogatio-font-mono);
+  font-size: 0.85rem;
+}
+.rogatio-match-history-meta {
+  color: var(--rogatio-muted);
+  font-size: 0.85rem;
 }
 .rogatio-dashboard-card {
   display: grid;

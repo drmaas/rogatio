@@ -3,6 +3,21 @@ export interface ChromeStorageArea {
   set(value: Record<string, unknown>): Promise<void>;
 }
 
+interface ChromeStorageChange {
+  readonly newValue?: unknown;
+  readonly oldValue?: unknown;
+}
+
+export type ChromeStorageChangedListener = (
+  changes: Readonly<Record<string, ChromeStorageChange>>,
+  areaName: string,
+) => void;
+
+interface ChromeStorageOnChanged {
+  addListener(listener: ChromeStorageChangedListener): void;
+  removeListener?(listener: ChromeStorageChangedListener): void;
+}
+
 export interface ChromeAction {
   setBadgeText(details: { text: string }): Promise<void>;
   setBadgeBackgroundColor(details: { color: string }): Promise<void>;
@@ -129,7 +144,11 @@ interface ChromeTabs {
 }
 
 export interface ChromeApi {
-  storage: { local: ChromeStorageArea };
+  storage: {
+    local: ChromeStorageArea;
+    session?: ChromeStorageArea;
+    onChanged?: ChromeStorageOnChanged;
+  };
   action: ChromeAction;
   runtime: ChromeRuntime;
   declarativeNetRequest?: ChromeDeclarativeNetRequest;

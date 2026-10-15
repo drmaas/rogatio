@@ -1,4 +1,4 @@
-import type { ChromeApi } from "./chrome.js";
+import type { ChromeApi, ChromeStorageChangedListener } from "./chrome.js";
 
 export const MATCH_LOGGING_ENABLED_KEY = "rogatio.matchLogging.enabled";
 
@@ -30,4 +30,27 @@ export async function readMatchLoggingEnabled(
   } catch {
     return false;
   }
+}
+
+/** Follow the Match logging toggle. A removed key stays on (the default). */
+export function subscribeMatchLoggingEnabled(
+  api: ChromeApi,
+  listener: (enabled: boolean) => void,
+): () => void {
+  const onChanged = api.storage.onChanged;
+  if (onChanged?.addListener === undefined) return () => {};
+  const wrapped: ChromeStorageChangedListener = (changes, areaName) => {
+    if (areaName !== "local") return;
+    if (!Object.hasOwn(changes, MATCH_LOGGING_ENABLED_KEY)) return;
+    const next = changes[MATCH_LOGGING_ENABLED_KEY]?.newValue;
+    listener(
+      readMatchLoggingEnabledFromStorageResult({
+        [MATCH_LOGGING_ENABLED_KEY]: next,
+      }),
+    );
+  };
+  onChanged.addListener(wrapped);
+  return () => {
+    onChanged.removeListener?.(wrapped);
+  };
 }

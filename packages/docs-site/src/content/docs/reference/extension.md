@@ -27,7 +27,10 @@ boundary is designed to accommodate additional browser extensions in the future.
   load only; redirect/query/header, plus body via session markers when the strip path
   gate allows install). See [Chrome extension](/guides/extension/) for coverage, the
   **Match logging** toggle (default on), per-rule redact checkbox, live vs intended
-  fields, and limitations.
+  fields, and limitations. The same pipeline appends a ring of at most 100 redacted rows
+  to `chrome.storage.session` for the management-page **Match history** feed. That store
+  is outside the project envelope, is cleared when Match logging is turned off or the
+  browser session ends, and is never exported or sent to the native host.
 
 ## Distribution
 

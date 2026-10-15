@@ -8,7 +8,7 @@ Rogatio is local-first by design.
 ## What Rogatio does not do
 
 - No accounts, hosted Rogatio runtime, cloud sync, or telemetry.
-- No retained traffic history.
+- No retained traffic history. The only exception is an ephemeral match feed: at most 100 redacted rule hits kept in `chrome.storage.session` for the current browser session. It is not a traffic archive, it is not exported, and it does not survive the session.
 - No general-purpose forward proxy, open file server, or traffic archive.
 - Persistent product state is the version-controlled `.rogatio.json` project file
   (plus optional local AI provider config configured via `rogatio ai`).
@@ -35,10 +35,13 @@ middlebox.
   DNS-rebinding, redirect, credential, method, timeout, and size controls.
 - The **local runtime** independently revalidates project, rule, URL, method, initiator,
   target, permission, and grant authority.
-- **Console match logging** is live-only: each reported match writes one bounded, redacted
-  line to the matched page's DevTools Console and retains no match history. Request and
-  response bodies and wire-applied header values are never included. See
-  [Chrome extension](/guides/extension/#match-logging).
+- **Console match logging** writes one bounded, redacted line to the matched page's
+  DevTools Console. The same match also appends one row to **Match history** (see
+  [Chrome extension](/guides/extension/#match-history)). That feed lives only in
+  `chrome.storage.session`, holds at most 100 rows, and is cleared when Match logging is
+  turned off, when you choose Clear, or when the browser session ends. It is not written
+  to the project file, `storage.local`, sync, export, or the native host. Request and
+  response bodies and wire-applied header values are never included.
 
 ## Body confidentiality
 
