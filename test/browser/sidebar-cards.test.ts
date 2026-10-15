@@ -27,6 +27,12 @@ type MockEnvelope = {
   nativeRuntimeState?: { phase: string };
   nativeRuntimeError?: string;
   aiCheck?: AiCheck;
+  /** Canned `dry-run` reply. Absent replies fall through to the state envelope. */
+  dryRun?: {
+    ok: boolean;
+    value?: unknown;
+    diagnostics?: Array<{ code: string; path: string; message: string }>;
+  };
 };
 
 /** The service worker's check-ai-support answer (issue #241 response shape). */
@@ -152,6 +158,10 @@ function installChromeMock(seed: MockEnvelope): void {
               ok: true,
               value: state.aiCheck ?? { supported: false, reported: false },
             });
+            return;
+          }
+          if (message.command === "dry-run" && state.dryRun) {
+            callback(state.dryRun);
             return;
           }
           callback({ ok: true, value: state });
@@ -506,6 +516,166 @@ test("returning to Workspace does not scroll back to the open rule", async ({
   const card = page.locator("[data-rule-card]");
   await expect(card).toHaveAttribute("data-rule-id", "rule-two");
   await expect(card).not.toBeFocused();
+});
+
+function matchedDryRun(groupId: string, ruleId: string) {
+  return {
+    ok: true,
+    value: {
+      results: [
+        {
+          url: "https://two.example/second",
+          matchedRuleCount: 1,
+          rules: [
+            {
+              groupId,
+              ruleId,
+              matched: true,
+              source: { state: "matched", matched: true, detail: "url" },
+              method: { state: "matched", matched: true, detail: "GET" },
+              resourceType: {
+                state: "matched",
+                matched: true,
+                detail: "main_frame",
+              },
+              actionPreview: {
+                kind: "redirect",
+                summary: "https://example.com/new",
+              },
+            },
+          ],
+        },
+      ],
+      errors: [],
+      summary: {
+        caseCount: 1,
+        urlCount: 1,
+        matchedUrlCount: 1,
+        matchedRuleTotal: 1,
+      },
+    },
+  };
+}
+
+function fieldDryRun(path: string) {
+  return {
+    ok: false,
+    diagnostics: [
+      {
+        code: "schema.required",
+        path,
+        message: "Enter a valid regular expression.",
+      },
+    ],
+  };
+}
+
+async function openConsoleAndRun(
+  page: import("./page.js").Page,
+): Promise<void> {
+  await page.getByRole("button", { name: "Console", exact: true }).click();
+  await page.locator("[data-test-urls]").fill("https://two.example/second");
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
+}
+
+test("a console rule click keeps that rule when the URL has no group", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, {
+    ...sidebarEnvelope(),
+    dryRun: matchedDryRun("group-two", "rule-two"),
+  });
+  await openWorkspace(page);
+  await openConsoleAndRun(page);
+  await page.getByRole("button", { name: "Second rule", exact: true }).click();
+
+  const url = await page.url();
+  expect(url).toContain("group=group-two");
+  expect(url).toContain("rule=rule-two");
+  await expect(page.locator("[data-test-page]")).toHaveCount(0);
+  await expect(page.locator("[data-rule-card]")).toHaveAttribute(
+    "data-rule-id",
+    "rule-two",
+  );
+  await expect(page.locator("[data-command='open-group-picker']")).toHaveText(
+    "Two",
+  );
+  await expect(
+    page.getByRole("button", { name: "Workspace", exact: true }),
+  ).toHaveAttribute("aria-current", "true");
+});
+
+test("a console rule click keeps that rule when the URL names another group", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, {
+    ...sidebarEnvelope(),
+    dryRun: matchedDryRun("group-two", "rule-two"),
+  });
+  await openWorkspace(page);
+  await page.locator('[data-rule-link][data-rule-id="rule-one"]').click();
+  expect(await page.url()).toContain("group=group-one");
+
+  await openConsoleAndRun(page);
+  await page.getByRole("button", { name: "Second rule", exact: true }).click();
+
+  const url = await page.url();
+  expect(url).toContain("group=group-two");
+  expect(url).toContain("rule=rule-two");
+  expect(url).not.toContain("group=group-one");
+  await expect(page.locator("[data-test-page]")).toHaveCount(0);
+  await expect(page.locator("[data-rule-card]")).toHaveAttribute(
+    "data-rule-id",
+    "rule-two",
+  );
+  await expect(page.locator("[data-command='open-group-picker']")).toHaveText(
+    "Two",
+  );
+});
+
+test("a console field error keeps that field when the URL has no group", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, {
+    ...sidebarEnvelope(),
+    dryRun: fieldDryRun("/groups/1/rules/0/source/value"),
+  });
+  await openWorkspace(page);
+  await openConsoleAndRun(page);
+
+  const field = page.locator('[data-path="/groups/1/rules/0/source/value"]');
+  await expect(field).toBeFocused();
+  const url = await page.url();
+  expect(url).toContain("group=group-two");
+  expect(url).toContain("rule=rule-two");
+  await expect(page.locator("[data-test-page]")).toHaveCount(0);
+  await expect(page.locator("[data-command='open-group-picker']")).toHaveText(
+    "Two",
+  );
+});
+
+test("a console field error keeps that field when the URL names another group", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, {
+    ...sidebarEnvelope(),
+    dryRun: fieldDryRun("/groups/1/rules/0/source/value"),
+  });
+  await openWorkspace(page);
+  await page.locator('[data-rule-link][data-rule-id="rule-one"]').click();
+  expect(await page.url()).toContain("group=group-one");
+
+  await openConsoleAndRun(page);
+  const field = page.locator('[data-path="/groups/1/rules/0/source/value"]');
+  await expect(field).toBeFocused();
+  const url = await page.url();
+  expect(url).toContain("group=group-two");
+  expect(url).toContain("rule=rule-two");
+  expect(url).not.toContain("group=group-one");
+  await expect(page.locator("[data-test-page]")).toHaveCount(0);
+  await expect(page.locator("[data-command='open-group-picker']")).toHaveText(
+    "Two",
+  );
 });
 
 test("browser Back returns from a rule to the previous group", async ({

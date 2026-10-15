@@ -697,4 +697,57 @@ describe("test console page", () => {
       HTMLElement.prototype.scrollIntoView = original;
     }
   });
+
+  it("reports the rule and the field when leaving the console page", async () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    const destinations: Array<{
+      groupId: string | null;
+      ruleId: string | null;
+    }> = [];
+    const editor = createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      consoleSurface: "page",
+      onLeaveConsole(destination) {
+        destinations.push(destination);
+      },
+      dryRun: () => ({
+        ok: false as const,
+        diagnostics: [
+          {
+            code: "schema.required",
+            severity: "error" as const,
+            path: "/groups/0/rules/0/source/value",
+            message: "Enter a valid regular expression.",
+          },
+        ],
+      }),
+    });
+    editor.setConsolePage(true);
+    const open = document.createElement("button");
+    open.dataset.command = "test:open-rule";
+    open.dataset.groupId = "ads";
+    open.dataset.ruleId = "old-path";
+    root.querySelector(".rogatio-editor")?.append(open);
+    open.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(destinations).toEqual([{ groupId: "ads", ruleId: "old-path" }]);
+    expect(
+      root.querySelector("[data-rule-card]")?.getAttribute("data-rule-id"),
+    ).toBe("old-path");
+
+    editor.setConsolePage(true);
+    typeUrl(root, "https://example.com/old");
+    await clickRun(root);
+    expect(destinations.at(-1)).toEqual({
+      groupId: "ads",
+      ruleId: "old-path",
+    });
+    expect(document.activeElement).toBe(
+      root.querySelector('[data-path="/groups/0/rules/0/source/value"]'),
+    );
+    editor.destroy();
+  });
 });

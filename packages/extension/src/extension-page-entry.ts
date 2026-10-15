@@ -1473,15 +1473,22 @@ function syncEditorTabChrome(): void {
   }
 }
 
-function activateTab(tab: ManagementTab): void {
+function activateTab(
+  tab: ManagementTab,
+  options?: { readonly applyHistory?: boolean },
+): void {
   if (tab === activeTab) return;
   const previous = activeTab;
   if (editor && editorTab(previous) && editorTab(tab) && ids().length > 0) {
     activeTab = tab;
     syncEditorTabChrome();
-    if (previous === "console" && tab === "workspace") {
-      // The URL was applied on Back/Forward. Applying it again is a no-op
-      // when the editor is already there, so this does not scroll to a rule.
+    // A rule click or field diagnostic has already moved the draft. Applying
+    // the history URL here would write that old address back over it.
+    if (
+      previous === "console" &&
+      tab === "workspace" &&
+      options?.applyHistory !== false
+    ) {
       syncMountedEditorRoute();
     }
     editor.setConsolePage(tab === "console");
@@ -1826,9 +1833,10 @@ function renderShell(): void {
           { command: "remove", label: "Remove project", tone: "danger" },
         ],
         consoleSurface: "page",
-        onLeaveConsole() {
+        onLeaveConsole(destination) {
           if (activeTab !== "console") return;
-          activateTab("workspace");
+          recordConsoleDestination(destination);
+          activateTab("workspace", { applyHistory: false });
         },
         mountProjectDetails(parent) {
           const saved = state.activeProjectId
@@ -2609,6 +2617,35 @@ if (readRuleDeepLink()) activeTab = "workspace";
 function syncMountedEditorRoute(): void {
   const link = readRuleDeepLink();
   editor?.syncRoute(link?.groupId ?? null);
+}
+
+/**
+ * A console rule or field leave already moved the draft. The address bar has
+ * to name that place, or the next Workspace visit treats the old URL as the
+ * destination. Skip the write when the URL already matches.
+ */
+function recordConsoleDestination(destination: {
+  readonly groupId: string | null;
+  readonly ruleId: string | null;
+}): void {
+  const groupId = destination.groupId ?? "";
+  const ruleId = groupId.length === 0 ? "" : (destination.ruleId ?? "");
+  const current = readRuleDeepLink();
+  if (groupId.length === 0) {
+    if (current === null) return;
+    window.history.pushState(
+      null,
+      "",
+      `${window.location.pathname}${window.location.hash}`,
+    );
+    return;
+  }
+  if (current?.groupId === groupId && current.ruleId === ruleId) return;
+  const href =
+    ruleId.length > 0
+      ? ruleDeepLink(groupId, ruleId)
+      : `?group=${encodeURIComponent(groupId)}`;
+  window.history.pushState({ rogatioRule: { groupId, ruleId } }, "", href);
 }
 
 // Browser Back and Forward after an in-page rule navigation. Resolving without

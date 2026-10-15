@@ -868,6 +868,8 @@ class EditorControllerImpl implements EditorController {
   private testConsoleOpen = false;
   /** Page-surface console closed by navigation; the host is told after render. */
   private pendingConsoleLeave = false;
+  /** Rule a console leave is opening, when the destination has one. */
+  private consoleLeaveRuleId: string | null = null;
   private readonly consoleSurface: "dialog" | "page";
   private readonly projectActions: readonly EditorProjectAction[];
   private focusRequest: string | undefined;
@@ -2740,6 +2742,8 @@ class EditorControllerImpl implements EditorController {
     groupId: string | null | undefined,
     ruleId: string | null | undefined,
   ): void {
+    const rule = safeText(ruleId);
+    this.consoleLeaveRuleId = rule.length > 0 ? rule : null;
     this.navigateToGroup(groupId);
     const resolvedGroup = safeText(this.currentGroupId());
     const resolvedRule = safeText(ruleId);
@@ -2766,6 +2770,10 @@ class EditorControllerImpl implements EditorController {
     this.route = { kind: "group", groupId: group.id };
     this.searchQuery = "";
     this.statusMessage = "Jumped to rule.";
+    this.consoleLeaveRuleId =
+      rule && typeof rule.id === "string" && rule.id.length > 0
+        ? rule.id
+        : null;
     this.render();
     if (rule && typeof rule.id === "string") {
       this.revealRuleCard(group.id, rule.id);
@@ -2776,6 +2784,7 @@ class EditorControllerImpl implements EditorController {
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
       this.route = { kind: "project" };
+      this.consoleLeaveRuleId = null;
       this.releaseConsolePage();
       this.focusRequest = path;
       this.render();
@@ -2786,12 +2795,18 @@ class EditorControllerImpl implements EditorController {
     const group = this.draft.groups[groupIndex];
     if (!group || typeof group.id !== "string") return;
     this.route = { kind: "group", groupId: group.id };
+    const ruleIndex = arrayIndex(segments[3] ?? "");
+    const namedRule =
+      ruleIndex === undefined ? undefined : group.rules[ruleIndex];
+    this.consoleLeaveRuleId =
+      namedRule && typeof namedRule.id === "string" && namedRule.id.length > 0
+        ? namedRule.id
+        : null;
     this.releaseConsolePage();
     // A diagnostic naming an entity rather than its `name` property still means
     // "this name needs fixing": the schema reports a missing required property at
     // the property's own path, but a host adapter is not obliged to.
     const last = segments[segments.length - 1];
-    const ruleIndex = arrayIndex(segments[3] ?? "");
     const entityPath =
       last === "name"
         ? path
@@ -2868,9 +2883,22 @@ class EditorControllerImpl implements EditorController {
     this.syncConsolePageChrome();
     const leavingConsole = this.pendingConsoleLeave;
     this.pendingConsoleLeave = false;
+    const leaveGroupId = this.currentGroupId() ?? null;
+    const leaveRuleId = this.consoleLeaveRuleId;
+    this.consoleLeaveRuleId = null;
     this.restoreFocus();
     this.focusRequest = undefined;
-    if (leavingConsole) this.options.onLeaveConsole?.();
+    if (leavingConsole) {
+      this.options.onLeaveConsole?.({
+        groupId: leaveGroupId,
+        ruleId:
+          leaveGroupId !== null &&
+          leaveRuleId !== null &&
+          this.ruleById(leaveGroupId, leaveRuleId)
+            ? leaveRuleId
+            : null,
+      });
+    }
   }
 
   private renderHeader(): void {

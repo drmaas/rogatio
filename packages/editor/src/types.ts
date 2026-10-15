@@ -263,8 +263,13 @@ export interface EditorOptions {
   /**
    * Called after a page-surface console navigates to a rule or a field.
    * The host shows Workspace. Not called when the host closes the page.
+   * `groupId` and `ruleId` are the destination already on screen (`null` when
+   * that part of the URL is absent).
    */
-  readonly onLeaveConsole?: () => void;
+  readonly onLeaveConsole?: (destination: {
+    readonly groupId: string | null;
+    readonly ruleId: string | null;
+  }) => void;
 }
 
 export interface EditorController {
