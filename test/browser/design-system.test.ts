@@ -337,6 +337,15 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   await expect(
     page.getByRole("button", { name: "Workspace", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Console", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".rogatio-tabs button")).toHaveText([
+    "Dashboard",
+    "Match history",
+    "Workspace",
+    "Console",
+  ]);
 
   const overview = page.locator("[data-overview]");
   await expect(overview).toBeVisible();
@@ -433,7 +442,10 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   ).toContainText("Active rules:");
   await expect(
     page.locator("[data-rail-tools] [data-route='test']"),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  await expect(page.locator(".rogatio-tabs button").nth(3)).toHaveText(
+    "Console",
+  );
 
   await breadcrumb.locator("[data-command='open-group-picker']").click();
   await page.locator("[data-group-picker] [data-group-id='group-one']").click();
@@ -480,6 +492,49 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
   await expect(page.locator("[data-group-menu]")).toHaveCount(0);
   await expect(page.locator("[data-route-breadcrumb]")).toBeVisible();
   await expect(page.locator("[data-mobile-route-nav]")).toHaveCount(0);
+});
+
+test("Console is a full page and keeps the draft and test state", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, defaultEnvelope());
+  await page.goto("/extension/index.html");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(
+    page.locator("[data-rail-tools] [data-route='test']"),
+  ).toHaveCount(0);
+  await page.getByLabel("Project name").fill("Draft name");
+  await page.getByRole("button", { name: "Console", exact: true }).click();
+
+  await expect(page.locator("[data-test-page]")).toBeVisible();
+  await expect(page.locator("[data-test-dialog]")).toHaveCount(0);
+  await expect(page.locator("[data-test-console]")).toHaveCount(0);
+  await expect(page.locator(".rogatio-sidebar")).toHaveCount(0);
+  await expect(page.locator("[data-overview]")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Console", exact: true }),
+  ).toHaveAttribute("aria-current", "true");
+  await expect(
+    page.getByRole("heading", { name: "Test console", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Run test", exact: true }),
+  ).toHaveCount(1);
+
+  await page.locator("[data-test-urls]").fill("https://one.example/first");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.locator("[data-test-page]")).toHaveCount(0);
+  await expect(page.locator(".rogatio-sidebar")).toBeVisible();
+  await expect(page.getByLabel("Project name")).toHaveValue("Draft name");
+  await expect(
+    page.getByRole("button", { name: "Workspace", exact: true }),
+  ).toHaveAttribute("aria-current", "true");
+
+  await page.getByRole("button", { name: "Console", exact: true }).click();
+  await expect(page.locator("[data-test-urls]")).toHaveValue(
+    "https://one.example/first",
+  );
+  await expect(page.getByLabel("Project name")).toBeHidden();
 });
 
 test("popup renders the dark Rogatio card", async ({ page, request }) => {

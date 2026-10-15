@@ -913,12 +913,28 @@
   margin: 0;
   color: var(--rogatio-muted);
 }
+.rogatio-editor [data-test-page] {
+  width: min(68rem, 100%);
+  margin-inline: auto;
+}
+.rogatio-editor [data-test-page-head] h2 {
+  margin: 0;
+  font-size: 1.65rem;
+  letter-spacing: -0.03em;
+}
+.rogatio-editor [data-test-page] [data-test-description] {
+  margin: 0.35rem 0 1rem;
+  max-width: 40rem;
+  color: var(--rogatio-muted);
+}
 @media (min-width: 52rem) {
-  .rogatio-editor [data-test-dialog] [data-test-panel] {
+  .rogatio-editor [data-test-dialog] [data-test-panel],
+  .rogatio-editor [data-test-page] [data-test-panel] {
     grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.7fr);
     align-items: start;
   }
-  .rogatio-editor [data-test-dialog] [data-test-panel] > fieldset {
+  .rogatio-editor [data-test-dialog] [data-test-panel] > fieldset,
+  .rogatio-editor [data-test-page] [data-test-panel] > fieldset {
     grid-row: 1 / span 3;
   }
 }

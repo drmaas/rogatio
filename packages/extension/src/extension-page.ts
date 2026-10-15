@@ -1,3 +1,19 @@
+/** Management-page top bar, left to right. Console is the right-most destination. */
+export const MANAGEMENT_TABS = [
+  ["dashboard", "Dashboard"],
+  ["history", "Match history"],
+  ["workspace", "Workspace"],
+  ["console", "Console"],
+] as const;
+
+export type ManagementTab = (typeof MANAGEMENT_TABS)[number][0];
+
+export function isManagementTab(
+  value: string | undefined,
+): value is ManagementTab {
+  return MANAGEMENT_TABS.some(([tab]) => tab === value);
+}
+
 export interface ExtensionPageModelOptions {
   readonly activeProjectId: string | null;
   readonly projectIds: readonly string[];

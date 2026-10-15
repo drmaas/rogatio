@@ -866,6 +866,9 @@ class EditorControllerImpl implements EditorController {
   private confirmation: Confirmation | undefined;
   private groupPickerOpen = false;
   private testConsoleOpen = false;
+  /** Page-surface console closed by navigation; the host is told after render. */
+  private pendingConsoleLeave = false;
+  private readonly consoleSurface: "dialog" | "page";
   private readonly projectActions: readonly EditorProjectAction[];
   private focusRequest: string | undefined;
   private saving = false;
@@ -902,6 +905,7 @@ class EditorControllerImpl implements EditorController {
     this.root = options.root;
     this.document = options.root.ownerDocument;
     this.options = options;
+    this.consoleSurface = options.consoleSurface === "page" ? "page" : "dialog";
     this.projectActions = normalizeProjectActions(options.projectActions);
     this.extensions = extensions;
     this.instanceId = `rogatio-editor-${++editorInstanceCount}`;
@@ -1032,6 +1036,7 @@ class EditorControllerImpl implements EditorController {
     const target = event.target;
     if (!(target instanceof Element)) return;
     if (
+      this.consoleSurface === "dialog" &&
       this.testConsoleOpen &&
       target instanceof HTMLElement &&
       target.dataset.testConsole !== undefined &&
@@ -1210,12 +1215,21 @@ class EditorControllerImpl implements EditorController {
       this.closeGroupPicker();
       return;
     }
-    if (event.key === "Escape" && this.testConsoleOpen) {
+    if (
+      event.key === "Escape" &&
+      this.consoleSurface === "dialog" &&
+      this.testConsoleOpen
+    ) {
       event.preventDefault();
       this.closeTestConsole();
       return;
     }
-    if (event.key === "Tab" && this.testConsoleOpen && !this.confirmation) {
+    if (
+      event.key === "Tab" &&
+      this.consoleSurface === "dialog" &&
+      this.testConsoleOpen &&
+      !this.confirmation
+    ) {
       this.trapTestConsoleFocus(event);
     }
     const target = event.target;
@@ -1375,7 +1389,7 @@ class EditorControllerImpl implements EditorController {
       return;
     }
     if (command === "test:open-rule") {
-      this.testConsoleOpen = false;
+      this.releaseConsolePage();
       this.navigateToRule(element.dataset.groupId, element.dataset.ruleId);
       return;
     }
@@ -2265,7 +2279,7 @@ class EditorControllerImpl implements EditorController {
         : `${count} validation error${count === 1 ? "" : "s"} found.`;
     const first = diagnostics[0];
     if (first) {
-      this.testConsoleOpen = false;
+      this.releaseConsolePage();
       this.navigateToPath(first.path);
       return;
     }
@@ -2566,6 +2580,9 @@ class EditorControllerImpl implements EditorController {
 
   private navigate(route: string, groupId: string | undefined): void {
     if (route === "test") {
+      // The management page owns this destination. The rail button exists
+      // only for the dialog surface.
+      if (this.consoleSurface === "page") return;
       this.openTestConsole();
       return;
     }
@@ -2577,7 +2594,7 @@ class EditorControllerImpl implements EditorController {
     } else {
       return;
     }
-    this.testConsoleOpen = false;
+    this.releaseConsolePage();
     this.groupPickerOpen = false;
     if (returnFocusToGroups) this.focusRequest = "route:groups";
     this.closeRenameOnLeave();
@@ -2610,7 +2627,7 @@ class EditorControllerImpl implements EditorController {
 
   navigateToGroup(groupId: string | null | undefined): void {
     this.groupPickerOpen = false;
-    this.testConsoleOpen = false;
+    this.releaseConsolePage();
     const groupIds = new Set(
       this.draft.groups
         .map((group) => (typeof group.id === "string" ? group.id : ""))
@@ -2702,7 +2719,7 @@ class EditorControllerImpl implements EditorController {
 
   private navigateToSearchResult(path: string): void {
     this.groupPickerOpen = false;
-    this.testConsoleOpen = false;
+    this.releaseConsolePage();
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
       this.route = { kind: "project" };
@@ -2729,7 +2746,7 @@ class EditorControllerImpl implements EditorController {
     const segments = decodePointer(path);
     if (segments?.[0] !== "groups") {
       this.route = { kind: "project" };
-      this.testConsoleOpen = false;
+      this.releaseConsolePage();
       this.focusRequest = path;
       this.render();
       return;
@@ -2739,7 +2756,7 @@ class EditorControllerImpl implements EditorController {
     const group = this.draft.groups[groupIndex];
     if (!group || typeof group.id !== "string") return;
     this.route = { kind: "group", groupId: group.id };
-    this.testConsoleOpen = false;
+    this.releaseConsolePage();
     // A diagnostic naming an entity rather than its `name` property still means
     // "this name needs fixing": the schema reports a missing required property at
     // the property's own path, but a host adapter is not obliged to.
@@ -2818,8 +2835,12 @@ class EditorControllerImpl implements EditorController {
     this.renderConfirmation();
     this.renderGroupPicker();
     this.renderTestConsole();
+    this.syncConsolePageChrome();
+    const leavingConsole = this.pendingConsoleLeave;
+    this.pendingConsoleLeave = false;
     this.restoreFocus();
     this.focusRequest = undefined;
+    if (leavingConsole) this.options.onLeaveConsole?.();
   }
 
   private renderHeader(): void {
@@ -2905,19 +2926,22 @@ class EditorControllerImpl implements EditorController {
     searchWrap.append(searchLabel, this.searchResults);
     const railTools = this.document.createElement("div");
     railTools.dataset.railTools = "true";
-    const testBtn = this.createButton("Console", "route:test");
-    testBtn.dataset.route = "test";
-    testBtn.dataset.editorKey = "route:test";
-    testBtn.dataset.btn = "secondary";
-    testBtn.disabled = this.saving;
-    testBtn.setAttribute("aria-label", "Test console");
-    testBtn.setAttribute("aria-haspopup", "dialog");
-    testBtn.setAttribute(
-      "aria-expanded",
-      this.testConsoleOpen ? "true" : "false",
-    );
-    testBtn.setAttribute("aria-controls", `${this.instanceId}-test-console`);
-    railTools.append(testBtn, searchWrap);
+    if (this.consoleSurface === "dialog") {
+      const testBtn = this.createButton("Console", "route:test");
+      testBtn.dataset.route = "test";
+      testBtn.dataset.editorKey = "route:test";
+      testBtn.dataset.btn = "secondary";
+      testBtn.disabled = this.saving;
+      testBtn.setAttribute("aria-label", "Test console");
+      testBtn.setAttribute("aria-haspopup", "dialog");
+      testBtn.setAttribute(
+        "aria-expanded",
+        this.testConsoleOpen ? "true" : "false",
+      );
+      testBtn.setAttribute("aria-controls", `${this.instanceId}-test-console`);
+      railTools.append(testBtn);
+    }
+    railTools.append(searchWrap);
     this.rail.append(railTools);
   }
 
@@ -4479,6 +4503,34 @@ class EditorControllerImpl implements EditorController {
     fields.append(group);
   }
 
+  setConsolePage(open: boolean): void {
+    if (this.destroyed || this.consoleSurface !== "page") return;
+    if (this.testConsoleOpen === open) return;
+    // Host-driven. A navigation close is the only path that tells the host.
+    this.pendingConsoleLeave = false;
+    this.groupPickerOpen = false;
+    this.testConsoleOpen = open;
+    if (open) this.focusRequest = "test-urls";
+    this.render();
+  }
+
+  /** Close the console because the user left it for a rule, field, or route. */
+  private releaseConsolePage(): void {
+    if (this.consoleSurface === "page" && this.testConsoleOpen) {
+      this.pendingConsoleLeave = true;
+    }
+    this.testConsoleOpen = false;
+  }
+
+  private syncConsolePageChrome(): void {
+    const page = this.consoleSurface === "page" && this.testConsoleOpen;
+    this.rail.hidden = page;
+    this.header.hidden = page;
+    this.status.hidden = page;
+    this.summary.hidden = page;
+    this.form.hidden = page;
+  }
+
   private openTestConsole(): void {
     this.groupPickerOpen = false;
     this.testConsoleOpen = true;
@@ -4487,12 +4539,13 @@ class EditorControllerImpl implements EditorController {
   }
 
   private closeTestConsole(): void {
+    if (this.consoleSurface === "page") return;
     if (this.testRunning) {
       this.testRequestId += 1;
       this.testRunning = false;
       this.testNotice = "";
     }
-    this.testConsoleOpen = false;
+    this.releaseConsolePage();
     this.focusRequest = "route:test";
     this.render();
   }
@@ -4543,6 +4596,13 @@ class EditorControllerImpl implements EditorController {
 
   private renderTestConsole(): void {
     this.host.querySelector("[data-test-console]")?.remove();
+    this.host.querySelector("[data-test-page]")?.remove();
+    if (this.consoleSurface === "page") {
+      if ("inert" in this.layout) this.layout.inert = false;
+      if (!this.testConsoleOpen) return;
+      this.main.append(this.buildTestPage());
+      return;
+    }
     if ("inert" in this.layout) this.layout.inert = this.testConsoleOpen;
     if (!this.testConsoleOpen) return;
 
@@ -4584,8 +4644,33 @@ class EditorControllerImpl implements EditorController {
     this.host.append(overlay);
   }
 
+  private buildTestPage(): HTMLElement {
+    const page = this.document.createElement("section");
+    page.dataset.testPage = "true";
+    page.id = `${this.instanceId}-test-console`;
+    const head = this.document.createElement("div");
+    head.dataset.testPageHead = "true";
+    const kicker = this.document.createElement("p");
+    kicker.dataset.testKicker = "true";
+    kicker.textContent = "Offline match";
+    const heading = this.document.createElement("h2");
+    heading.id = `${this.instanceId}-test-console-title`;
+    heading.textContent = "Test console";
+    page.setAttribute("aria-labelledby", heading.id);
+    const description = this.document.createElement("p");
+    description.dataset.testDescription = "true";
+    description.textContent =
+      "Check whether these URLs match your rules. Nothing is contacted, and nothing is saved.";
+    head.append(kicker, heading, description);
+    const body = this.document.createElement("div");
+    body.dataset.testPageBody = "true";
+    this.renderTestBody(body);
+    page.append(head, body);
+    return page;
+  }
+
   private openGroupPicker(): void {
-    this.testConsoleOpen = false;
+    this.releaseConsolePage();
     this.groupPickerOpen = true;
     this.focusRequest =
       this.draft.groups.length > 0

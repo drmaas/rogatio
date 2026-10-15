@@ -1,5 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
-import { createExtensionPageModel } from "../src/extension-page.js";
+import {
+  createExtensionPageModel,
+  isManagementTab,
+  MANAGEMENT_TABS,
+} from "../src/extension-page.js";
+
+describe("management page destinations", () => {
+  it("puts Console last in the top bar", () => {
+    expect(MANAGEMENT_TABS.map(([tab, label]) => [tab, label])).toEqual([
+      ["dashboard", "Dashboard"],
+      ["history", "Match history"],
+      ["workspace", "Workspace"],
+      ["console", "Console"],
+    ]);
+    expect(MANAGEMENT_TABS.at(-1)?.[0]).toBe("console");
+    expect(isManagementTab("console")).toBe(true);
+    expect(isManagementTab("test")).toBe(false);
+    expect(isManagementTab(undefined)).toBe(false);
+  });
+});
 
 describe("F7 extension page model", () => {
   it("does not switch when only the pending selector changes", () => {

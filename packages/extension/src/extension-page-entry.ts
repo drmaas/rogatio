@@ -14,6 +14,11 @@ import {
   nativeHostOriginMismatchMessage,
   runtimeInstallCommand,
 } from "./extension-id.js";
+import {
+  isManagementTab,
+  MANAGEMENT_TABS,
+  type ManagementTab,
+} from "./extension-page.js";
 import { type MatchHistoryEntry, readMatchHistory } from "./match-history.js";
 import {
   bindMatchHistoryFeed,
@@ -167,7 +172,7 @@ const client: MessageClient = {
 
 let state: Envelope = { projects: {}, activeProjectId: null };
 let pendingProjectId: string | null = null;
-let activeTab: "dashboard" | "workspace" | "history" = "dashboard";
+let activeTab: ManagementTab = "dashboard";
 let matchHistoryEntries: readonly MatchHistoryEntry[] = [];
 let editor: EditorController | undefined;
 /** True once an editor has been mounted, to tell navigation from a rebuild. */
@@ -539,8 +544,10 @@ function statusForRule(groupId: string, ruleId: string): string | undefined {
  *
  * On the workspace path it never calls `renderShell()`. The mounted editor is
  * the user's unsaved work, and rule navigation is a sidebar state change, so
- * the sidebar is replaced on its own. The dashboard path has no mounted editor
- * to preserve, so it remounts and lets the mount path apply the link.
+ * the sidebar is replaced on its own. Console uses that same editor, so a rule
+ * link from the console page keeps the draft and closes the page. Dashboard
+ * and Match history have no mounted editor to preserve, so they remount and
+ * let the mount path apply the link.
  */
 function navigateToRuleDeepLink(
   groupId: string,
@@ -554,9 +561,18 @@ function navigateToRuleDeepLink(
       ruleDeepLink(groupId, ruleId),
     );
   }
+  if (activeTab === "console" && editor) {
+    // Console is the same mounted editor. Keep the draft; rule navigation
+    // closes the page and this switch reveals Workspace around it.
+    activeTab = "workspace";
+    syncEditorTabChrome();
+    editor.navigateToRule(groupId, ruleId);
+    return;
+  }
   if (activeTab !== "workspace") {
-    // Coming from the dashboard means there is no mounted editor to preserve.
-    // `renderShell` applies the deep link on mount, so do not navigate twice.
+    // Coming from Dashboard or Match history means there is no mounted editor
+    // to preserve. `renderShell` applies the deep link on mount, so do not
+    // navigate twice.
     activeTab = "workspace";
     renderShell();
     return;
@@ -882,12 +898,7 @@ function renderTopbar(shell: HTMLElement): void {
 
   const tabs = document.createElement("div");
   tabs.className = "rogatio-tabs";
-  const destinations = [
-    ["dashboard", "Dashboard"],
-    ["history", "Match history"],
-    ["workspace", "Workspace"],
-  ] as const;
-  for (const [tab, label] of destinations) {
+  for (const [tab, label] of MANAGEMENT_TABS) {
     const tabButton = document.createElement("button");
     tabButton.type = "button";
     tabButton.textContent = label;
@@ -1417,6 +1428,63 @@ function renderMatchHistory(shell: HTMLElement): void {
   shell.append(historyPanel());
 }
 
+function renderConsole(main: HTMLElement): void {
+  if (ids().length === 0) {
+    const empty = document.createElement("p");
+    empty.dataset.consoleEmpty = "true";
+    empty.textContent = "Open a project to test its rules.";
+    main.append(empty);
+    return;
+  }
+  const editorRoot = document.createElement("div");
+  editorRoot.dataset.editorRoot = "true";
+  main.append(editorRoot);
+}
+
+function editorTab(tab: ManagementTab): tab is "workspace" | "console" {
+  return tab === "workspace" || tab === "console";
+}
+
+/**
+ * Workspace and Console share one editor. Moving between them updates the
+ * top bar and sidebar without `renderShell()`, which is what destroys a draft.
+ */
+function syncEditorTabChrome(): void {
+  const shell = root.querySelector(".rogatio-shell");
+  if (!(shell instanceof HTMLElement)) return;
+  for (const button of shell.querySelectorAll<HTMLButtonElement>(
+    ".rogatio-tabs button[data-tab]",
+  )) {
+    if (button.dataset.tab === activeTab) {
+      button.setAttribute("aria-current", "true");
+    } else {
+      button.removeAttribute("aria-current");
+    }
+  }
+  const layout = shell.querySelector(".rogatio-layout");
+  if (!(layout instanceof HTMLElement)) return;
+  layout.dataset.view = activeTab;
+  const sidebar = layout.querySelector(":scope > .rogatio-sidebar");
+  if (activeTab === "workspace") {
+    if (!sidebar) layout.prepend(createSidebar());
+  } else if (sidebar) {
+    sidebar.remove();
+  }
+}
+
+function activateTab(tab: ManagementTab): void {
+  if (tab === activeTab) return;
+  const previous = activeTab;
+  if (editor && editorTab(previous) && editorTab(tab) && ids().length > 0) {
+    activeTab = tab;
+    syncEditorTabChrome();
+    editor.setConsolePage(tab === "console");
+    return;
+  }
+  activeTab = tab;
+  renderShell();
+}
+
 function renderShell(): void {
   // Both rebuild paths restore focus: `renderShell` for a clean editor and
   // `patchWorkspaceEnablementChrome` for a dirty one. Without this the focused
@@ -1489,6 +1557,8 @@ function renderShell(): void {
     renderOverview(main);
   } else if (activeTab === "history") {
     renderMatchHistory(main);
+  } else if (activeTab === "console") {
+    renderConsole(main);
   } else {
     const editorRoot = document.createElement("div");
     editorRoot.dataset.editorRoot = "true";
@@ -1537,9 +1607,8 @@ function renderShell(): void {
       return;
     }
     const tab = target.dataset.tab;
-    if (tab === "dashboard" || tab === "workspace" || tab === "history") {
-      activeTab = tab;
-      renderShell();
+    if (isManagementTab(tab)) {
+      activateTab(tab);
       return;
     }
     const commandTarget = target.closest<HTMLElement>("[data-command]");
@@ -1654,7 +1723,10 @@ function renderShell(): void {
     "change",
     () => void importProject(importControl),
   );
-  if (activeTab === "workspace" && ids().length > 0) {
+  if (
+    (activeTab === "workspace" || activeTab === "console") &&
+    ids().length > 0
+  ) {
     const editorRoot = shell.querySelector<HTMLElement>("[data-editor-root]");
     if (editorRoot) {
       editor = createEditor({
@@ -1747,6 +1819,11 @@ function renderShell(): void {
           { command: "export", label: "Export project" },
           { command: "remove", label: "Remove project", tone: "danger" },
         ],
+        consoleSurface: "page",
+        onLeaveConsole() {
+          if (activeTab !== "console") return;
+          activateTab("workspace");
+        },
         mountProjectDetails(parent) {
           const saved = state.activeProjectId
             ? state.projects[state.activeProjectId]?.mockFileRoot
@@ -1781,6 +1858,7 @@ function renderShell(): void {
       } else {
         editorHasMounted = true;
       }
+      if (activeTab === "console") editor.setConsolePage(true);
     }
   }
 

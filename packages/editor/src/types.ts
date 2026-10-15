@@ -251,6 +251,20 @@ export interface EditorOptions {
    * The editor does not read or save what the host mounts here.
    */
   readonly mountProjectDetails?: (parent: HTMLElement) => void;
+  /**
+   * Where the Test console is drawn.
+   * - `"dialog"` (default): the rail button opens a dialog over the current
+   *   page. `rogatio edit` uses this.
+   * - `"page"`: the host owns the button. `setConsolePage` shows the same
+   *   console as the editor's page, with no dialog and no rail button. The
+   *   extension management page uses this.
+   */
+  readonly consoleSurface?: "dialog" | "page";
+  /**
+   * Called after a page-surface console navigates to a rule or a field.
+   * The host shows Workspace. Not called when the host closes the page.
+   */
+  readonly onLeaveConsole?: () => void;
 }
 
 export interface EditorController {
@@ -274,6 +288,11 @@ export interface EditorController {
     groupId: string | null | undefined,
     ruleId: string | null | undefined,
   ): void;
+  /**
+   * Show or hide the Test console page. No-op unless `consoleSurface` is
+   * `"page"`. URLs, method, resource type, and results stay on this instance.
+   */
+  setConsolePage(open: boolean): void;
 }
 
 export type UrlConversionResult =

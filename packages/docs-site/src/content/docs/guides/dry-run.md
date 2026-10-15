@@ -27,7 +27,7 @@ Test console, and the extension Workspace.
 
 ## Using it
 
-Open **Console** in the top bar. The dialog says “Check whether these URLs match your rules. Nothing
+Open **Console**. In `rogatio edit` it sits in the top bar and opens a dialog. In the extension it is the right-most management-page destination and opens a full page. Either way it says “Check whether these URLs match your rules. Nothing
 is contacted, and nothing is saved.” Enter one URL per line and click **Run test**. The
 default case is a page load (GET), and the form says “Checking these as page loads (GET).”
 Choose **Any method** or **Any resource type** only when you want that constraint left
