@@ -1,3 +1,9 @@
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type AICompletionOptions,
@@ -349,4 +355,216 @@ describe("ai-client", () => {
       await expect(iterator.next()).rejects.toThrow(/aborted/i);
     });
   });
+});
+
+interface LocalServer {
+  server: Server;
+  origin: string;
+  port: number;
+  connections: () => number;
+  requests: Array<{
+    url: string | undefined;
+    authorization: string | undefined;
+  }>;
+}
+
+function listen(
+  handler: (req: IncomingMessage, res: ServerResponse) => void,
+): Promise<LocalServer> {
+  const requests: LocalServer["requests"] = [];
+  let connections = 0;
+  const server = createServer((req, res) => {
+    requests.push({
+      url: req.url,
+      authorization: req.headers.authorization,
+    });
+    handler(req, res);
+  });
+  server.on("connection", () => {
+    connections += 1;
+  });
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address();
+      if (addr === null || typeof addr === "string") {
+        reject(new Error("no address"));
+        return;
+      }
+      resolve({
+        server,
+        port: addr.port,
+        origin: `http://127.0.0.1:${addr.port}`,
+        connections: () => connections,
+        requests,
+      });
+    });
+  });
+}
+
+function closeServer(server: Server): Promise<void> {
+  server.closeAllConnections();
+  return new Promise((resolve) => {
+    server.close(() => resolve());
+  });
+}
+
+const completionBody = JSON.stringify({
+  choices: [{ message: { content: "ok-completion" } }],
+  usage: { prompt_tokens: 3, completion_tokens: 4 },
+});
+
+const streamBody = [
+  `data: ${JSON.stringify({
+    choices: [{ delta: { content: "ok-chunk" }, finish_reason: null }],
+  })}`,
+  "",
+  `data: ${JSON.stringify({
+    choices: [{ delta: {}, finish_reason: "stop" }],
+    usage: { prompt_tokens: 1, completion_tokens: 2 },
+  })}`,
+  "",
+  "data: [DONE]",
+  "",
+].join("\n");
+
+async function readClient(
+  mode: "complete" | "stream",
+  origin: string,
+): Promise<string> {
+  const client = createAIClient({
+    providerUrl: origin,
+    model: "m",
+    apiKey: "sk-configured-only",
+  });
+  if (mode === "complete") {
+    const result = await client.complete({
+      messages: [{ role: "user", content: "Hello" }],
+      model: "m",
+    });
+    return result.content;
+  }
+  let text = "";
+  for await (const chunk of client.stream({
+    messages: [{ role: "user", content: "Hello" }],
+    model: "m",
+  })) {
+    text += chunk.delta;
+  }
+  return text;
+}
+
+describe("ai-client stays on the configured URL", () => {
+  it("returns a completion from a direct 200 and sends the API key on that request", async () => {
+    const provider = await listen((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(completionBody);
+    });
+    try {
+      const content = await readClient("complete", provider.origin);
+      expect(content).toBe("ok-completion");
+      expect(provider.requests).toEqual([
+        {
+          url: "/chat/completions",
+          authorization: "Bearer sk-configured-only",
+        },
+      ]);
+      expect(provider.connections()).toBe(1);
+    } finally {
+      await closeServer(provider.server);
+    }
+  });
+
+  it("returns a stream from a direct 200 and sends the API key on that request", async () => {
+    const provider = await listen((_req, res) => {
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      res.end(streamBody);
+    });
+    try {
+      const content = await readClient("stream", provider.origin);
+      expect(content).toBe("ok-chunk");
+      expect(provider.requests).toEqual([
+        {
+          url: "/chat/completions",
+          authorization: "Bearer sk-configured-only",
+        },
+      ]);
+      expect(provider.connections()).toBe(1);
+    } finally {
+      await closeServer(provider.server);
+    }
+  });
+
+  for (const status of [302, 307] as const) {
+    for (const mode of ["complete", "stream"] as const) {
+      it(`fails a ${status} from ${mode} without connecting to the local target`, async () => {
+        const targetBody = `target-body-${status}`;
+        const sourceBody = `source-body-${status}`;
+        const target = await listen((_req, res) => {
+          res.writeHead(200, { "content-type": "text/plain" });
+          res.end(targetBody);
+        });
+        const provider = await listen((_req, res) => {
+          res.writeHead(status, {
+            location: `${target.origin}/collected`,
+            "content-type": "text/plain",
+          });
+          res.end(sourceBody);
+        });
+        try {
+          let caught: unknown;
+          try {
+            await readClient(mode, provider.origin);
+          } catch (error) {
+            caught = error;
+          }
+          expect(caught).toBeInstanceOf(Error);
+          const error = caught as Error;
+          expect(error.message).toBe(`HTTP ${status}`);
+          expect(error.message).not.toContain(sourceBody);
+          expect(error.message).not.toContain(targetBody);
+          expect(String(error)).not.toContain(target.origin);
+          expect(String(error)).not.toContain("/collected");
+          expect(error.cause).toBeUndefined();
+          expect(target.connections()).toBe(0);
+          expect(target.requests).toEqual([]);
+          expect(provider.requests).toEqual([
+            {
+              url: "/chat/completions",
+              authorization: "Bearer sk-configured-only",
+            },
+          ]);
+        } finally {
+          await closeServer(provider.server);
+          await closeServer(target.server);
+        }
+      });
+    }
+  }
+
+  for (const mode of ["complete", "stream"] as const) {
+    it(`omits the response body from a non-OK ${mode} error`, async () => {
+      const body = "provider-error-body-not-for-the-message";
+      const provider = await listen((_req, res) => {
+        res.writeHead(400, { "content-type": "text/plain" });
+        res.end(body);
+      });
+      try {
+        let caught: unknown;
+        try {
+          await readClient(mode, provider.origin);
+        } catch (error) {
+          caught = error;
+        }
+        expect(caught).toBeInstanceOf(Error);
+        const error = caught as Error;
+        expect(error.message).toBe("HTTP 400");
+        expect(error.message).not.toContain(body);
+        expect(String(error)).not.toContain(body);
+        expect(provider.requests).toHaveLength(1);
+      } finally {
+        await closeServer(provider.server);
+      }
+    });
+  }
 });

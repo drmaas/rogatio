@@ -49,9 +49,22 @@ function calculateRetryDelay(attempt: number): number {
   return RETRY_DELAY_BASE * 2 ** attempt + Math.random() * 100;
 }
 
-async function fetchWithRetry(
+function providerStatusError(status: number): Error {
+  return new Error(`HTTP ${status}`);
+}
+
+async function releaseResponse(response: Response): Promise<void> {
+  await response.body?.cancel().catch(() => undefined);
+}
+
+/**
+ * Fetch the configured provider URL.
+ * Redirects are not followed: a 3xx status fails with that status alone.
+ */
+async function fetchProvider(
   url: string,
   init: RequestInit,
+  timeoutMs: number,
   signal?: AbortSignal,
 ): Promise<Response> {
   let lastError: Error | undefined;
@@ -61,39 +74,46 @@ async function fetchWithRetry(
       throw new DOMException("Aborted", "AbortError");
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    if (signal) {
+      signal.addEventListener("abort", () => controller.abort());
+    }
+
+    let terminalStatus: number | undefined;
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), COMPLETE_TIMEOUT);
-
-      if (signal) {
-        signal.addEventListener("abort", () => controller.abort());
-      }
-
       const response = await fetch(url, {
         ...init,
+        // Stay on the configured URL. A 3xx response is not followed.
+        redirect: "manual",
         signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
 
-      if (response.ok) {
+      if (response.status >= 300 && response.status <= 399) {
+        await releaseResponse(response);
+        terminalStatus = response.status;
+      } else if (response.ok) {
         return response;
-      }
+      } else {
+        // Retry on 429 (rate limit) and 5xx errors
+        const shouldRetry = response.status === 429 || response.status >= 500;
+        if (shouldRetry && attempt < MAX_RETRIES) {
+          await releaseResponse(response);
+          const retryAfter = response.headers.get("Retry-After");
+          const delay = retryAfter
+            ? parseInt(retryAfter, 10) * 1000
+            : calculateRetryDelay(attempt);
+          await sleep(Math.min(delay, 10_000));
+          continue;
+        }
 
-      // Retry on 429 (rate limit) and 5xx errors
-      const shouldRetry = response.status === 429 || response.status >= 500;
-      if (shouldRetry && attempt < MAX_RETRIES) {
-        const retryAfter = response.headers.get("Retry-After");
-        const delay = retryAfter
-          ? parseInt(retryAfter, 10) * 1000
-          : calculateRetryDelay(attempt);
-        await sleep(Math.min(delay, 10_000));
-        continue;
+        await releaseResponse(response);
+        terminalStatus = response.status;
       }
-
-      const errorText = await response.text().catch(() => "");
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
     } catch (e) {
+      clearTimeout(timeoutId);
       lastError = e as Error;
       if (e instanceof DOMException && e.name === "AbortError") {
         throw e;
@@ -103,70 +123,30 @@ async function fetchWithRetry(
         continue;
       }
       throw e;
+    }
+
+    if (terminalStatus !== undefined) {
+      throw providerStatusError(terminalStatus);
     }
   }
 
   throw lastError;
 }
 
-async function fetchStreamWithRetry(
+function fetchWithRetry(
   url: string,
   init: RequestInit,
   signal?: AbortSignal,
 ): Promise<Response> {
-  let lastError: Error | undefined;
+  return fetchProvider(url, init, COMPLETE_TIMEOUT, signal);
+}
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (signal?.aborted) {
-      throw new DOMException("Aborted", "AbortError");
-    }
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), STREAM_TIMEOUT);
-
-      if (signal) {
-        signal.addEventListener("abort", () => controller.abort());
-      }
-
-      const response = await fetch(url, {
-        ...init,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        return response;
-      }
-
-      // Retry on 429 (rate limit) and 5xx errors
-      const shouldRetry = response.status === 429 || response.status >= 500;
-      if (shouldRetry && attempt < MAX_RETRIES) {
-        const retryAfter = response.headers.get("Retry-After");
-        const delay = retryAfter
-          ? parseInt(retryAfter, 10) * 1000
-          : calculateRetryDelay(attempt);
-        await sleep(Math.min(delay, 10_000));
-        continue;
-      }
-
-      const errorText = await response.text().catch(() => "");
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
-    } catch (e) {
-      lastError = e as Error;
-      if (e instanceof DOMException && e.name === "AbortError") {
-        throw e;
-      }
-      if (attempt < MAX_RETRIES && (e as Error).name !== "AbortError") {
-        await sleep(calculateRetryDelay(attempt));
-        continue;
-      }
-      throw e;
-    }
-  }
-
-  throw lastError;
+function fetchStreamWithRetry(
+  url: string,
+  init: RequestInit,
+  signal?: AbortSignal,
+): Promise<Response> {
+  return fetchProvider(url, init, STREAM_TIMEOUT, signal);
 }
 
 function sanitizeResponse(text: string): string {
