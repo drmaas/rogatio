@@ -2628,12 +2628,7 @@ class EditorControllerImpl implements EditorController {
   navigateToGroup(groupId: string | null | undefined): void {
     this.groupPickerOpen = false;
     this.releaseConsolePage();
-    const groupIds = new Set(
-      this.draft.groups
-        .map((group) => (typeof group.id === "string" ? group.id : ""))
-        .filter((id) => id.length > 0),
-    );
-    const resolved = resolveGroupRoute(groupId, groupIds);
+    const resolved = resolveGroupRoute(groupId, this.draftGroupIds());
     if (resolved.kind === "group") {
       this.route = { kind: "group", groupId: resolved.groupId };
     } else {
@@ -2642,6 +2637,41 @@ class EditorControllerImpl implements EditorController {
     this.testRequestId += 1;
     this.statusMessage = "";
     this.render();
+  }
+
+  syncRoute(groupId: string | null | undefined): void {
+    if (this.destroyed) return;
+    const resolved = resolveGroupRoute(groupId, this.draftGroupIds());
+    const next: Route =
+      resolved.kind === "group"
+        ? { kind: "group", groupId: resolved.groupId }
+        : { kind: "project" };
+    if (this.sameRoute(this.route, next)) return;
+    this.groupPickerOpen = false;
+    this.route = next;
+    this.closeRenameOnLeave();
+    // The console page stays up. Rendering here would rebuild it and would
+    // also be the path that tells the host the user left.
+    if (this.consoleSurface === "page" && this.testConsoleOpen) return;
+    this.testRequestId += 1;
+    this.statusMessage = "";
+    this.render();
+  }
+
+  private draftGroupIds(): Set<string> {
+    return new Set(
+      this.draft.groups
+        .map((group) => (typeof group.id === "string" ? group.id : ""))
+        .filter((id) => id.length > 0),
+    );
+  }
+
+  private sameRoute(left: Route, right: Route): boolean {
+    if (left.kind === "project" && right.kind === "project") return true;
+    if (left.kind === "group" && right.kind === "group") {
+      return left.groupId === right.groupId;
+    }
+    return false;
   }
 
   syncGroupEnablement(enabledGroupIds: readonly string[]): void {

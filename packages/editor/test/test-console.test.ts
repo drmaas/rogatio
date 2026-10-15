@@ -621,4 +621,80 @@ describe("test console page", () => {
     );
     editor.destroy();
   });
+
+  it("follows a history entry with no group without leaving the page", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    let left = 0;
+    const editor = createEditor({
+      root,
+      initialProject: project,
+      validate: () => [],
+      save: () => ({ ok: true }),
+      consoleSurface: "page",
+      onLeaveConsole() {
+        left += 1;
+      },
+    });
+    const name = root.querySelector<HTMLInputElement>("[data-path='/name']");
+    if (!name) throw new Error("missing project name");
+    name.value = "Draft name";
+    name.dispatchEvent(new Event("input", { bubbles: true }));
+    editor.navigateToRule("ads", "old-path");
+    editor.setConsolePage(true);
+    typeUrl(root, "https://example.com/old");
+    editor.syncRoute(null);
+    expect(left).toBe(0);
+    expect(root.querySelector("[data-test-page]")).not.toBeNull();
+    expect(
+      root.querySelector<HTMLTextAreaElement>("[data-test-urls]")?.value,
+    ).toBe("https://example.com/old");
+    editor.setConsolePage(false);
+    expect(left).toBe(0);
+    expect(root.querySelector("[data-test-page]")).toBeNull();
+    expect(root.querySelector("[data-rule-card]")).toBeNull();
+    expect(
+      root.querySelector<HTMLInputElement>("[data-path='/name']")?.value,
+    ).toBe("Draft name");
+    expect(
+      root.querySelector("[data-command='open-group-picker']")?.textContent,
+    ).toBe("Groups");
+    editor.destroy();
+  });
+
+  it("does not scroll a rule the editor is already showing", () => {
+    const root = document.createElement("div");
+    document.body.append(root);
+    let left = 0;
+    const scrolls: string[] = [];
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function scrollIntoViewStub() {
+      scrolls.push(this.id);
+    };
+    try {
+      const editor = createEditor({
+        root,
+        initialProject: project,
+        validate: () => [],
+        save: () => ({ ok: true }),
+        consoleSurface: "page",
+        onLeaveConsole() {
+          left += 1;
+        },
+      });
+      editor.navigateToRule("ads", "old-path");
+      scrolls.length = 0;
+      editor.setConsolePage(true);
+      editor.syncRoute("ads");
+      editor.setConsolePage(false);
+      expect(left).toBe(0);
+      expect(scrolls).toEqual([]);
+      const card = root.querySelector("[data-rule-card]");
+      expect(card?.getAttribute("data-rule-id")).toBe("old-path");
+      expect(document.activeElement).not.toBe(card);
+      editor.destroy();
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+  });
 });

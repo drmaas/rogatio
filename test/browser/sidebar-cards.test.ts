@@ -434,6 +434,80 @@ test("rule link navigates to the rule and the URL reflects it", async ({
   expect(url).toContain("rule=rule-two");
 });
 
+test("Console follows Back and Forward and keeps the draft", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, sidebarEnvelope());
+  await openWorkspace(page);
+
+  await page.getByLabel("Project name").fill("Draft name");
+  await page.locator('[data-rule-link][data-rule-id="rule-two"]').click();
+  await expect(page.locator("[data-rule-card]")).toHaveAttribute(
+    "data-rule-id",
+    "rule-two",
+  );
+
+  await page.getByRole("button", { name: "Console", exact: true }).click();
+  await page.locator("[data-test-urls]").fill("https://one.example/kept");
+  await page.goBack();
+
+  expect(await page.url()).not.toContain("group=");
+  expect(await page.url()).not.toContain("rule=");
+  await expect(page.locator("[data-test-page]")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Console", exact: true }),
+  ).toHaveAttribute("aria-current", "true");
+  await expect(page.locator(".rogatio-sidebar")).toHaveCount(0);
+  await expect(page.locator("[data-test-urls]")).toHaveValue(
+    "https://one.example/kept",
+  );
+
+  await page.goForward();
+  expect(await page.url()).toContain("group=group-two");
+  expect(await page.url()).toContain("rule=rule-two");
+  await expect(page.locator("[data-test-page]")).toBeVisible();
+  await expect(page.locator("[data-test-urls]")).toHaveValue(
+    "https://one.example/kept",
+  );
+
+  await page.goBack();
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.locator("[data-test-page]")).toHaveCount(0);
+  await expect(page.locator("[data-rule-card]")).toHaveCount(0);
+  await expect(page.locator("[data-command='open-group-picker']")).toHaveText(
+    "Groups",
+  );
+  await expect(page.getByLabel("Project name")).toHaveValue("Draft name");
+  await expect(page.locator("[data-dirty-state]")).toHaveText(
+    "Unsaved changes",
+  );
+});
+
+test("returning to Workspace does not scroll back to the open rule", async ({
+  page,
+}) => {
+  await page.addInitScript(installChromeMock, sidebarEnvelope());
+  await openWorkspace(page);
+
+  await page.locator('[data-rule-link][data-rule-id="rule-two"]').click();
+  await expect(page.locator("[data-rule-card]")).toHaveAttribute(
+    "data-rule-id",
+    "rule-two",
+  );
+  await page.getByRole("button", { name: "Console", exact: true }).click();
+  await expect(page.locator("[data-test-page]")).toBeVisible();
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+
+  expect(await page.url()).toContain("rule=rule-two");
+  await expect(page.locator("[data-test-page]")).toHaveCount(0);
+  await expect(page.locator("[data-command='open-group-picker']")).toHaveText(
+    "Two",
+  );
+  const card = page.locator("[data-rule-card]");
+  await expect(card).toHaveAttribute("data-rule-id", "rule-two");
+  await expect(card).not.toBeFocused();
+});
+
 test("browser Back returns from a rule to the previous group", async ({
   page,
 }) => {

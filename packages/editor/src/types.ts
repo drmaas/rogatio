@@ -275,6 +275,17 @@ export interface EditorController {
   /** Deep-link the editor to a group's destination, falling back to Overview. */
   navigateToGroup(groupId: string | null | undefined): void;
   /**
+   * Point the mounted draft at a history destination without closing the
+   * console page and without `onLeaveConsole`.
+   *
+   * An empty `groupId` is the project page, which is what a history entry
+   * with no `group` parameter means. A group the editor already shows is left
+   * untouched, so revealing Workspace does not scroll a rule back into view.
+   * While the console page is open, the route is stored and the page stays
+   * up; the next render shows it.
+   */
+  syncRoute(groupId: string | null | undefined): void;
+  /**
    * Refresh heading Enable/Disable labels without re-rendering the draft.
    * Used when a dirty Workspace must keep unsaved edits mounted.
    */

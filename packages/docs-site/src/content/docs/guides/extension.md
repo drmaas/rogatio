@@ -23,7 +23,7 @@ pencil that opens the management page on that group. The popup also has **Match 
 **Import project** (a file picker that accepts any filename), and **Run checks**. **Run checks** in the popup also compares the current tab with enabled rules. The tab URL is not stored or sent. The popup has no editor, search, proxy, permission,
 or rule-authoring controls.
 
-The management page uses a **Dashboard** overview, a **Workspace** editor shell, a **Match history** feed, and a **Console** page. **Console** is the right-most item in the top bar, after **Match history**. It opens the Test console as a full page and keeps the draft you were editing in Workspace. The
+The management page uses a **Dashboard** overview, a **Workspace** editor shell, a **Match history** feed, and a **Console** page. **Console** is the right-most item in the top bar, after **Match history**. It opens the Test console as a full page and keeps the draft you were editing in Workspace. Back and Forward stay on Console and move that draft to the address bar, including when the address has no rule. The
 Workspace breadcrumb is the editor's project name and group link. The group link opens a
 picker. **Refresh**, **Export project**, and **Remove project** sit on Project details.
 **Mock files** sits there too. **Choose folder** opens a system directory dialog through the runtime host, and a pasted path must be a full path to an existing folder. A relative path is rejected next to the field.

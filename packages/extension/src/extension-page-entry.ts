@@ -545,9 +545,10 @@ function statusForRule(groupId: string, ruleId: string): string | undefined {
  * On the workspace path it never calls `renderShell()`. The mounted editor is
  * the user's unsaved work, and rule navigation is a sidebar state change, so
  * the sidebar is replaced on its own. Console uses that same editor, so a rule
- * link from the console page keeps the draft and closes the page. Dashboard
- * and Match history have no mounted editor to preserve, so they remount and
- * let the mount path apply the link.
+ * link from the console page keeps the draft and closes the page. History
+ * while Console is open does not come through here: that would leave the page.
+ * Dashboard and Match history have no mounted editor to preserve, so they
+ * remount and let the mount path apply the link.
  */
 function navigateToRuleDeepLink(
   groupId: string,
@@ -1478,6 +1479,11 @@ function activateTab(tab: ManagementTab): void {
   if (editor && editorTab(previous) && editorTab(tab) && ids().length > 0) {
     activeTab = tab;
     syncEditorTabChrome();
+    if (previous === "console" && tab === "workspace") {
+      // The URL was applied on Back/Forward. Applying it again is a no-op
+      // when the editor is already there, so this does not scroll to a rule.
+      syncMountedEditorRoute();
+    }
     editor.setConsolePage(tab === "console");
     return;
   }
@@ -2595,13 +2601,27 @@ async function removeProject(explicitId?: string): Promise<void> {
 // editor at a group or a rule.
 if (readRuleDeepLink()) activeTab = "workspace";
 
+/**
+ * Move the mounted editor to the current `?group=&rule=` URL without leaving
+ * Console and without the rule-click callback. An empty group is the project
+ * page. A route the editor already shows is skipped inside `syncRoute`.
+ */
+function syncMountedEditorRoute(): void {
+  const link = readRuleDeepLink();
+  editor?.syncRoute(link?.groupId ?? null);
+}
+
 // Browser Back and Forward after an in-page rule navigation. Resolving without
-// pushing keeps history from growing. Both directions reconcile the active tab
-// from the URL so Back and Forward behave symmetrically: a rule link means
-// Workspace, and no rule link means the view is left alone rather than silently
-// changing underneath the user.
+// pushing keeps history from growing. A rule link opens Workspace, except while
+// Console is open: that tab keeps the page up and only moves the mounted draft.
+// Dashboard and Match history have no draft to move, so a URL with no group
+// leaves them alone.
 window.addEventListener("popstate", () => {
   const link = readRuleDeepLink();
+  if (activeTab === "console" && editor) {
+    editor.syncRoute(link?.groupId ?? null);
+    return;
+  }
   if (link === null) {
     if (activeTab !== "workspace") return;
     editor?.navigateToGroup(null);
