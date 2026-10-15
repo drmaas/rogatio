@@ -13,7 +13,7 @@
 Rogatio is a local-first tool for creating, reviewing, and running browser request and
 response rules. It replaces scattered Requestly-style workflows with one
 version-controlled file, a CLI, and a Chrome extension. There are no accounts, no hosted
-runtime, no cloud sync, no telemetry, and no retained traffic history.
+runtime, no cloud sync, no telemetry, and no retained traffic history across browser sessions.
 
 - **One canonical file.** All rules live in a `.rogatio.json` file you keep in version
   control. Moving changes between the file and your browser is an explicit import/export.

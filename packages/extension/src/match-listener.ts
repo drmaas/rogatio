@@ -26,10 +26,10 @@ interface MatchAppendLiveFields {
 }
 
 /**
- * In-process post-lookup side-notify consumer (#204 history later).
+ * In-process post-lookup side-notify consumer.
  * Sync only — async console inject stays a separate hard-wired path so a
- * bad/slow side consumer cannot own delivery. Product path today: inject only;
- * no history store/UI registers here.
+ * bad/slow side consumer cannot own delivery. The service worker registers
+ * match history here. Console inject is not a consumer; it runs after notify.
  */
 export type MatchAppendConsumer = (
   entry: MatchIndexEntry,

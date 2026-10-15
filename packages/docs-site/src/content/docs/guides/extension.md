@@ -23,7 +23,7 @@ pencil that opens the management page on that group. The popup also has **Match 
 **Import project** (a file picker that accepts any filename), and **Run checks**. **Run checks** in the popup also compares the current tab with enabled rules. The tab URL is not stored or sent. The popup has no editor, search, proxy, permission,
 or rule-authoring controls.
 
-The management page uses a **Dashboard** overview and a **Workspace** editor shell. The
+The management page uses a **Dashboard** overview, a **Match history** feed, and a **Workspace** editor shell. The
 Workspace breadcrumb is the editor's project name and group link. The group link opens a
 picker. **Refresh**, **Export project**, and **Remove project** sit on Project details.
 **Mock files** sits there too. **Choose folder** opens a system directory dialog through the runtime host, and a pasted path must be a full path to an existing folder. A relative path is rejected next to the field.
@@ -96,6 +96,27 @@ fail-closed gate). Iframe/subframe matches depend on Chrome supplying a real tab
 id and successful top-frame injection. Matches that arrive while Chrome has the extension's
 service worker terminated and does not wake it are dropped; no keepalive is used.
 
-No match history or management-page feed is created.
+## Match history
+
+**Match history** sits next to **Dashboard** on the management page. It lists recent
+Rogatio rule matches from this browser session. Only matched rules appear (redirect,
+query, header, and body rules on the same match pipeline as console logging, plus mock
+when a mock redirect is installed). Unmatched network traffic is not listed. Matcher
+rules are not listed.
+
+The feed uses the same gates as console logging: unpacked loads only, the **Match
+logging** toggle, redaction, field bounds, and the same silent skips (`tabId === -1`,
+unknown rules, the mock allow-guard, and body rules whose markers were not installed).
+Each row shows the redacted URL, method, resource type, rule id, name, kind, initiator,
+and intended action. It does not show request or response bodies or wire header values.
+
+History is a ring of at most 100 rows in `chrome.storage.session`. Older rows drop off.
+**Clear** empties it. Turning **Match logging** off empties it too. Closing the browser
+session empties it. It is not saved in `.rogatio.json`, not kept in `storage.local` or
+sync, not included in project export, and not sent to the native host.
+
+When Match logging is off, the page says so. When it is on and nothing has matched yet,
+the page says there are no matches yet. Packed or store installs do not report matches,
+so the feed stays empty there.
 
 See [Platforms & capabilities](/reference/platforms/) for where each rule type runs.

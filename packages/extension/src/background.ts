@@ -7,6 +7,10 @@ import {
 } from "./chrome.js";
 import { createDnrInstaller } from "./dnr.js";
 import { isNativeHostOriginForbiddenMessage } from "./extension-id.js";
+import {
+  handleMatchHistoryMessage,
+  registerMatchHistory,
+} from "./match-history.js";
 import { registerMatchLogListener } from "./match-listener.js";
 import { removeMockRedirects } from "./mock-redirect.js";
 import type {
@@ -391,9 +395,11 @@ const application = createExtensionApplication({
   nativeRuntime: createNativeRuntimeAdapter(),
 });
 
+registerMatchHistory(api);
 registerMatchLogListener(api);
 
 api.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (handleMatchHistoryMessage(api, message, sendResponse)) return true;
   void application.handle(message).then(sendResponse);
   return true;
 });
