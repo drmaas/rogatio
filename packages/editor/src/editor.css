@@ -158,8 +158,12 @@
   min-width: 0;
 }
 /* Author `display` rules would otherwise beat the hidden attribute. */
-.rogatio-editor [hidden] {
-  display: none !important;
+.rogatio-editor [data-desktop-route-rail][hidden],
+.rogatio-editor [data-editor-header][hidden],
+.rogatio-editor [data-editor-status][hidden],
+.rogatio-editor [data-editor-summary][hidden],
+.rogatio-editor [data-editor-form][hidden] {
+  display: none;
 }
 .rogatio-editor [data-desktop-route-rail] {
   position: sticky;
