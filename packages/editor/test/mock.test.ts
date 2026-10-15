@@ -570,7 +570,7 @@ describe("@rogatio/editor mock rule lifecycle", () => {
     openListedGroup(root);
     root
       .querySelector<HTMLButtonElement>(
-        '[data-editor-command-bar] button[data-route="test"]',
+        '[data-rail-tools] button[data-route="test"]',
       )
       ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const urls = root.querySelector<HTMLTextAreaElement>("[data-test-urls]");

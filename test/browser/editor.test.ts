@@ -109,13 +109,13 @@ test("supports search, routes, CRUD, source-order reordering, and confirmation",
   await page.locator("[data-route-breadcrumb] [data-route='project']").click();
   await openEditorGroup(page, "group-two");
   await expect(
-    page.locator('[data-editor-command-bar] [data-command="move-group-up"]'),
+    page.locator('[data-editor-header] [data-command="move-group-up"]'),
   ).toHaveCount(0);
   await expect(
-    page.locator('[data-editor-command-bar] [data-command="move-group-down"]'),
+    page.locator('[data-editor-header] [data-command="move-group-down"]'),
   ).toHaveCount(0);
   await expect(
-    page.locator('[data-editor-command-bar] [data-command="add-rule"]'),
+    page.locator('[data-editor-header] [data-command="add-rule"]'),
   ).toHaveCount(0);
   await expect(
     page.locator('[data-section-heading] [data-command="add-rule"]'),
@@ -194,7 +194,7 @@ test("renders validation errors and never saves an invalid draft", async ({
 }) => {
   await page.getByLabel("Project name").fill("");
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-editor-header]")
     .getByRole("button", { name: "Validate" })
     .click();
 
@@ -204,7 +204,7 @@ test("renders validation errors and never saves an invalid draft", async ({
     "true",
   );
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-editor-header]")
     .getByRole("button", { name: "Save", exact: true })
     .click();
   expect(await page.evaluate(() => window.editorTest.saveCalls)).toHaveLength(
@@ -252,7 +252,7 @@ test("supports keyboard commands and exposes screen-reader error associations", 
   const projectName = page.getByLabel("Project name");
   await projectName.fill("");
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-editor-header]")
     .getByRole("button", { name: "Validate" })
     .focus();
   await page.keyboard.press("Enter");
@@ -265,7 +265,7 @@ test("supports keyboard commands and exposes screen-reader error associations", 
   );
 
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-editor-header]")
     .getByRole("button", { name: "Cancel" })
     .focus();
   await page.keyboard.press("Enter");
@@ -337,7 +337,7 @@ test("preserves draft on save failure and prevents pending-save races", async ({
   await page.getByLabel("Project name").fill("Retry project");
   await page.evaluate(() => window.editorTest.setSaveMode("fail"));
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-editor-header]")
     .getByRole("button", { name: "Save", exact: true })
     .click();
   await expect(page.getByRole("alert")).toContainText("could not save");
@@ -348,12 +348,12 @@ test("preserves draft on save failure and prevents pending-save races", async ({
 
   await page.evaluate(() => window.editorTest.setSaveMode("pending"));
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-editor-header]")
     .getByRole("button", { name: "Save", exact: true })
     .click();
   await expect(
     page
-      .locator("[data-editor-command-bar]")
+      .locator("[data-editor-header]")
       .getByRole("button", { name: "Cancel" }),
   ).toBeDisabled();
   await expect(page.locator("[data-action-dock]")).toHaveCount(0);
@@ -379,7 +379,7 @@ test("keeps route and mobile navigation accessible at narrow width and zoom", as
   await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
   await expect(
     page
-      .locator("[data-editor-command-bar]")
+      .locator("[data-editor-header]")
       .getByRole("button", { name: "Validate" }),
   ).toBeVisible();
   await page.getByLabel("Project name").focus();
@@ -635,13 +635,13 @@ test("selects the Query parameters rule type and round-trips the action through 
   await valueInput.fill("rogatio");
 
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-editor-header]")
     .getByRole("button", { name: "Validate" })
     .click();
   await expect(page.getByRole("alert")).toHaveCount(0);
 
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-editor-header]")
     .getByRole("button", { name: "Save", exact: true })
     .click();
   const saved = await page.evaluate(() => window.editorTest.saveCalls.at(-1));
@@ -719,7 +719,7 @@ test("runs one test, keeps misses collapsed, opens the named rule, and labels a 
   });
 
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-rail-tools]")
     .getByRole("button", { name: "Test console", exact: true })
     .click();
   await expect(
@@ -751,7 +751,7 @@ test("runs one test, keeps misses collapsed, opens the named rule, and labels a 
   ).toBeVisible();
 
   await page
-    .locator("[data-editor-command-bar]")
+    .locator("[data-rail-tools]")
     .getByRole("button", { name: "Test console", exact: true })
     .click();
   await expect(

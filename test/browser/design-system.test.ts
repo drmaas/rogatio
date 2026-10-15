@@ -432,7 +432,7 @@ test("extension shell renders the top bar, tabs, and project-card overview", asy
     page.locator("[data-card='rules'] [data-badge-state]"),
   ).toContainText("Active rules:");
   await expect(
-    page.locator("[data-editor-command-bar] [data-route='test']"),
+    page.locator("[data-rail-tools] [data-route='test']"),
   ).toBeVisible();
 
   await breadcrumb.locator("[data-command='open-group-picker']").click();

@@ -547,7 +547,7 @@ describe("rename focus after structural commands", () => {
         }),
     });
     openGroup(root, "group-one");
-    click(root, '[data-editor-command-bar] [data-command="ai-assist"]');
+    click(root, '[data-editor-header] [data-command="ai-assist"]');
     // The panel's Apply control applies the proposal.
     const apply = root.querySelector<HTMLButtonElement>(
       '[data-ai-apply], [data-command="ai-apply"]',
@@ -827,7 +827,7 @@ describe("generated identity", () => {
     );
     groupRename(root).click();
     type(openGroupEditor(root), "UNCOMMITTED");
-    click(root, '[data-editor-command-bar] [data-command="cancel"]');
+    click(root, '[data-editor-header] [data-command="cancel"]');
     click(root, '[data-command="confirm-cancel"]');
     expect(root.querySelector("[data-rename-input]")).toBeNull();
   });
@@ -918,7 +918,7 @@ describe("generated identity", () => {
       save: () => ({ ok: true }),
       groupEnablement: { isEnabled: () => false, setEnabled: () => undefined },
     });
-    click(root, '[data-editor-command-bar] [data-command="validate"]');
+    click(root, '[data-editor-header] [data-command="validate"]');
     const repair = root.querySelector<HTMLButtonElement>(
       '[data-command="repair-id"][data-repair-path="/groups/1/id"]',
     );
@@ -985,7 +985,7 @@ describe("generated identity", () => {
       groupEnablement: { isEnabled: () => false, setEnabled: () => undefined },
     });
     openGroup(root, "group-one");
-    click(root, '[data-editor-command-bar] [data-command="validate"]');
+    click(root, '[data-editor-header] [data-command="validate"]');
     click(
       root,
       '[data-command="repair-id"][data-repair-path="/groups/0/rules/1/id"]',
@@ -1041,7 +1041,7 @@ describe("name diagnostics", () => {
       ],
       save: () => ({ ok: true }),
     });
-    click(root, '[data-editor-command-bar] [data-command="validate"]');
+    click(root, '[data-editor-header] [data-command="validate"]');
     // The summary link is how a diagnostic is followed, and it navigates to the
     // owning group as well as focusing the field.
     click(root, '[data-error-path="/groups/1/name"]');
@@ -1099,7 +1099,7 @@ describe("name diagnostics", () => {
       ],
       save: () => ({ ok: true }),
     });
-    click(root, '[data-editor-command-bar] [data-command="validate"]');
+    click(root, '[data-editor-header] [data-command="validate"]');
     click(root, '[data-error-path="/groups/0/name"]');
     const input = openGroupEditor(root);
     type(input, "Repaired group name");
@@ -1149,7 +1149,7 @@ describe("name diagnostics", () => {
       ],
       save: () => ({ ok: true }),
     });
-    click(root, '[data-editor-command-bar] [data-command="validate"]');
+    click(root, '[data-editor-header] [data-command="validate"]');
     openGroup(root, "group-one");
     click(root, '[data-error-path="/groups/0/rules/0/name"]');
     const input = openRuleEditor(root, "rule-one");
@@ -1180,7 +1180,7 @@ describe("name diagnostics", () => {
       ],
       save: () => ({ ok: true }),
     });
-    click(root, '[data-editor-command-bar] [data-command="validate"]');
+    click(root, '[data-editor-header] [data-command="validate"]');
     click(root, '[data-error-path="/groups/0/rules/0"]');
     const input = root.querySelector<HTMLInputElement>(
       '[data-rule-card][data-rule-id="rule-one"] [data-rename-input]',
