@@ -42,7 +42,7 @@ export const FORBIDDEN_RESPONSE_HEADERS = Object.freeze([
   "via",
 ] as const);
 
-const FORBIDDEN_REQUEST_PREFIXES = Object.freeze(["proxy-", "sec-"]);
+export const FORBIDDEN_REQUEST_PREFIXES = Object.freeze(["proxy-", "sec-"]);
 
 export function isForbiddenHeader(
   name: string,

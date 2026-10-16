@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FORBIDDEN_REQUEST_HEADERS,
+  FORBIDDEN_REQUEST_PREFIXES,
   FORBIDDEN_RESPONSE_HEADERS,
   isForbiddenHeader,
 } from "../src/headers.js";
@@ -281,6 +282,8 @@ describe("@rogatio/schema", () => {
   it("exposes frozen, case-insensitive forbidden-header policies", () => {
     expect(Object.isFrozen(FORBIDDEN_REQUEST_HEADERS)).toBe(true);
     expect(Object.isFrozen(FORBIDDEN_RESPONSE_HEADERS)).toBe(true);
+    expect(Object.isFrozen(FORBIDDEN_REQUEST_PREFIXES)).toBe(true);
+    expect([...FORBIDDEN_REQUEST_PREFIXES]).toEqual(["proxy-", "sec-"]);
     expect(isForbiddenHeader("Host", "request")).toBe(true);
     expect(isForbiddenHeader("SEC-FETCH-SITE", "request")).toBe(true);
     expect(isForbiddenHeader("set-cookie", "response")).toBe(true);
