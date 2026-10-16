@@ -1,69 +1,36 @@
-const RESOURCE_TYPES = [
-  "main_frame",
-  "sub_frame",
-  "stylesheet",
-  "script",
-  "image",
-  "font",
-  "object",
-  "xmlhttprequest",
-  "fetch",
-  "media",
-  "websocket",
-  "manifest",
-  "other",
-] as const;
+import { diagnosticMessages } from "@rogatio/compiler";
+import {
+  FORBIDDEN_REQUEST_HEADERS,
+  FORBIDDEN_REQUEST_PREFIXES,
+  FORBIDDEN_RESPONSE_HEADERS,
+  HTTP_METHODS,
+  LIMITS,
+  RESOURCE_TYPES,
+} from "@rogatio/schema";
 
-const HTTP_METHODS = [
-  "GET",
-  "POST",
-  "PUT",
-  "PATCH",
-  "DELETE",
-  "HEAD",
-  "OPTIONS",
-  "CONNECT",
-  "TRACE",
-] as const;
-
-const FORBIDDEN_REQUEST_HEADERS = [
-  "accept-charset",
-  "accept-encoding",
-  "access-control-request-headers",
-  "access-control-request-method",
-  "connection",
-  "content-length",
-  "cookie",
-  "cookie2",
-  "date",
-  "dnt",
-  "expect",
-  "host",
-  "keep-alive",
-  "origin",
-  "referer",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
-  "via",
-] as const;
-
-const FORBIDDEN_RESPONSE_HEADERS = ["set-cookie", "set-cookie2"] as const;
+// browser-core owns the profile cap. Runtime must not import that package.
+const MAX_PROJECTS_PER_PROFILE = 64;
 
 function formatResourceTypes(): string {
-  return RESOURCE_TYPES.join(", ");
+  return [...RESOURCE_TYPES].join(", ");
 }
 
 function formatHttpMethods(): string {
-  return HTTP_METHODS.join(", ");
+  return [...HTTP_METHODS].join(", ");
 }
 
 function formatForbiddenHeaders(): string {
   return [
-    ...FORBIDDEN_REQUEST_HEADERS.map((h) => `request: ${h}`),
-    ...FORBIDDEN_RESPONSE_HEADERS.map((h) => `response: ${h}`),
+    ...FORBIDDEN_REQUEST_HEADERS.map((header) => `request: ${header}`),
+    ...FORBIDDEN_REQUEST_PREFIXES.map((prefix) => `request prefix: ${prefix}`),
+    ...FORBIDDEN_RESPONSE_HEADERS.map((header) => `response: ${header}`),
   ].join(", ");
+}
+
+function formatDiagnostics(): string {
+  return Object.entries(diagnosticMessages)
+    .map(([code, message]) => `- ${code} - ${message}`)
+    .join("\n");
 }
 
 function formatProjectContext(project: unknown): string {
@@ -100,9 +67,10 @@ ${formatResourceTypes()}
 ${formatHttpMethods()}
 
 ### Bounds
-- Max 64 projects per profile
-- Max 100 groups per project
-- Max 500 rules per project
+- Max ${MAX_PROJECTS_PER_PROFILE} projects per profile
+- Max ${LIMITS.maxGroups} groups per project
+- Max ${LIMITS.maxRulesPerGroup} rules per group
+- Max ${LIMITS.maxRulesPerProject} rules per project
 
 ## Rule Types
 
@@ -124,22 +92,7 @@ Replace-mode body may use URL captures. Regex-mode replacement strings use captu
 Replace-mode body may use URL captures. Regex-mode replacement strings use captures from the body pattern, not the source pattern.
 
 ## Compiler Diagnostic Codes (stable)
-- schema.required - Required project data is missing
-- schema.unknown-property - The project contains an unknown property
-- schema.invalid-type - A value has an invalid type
-- schema.invalid-format - A value has an invalid format
-- schema.invalid-value - A value is invalid
-- schema.out-of-range - A value is outside its allowed bounds
-- schema.invalid-structure - A value has invalid structure
-- schema.duplicate-id - Duplicate group or rule ID
-- schema.duplicate-name - Duplicate group or rule name; every group and rule name must be unique in the project
-- schema.rule-limit - The project contains too many rules
-- compiler.invariant - The compiler could not normalize the project
-- compiler.forbidden-header - The header is forbidden for this direction
-- compiler.header-value-required - A header value is required for set and append
-- compiler.header-value-unexpected - A header value is not allowed for remove
-- compiler.invalid-header-direction - Invalid header direction
-- compiler.invalid-header-operation - Invalid header operation
+${formatDiagnostics()}
 
 ## Current Project
 ${projectJson}

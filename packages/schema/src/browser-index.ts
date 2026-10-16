@@ -16,6 +16,7 @@ export { formatSha256, isSha256Digest } from "./digest.js";
 export type { HeaderDirection } from "./headers.js";
 export {
   FORBIDDEN_REQUEST_HEADERS,
+  FORBIDDEN_REQUEST_PREFIXES,
   FORBIDDEN_RESPONSE_HEADERS,
   isForbiddenHeader,
 } from "./headers.js";

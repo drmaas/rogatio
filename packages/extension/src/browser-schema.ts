@@ -36,6 +36,7 @@ export { hasControl } from "../../schema/src/control.js";
 export { formatSha256, isSha256Digest } from "../../schema/src/digest.js";
 export {
   FORBIDDEN_REQUEST_HEADERS,
+  FORBIDDEN_REQUEST_PREFIXES,
   FORBIDDEN_RESPONSE_HEADERS,
   isForbiddenHeader,
 } from "../../schema/src/headers.js";

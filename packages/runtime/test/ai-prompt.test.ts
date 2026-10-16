@@ -1,3 +1,12 @@
+import { diagnosticMessages } from "@rogatio/compiler";
+import {
+  FORBIDDEN_REQUEST_HEADERS,
+  FORBIDDEN_REQUEST_PREFIXES,
+  FORBIDDEN_RESPONSE_HEADERS,
+  HTTP_METHODS,
+  LIMITS,
+  RESOURCE_TYPES,
+} from "@rogatio/schema";
 import { describe, expect, it } from "vitest";
 import { buildSystemPrompt } from "../src/ai-prompt.js";
 
@@ -59,6 +68,23 @@ describe("ai-prompt", () => {
       expect(prompt.toLowerCase()).toContain("header");
     });
 
+    it("lists schema forbidden headers and request prefixes", () => {
+      const section = prompt.slice(
+        prompt.indexOf("### Forbidden Headers"),
+        prompt.indexOf("### Resource Types"),
+      );
+      for (const header of FORBIDDEN_REQUEST_HEADERS) {
+        expect(section).toContain(`request: ${header}`);
+      }
+      for (const header of FORBIDDEN_RESPONSE_HEADERS) {
+        expect(section).toContain(`response: ${header}`);
+      }
+      for (const prefix of FORBIDDEN_REQUEST_PREFIXES) {
+        expect(section).toContain(`request prefix: ${prefix}`);
+      }
+      expect(section).not.toContain("referer");
+    });
+
     it("includes source condition docs", () => {
       expect(prompt).toContain("source");
       expect(prompt).toContain('"url"');
@@ -71,10 +97,31 @@ describe("ai-prompt", () => {
       expect(prompt).toContain("xmlhttprequest");
     });
 
+    it("lists schema resource types without fetch or manifest", () => {
+      const line = [...RESOURCE_TYPES].join(", ");
+      expect(prompt).toContain(`### Resource Types\n${line}\n`);
+      expect(line.split(", ")).not.toContain("fetch");
+      expect(line.split(", ")).not.toContain("manifest");
+    });
+
     it("includes HTTP method enum", () => {
       expect(prompt).toContain("GET");
       expect(prompt).toContain("POST");
       expect(prompt).toContain("method");
+      expect(prompt).toContain(
+        `### HTTP Methods\n${[...HTTP_METHODS].join(", ")}\n`,
+      );
+    });
+
+    it("uses schema group and rule bounds", () => {
+      expect(prompt).toContain(
+        [
+          "- Max 64 projects per profile",
+          `- Max ${LIMITS.maxGroups} groups per project`,
+          `- Max ${LIMITS.maxRulesPerGroup} rules per group`,
+          `- Max ${LIMITS.maxRulesPerProject} rules per project`,
+        ].join("\n"),
+      );
     });
   });
 
@@ -115,28 +162,19 @@ describe("ai-prompt", () => {
       expect(prompt.toLowerCase()).toContain("code");
     });
 
-    it("lists every real compiler diagnostic code", () => {
+    it("lists every compiler diagnostic code", () => {
       // A code the compiler can never emit teaches the model nothing, and a code
       // it can emit but the prompt omits leaves the model unable to repair it.
-      const real = [
-        "schema.required",
-        "schema.unknown-property",
-        "schema.invalid-type",
-        "schema.invalid-format",
-        "schema.invalid-value",
-        "schema.out-of-range",
-        "schema.invalid-structure",
-        "schema.duplicate-id",
-        "schema.duplicate-name",
-        "schema.rule-limit",
-        "compiler.invariant",
-        "compiler.forbidden-header",
-        "compiler.header-value-required",
-        "compiler.header-value-unexpected",
-        "compiler.invalid-header-direction",
-        "compiler.invalid-header-operation",
-      ];
-      for (const code of real) expect(prompt).toContain(code);
+      const codes = Object.keys(diagnosticMessages);
+      expect(codes).toEqual(
+        expect.arrayContaining([
+          "compiler.mock-body-source",
+          "compiler.mock-forbidden-header",
+        ]),
+      );
+      for (const [code, message] of Object.entries(diagnosticMessages)) {
+        expect(prompt).toContain(`${code} - ${message}`);
+      }
     });
 
     it("does not list codes the compiler cannot emit", () => {
