@@ -135,8 +135,9 @@ The editor no longer embeds a CSS string in its controller; it ships
 it, mirroring the existing host-supplied validation and save ports. Hosts that mount
 `createEditor` must link the stylesheet:
 
-- CLI editor page links `/vendor/editor.css` and fonts at `/vendor/fonts/*` (new
-  confined routes on the edit server).
+- CLI editor page links `vendor/editor.css` relative to `/e/<session>/editor.html`.
+  The edit server serves that stylesheet and `vendor/fonts/*` only under the same
+  session prefix.
 - Extension `index.html` links `index.css` (editor) + `extension-page.css` (shell)
   and fonts at `/fonts/*`; `popup.html` links `popup.css`.
 - The browser test fixture links `/editor/index.css`.
@@ -385,8 +386,8 @@ The loopback listener remains narrowly scoped: exact authorized origins, bounded
 
 **2. Edit Command (`src/commands/edit.ts`)**
 - HTTP server (Node `http` module) bound to `127.0.0.1:0` (OS-assigned ephemeral port, or a fixed port via `--port`)
-- Static file serving for the editor page (`GET /editor.html`) and the `@rogatio/editor` browser bundle (`GET /vendor/editor.js`, `GET /vendor/editor.css`, `GET /vendor/fonts/*`)
-- API endpoints:
+- Static file serving for the editor page and the `@rogatio/editor` browser bundle, only under `/e/<session>/` (`editor.html`, `vendor/editor.js`, `vendor/editor.css`, `vendor/fonts/*`)
+- API endpoints, only under the same `/e/<session>/` prefix:
   - `GET /api/project` → returns current project JSON
   - `POST /api/validate` → runs schema + compiler validation through `diagnoseProject`
   - `POST /api/save` → writes project to file
@@ -396,7 +397,7 @@ The loopback listener remains narrowly scoped: exact authorized origins, bounded
   - `POST /api/ai/stream` → streaming AI completion (SSE)
   - `POST /api/ai/assist` → validated Assist proposal via `runAIAssist` (editor contract; uses configured model; fix requests validate the repaired project)
 - Cross-platform browser launch (macOS `open`, Linux `xdg-open`, Windows `start`)
-- CSRF protection via random token in HTML and validated on mutating endpoints
+- Session scoping: a 128-bit token (`randomBytes(16)` hex) is placed only in the URL `rogatio edit` opens and prints (`/e/<token>/editor.html`). The editor page reads that prefix for its fetches and does not embed the token. Requests without the matching path token get an empty 404. The path token is compared in constant time. The Host allowlist stays `127.0.0.1:<port>` and `localhost:<port>`. POST also requires `Origin` to be exactly `http://127.0.0.1:<port>` or `http://localhost:<port>` (a missing Origin is rejected). The editor document is sent with `Referrer-Policy: no-referrer`. POST still checks `X-CSRF-Token` against the same session token.
 - Cleanup on SIGINT/SIGTERM, save, cancel, or browser close detection
 
 **3. Verify Command (`src/commands/verify.ts`)**
@@ -437,11 +438,12 @@ The loopback listener remains narrowly scoped: exact authorized origins, bounded
 - AI provider metadata: the host answers the additive `ai.status` envelope with `{ configured, providerUrl?, model? }`, built from a pick-type so the API key never crosses the native boundary. The management page's AI capability check is metadata-only — one `ai.status` request, no completion probe, and no provider network call. An older host drops the unknown `ai.status` frame and the card reports `not reported` rather than an error; the bounded wait keeps a stale host from slowing the page. The host re-reads `provider.json` on every AI envelope (`ai.status`, `ai.complete`, `ai.stream.chunk`) and rebuilds its AI client when the content changed, so `rogatio ai setup` takes effect without a host restart and the card can never disagree with the client in force. The project schema carries no AI metadata; host config is the single source of truth.
 
 **9. Editor Hosting (`src/server/`, `src/commands/edit.ts`)**
-- `editor.html` is generated inline (`generateEditorHtml`) with embedded config (API base URL, CSRF token, file path) plus an import map
-- The import map maps `@rogatio/editor` to `/vendor/editor.js`, served by the CLI's own HTTP server
-- The `@rogatio/editor` browser bundle is resolved at runtime via `import.meta.resolve("@rogatio/editor")` and streamed from disk on `GET /vendor/editor.js` — no separate CLI browser build target is required
+- `editor.html` is generated inline (`generateEditorHtml`) with the open file path plus an import map. The page script derives its API prefix from the document URL (`/e/<session>/`), so the session token is not written into the document.
+- The import map maps `@rogatio/editor` to `./vendor/editor.js`, served by the CLI's own HTTP server under the session prefix
+- The `@rogatio/editor` browser bundle is resolved at runtime via `import.meta.resolve("@rogatio/editor")` and streamed from disk on `GET /e/<session>/vendor/editor.js` — no separate CLI browser build target is required
+- `GET /e/<session>/editor.html` is sent with `Referrer-Policy: no-referrer`
 - Editor instantiates via `createEditor(root, options)` with HTTP-based callbacks (`validate`, `save`, `onCancel`)
-- `POST /api/doctor` is CSRF-protected. It runs `runInstalledDoctor` for the open file with `checkUpdates: false` and returns that report nested under `host`, plus editor checks for the server, the session, the draft, AI Assist, and an optional mock file root. The extension Workspace editor does not call this route.
+- `POST /e/<session>/api/doctor` requires the session path, a loopback `Origin`, and `X-CSRF-Token`. It runs `runInstalledDoctor` for the open file with `checkUpdates: false` and returns that report nested under `host`, plus editor checks for the server, the session, the draft, AI Assist, and an optional mock file root. The extension Workspace editor does not call this route.
 
 **10. Utilities (`src/utils/`)**
 - `project-storage.ts`: CLI-owned `ProjectStorage` port (`list` / `get` / `create` / `import` / `update` / `delete`) plus the JSON-file adapter (`createJsonFileProjectStorage`). Path-as-id; atomic write (pretty JSON, mkdir, temp + rename). `list` keeps `.rogatio.json` and `*.rogatio.json` as the fast path and also includes other `*.json` files whose contents validate as a Rogatio project (own numeric `version` of 1 or 2, then schema validation, migrating version 1 first). Non-project JSON such as `package.json` is skipped. `edit`, `verify`, and `test` accept an explicit path of any filename and default to `./.rogatio.json`. Production `edit` / `verify` / `test` / `doctor` / `runtime` / `import` and save use the port for file-backed I/O. This surface is separate from browser-core `ProjectRepository` / `StorageAdapter` (envelope store); the two are not unified.

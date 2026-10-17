@@ -12,6 +12,7 @@ import { showEditHelp } from "../help.js";
 import { createServer } from "../server/http.js";
 import {
   createRoutes,
+  editorSessionPath,
   generateCsrfToken,
   type RouteContext,
 } from "../server/routes.js";
@@ -135,7 +136,7 @@ export async function editCommand(
     aiClient = createAIClient(providerConfig);
   }
 
-  // Generate CSRF token
+  // 128-bit session token. It is placed only in the editor URL.
   const csrfToken = generateCsrfToken();
 
   const context: RouteContext = {
@@ -171,7 +172,7 @@ export async function editCommand(
 
   context.boundPort = server.port;
   const serverUrl = `http://127.0.0.1:${server.port}`;
-  const editorUrl = `${serverUrl}/editor.html`;
+  const editorUrl = `${serverUrl}${editorSessionPath(csrfToken, "/editor.html")}`;
 
   // Locate the editor bundle, css, and fonts from the published tarball
   // (or the workspace editor build during development).
@@ -181,12 +182,7 @@ export async function editCommand(
     fonts: editorFontsPath,
   } = editorAssetPaths();
 
-  context.editorHtml = generateEditorHtml(
-    serverUrl,
-    csrfToken,
-    filePath,
-    !!aiClient,
-  );
+  context.editorHtml = generateEditorHtml(filePath, !!aiClient);
   context.editorBundlePath = editorBundlePath;
   context.editorCssPath = editorCssPath;
   context.editorFontsPath = editorFontsPath;
@@ -274,8 +270,6 @@ async function ensureCivilizationProjectName(
 }
 
 export function generateEditorHtml(
-  apiBase: string,
-  csrfToken: string,
   filePath: string,
   aiConfigured: boolean,
 ): string {
@@ -310,7 +304,7 @@ export function generateEditorHtml(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rogatio Editor</title>
-  <link rel="stylesheet" href="/vendor/editor.css" />
+  <link rel="stylesheet" href="vendor/editor.css" />
   <style>
     html, body { margin: 0; min-height: 100%; }
     body {
@@ -338,14 +332,16 @@ export function generateEditorHtml(
    <div id="editor-doctor" hidden></div>
    <div id="editor-root"></div>
    <script type="importmap">
-     { "imports": { "@rogatio/editor": "/vendor/editor.js" } }
+     { "imports": { "@rogatio/editor": "./vendor/editor.js" } }
    </script>
    <script type="module">
       import { createEditor } from '@rogatio/editor';
     
     const root = document.getElementById('editor-root');
-    const apiBase = ${JSON.stringify(apiBase)};
-    const csrfToken = ${JSON.stringify(csrfToken)};
+    const apiBase = location.pathname.endsWith('/editor.html')
+      ? location.pathname.slice(0, -'/editor.html'.length)
+      : location.pathname;
+    const csrfToken = apiBase.slice(apiBase.lastIndexOf('/') + 1);
     const filePath = ${embedJson(filePath)};
     const doctorTitles = ${embedJson(editorPageTitles())};
     const serverStoppedJson = ${embedJson(serializeEditorDiagnostics(editorServerStoppedReport(filePath)))};

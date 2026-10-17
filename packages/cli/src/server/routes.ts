@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { dirname, isAbsolute, resolve } from "node:path";
@@ -28,13 +28,13 @@ export interface RouteContext {
   shutdown: () => void;
   /** Bound loopback port after `server.start()`; used for Host/Origin checks. */
   boundPort: number;
-  /** HTML document served at GET /editor.html. */
+  /** HTML document served at GET /e/<session>/editor.html. */
   editorHtml: string;
-  /** Absolute path to the editor browser bundle shipped with the cli, served at GET /vendor/editor.js. */
+  /** Absolute path to the editor browser bundle shipped with the cli, served at GET /e/<session>/vendor/editor.js. */
   editorBundlePath: string;
-  /** Absolute path to the editor stylesheet shipped with the cli, served at GET /vendor/editor.css. */
+  /** Absolute path to the editor stylesheet shipped with the cli, served at GET /e/<session>/vendor/editor.css. */
   editorCssPath: string;
-  /** Absolute path to the directory of editor fonts shipped with the cli, served at GET /vendor/fonts/<file>. */
+  /** Absolute path to the directory of editor fonts shipped with the cli, served at GET /e/<session>/vendor/fonts/<file>. */
   editorFontsPath: string;
   /** AI client for completions (optional, when AI is configured). */
   aiClient?: AIClient;
@@ -74,13 +74,14 @@ function isAllowedEditorHost(
   return host === `127.0.0.1:${expected}` || host === `localhost:${expected}`;
 }
 
-/** Exact Origin allowlist when Origin is present on a state-changing request. */
+/** Exact Origin allowlist for POST. A missing Origin is rejected. */
 function isAllowedEditorOrigin(
   origin: string | undefined,
   boundPort: number,
 ): boolean {
-  if (origin === undefined) return true;
-  if (!Number.isInteger(boundPort) || boundPort <= 0) return false;
+  if (origin === undefined || !Number.isInteger(boundPort) || boundPort <= 0) {
+    return false;
+  }
   const expected = String(boundPort);
   return (
     origin === `http://127.0.0.1:${expected}` ||
@@ -92,9 +93,48 @@ export function generateCsrfToken(): string {
   return randomBytes(16).toString("hex");
 }
 
+/** Compare session tokens with timingSafeEqual when their lengths match. */
+function tokensEqual(provided: string, expected: string): boolean {
+  const providedBytes = Buffer.from(provided);
+  const expectedBytes = Buffer.from(expected);
+  if (providedBytes.length !== expectedBytes.length) return false;
+  return timingSafeEqual(providedBytes, expectedBytes);
+}
+
+/**
+ * Map `/e/<token>/...` to the path after the session prefix.
+ * Returns undefined when the path token is missing or does not match.
+ */
+function scopedPathname(
+  pathname: string,
+  sessionToken: string,
+): string | undefined {
+  const marker = "/e/";
+  if (!pathname.startsWith(marker)) return undefined;
+  const after = pathname.slice(marker.length);
+  const slash = after.indexOf("/");
+  const candidate = slash === -1 ? after : after.slice(0, slash);
+  if (candidate.length === 0 || !tokensEqual(candidate, sessionToken)) {
+    return undefined;
+  }
+  return slash === -1 ? "/" : after.slice(slash);
+}
+
+/** Editor and API path for one session, for example `/e/<token>/editor.html`. */
+export function editorSessionPath(token: string, suffix: string): string {
+  const path = suffix.startsWith("/") ? suffix : `/${suffix}`;
+  return `/e/${token}${path}`;
+}
+
 function validateCsrf(req: IncomingMessage, expectedToken: string): boolean {
-  const token = req.headers["x-csrf-token"];
-  return token === expectedToken;
+  const token = headerValue(req.headers["x-csrf-token"]);
+  if (token === undefined) return false;
+  return tokensEqual(token, expectedToken);
+}
+
+function emptyNotFound(res: ServerResponse): void {
+  res.writeHead(404);
+  res.end();
 }
 
 const MAX_REQUEST_BODY_BYTES = 8 * 1024 * 1024;
@@ -251,8 +291,13 @@ export function createRoutes(context: RouteContext) {
       return;
     }
 
-    const { pathname } = parseUrl(req);
+    const { pathname: requestPath } = parseUrl(req);
     const method = req.method || "GET";
+    const pathname = scopedPathname(requestPath, context.csrfToken);
+    if (pathname === undefined) {
+      emptyNotFound(res);
+      return;
+    }
 
     if (method === "POST") {
       const origin = headerValue(req.headers.origin);
@@ -274,10 +319,11 @@ export function createRoutes(context: RouteContext) {
       return;
     }
 
-    // GET /editor.html — the browser editor page
+    // GET /e/<session>/editor.html — the browser editor page
     if (pathname === "/editor.html" && method === "GET") {
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
+        "Referrer-Policy": "no-referrer",
       });
       res.end(context.editorHtml);
       return;

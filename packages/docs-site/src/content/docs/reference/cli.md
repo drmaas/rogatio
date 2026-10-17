@@ -48,7 +48,7 @@ Release users never pass `--extension-id`. That flag is only for development (a 
 
 Exit codes: `0` every required check passed (warnings are allowed), `1` a required check failed, `2` usage error.
 
-The extension's **Run checks** button runs these same checks through the native host and lists browser-side checks before them. `rogatio edit` has **Run checks** too. `POST /api/doctor` on that loopback server requires the editor's CSRF token and returns this same report for the open file, nested under `host`, with editor checks for the server, the session, the draft, AI Assist, and an optional mock file root. Neither UI passes `--check-updates`.
+The extension's **Run checks** button runs these same checks through the native host and lists browser-side checks before them. `rogatio edit` has **Run checks** too. `POST /e/<session>/api/doctor` on that loopback server requires the session path, a loopback Origin, and the editor's `X-CSRF-Token` header. It returns this same report for the open file, nested under `host`, with editor checks for the server, the session, the draft, AI Assist, and an optional mock file root. Neither UI passes `--check-updates`.
 
 The CLI `--json` schema, check ids, and exit codes are unchanged.
 

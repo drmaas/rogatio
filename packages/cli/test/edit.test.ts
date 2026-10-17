@@ -93,11 +93,15 @@ describe("edit command", () => {
   });
 
   it("serves the editor page and @rogatio/editor bundle over HTTP", async () => {
-    const fetched: { html: string; js: string } = { html: "", js: "" };
+    const fetched: { html: string; js: string; referrerPolicy: string | null } =
+      { html: "", js: "", referrerPolicy: null };
+    let openedUrl = "";
     const result = await editCommand([testFile], {
       launchBrowser: async (url) => {
+        openedUrl = url;
         const serverUrl = url.replace("/editor.html", "");
         const htmlRes = await fetch(`${serverUrl}/editor.html`);
+        fetched.referrerPolicy = htmlRes.headers.get("referrer-policy");
         fetched.html = await htmlRes.text();
         const jsRes = await fetch(`${serverUrl}/vendor/editor.js`);
         fetched.js = await jsRes.text();
@@ -105,9 +109,16 @@ describe("edit command", () => {
       },
     });
 
+    expect(openedUrl).toMatch(
+      /^http:\/\/127\.0\.0\.1:\d+\/e\/[0-9a-f]{32}\/editor\.html$/u,
+    );
+    const token = openedUrl.match(/\/e\/([0-9a-f]{32})\/editor\.html$/u)?.[1];
+    expect(token).toBeTruthy();
+    expect(fetched.referrerPolicy).toBe("no-referrer");
     expect(fetched.html).toContain('id="editor-root"');
+    expect(fetched.html).not.toContain(token);
     expect(fetched.html).toContain('type="importmap"');
-    expect(fetched.html).toContain('"/vendor/editor.js"');
+    expect(fetched.html).toContain('"./vendor/editor.js"');
     // Inline browser script must be plain JS — TypeScript annotations blank the page.
     expect(fetched.html).not.toMatch(/\(\s*\w+\s*:\s*any\s*\)/);
     // Host validate is sync; async validate returns a Promise and blanks init.
@@ -129,7 +140,7 @@ describe("edit command", () => {
     expect(launch).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
       expect.stringMatching(
-        /^Editor available at: http:\/\/127\.0\.0\.1:\d+\/editor\.html$/u,
+        /^Editor available at: http:\/\/127\.0\.0\.1:\d+\/e\/[0-9a-f]{32}\/editor\.html$/u,
       ),
     );
     shutdown();
