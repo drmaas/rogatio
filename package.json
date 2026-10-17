@@ -28,9 +28,9 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",
     "@biomejs/biome": "2.5.15",
-    "@puppeteer/browsers": "3.2.3",
+    "@puppeteer/browsers": "3.2.4",
     "@semantic-release/changelog": "7.0.0",
-    "@types/node": "26.6.4",
+    "@types/node": "26.6.5",
     "@types/selenium-webdriver": "4.35.7",
     "ajv": "8.20.0",
     "esbuild": "0.28.2",
@@ -38,10 +38,10 @@
     "husky": "^9.1.7",
     "knip": "6.41.0",
     "publint": "0.3.25",
-    "selenium-webdriver": "4.50.0",
+    "selenium-webdriver": "4.51.0",
     "semantic-release": "25.0.9",
     "typescript": "7.0.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.4"
   },
   "dependencies": {
     "@peculiar/x509": "^2.1.0",
