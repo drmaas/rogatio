@@ -34,7 +34,7 @@
     "@types/selenium-webdriver": "4.35.7",
     "ajv": "8.20.0",
     "esbuild": "0.28.2",
-    "happy-dom": "^20.14.5",
+    "happy-dom": "^21.0.1",
     "husky": "^9.1.7",
     "knip": "6.41.0",
     "publint": "0.3.25",
