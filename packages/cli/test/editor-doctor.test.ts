@@ -218,12 +218,7 @@ describe("editor doctor", () => {
   });
 
   it("embeds Run checks in the editor page", () => {
-    const html = generateEditorHtml(
-      "http://127.0.0.1:9",
-      "token",
-      "/tmp/my project.json",
-      false,
-    );
+    const html = generateEditorHtml("/tmp/my project.json", false);
     expect(html).toContain("Run checks");
     expect(html).toContain("/api/doctor");
     expect(html).toContain(EDITOR_SERVER_STOPPED_SUMMARY);

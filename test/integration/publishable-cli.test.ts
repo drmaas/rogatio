@@ -219,31 +219,39 @@ describe("publishable CLI tarball", () => {
         [bin, "edit", project, "--port", String(port), "--no-open"],
         { cwd: consumer },
       );
+      let logged = "";
+      editServer.child.stdout?.setEncoding("utf8");
+      editServer.child.stdout?.on("data", (chunk: string) => {
+        logged += chunk;
+      });
+      editServer.child.stderr?.setEncoding("utf8");
+      editServer.child.stderr?.on("data", (chunk: string) => {
+        logged += chunk;
+      });
 
-      // Poll for the server to come up (max 5s).
+      // Poll for the printed session URL (max 5s), then load assets under it.
       const deadline = Date.now() + 5000;
-      let editor = { status: 0, body: "" };
-      let css = { status: 0, body: "" };
-      let font = { status: 0, body: "" };
-      while (Date.now() < deadline) {
-        try {
-          editor = await get(`http://127.0.0.1:${port}/vendor/editor.js`);
-          css = await get(`http://127.0.0.1:${port}/vendor/editor.css`);
-          font = await get(
-            `http://127.0.0.1:${port}/vendor/fonts/hanken-grotesk-400.woff2`,
-          );
-          if (
-            editor.status === 200 &&
-            css.status === 200 &&
-            font.status === 200
-          ) {
-            break;
-          }
-        } catch {
-          // not ready yet
-        }
-        await new Promise((r) => setTimeout(r, 100));
+      let sessionBase = "";
+      while (Date.now() < deadline && sessionBase === "") {
+        const match = logged.match(
+          /Editor available at: (http:\/\/127\.0\.0\.1:\d+\/e\/[0-9a-f]{32})\/editor\.html/u,
+        );
+        if (match?.[1]) sessionBase = match[1];
+        else await new Promise((r) => setTimeout(r, 50));
       }
+      expect(sessionBase, logged).not.toBe("");
+      const token = sessionBase.slice(sessionBase.lastIndexOf("/") + 1);
+
+      const unscoped = await get(`http://127.0.0.1:${port}/vendor/editor.js`);
+      expect(unscoped.status).toBe(404);
+      expect(unscoped.body).toBe("");
+      expect(unscoped.body).not.toContain(token);
+
+      const editor = await get(`${sessionBase}/vendor/editor.js`);
+      const css = await get(`${sessionBase}/vendor/editor.css`);
+      const font = await get(
+        `${sessionBase}/vendor/fonts/hanken-grotesk-400.woff2`,
+      );
       expect(
         editor.status,
         "editor.js must be served from the published cli",

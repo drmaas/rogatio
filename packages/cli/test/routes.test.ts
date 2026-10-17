@@ -1,8 +1,9 @@
-import { rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readSavedMockRoot } from "../src/mock-root-config.js";
 import {
   createRoutes,
   generateCsrfToken,
@@ -17,6 +18,7 @@ describe("API routes", () => {
   let storage: ProjectStorage;
   const boundPort = 34567;
   const allowedHost = `127.0.0.1:${boundPort}`;
+  const sessionToken = "test-csrf-token";
 
   const validProject = {
     version: 2,
@@ -47,7 +49,7 @@ describe("API routes", () => {
   };
 
   beforeEach(() => {
-    const csrfToken = "test-csrf-token";
+    const csrfToken = sessionToken;
     updateMock = vi.fn<ProjectStorage["update"]>().mockResolvedValue(undefined);
     storage = {
       list: vi.fn(),
@@ -77,11 +79,27 @@ describe("API routes", () => {
     path: string,
     headers: Record<string, string> = {},
     body: string = "",
+    options: { unscoped?: boolean; omitOrigin?: boolean } = {},
   ): IncomingMessage {
+    const url =
+      options.unscoped || path.startsWith("/e/")
+        ? path
+        : `/e/${sessionToken}${path}`;
     const req = new IncomingMessage(new (require("node:stream").PassThrough)());
     Object.defineProperty(req, "method", { value: method, writable: true });
-    Object.defineProperty(req, "url", { value: path, writable: true });
-    req.headers = { host: allowedHost, ...headers };
+    Object.defineProperty(req, "url", { value: url, writable: true });
+    const reqHeaders: Record<string, string> = {
+      host: allowedHost,
+      ...headers,
+    };
+    if (
+      method === "POST" &&
+      !options.omitOrigin &&
+      !Object.hasOwn(headers, "origin")
+    ) {
+      reqHeaders.origin = `http://${allowedHost}`;
+    }
+    req.headers = reqHeaders;
     req.push(body);
     req.push(null);
     return req;
@@ -203,6 +221,246 @@ describe("API routes", () => {
         | undefined;
       expect(headers).toBeDefined();
       expect(headers?.["Access-Control-Allow-Origin"]).toBeUndefined();
+    });
+  });
+
+  describe("session path", () => {
+    const unscopedPaths = ["/editor.html", "/api/project", "/api/mock-root"];
+
+    function responseBody(res: ServerResponse): string {
+      const body = vi.mocked(res.end).mock.calls.at(-1)?.[0];
+      return body === undefined || body === null ? "" : String(body);
+    }
+
+    it("returns an empty 404 when the request has only the port", async () => {
+      for (const path of unscopedPaths) {
+        const req = createMockReq("GET", path, {}, "", { unscoped: true });
+        const res = createMockRes();
+        await handler(req, res);
+        expect(res.writeHead).toHaveBeenCalledWith(404);
+        const body = responseBody(res);
+        expect(body).toBe("");
+        expect(body).not.toContain(sessionToken);
+      }
+    });
+
+    it("returns an empty 404 when the path token does not match", async () => {
+      const req = createMockReq(
+        "GET",
+        `/e/${"a".repeat(32)}/api/project`,
+        {},
+        "",
+        { unscoped: true },
+      );
+      const res = createMockRes();
+      await handler(req, res);
+      expect(res.writeHead).toHaveBeenCalledWith(404);
+      const body = responseBody(res);
+      expect(body).toBe("");
+      expect(body).not.toContain(sessionToken);
+    });
+
+    it("serves the editor and project under the session path", async () => {
+      const editor = createMockReq("GET", "/editor.html");
+      const editorRes = createMockRes();
+      await handler(editor, editorRes);
+      expect(editorRes.writeHead).toHaveBeenCalledWith(
+        200,
+        expect.objectContaining({
+          "Content-Type": "text/html; charset=utf-8",
+          "Referrer-Policy": "no-referrer",
+        }),
+      );
+      expect(editorRes.end).toHaveBeenCalledWith(context.editorHtml);
+
+      const project = createMockReq("GET", "/api/project", {
+        host: allowedHost,
+      });
+      const projectRes = createMockRes();
+      await handler(project, projectRes);
+      expect(projectRes.writeHead).toHaveBeenCalledWith(200, {
+        "Content-Type": "application/json",
+      });
+      expect(projectRes.end).toHaveBeenCalledWith(JSON.stringify(validProject));
+
+      const mockRoot = createMockReq("GET", "/api/mock-root");
+      const mockRes = createMockRes();
+      await handler(mockRoot, mockRes);
+      expect(mockRes.writeHead).toHaveBeenCalledWith(200, {
+        "Content-Type": "application/json",
+      });
+      const payload = JSON.parse(responseBody(mockRes)) as { root?: string };
+      expect(typeof payload.root).toBe("string");
+    });
+
+    it("does not write, change the mock root, or call the AI client without the session path", async () => {
+      const directory = await mkdtemp(join(tmpdir(), "rogatio-session-"));
+      const previous = process.env.ROGATIO_CONFIG_DIR;
+      process.env.ROGATIO_CONFIG_DIR = join(directory, "config");
+      const complete = vi.fn();
+      context.aiClient = { complete, stream: vi.fn() };
+      handler = createRoutes(context);
+      const savedProject = { ...validProject, name: "Should not save" };
+      const mockRoot = join(directory, "mocks");
+      try {
+        const save = createMockReq(
+          "POST",
+          "/api/save",
+          {
+            "x-csrf-token": sessionToken,
+            "content-type": "application/json",
+          },
+          JSON.stringify(savedProject),
+          { unscoped: true },
+        );
+        const saveRes = createMockRes();
+        await handler(save, saveRes);
+        expect(saveRes.writeHead).toHaveBeenCalledWith(404);
+        expect(responseBody(saveRes)).toBe("");
+        expect(updateMock).not.toHaveBeenCalled();
+
+        const mock = createMockReq(
+          "POST",
+          "/api/mock-root",
+          {
+            "x-csrf-token": sessionToken,
+            "content-type": "application/json",
+          },
+          JSON.stringify({ root: mockRoot }),
+          { unscoped: true },
+        );
+        const mockRes = createMockRes();
+        await handler(mock, mockRes);
+        expect(mockRes.writeHead).toHaveBeenCalledWith(404);
+        expect(await readSavedMockRoot(context.filePath)).toBeUndefined();
+
+        const ai = createMockReq(
+          "POST",
+          "/api/ai/complete",
+          {
+            "x-csrf-token": sessionToken,
+            "content-type": "application/json",
+          },
+          JSON.stringify({ messages: [{ role: "user", content: "hello" }] }),
+          { unscoped: true },
+        );
+        const aiRes = createMockRes();
+        await handler(ai, aiRes);
+        expect(aiRes.writeHead).toHaveBeenCalledWith(404);
+        expect(complete).not.toHaveBeenCalled();
+
+        const allowedSave = createMockReq(
+          "POST",
+          "/api/save",
+          {
+            "x-csrf-token": sessionToken,
+            "content-type": "application/json",
+          },
+          JSON.stringify(savedProject),
+        );
+        const allowedSaveRes = createMockRes();
+        await handler(allowedSave, allowedSaveRes);
+        expect(updateMock).toHaveBeenCalledOnce();
+
+        const allowedMock = createMockReq(
+          "POST",
+          "/api/mock-root",
+          {
+            "x-csrf-token": sessionToken,
+            "content-type": "application/json",
+          },
+          JSON.stringify({ root: mockRoot }),
+        );
+        const allowedMockRes = createMockRes();
+        await handler(allowedMock, allowedMockRes);
+        expect(await readSavedMockRoot(context.filePath)).toBe(mockRoot);
+
+        const allowedAi = createMockReq(
+          "POST",
+          "/api/ai/complete",
+          {
+            "x-csrf-token": sessionToken,
+            "content-type": "application/json",
+          },
+          JSON.stringify({ messages: [{ role: "user", content: "hello" }] }),
+        );
+        const allowedAiRes = createMockRes();
+        await handler(allowedAi, allowedAiRes);
+        expect(complete).toHaveBeenCalledOnce();
+      } finally {
+        if (previous === undefined) delete process.env.ROGATIO_CONFIG_DIR;
+        else process.env.ROGATIO_CONFIG_DIR = previous;
+        await rm(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("does not write, change the mock root, or call the AI client when Origin is missing or foreign", async () => {
+      const directory = await mkdtemp(join(tmpdir(), "rogatio-origin-"));
+      const previous = process.env.ROGATIO_CONFIG_DIR;
+      process.env.ROGATIO_CONFIG_DIR = join(directory, "config");
+      const complete = vi.fn();
+      context.aiClient = { complete, stream: vi.fn() };
+      handler = createRoutes(context);
+      const savedProject = { ...validProject, name: "Should not save" };
+      const mockRoot = join(directory, "mocks");
+      const aiBody = JSON.stringify({
+        messages: [{ role: "user", content: "hello" }],
+      });
+      try {
+        const cases: Array<{ omitOrigin?: boolean; origin?: string }> = [
+          { omitOrigin: true },
+          { origin: "https://example.test" },
+        ];
+        for (const originCase of cases) {
+          const headers: Record<string, string> = {
+            "x-csrf-token": sessionToken,
+            "content-type": "application/json",
+          };
+          if (originCase.origin !== undefined)
+            headers.origin = originCase.origin;
+          const options = { omitOrigin: originCase.omitOrigin === true };
+
+          const save = createMockReq(
+            "POST",
+            "/api/save",
+            headers,
+            JSON.stringify(savedProject),
+            options,
+          );
+          const saveRes = createMockRes();
+          await handler(save, saveRes);
+          expect(vi.mocked(saveRes.writeHead).mock.calls.at(-1)?.[0]).toBe(403);
+          expect(updateMock).not.toHaveBeenCalled();
+
+          const mock = createMockReq(
+            "POST",
+            "/api/mock-root",
+            headers,
+            JSON.stringify({ root: mockRoot }),
+            options,
+          );
+          const mockRes = createMockRes();
+          await handler(mock, mockRes);
+          expect(vi.mocked(mockRes.writeHead).mock.calls.at(-1)?.[0]).toBe(403);
+          expect(await readSavedMockRoot(context.filePath)).toBeUndefined();
+
+          const ai = createMockReq(
+            "POST",
+            "/api/ai/complete",
+            headers,
+            aiBody,
+            options,
+          );
+          const aiRes = createMockRes();
+          await handler(ai, aiRes);
+          expect(vi.mocked(aiRes.writeHead).mock.calls.at(-1)?.[0]).toBe(403);
+          expect(complete).not.toHaveBeenCalled();
+        }
+      } finally {
+        if (previous === undefined) delete process.env.ROGATIO_CONFIG_DIR;
+        else process.env.ROGATIO_CONFIG_DIR = previous;
+        await rm(directory, { recursive: true, force: true });
+      }
     });
   });
 
@@ -519,7 +777,7 @@ describe("API routes", () => {
       const token1 = generateCsrfToken();
       const token2 = generateCsrfToken();
       expect(token1).not.toBe(token2);
-      expect(token1.length).toBeGreaterThan(20);
+      expect(token1).toMatch(/^[0-9a-f]{32}$/u);
     });
   });
 
@@ -545,6 +803,7 @@ describe("API routes", () => {
         200,
         expect.objectContaining({
           "Content-Type": "text/html; charset=utf-8",
+          "Referrer-Policy": "no-referrer",
         }),
       );
       expect(res.end).toHaveBeenCalledWith(

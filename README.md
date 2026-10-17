@@ -139,7 +139,7 @@ cat .rogatio.json | rogatio verify - --json
 
 | Command | Description |
 | --- | --- |
-| `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1`; `--port <n>` fixes the port; `--no-open` starts the server without opening a browser. |
+| `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1` at `/e/<session>/editor.html`; `--port <n>` fixes the port; `--no-open` prints that address without opening a browser. |
 | `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
 | `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
 | `rogatio doctor [path]` | Checks Node, the project file, the native host, the device CA, a loopback PAC answer, and optional AI Assist. Prints `pass` / `warn` / `fail` and a copy-paste fix. `--json` prints a stable report. `--check-updates` is the only npm-registry call. |
