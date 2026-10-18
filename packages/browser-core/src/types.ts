@@ -108,20 +108,3 @@ export type EnvelopeMigrationResult =
   | { readonly ok: false; readonly diagnostic: CoreDiagnostic };
 
 export type NativeRuntimePhase = "stopped" | "starting" | "started" | "failed";
-
-export interface NativeRuntimeState {
-  readonly phase: NativeRuntimePhase;
-  readonly lastError?: string;
-}
-
-export interface RuntimeStates {
-  readonly native: NativeRuntimeState;
-}
-
-export type RuntimeTransitionResult =
-  | { readonly ok: true; readonly value: RuntimeStates }
-  | {
-      readonly ok: false;
-      readonly kind: "failure";
-      readonly diagnostics: readonly CoreDiagnostic[];
-    };

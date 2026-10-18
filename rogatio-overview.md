@@ -43,7 +43,7 @@ Rogatio is a strict TypeScript 7, ESM/NodeNext monorepo using pnpm 12.10.1 as it
 
 - **`schema`** owns the version-2 JSON Schema, generated AJV validation, source conditions, bounds, forbidden headers, and v1→v2 migration.
 - **`compiler`** converts validated source into browser-neutral operations and stable diagnostics.
-- **`browser-core`** owns versioned project storage, migrations, enablement, compare-and-swap lifecycle, atomic rule installation and recovery, runtime state, diagnostics, and badge state.
+- **`browser-core`** owns versioned project storage, migrations, enablement, compare-and-swap lifecycle, atomic rule installation and recovery, the shared `NativeRuntimePhase` type, diagnostics, and badge state.
 - **`editor`** provides the shared framework-free DOM controller and accessible view.
 - The Chrome Manifest V3 package translates neutral rules to WebExtensions and Declarative Net Request APIs. The extension boundary is designed to accommodate additional browser extensions in the future.
 - **`cli`** bundles the editor host, file verification, offline dry-run (`test`), AI provider configuration (`ai`), and runtime dispatch (`install` / `uninstall` / `verify` / `host`).

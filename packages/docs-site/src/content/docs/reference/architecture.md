@@ -14,7 +14,7 @@ file `docs/architecture.md`. This page is the short user-facing summary.
 |---------|----------------|
 | `@rogatio/schema` | Version-2 JSON Schema, AJV validation, source conditions, bounds, forbidden headers. |
 | `@rogatio/compiler` | Validated source → browser-neutral operations + stable diagnostics. |
-| `@rogatio/browser-core` | Versioned storage, migrations, permissions, enablement, CAS lifecycle, atomic install/recovery, runtime state, diagnostics, badge state. |
+| `@rogatio/browser-core` | Versioned storage, migrations, permissions, enablement, CAS lifecycle, atomic install/recovery, the shared `NativeRuntimePhase` type, diagnostics, badge state. |
 | `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
 | `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (3-dim matching: source, method, resource type; preview seam). |
 | `@rogatio/runtime` | Bounded response-body and request-body transformation/runtime components (native host). |

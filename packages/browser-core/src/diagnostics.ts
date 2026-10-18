@@ -13,7 +13,6 @@ export type CoreDiagnosticCode =
   | "core.install-failed"
   | "core.recovery-failed"
   | "core.rule-not-installed"
-  | "core.runtime-transition"
   | "core.invariant";
 
 const CORE_MESSAGES: Record<
@@ -34,7 +33,6 @@ const CORE_MESSAGES: Record<
   "core.recovery-failed":
     "The previous rule set could not be restored after a failed installation.",
   "core.rule-not-installed": "The rule is enabled but is not installed.",
-  "core.runtime-transition": "The runtime state transition is not allowed.",
   "core.invariant": "An internal invariant could not be maintained.",
 };
 

@@ -10,10 +10,6 @@ export {
 export type { RepositoryOptions } from "./repository.js";
 export { MAX_PROJECTS, ProjectRepository } from "./repository.js";
 export {
-  initialRuntimeStates,
-  RuntimeStateController,
-} from "./runtime.js";
-export {
   computeBadge,
   computeDesiredRules,
   computeRuleStatuses,
@@ -25,13 +21,10 @@ export type {
   InstallOutcome,
   InstallResult,
   NativeRuntimePhase,
-  NativeRuntimeState,
   RuleInstallerAdapter,
   RuleStatus,
   RuleStatusInput,
   RuleStatusKind,
-  RuntimeStates,
-  RuntimeTransitionResult,
   StorageAdapter,
   StoredEnvelope,
   StoredProject,
