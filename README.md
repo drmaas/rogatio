@@ -295,7 +295,7 @@ This is a strict-TypeScript 7, ESM/NodeNext pnpm monorepo.
 | `@rogatio/schema` | Version-2 JSON schema, validation, source conditions, bounds, forbidden headers, v1 migration. |
 | `@rogatio/compiler` | Transforms validated source into browser-neutral operations and stable diagnostics. |
 | `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (3-dim matching, preview seam). |
-| `@rogatio/browser-core` | Versioned storage, migrations, enablement, lifecycle, runtime state. |
+| `@rogatio/browser-core` | Versioned storage, migrations, enablement, lifecycle, and the shared `NativeRuntimePhase` type. |
 | `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
 | `@rogatio/extension` | Chrome MV3 service worker and extension page (WebExtensions/DNR translation). |
 | `@rogatio/runtime` | Reusable response-body and request-body transformation components. |
