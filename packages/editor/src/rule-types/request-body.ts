@@ -1,4 +1,8 @@
-import { hasLoneSurrogate, LIMITS } from "@rogatio/schema";
+import {
+  compileReplacementRegex,
+  hasLoneSurrogate,
+  LIMITS,
+} from "@rogatio/schema";
 import type {
   EditorDiagnostic,
   RuleTypeFieldContext,
@@ -102,17 +106,13 @@ export function createRequestBodyRuleType(): RuleTypeFieldExtension {
             path: `${rulePath}/requestBody/pattern`,
             message: "Regex pattern must not contain lone UTF-16 surrogates.",
           });
-        } else {
-          try {
-            new RegExp(action.pattern, "u");
-          } catch {
-            diagnostics.push({
-              code: "editor.request-body-pattern",
-              severity: "error",
-              path: `${rulePath}/requestBody/pattern`,
-              message: "Regex pattern must be a valid regular expression.",
-            });
-          }
+        } else if (compileReplacementRegex(action.pattern) === null) {
+          diagnostics.push({
+            code: "editor.request-body-pattern",
+            severity: "error",
+            path: `${rulePath}/requestBody/pattern`,
+            message: "Regex pattern must be a valid regular expression.",
+          });
         }
         if (
           typeof action.replacement !== "string" ||

@@ -54,6 +54,67 @@ describe(" response-body schema", () => {
   it("accepts replace mode with body", () =>
     expect(validateProjectDetailed(project(baseReplace)).valid).toBe(true));
 
+  it.each(["\\u{1F600}", "\\p{Letter}"])(
+    "accepts unicode replacement pattern %s",
+    (pattern) => {
+      expect(
+        validateProjectDetailed(
+          project({
+            ...baseRegex,
+            responseBody: { replacements: [{ pattern, replacement: "x" }] },
+          }),
+        ).valid,
+      ).toBe(true);
+    },
+  );
+
+  it.each(["\\q", "\\8", "\\#", "\\-", "["])(
+    "rejects replacement pattern %s that is invalid in unicode mode",
+    (pattern) => {
+      const result = validateProjectDetailed(
+        project({
+          ...baseRegex,
+          responseBody: { replacements: [{ pattern, replacement: "x" }] },
+        }),
+      );
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(
+          result.errors.some((error) =>
+            error.instancePath.endsWith("/responseBody/replacements/0/pattern"),
+          ),
+        ).toBe(true);
+      }
+    },
+  );
+
+  it("bounds response-body patterns with maxResponseBodyPatternLength", () => {
+    const atLimit = "a".repeat(LIMITS.maxResponseBodyPatternLength);
+    expect(
+      validateProjectDetailed(
+        project({
+          ...baseTaggedRegex,
+          responseBody: {
+            mode: "regex",
+            replacements: [{ pattern: atLimit, replacement: "x" }],
+          },
+        }),
+      ).valid,
+    ).toBe(true);
+    const overLimit = "a".repeat(LIMITS.maxResponseBodyPatternLength + 1);
+    expect(
+      validateProjectDetailed(
+        project({
+          ...baseTaggedRegex,
+          responseBody: {
+            mode: "regex",
+            replacements: [{ pattern: overLimit, replacement: "x" }],
+          },
+        }),
+      ).valid,
+    ).toBe(false);
+  });
+
   it.each([
     ["missing action", { ...baseRegex, responseBody: undefined }],
     [

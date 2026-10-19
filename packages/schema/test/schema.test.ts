@@ -7,8 +7,10 @@ import {
 } from "../src/headers.js";
 import {
   assertValidProject,
+  compileReplacementRegex,
   compileUrlRegex,
   isSiteOrigin,
+  isValidReplacementRegex,
   isValidUrlRegex,
   LIMITS,
   normalizeSiteOrigin,
@@ -149,6 +151,27 @@ describe("@rogatio/schema", () => {
       LIMITS.maxUrlRegexLength + 1,
     );
     expect(validateProject(longRegex)).toBe(false);
+  });
+
+  it("keeps URL patterns flagless and compiles body patterns in unicode mode", () => {
+    const identityEscape = makeProject();
+    identityEscape.groups[0].rules[0].source.value = "\\q";
+    expect(validateProject(identityEscape)).toBe(true);
+    expect(isValidUrlRegex("\\q")).toBe(true);
+    expect(compileUrlRegex("\\q")).not.toBeNull();
+
+    expect(isValidReplacementRegex("\\q")).toBe(false);
+    expect(compileReplacementRegex("\\q")).toBeNull();
+    expect(isValidReplacementRegex("\\8")).toBe(false);
+    expect(isValidReplacementRegex("\\#")).toBe(false);
+    expect(isValidReplacementRegex("\\-")).toBe(false);
+    expect(isValidReplacementRegex("[")).toBe(false);
+    expect(compileReplacementRegex("\\u{1F600}")?.test("😀")).toBe(true);
+    expect(compileReplacementRegex("\\p{Letter}")?.test("A")).toBe(true);
+
+    const longerThanUrl = "a".repeat(LIMITS.maxUrlRegexLength + 1);
+    expect(compileUrlRegex(longerThanUrl)).toBeNull();
+    expect(compileReplacementRegex(longerThanUrl)).not.toBeNull();
   });
 
   it("rejects origins fields and requires unique stable IDs", () => {

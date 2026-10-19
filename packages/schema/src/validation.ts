@@ -11,7 +11,7 @@ import { normalizeNameKey } from "./identity.js";
 import { LIMITS } from "./limits.js";
 import { isSiteOrigin, normalizeSiteOrigin } from "./origins.js";
 import { isValidMockLogicalPath } from "./path.js";
-import { compileUrlRegex } from "./regex.js";
+import { compileReplacementRegex, compileUrlRegex } from "./regex.js";
 import { projectSchema } from "./schema.js";
 import type { RogatioProject } from "./types.js";
 import { hasLoneSurrogate } from "./utf16.js";
@@ -45,6 +45,10 @@ ajv.addFormat("rogatio-origin", {
 ajv.addFormat("rogatio-url-regex", {
   type: "string",
   validate: (value: string) => compileUrlRegex(value) !== null,
+});
+ajv.addFormat("rogatio-replacement-regex", {
+  type: "string",
+  validate: (value: string) => compileReplacementRegex(value) !== null,
 });
 
 function ajvIssues(
@@ -454,7 +458,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
               index += 1
             ) {
               const replacement = action.replacements[index];
-              if (compileUrlRegex(replacement.pattern) === null) {
+              if (compileReplacementRegex(replacement.pattern) === null) {
                 issues.push({
                   instancePath: `${actionPath}/replacements/${index}/pattern`,
                   keyword: "response-body-pattern",
@@ -549,7 +553,7 @@ function semanticIssues(project: RogatioProject): ValidationIssue[] {
                 message: `Regex pattern exceeds the maximum length of ${LIMITS.maxRequestBodyPatternLength} characters.`,
                 params: { limit: LIMITS.maxRequestBodyPatternLength },
               });
-            } else if (compileUrlRegex(action.pattern) === null) {
+            } else if (compileReplacementRegex(action.pattern) === null) {
               issues.push({
                 instancePath: `${actionPath}/pattern`,
                 keyword: "request-body-pattern",

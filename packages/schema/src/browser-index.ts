@@ -38,7 +38,12 @@ export {
 } from "./migrate-v1.js";
 export { isSiteOrigin, normalizeSiteOrigin } from "./origins.js";
 export { isValidMockLogicalPath, normalizeLogicalPath } from "./path.js";
-export { compileUrlRegex, isValidUrlRegex } from "./regex.js";
+export {
+  compileReplacementRegex,
+  compileUrlRegex,
+  isValidReplacementRegex,
+  isValidUrlRegex,
+} from "./regex.js";
 export type { Result } from "./result.js";
 export { err, isErr, isOk, ok } from "./result.js";
 export type {

@@ -124,6 +124,43 @@ describe(" request-body editor extension", () => {
     ).toBe(true);
   });
 
+  it.each(["\\q", "\\8", "\\#", "\\-"])(
+    "rejects body pattern %s that only compiles without flags",
+    (pattern) => {
+      const extension = createRequestBodyRuleType();
+      const diagnostics = extension.validate(
+        {
+          type: "request-body",
+          method: "POST",
+          resourceTypes: ["xmlhttprequest"],
+          requestBody: { mode: "regex", pattern, replacement: "x" },
+        },
+        "/groups/0/rules/0",
+      );
+      expect(
+        diagnostics.some((d) => d.code === "editor.request-body-pattern"),
+      ).toBe(true);
+    },
+  );
+
+  it.each(["\\u{1F600}", "\\p{Letter}"])(
+    "accepts unicode body pattern %s",
+    (pattern) => {
+      const extension = createRequestBodyRuleType();
+      expect(
+        extension.validate(
+          {
+            type: "request-body",
+            method: "POST",
+            resourceTypes: ["xmlhttprequest"],
+            requestBody: { mode: "regex", pattern, replacement: "x" },
+          },
+          "/groups/0/rules/0",
+        ),
+      ).toEqual([]);
+    },
+  );
+
   it("rejects oversized values", () => {
     const extension = createRequestBodyRuleType();
     const diagnostics = extension.validate(

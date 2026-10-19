@@ -336,7 +336,7 @@ const projectSchemaDefinition = {
           type: "string",
           minLength: 1,
           maxLength: LIMITS.maxResponseBodyPatternLength,
-          format: "rogatio-url-regex",
+          format: "rogatio-replacement-regex",
         },
         replacement: {
           type: "string",
@@ -412,7 +412,7 @@ const projectSchemaDefinition = {
           type: "string",
           minLength: 1,
           maxLength: LIMITS.maxRequestBodyPatternLength,
-          format: "rogatio-url-regex",
+          format: "rogatio-replacement-regex",
         },
         replacement: {
           type: "string",

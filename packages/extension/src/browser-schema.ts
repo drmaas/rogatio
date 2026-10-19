@@ -15,7 +15,10 @@ import { normalizeNameKey } from "../../schema/src/identity.js";
 import { LIMITS } from "../../schema/src/limits.js";
 import { normalizeSiteOrigin } from "../../schema/src/origins.js";
 import { isValidMockLogicalPath } from "../../schema/src/path.js";
-import { isValidUrlRegex } from "../../schema/src/regex.js";
+import {
+  isValidReplacementRegex,
+  isValidUrlRegex,
+} from "../../schema/src/regex.js";
 import {
   HTTP_METHODS,
   PROJECT_VERSION,
@@ -49,7 +52,12 @@ export {
 export { LIMITS } from "../../schema/src/limits.js";
 export { migrateV1Project } from "../../schema/src/migrate-v1.js";
 export { isSiteOrigin, normalizeSiteOrigin } from "../../schema/src/origins.js";
-export { compileUrlRegex, isValidUrlRegex } from "../../schema/src/regex.js";
+export {
+  compileReplacementRegex,
+  compileUrlRegex,
+  isValidReplacementRegex,
+  isValidUrlRegex,
+} from "../../schema/src/regex.js";
 export {
   HTTP_METHODS,
   PROJECT_VERSION,
@@ -1007,7 +1015,7 @@ export function validateProjectDetailed(
                     "response-body-pattern",
                   ),
                 );
-              } else if (!isValidUrlRegex(pattern)) {
+              } else if (!isValidReplacementRegex(pattern)) {
                 errors.push(
                   issue(
                     `${actionPath}/replacements/${index}/pattern`,
@@ -1084,7 +1092,7 @@ export function validateProjectDetailed(
               errors.push(
                 issue(`${actionPath}/pattern`, "request-body-pattern"),
               );
-            } else if (!isValidUrlRegex(pattern)) {
+            } else if (!isValidReplacementRegex(pattern)) {
               errors.push(
                 issue(`${actionPath}/pattern`, "request-body-pattern"),
               );

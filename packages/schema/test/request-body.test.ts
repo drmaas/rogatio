@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateProjectDetailed } from "../src/index.js";
+import { LIMITS, validateProjectDetailed } from "../src/index.js";
 
 function project(rule: Record<string, unknown>) {
   return {
@@ -58,6 +58,61 @@ describe(" request-body schema", () => {
 
   it("accepts a valid regex action", () =>
     expect(validateProjectDetailed(project(baseRegex)).valid).toBe(true));
+
+  it.each(["\\u{1F600}", "\\p{Letter}"])(
+    "accepts unicode body pattern %s",
+    (pattern) => {
+      expect(
+        validateProjectDetailed(
+          project({
+            ...baseRegex,
+            requestBody: { mode: "regex", pattern, replacement: "x" },
+          }),
+        ).valid,
+      ).toBe(true);
+    },
+  );
+
+  it.each(["\\q", "\\8", "\\#", "\\-", "["])(
+    "rejects body pattern %s that is invalid in unicode mode",
+    (pattern) => {
+      const result = validateProjectDetailed(
+        project({
+          ...baseRegex,
+          requestBody: { mode: "regex", pattern, replacement: "x" },
+        }),
+      );
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(
+          result.errors.some((error) =>
+            error.instancePath.endsWith("/requestBody/pattern"),
+          ),
+        ).toBe(true);
+      }
+    },
+  );
+
+  it("bounds request-body patterns with maxRequestBodyPatternLength", () => {
+    const atLimit = "a".repeat(LIMITS.maxRequestBodyPatternLength);
+    expect(
+      validateProjectDetailed(
+        project({
+          ...baseRegex,
+          requestBody: { mode: "regex", pattern: atLimit, replacement: "x" },
+        }),
+      ).valid,
+    ).toBe(true);
+    const overLimit = "a".repeat(LIMITS.maxRequestBodyPatternLength + 1);
+    expect(
+      validateProjectDetailed(
+        project({
+          ...baseRegex,
+          requestBody: { mode: "regex", pattern: overLimit, replacement: "x" },
+        }),
+      ).valid,
+    ).toBe(false);
+  });
 
   it.each([
     ["missing action", { ...baseReplace, requestBody: undefined }],

@@ -1,4 +1,8 @@
-import { hasLoneSurrogate, LIMITS } from "@rogatio/schema";
+import {
+  compileReplacementRegex,
+  hasLoneSurrogate,
+  LIMITS,
+} from "@rogatio/schema";
 import type {
   EditorDiagnostic,
   RuleTypeFieldContext,
@@ -67,15 +71,12 @@ function validateRegexReplacements(
   replacements.forEach((entry, index) => {
     const patternPath = `${rulePath}/responseBody/replacements/${index}/pattern`;
     const replacementPath = `${rulePath}/responseBody/replacements/${index}/replacement`;
-    try {
-      if (
-        typeof entry?.pattern !== "string" ||
-        entry.pattern.length === 0 ||
-        entry.pattern.length > LIMITS.maxResponseBodyPatternLength
-      )
-        throw new Error();
-      new RegExp(entry.pattern, "u");
-    } catch {
+    if (
+      typeof entry?.pattern !== "string" ||
+      entry.pattern.length === 0 ||
+      entry.pattern.length > LIMITS.maxResponseBodyPatternLength ||
+      compileReplacementRegex(entry.pattern) === null
+    ) {
       diagnostics.push({
         code: "editor.response-body-pattern",
         severity: "error",

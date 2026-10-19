@@ -138,6 +138,43 @@ describe("@rogatio/editor response-body rule type", () => {
     ).toBe(true);
   });
 
+  it.each(["\\q", "\\8", "\\#", "\\-"])(
+    "rejects replacement pattern %s that only compiles without flags",
+    (pattern) => {
+      const diagnostics = ext.validate(
+        {
+          type: "response-body",
+          responseBody: {
+            mode: "regex",
+            replacements: [{ pattern, replacement: "x" }],
+          },
+        },
+        rulePath,
+      );
+      expect(
+        diagnostics.some((d) => d.code === "editor.response-body-pattern"),
+      ).toBe(true);
+    },
+  );
+
+  it.each(["\\u{1F600}", "\\p{Letter}"])(
+    "accepts unicode replacement pattern %s",
+    (pattern) => {
+      expect(
+        ext.validate(
+          {
+            type: "response-body",
+            responseBody: {
+              mode: "regex",
+              replacements: [{ pattern, replacement: "x" }],
+            },
+          },
+          rulePath,
+        ),
+      ).toEqual([]);
+    },
+  );
+
   it("rejects oversized replace body", () => {
     const diagnostics = ext.validate(
       {
