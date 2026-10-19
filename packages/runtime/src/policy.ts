@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { hasLoneSurrogate } from "@rogatio/schema";
+import { compileReplacementRegex, hasLoneSurrogate } from "@rogatio/schema";
 import { failure } from "./errors.js";
 import { RUNTIME_LIMITS } from "./limits.js";
 import type { RuntimeResult } from "./types.js";
@@ -95,9 +95,7 @@ function validateOperation(
     if (hasLoneSurrogate(op.requestBody.pattern)) {
       return failure("runtime.request-body-lone-surrogate");
     }
-    try {
-      new RegExp(op.requestBody.pattern, "gu");
-    } catch {
+    if (compileReplacementRegex(op.requestBody.pattern) === null) {
       return failure("runtime.request-body-regex-invalid");
     }
     if (typeof op.requestBody.replacement !== "string") {

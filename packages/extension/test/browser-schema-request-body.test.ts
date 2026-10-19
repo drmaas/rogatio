@@ -93,6 +93,34 @@ describe(" request-body browser schema", () => {
   it("accepts a valid regex action", () =>
     expect(validateProjectDetailed(project(baseRegex)).valid).toBe(true));
 
+  it.each(["\\u{1F600}", "\\p{Letter}"])(
+    "accepts unicode body pattern %s",
+    (pattern) => {
+      expect(
+        validateProjectDetailed(
+          project({
+            ...baseRegex,
+            requestBody: { mode: "regex", pattern, replacement: "x" },
+          }),
+        ).valid,
+      ).toBe(true);
+    },
+  );
+
+  it.each(["\\q", "\\8", "\\#", "\\-", "["])(
+    "rejects body pattern %s that is invalid in unicode mode",
+    (pattern) => {
+      expect(
+        validateProjectDetailed(
+          project({
+            ...baseRegex,
+            requestBody: { mode: "regex", pattern, replacement: "x" },
+          }),
+        ).valid,
+      ).toBe(false);
+    },
+  );
+
   it.each([
     ["missing action", { ...baseReplace, requestBody: undefined }],
     [

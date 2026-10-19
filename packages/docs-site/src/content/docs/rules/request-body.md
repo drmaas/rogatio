@@ -11,7 +11,9 @@ decryption, so those request bodies are not rewritten.
 ## Behavior
 
 - **Full body replace**, or
-- **Bounded global ECMAScript regex replace** on the body.
+- **Bounded global ECMAScript regex replace** on the body. Patterns compile in
+  Unicode mode (`u`) and are bounded by the request-body pattern length, separate
+  from the URL source pattern limit.
 
 Replace-mode bodies may use `$1` through `$9` from the rule's **source** regex, and `$$`
 for a literal dollar sign. Regex-mode replacements keep `$1` through `$9` for

@@ -56,6 +56,34 @@ describe(" response-body browser schema", () => {
   it("accepts replace mode with body", () =>
     expect(validateBrowser(project(baseReplace)).valid).toBe(true));
 
+  it.each(["\\u{1F600}", "\\p{Letter}"])(
+    "accepts unicode replacement pattern %s",
+    (pattern) => {
+      expect(
+        validateBrowser(
+          project({
+            ...baseUntaggedRegex,
+            responseBody: { replacements: [{ pattern, replacement: "x" }] },
+          }),
+        ).valid,
+      ).toBe(true);
+    },
+  );
+
+  it.each(["\\q", "\\8", "\\#", "\\-", "["])(
+    "rejects replacement pattern %s that is invalid in unicode mode",
+    (pattern) => {
+      expect(
+        validateBrowser(
+          project({
+            ...baseUntaggedRegex,
+            responseBody: { replacements: [{ pattern, replacement: "x" }] },
+          }),
+        ).valid,
+      ).toBe(false);
+    },
+  );
+
   it.each([
     ["missing action", { ...baseUntaggedRegex, responseBody: undefined }],
     [
