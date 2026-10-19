@@ -1,11 +1,15 @@
 import { spawn, spawnSync } from "node:child_process";
-import { accessSync, constants, unlinkSync, writeFileSync } from "node:fs";
-import { mkdtemp, open, rm } from "node:fs/promises";
+import { accessSync, constants } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { join as posixJoin } from "node:path/posix";
 import type { TrustCapabilities } from "../trust.js";
 import { TrustError } from "../trust.js";
+import {
+  withInstallCertificateFile,
+  writeExclusiveCertificate,
+} from "./private-cert-file.js";
 import type { TrustPlatformAdapter } from "./types.js";
 
 const PREVIOUS_CA_PEM_MAX_BYTES = 16 * 1024;
@@ -79,49 +83,31 @@ const darwinAdapter: TrustPlatformAdapter = {
   },
   async caTrustInstaller(certPem: string): Promise<void> {
     const keychain = this.defaultCaInstallPath();
-    const tmpPath = join(tmpdir(), `rogatio-ca-${Date.now()}.crt`);
-
     try {
-      writeFileSync(tmpPath, certPem, "utf8");
-    } catch {
-      throw new TrustError("trust.internal", "keychain-unwritable", [
-        "keychain-unwritable",
-      ]);
-    }
-
-    const result = await new Promise<{ code: number; stderr: string }>(
-      (resolve) => {
-        const child = spawn("security", [
+      await withInstallCertificateFile(certPem, async (certPath) => {
+        const result = await spawnSecurity([
           "add-trusted-cert",
           "-d",
           "-r",
           "trustRoot",
           "-k",
           keychain,
-          tmpPath,
+          certPath,
         ]);
-        let stderr = "";
-        child.stderr?.on("data", (data) => {
-          stderr += data.toString();
-        });
-        child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
-        child.on("error", (err) => resolve({ code: 1, stderr: err.message }));
-      },
-    );
-
-    try {
-      unlinkSync(tmpPath);
-    } catch {
-      // best effort cleanup
-    }
-
-    if (result.code !== 0) {
-      const stderr = result.stderr.toLowerCase();
-      let reason = "keychain-unwritable";
-      if (stderr.includes("permission") || stderr.includes("auth")) {
-        reason = "keychain-unwritable";
-      }
-      throw new TrustError("trust.internal", reason, [reason]);
+        if (result.code !== 0) {
+          const stderr = result.stderr.toLowerCase();
+          let reason = "keychain-unwritable";
+          if (stderr.includes("permission") || stderr.includes("auth")) {
+            reason = "keychain-unwritable";
+          }
+          throw new TrustError("trust.internal", reason, [reason]);
+        }
+      });
+    } catch (error) {
+      if (error instanceof TrustError) throw error;
+      throw new TrustError("trust.internal", "keychain-unwritable", [
+        "keychain-unwritable",
+      ]);
     }
   },
   async caTrustRemover(): Promise<void> {
@@ -177,13 +163,7 @@ const darwinAdapter: TrustPlatformAdapter = {
     const tmpPath = join(dir, "previous.crt");
     let failed = false;
     try {
-      const handle = await open(tmpPath, "wx", 0o600);
-      try {
-        await handle.writeFile(certPem, "utf8");
-        await handle.chmod(0o600);
-      } finally {
-        await handle.close();
-      }
+      await writeExclusiveCertificate(tmpPath, certPem);
       const trust = await spawnSecurity(["remove-trusted-cert", "-d", tmpPath]);
       if (trust.code !== 0 && !securityMiss(trust.stderr)) failed = true;
       const item = await spawnSecurity([
