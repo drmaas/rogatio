@@ -1,10 +1,9 @@
 import { spawn, spawnSync } from "node:child_process";
-import { accessSync, constants, unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { accessSync, constants } from "node:fs";
 import { join as posixJoin } from "node:path/posix";
 import type { TrustCapabilities } from "../trust.js";
 import { TrustError } from "../trust.js";
+import { withInstallCertificateFile } from "./private-cert-file.js";
 import type { TrustPlatformAdapter } from "./types.js";
 
 const win32Adapter: TrustPlatformAdapter = {
@@ -46,41 +45,43 @@ const win32Adapter: TrustPlatformAdapter = {
     };
   },
   async caTrustInstaller(certPem: string): Promise<void> {
-    const tmpPath = join(tmpdir(), `rogatio-ca-${Date.now()}.crt`);
-
     try {
-      writeFileSync(tmpPath, certPem, "utf8");
-    } catch {
+      await withInstallCertificateFile(certPem, async (certPath) => {
+        const result = await new Promise<{ code: number; stderr: string }>(
+          (resolve) => {
+            const child = spawn("certutil", [
+              "-addstore",
+              "-f",
+              "Root",
+              certPath,
+            ]);
+            let stderr = "";
+            child.stderr?.on("data", (data) => {
+              stderr += data.toString();
+            });
+            child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
+            child.on("error", (err) =>
+              resolve({ code: 1, stderr: err.message }),
+            );
+          },
+        );
+        if (result.code !== 0) {
+          const stderr = result.stderr.toLowerCase();
+          let reason = "elevation-required";
+          if (
+            stderr.includes("access denied") ||
+            stderr.includes("permission")
+          ) {
+            reason = "elevation-required";
+          }
+          throw new TrustError("trust.internal", reason, [reason]);
+        }
+      });
+    } catch (error) {
+      if (error instanceof TrustError) throw error;
       throw new TrustError("trust.internal", "elevation-required", [
         "elevation-required",
       ]);
-    }
-
-    const result = await new Promise<{ code: number; stderr: string }>(
-      (resolve) => {
-        const child = spawn("certutil", ["-addstore", "-f", "Root", tmpPath]);
-        let stderr = "";
-        child.stderr?.on("data", (data) => {
-          stderr += data.toString();
-        });
-        child.on("close", (code) => resolve({ code: code ?? 1, stderr }));
-        child.on("error", (err) => resolve({ code: 1, stderr: err.message }));
-      },
-    );
-
-    try {
-      unlinkSync(tmpPath);
-    } catch {
-      // best effort cleanup
-    }
-
-    if (result.code !== 0) {
-      const stderr = result.stderr.toLowerCase();
-      let reason = "elevation-required";
-      if (stderr.includes("access denied") || stderr.includes("permission")) {
-        reason = "elevation-required";
-      }
-      throw new TrustError("trust.internal", reason, [reason]);
     }
   },
   async caTrustRemover(): Promise<void> {
