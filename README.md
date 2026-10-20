@@ -181,7 +181,7 @@ Configuration is stored at:
 - **macOS**: `~/Library/Application Support/rogatio/provider.json`
 - **Windows**: `%LOCALAPPDATA%\rogatio\provider.json`
 
-The config file has `600` permissions (owner read/write only). The API key never appears in `.rogatio.json` or git history.
+On POSIX the config directory is `700` and the config file is `600` (owner read/write only). The API key never appears in `.rogatio.json` or git history.
 
 ### Using AI in the Editor
 
@@ -210,7 +210,7 @@ When the native runtime is started (`Start runtime`) and a provider is configure
 
 - **Zero telemetry** — No data sent to Rogatio servers
 - **Your provider, your data** — Requests go only to your configured AI endpoint
-- **API key isolation** — Stored in config file (600 perms), read only by `rogatio edit` and `rogatio runtime host`
+- **API key isolation** — Stored in the config file (`600`, under a `700` directory on POSIX), read only by `rogatio edit` and `rogatio runtime host`
 - **Validation gate** — All AI output passes through schema + compiler validation before being applied
 - **No browser direct calls** — AI runs in CLI server process or native host, not in browser
 

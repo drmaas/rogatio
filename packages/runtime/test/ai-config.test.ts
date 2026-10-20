@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { closeSync, constants, openSync, readSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -236,11 +238,135 @@ describe("ai-config", () => {
       await writeProviderConfig(config);
 
       const stat = await fs.stat(configPath);
-      // Check owner read/write only (0o600 = 0o100600 in stat.mode)
-      // Mask with 0o777 to get permission bits, then verify group/other have no access
-      const perms = stat.mode & 0o777;
-      expect(perms & 0o077).toBe(0); // No group/other permissions
-      expect(perms & 0o600).toBe(0o600); // Owner has read/write
+      expect(stat.mode & 0o777).toBe(0o600);
+    });
+
+    it("creates the config directory as 0o700", async () => {
+      if (originalPlatform === "win32") return;
+
+      await writeProviderConfig({
+        providerUrl: "https://api.openai.com/v1",
+        model: "gpt-4o-mini",
+        apiKey: "sk-test123",
+      });
+
+      const dirMode = (await fs.lstat(path.dirname(configPath))).mode & 0o777;
+      expect(dirMode).toBe(0o700);
+    });
+
+    it("sets an existing 0o755 config directory to 0o700", async () => {
+      if (originalPlatform === "win32") return;
+
+      const configDir = path.dirname(configPath);
+      await fs.mkdir(configDir, { recursive: true, mode: 0o755 });
+      await fs.chmod(configDir, 0o755);
+      expect((await fs.lstat(configDir)).mode & 0o777).toBe(0o755);
+
+      await writeProviderConfig({
+        providerUrl: "https://api.openai.com/v1",
+        model: "gpt-4o-mini",
+        apiKey: "sk-test123",
+      });
+
+      expect((await fs.lstat(configDir)).mode & 0o777).toBe(0o700);
+    });
+
+    it("sets an existing 0o644 provider file to 0o600 and writes the new key", async () => {
+      if (originalPlatform === "win32") return;
+
+      const configDir = path.dirname(configPath);
+      await fs.mkdir(configDir, { recursive: true });
+      await fs.writeFile(configPath, '{"apiKey":"sk-old"}\n', { mode: 0o644 });
+      await fs.chmod(configPath, 0o644);
+      expect((await fs.lstat(configPath)).mode & 0o777).toBe(0o644);
+
+      const config = {
+        providerUrl: "https://api.openai.com/v1",
+        model: "gpt-4o-mini",
+        apiKey: "sk-replaced",
+      };
+      await writeProviderConfig(config);
+
+      expect((await fs.lstat(configPath)).mode & 0o777).toBe(0o600);
+      expect(await readProviderConfig()).toEqual(config);
+    });
+
+    it("does not follow a symlink at provider.json", async () => {
+      if (originalPlatform === "win32") return;
+
+      const configDir = path.dirname(configPath);
+      await fs.mkdir(configDir, { recursive: true });
+      const sink = path.join(configDir, "sink.json");
+      const sinkBytes = '{"apiKey":"sk-sink"}\n';
+      await fs.writeFile(sink, sinkBytes);
+      await fs.symlink(sink, configPath);
+
+      await expect(
+        writeProviderConfig({
+          providerUrl: "https://api.openai.com/v1",
+          model: "gpt-4o-mini",
+          apiKey: "sk-should-not-land",
+        }),
+      ).rejects.toThrow(/not a regular file/);
+
+      expect(await fs.readFile(sink, "utf8")).toBe(sinkBytes);
+      expect((await fs.lstat(configPath)).isSymbolicLink()).toBe(true);
+    });
+
+    it("does not write into a fifo at provider.json", async () => {
+      if (originalPlatform === "win32") return;
+
+      const configDir = path.dirname(configPath);
+      await fs.mkdir(configDir, { recursive: true });
+      try {
+        execFileSync("mkfifo", [configPath]);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "ENOENT") return;
+        throw error;
+      }
+
+      const reader = openSync(
+        configPath,
+        constants.O_RDONLY | constants.O_NONBLOCK,
+      );
+      try {
+        await expect(
+          writeProviderConfig({
+            providerUrl: "https://api.openai.com/v1",
+            model: "gpt-4o-mini",
+            apiKey: "sk-should-not-land",
+          }),
+        ).rejects.toThrow(/not a regular file/);
+
+        const buf = Buffer.alloc(64);
+        let bytes = 0;
+        try {
+          bytes = readSync(reader, buf, 0, buf.length, null);
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+          if (code !== "EAGAIN" && code !== "EWOULDBLOCK") throw error;
+        }
+        expect(bytes).toBe(0);
+        expect((await fs.lstat(configPath)).isFIFO()).toBe(true);
+      } finally {
+        closeSync(reader);
+      }
+    });
+
+    it("rejects a symlink when reading provider.json", async () => {
+      if (originalPlatform === "win32") return;
+
+      const configDir = path.dirname(configPath);
+      await fs.mkdir(configDir, { recursive: true });
+      const sink = path.join(configDir, "sink.json");
+      const sinkBytes = '{"apiKey":"sk-sink"}\n';
+      await fs.writeFile(sink, sinkBytes);
+      await fs.symlink(sink, configPath);
+
+      await expect(readProviderConfig()).rejects.toThrow(/not a regular file/);
+      expect(await fs.readFile(sink, "utf8")).toBe(sinkBytes);
+      expect((await fs.lstat(configPath)).isSymbolicLink()).toBe(true);
     });
 
     it("returns null when config does not exist", async () => {
