@@ -85,6 +85,49 @@ describe("rogatio runtime command ()", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     const code = await runtimeCommand(["host", projectPath]);
     expect(code).toBe(1);
+    expect(error.mock.calls.join("\n")).toContain("schema.");
+    expect(error.mock.calls.join("\n")).not.toContain("schema.schema.");
+    error.mockRestore();
+  });
+
+  it("prints a single schema prefix for a bad redirect via runtime host", async () => {
+    const projectPath = join(testDir, ".rogatio.json");
+    await writeFile(
+      projectPath,
+      JSON.stringify({
+        version: 2,
+        name: "Redirect",
+        groups: [
+          {
+            id: "group1",
+            name: "Group",
+            rules: [
+              {
+                id: "rule1",
+                name: "Redirect",
+                source: {
+                  key: "url",
+                  operator: "regex",
+                  value: "^https://example\\.com/",
+                },
+                resourceTypes: ["main_frame"],
+                priority: 1,
+                type: "redirect",
+                redirect: { destination: "ftp://example.com/elsewhere" },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const code = await runtimeCommand(["host", projectPath]);
+    expect(code).toBe(1);
+    expect(error.mock.calls.join("\n")).toContain("(schema.invalid-value)");
+    expect(error.mock.calls.join("\n")).toContain(
+      "Redirect destination must use the http or https scheme.",
+    );
+    expect(error.mock.calls.join("\n")).not.toContain("schema.schema.");
     error.mockRestore();
   });
 

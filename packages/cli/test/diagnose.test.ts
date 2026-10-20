@@ -25,6 +25,34 @@ const validProject = {
   ],
 };
 
+function redirectProject(destination: string) {
+  return {
+    version: 2,
+    name: "Redirect Project",
+    groups: [
+      {
+        id: "group1",
+        name: "Group 1",
+        rules: [
+          {
+            id: "rule1",
+            name: "Redirect Rule",
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/",
+            },
+            resourceTypes: ["main_frame"],
+            priority: 1,
+            type: "redirect",
+            redirect: { destination },
+          },
+        ],
+      },
+    ],
+  };
+}
+
 describe("diagnoseProject", () => {
   it("maps schema failures for a missing name and an unknown property", () => {
     const diagnosis = diagnoseProject({
@@ -74,12 +102,61 @@ describe("diagnoseProject", () => {
       expect(diagnosis.diagnostics.length).toBeGreaterThan(0);
       for (const diagnostic of diagnosis.diagnostics) {
         expect(diagnostic.code.startsWith("schema.")).toBe(true);
+        expect(diagnostic.code.includes("schema.schema.")).toBe(false);
         expect(diagnostic.severity).toBe("error");
         expect(diagnostic.path.length).toBeGreaterThan(0);
         expect(typeof diagnostic.message).toBe("string");
         expect(diagnostic.params).toEqual(expect.any(Object));
       }
     }
+  });
+
+  it("reports a non-http redirect destination as schema.invalid-value", () => {
+    const diagnosis = diagnoseProject(
+      redirectProject("ftp://example.com/elsewhere"),
+    );
+
+    expect(diagnosis.stage).toBe("schema");
+    expect(diagnosis.diagnostics).toEqual([
+      {
+        code: "schema.invalid-value",
+        severity: "error",
+        path: "/groups/0/rules/0/redirect/destination",
+        message: "Redirect destination must use the http or https scheme.",
+        params: {},
+      },
+    ]);
+  });
+
+  it("reports an unparsable redirect destination as schema.invalid-format", () => {
+    const diagnosis = diagnoseProject(redirectProject("not a url"));
+
+    expect(diagnosis.stage).toBe("schema");
+    expect(diagnosis.diagnostics).toEqual([
+      {
+        code: "schema.invalid-format",
+        severity: "error",
+        path: "/groups/0/rules/0/redirect/destination",
+        message: "Redirect destination must be an absolute URL.",
+        params: {},
+      },
+    ]);
+  });
+
+  it("reports a bare capture dollar as schema.capture-invalid-syntax", () => {
+    const diagnosis = diagnoseProject(redirectProject("https://example.com/$"));
+
+    expect(diagnosis.stage).toBe("schema");
+    expect(diagnosis.diagnostics).toEqual([
+      {
+        code: "schema.capture-invalid-syntax",
+        severity: "error",
+        path: "/groups/0/rules/0/redirect/destination",
+        message:
+          "Capture references must use $1 through $9; use $$ for a literal $.",
+        params: { offset: 20, groups: 0 },
+      },
+    ]);
   });
 
   it("returns the validated project and compiled operations", () => {

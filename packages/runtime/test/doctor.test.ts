@@ -344,6 +344,48 @@ describe("rogatio doctor", () => {
     expect(invalid.checks[1]?.status).toBe("fail");
     expect(invalid.checks[1]?.fix).toBe(`rogatio verify ${path}`);
     expect(invalid.checks[1]?.summary).toContain("schema.");
+    expect(invalid.checks[1]?.summary).not.toContain("schema.schema.");
+  });
+
+  it("reports a bad redirect with a single schema prefix", async () => {
+    const path = "/tmp/redirect.json";
+    const report = await runDoctor(
+      input({
+        project: fileProject(path, async () => ({
+          ok: true,
+          data: {
+            version: 2,
+            name: "Redirect",
+            groups: [
+              {
+                id: "group1",
+                name: "Group",
+                rules: [
+                  {
+                    id: "rule1",
+                    name: "Redirect",
+                    source: {
+                      key: "url",
+                      operator: "regex",
+                      value: "^https://example\\.com/",
+                    },
+                    resourceTypes: ["main_frame"],
+                    priority: 1,
+                    type: "redirect",
+                    redirect: { destination: "ftp://example.com/elsewhere" },
+                  },
+                ],
+              },
+            ],
+          },
+        })),
+      }),
+    );
+    expect(report.checks[1]?.status).toBe("fail");
+    expect(report.checks[1]?.summary).toContain(
+      "/groups/0/rules/0/redirect/destination: Redirect destination must use the http or https scheme. (schema.invalid-value)",
+    );
+    expect(report.checks[1]?.summary).not.toContain("schema.schema.");
   });
 
   it("fails a missing host manifest with the install command", async () => {

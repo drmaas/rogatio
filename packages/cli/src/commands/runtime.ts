@@ -13,6 +13,7 @@ import {
   RUNTIME_LIMITS,
   readProviderConfig,
   runNativeHost,
+  schemaDiagnosticCode,
 } from "@rogatio/runtime";
 import { validateProjectDetailed } from "@rogatio/schema";
 import { showRuntimeHelp } from "../help.js";
@@ -333,7 +334,7 @@ async function runtimeHostCommand(
   if (!schemaResult.valid) {
     for (const issue of schemaResult.errors) {
       console.error(
-        `${issue.instancePath || "/"}/: ${issue.message} (schema.${issue.keyword})`,
+        `${issue.instancePath || "/"}/: ${issue.message} (${schemaDiagnosticCode(issue.keyword)})`,
       );
     }
     return 1;
