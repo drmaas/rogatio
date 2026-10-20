@@ -107,7 +107,7 @@ rogatio ai test
 rogatio ai delete
 ```
 
-Configuration is stored at `~/.config/rogatio/provider.json` (Linux), `~/Library/Application Support/rogatio/provider.json` (macOS), or `%LOCALAPPDATA%\rogatio\provider.json` (Windows) with `600` permissions.
+Configuration is stored at `~/.config/rogatio/provider.json` (Linux), `~/Library/Application Support/rogatio/provider.json` (macOS), or `%LOCALAPPDATA%\rogatio\provider.json` (Windows). On POSIX the config directory mode is `700` and `provider.json` is `600`.
 
 When AI is configured, `rogatio edit` shows an **AI Assist** button on the project title row. Click it to:
 - Generate rules from natural language
