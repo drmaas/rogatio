@@ -135,6 +135,53 @@ describe("verify command", () => {
     expect(output.length).toBeGreaterThan(0);
   });
 
+  it("prints a single schema prefix for redirect and capture failures", async () => {
+    const nonHttp = structuredClone(validProject);
+    nonHttp.groups[0]?.rules.splice(0, 1, {
+      ...validProject.groups[0].rules[0],
+      redirect: { destination: "ftp://example.com/elsewhere" },
+    });
+    const nonHttpOutput = await verifyCommand(
+      ["-"],
+      JSON.stringify(nonHttp),
+      true,
+    );
+    expect(nonHttpOutput).toContain(
+      "/groups/0/rules/0/redirect/destination: Redirect destination must use the http or https scheme. (schema.invalid-value)",
+    );
+    expect(nonHttpOutput).not.toContain("schema.schema.");
+
+    const unparsable = structuredClone(validProject);
+    unparsable.groups[0]?.rules.splice(0, 1, {
+      ...validProject.groups[0].rules[0],
+      redirect: { destination: "not a url" },
+    });
+    const unparsableOutput = await verifyCommand(
+      ["-"],
+      JSON.stringify(unparsable),
+      true,
+    );
+    expect(unparsableOutput).toContain(
+      "/groups/0/rules/0/redirect/destination: Redirect destination must be an absolute URL. (schema.invalid-format)",
+    );
+    expect(unparsableOutput).not.toContain("schema.schema.");
+
+    const capture = structuredClone(validProject);
+    capture.groups[0]?.rules.splice(0, 1, {
+      ...validProject.groups[0].rules[0],
+      redirect: { destination: "https://example.com/$" },
+    });
+    const captureOutput = await verifyCommand(
+      ["-"],
+      JSON.stringify(capture),
+      true,
+    );
+    expect(captureOutput).toContain(
+      "Capture references must use $1 through $9; use $$ for a literal $. (schema.capture-invalid-syntax)",
+    );
+    expect(captureOutput).not.toContain("schema.schema.");
+  });
+
   it("shows schema errors in output", async () => {
     const invalidProject = {
       ...validProject,

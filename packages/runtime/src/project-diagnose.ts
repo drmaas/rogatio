@@ -17,6 +17,14 @@ export interface Diagnosis {
 }
 
 /**
+ * Catalog codes already start with `schema.`. Redirect-destination and
+ * URL-capture keywords are stored that way; Ajv keywords are not.
+ */
+export function schemaDiagnosticCode(keyword: string): string {
+  return keyword.startsWith("schema.") ? keyword : `schema.${keyword}`;
+}
+
+/**
  * Schema then compiler, the same sequence `rogatio verify` reports.
  * A thrown validator becomes an empty diagnosis only when the caller asks;
  * this function lets schema errors propagate so the caller can map them.
@@ -27,7 +35,7 @@ export function diagnoseProjectData(projectData: unknown): Diagnosis {
   if (!schemaResult.valid) {
     for (const error of schemaResult.errors) {
       diagnostics.push({
-        code: `schema.${error.keyword}`,
+        code: schemaDiagnosticCode(error.keyword),
         severity: "error",
         path: error.instancePath || "/",
         message: error.message,

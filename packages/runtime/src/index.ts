@@ -30,6 +30,7 @@ export {
   diagnoseProjectData,
   formatProjectDiagnostics,
   type ProjectDiagnostic,
+  schemaDiagnosticCode,
 } from "./project-diagnose.js";
 export {
   matchersFromOperations,
