@@ -386,7 +386,12 @@ function render(): void {
   if (doctorReport) {
     const doctor = document.createElement("section");
     doctor.dataset.doctorReport = "true";
-    renderDoctorReport(doctor, doctorReport);
+    renderDoctorReport(doctor, doctorReport, {
+      onClear: () => {
+        doctorReport = null;
+        render();
+      },
+    });
     parts.push(doctor);
   }
   parts.push(list, importField());

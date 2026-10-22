@@ -405,6 +405,14 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.rogatio-popup .rogatio-doctor-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.rogatio-popup .rogatio-doctor-actions button {
+  flex: 1;
+  min-width: 0;
+}
 @media (prefers-reduced-motion: reduce) {
   .rogatio-popup *,
   .rogatio-popup *::before,
