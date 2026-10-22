@@ -49,8 +49,31 @@ function calculateRetryDelay(attempt: number): number {
   return RETRY_DELAY_BASE * 2 ** attempt + Math.random() * 100;
 }
 
-function providerStatusError(status: number): Error {
-  return new Error(`HTTP ${status}`);
+/**
+ * URL safe to put in an error. Userinfo, query, and fragment can carry a key;
+ * the path is what distinguishes a missing endpoint from a model 404.
+ */
+function publicRequestUrl(url: string): string | undefined {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+  parsed.username = "";
+  parsed.password = "";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.href;
+}
+
+function providerStatusError(status: number, url: string): Error {
+  const requestUrl = publicRequestUrl(url);
+  return new Error(
+    requestUrl === undefined
+      ? `HTTP ${status}`
+      : `HTTP ${status} for ${requestUrl}`,
+  );
 }
 
 async function releaseResponse(response: Response): Promise<void> {
@@ -126,7 +149,7 @@ async function fetchProvider(
     }
 
     if (terminalStatus !== undefined) {
-      throw providerStatusError(terminalStatus);
+      throw providerStatusError(terminalStatus, url);
     }
   }
 
