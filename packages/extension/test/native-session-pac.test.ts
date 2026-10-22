@@ -190,4 +190,109 @@ describe("startNativeSession pacRoutes", () => {
       "redirect",
     ]);
   });
+
+  it("refuses response-body redirects when the listener token is missing", async () => {
+    const result = await startNativeSession({
+      extensionId: "ext",
+      nativeRuntime: {
+        start: async () => ({
+          state: "started" as const,
+          proxy: { host: "127.0.0.1", port: 9 },
+        }),
+        stop: async () => ({ state: "stopped" }),
+        status: async () => ({ state: "stopped" }),
+        sendPolicy: async () => undefined,
+        send: async (envelope) => ({
+          protocol: "v1",
+          type: envelope.type,
+          timestamp: Date.now(),
+          metadata: { ok: true, presetDigest: "sha256:abc" },
+        }),
+      },
+      getProject: async () => ({
+        data: bodyProject,
+        enabledGroupIds: ["group-body"],
+      }),
+      bodyMarkers: {
+        api: {
+          storage: {
+            local: {
+              get: async () => ({}),
+              set: async () => undefined,
+            },
+          },
+          declarativeNetRequest: {
+            getSessionRules: async () => [],
+            updateSessionRules: async () => undefined,
+          },
+        } as never,
+        runtimeStripPathAvailable: false,
+      },
+    });
+    expect(result).toEqual({
+      ok: false,
+      reason: "response-body-token-missing",
+    });
+  });
+
+  it("puts the listener token on each response-body redirect", async () => {
+    const token = "ab".repeat(32);
+    const added: Array<{
+      action?: { redirect?: { regexSubstitution?: string } };
+    }> = [];
+    const result = await startNativeSession({
+      extensionId: "ext",
+      nativeRuntime: {
+        start: async () => ({
+          state: "started" as const,
+          proxy: { host: "127.0.0.1", port: 9, responseBodyToken: token },
+        }),
+        stop: async () => ({ state: "stopped" }),
+        status: async () => ({ state: "stopped" }),
+        sendPolicy: async () => undefined,
+        send: async (envelope) => ({
+          protocol: "v1",
+          type: envelope.type,
+          timestamp: Date.now(),
+          metadata: { ok: true, presetDigest: "sha256:abc" },
+        }),
+      },
+      getProject: async () => ({
+        data: bodyProject,
+        enabledGroupIds: ["group-body"],
+      }),
+      bodyMarkers: {
+        api: {
+          storage: {
+            local: {
+              get: async () => ({}),
+              set: async () => undefined,
+            },
+          },
+          declarativeNetRequest: {
+            getSessionRules: async () => [],
+            updateSessionRules: async (payload: {
+              addRules?: Array<{
+                action?: { redirect?: { regexSubstitution?: string } };
+              }>;
+            }) => {
+              added.push(...(payload.addRules ?? []));
+            },
+          },
+        } as never,
+        runtimeStripPathAvailable: false,
+      },
+    });
+    expect(result.ok).toBe(true);
+    const substitutions = added.flatMap((rule) => {
+      const value = rule.action?.redirect?.regexSubstitution;
+      return value === undefined ? [] : [value];
+    });
+    expect(substitutions.length).toBeGreaterThan(0);
+    expect(
+      substitutions.every((value) =>
+        value.startsWith(`http://127.0.0.1:9/.rogatio/body/${token}/`),
+      ),
+    ).toBe(true);
+  });
 });

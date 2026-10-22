@@ -1,4 +1,10 @@
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingHttpHeaders,
+  type IncomingMessage,
+  type Server,
+} from "node:http";
 import { connect, type Socket } from "node:net";
 import { compileProject, type RogatioOperation } from "@rogatio/compiler";
 import type { RogatioProject } from "@rogatio/schema";
@@ -11,7 +17,15 @@ import {
 } from "../src/intercept-proxy.js";
 import { RUNTIME_LIMITS } from "../src/limits.js";
 import * as revalidateMod from "../src/revalidate.js";
-import type { ResolvedAddress } from "../src/types.js";
+import type {
+  OutboundRequest,
+  OutboundResponse,
+  OutboundTransport,
+  ResolvedAddress,
+} from "../src/types.js";
+
+const PROXY_DOCUMENT_CSP =
+  "sandbox; default-src 'none'; script-src 'none'; connect-src 'none'; form-action 'none'; frame-src 'none'";
 
 function listen(
   handler: (
@@ -469,7 +483,240 @@ describe("intercept-proxy data path", () => {
     });
     spy.mockRestore();
   });
+
+  it("serves a matched response-body document with a sandbox content policy", async () => {
+    const seen: Array<Record<string, string | undefined>> = [];
+    const up = await listen((_req, res) => {
+      res.writeHead(200, [
+        ["Content-Type", "text/html; charset=utf-8"],
+        ["Content-Security-Policy", "script-src 'unsafe-inline'"],
+        ["Content-Security-Policy-Report-Only", "script-src 'unsafe-inline'"],
+        ["Set-Cookie", "a=b"],
+        ["Cookie", "c=d"],
+        ["Authorization", "Bearer upstream"],
+      ]);
+      res.end("<html><script>window.__ran = 1</script>oldValue</html>");
+    });
+    upstream = up.server;
+    const project = buildProject(up.origin, [
+      {
+        id: "r-resp",
+        name: "resp",
+        urlRegex: "^http://fixture\\.example/page$",
+        origins: [],
+        resourceTypes: ["main_frame", "sub_frame"],
+        priority: 10,
+        type: "response-body",
+        responseBody: {
+          replacements: [{ pattern: "oldValue", replacement: "newValue" }],
+        },
+      },
+    ]);
+    const digest = "sha256:abc";
+    proxy = await startInterceptProxy({
+      policy: {
+        project,
+        operations: compileOps(project),
+        presetDigest: digest,
+      },
+      resolver: publicResolver(),
+      dial: dialFixture(up.port),
+      outbound: {
+        resolver: publicResolver(),
+        transport: recordingTransport(up.port, (headers) => {
+          seen.push(headers);
+        }),
+      },
+    });
+    expect(proxy.responseBodyToken).toMatch(/^[0-9a-f]{64}$/);
+    const spy = vi.spyOn(revalidateMod, "revalidateAuthority");
+    const url = `${FIXTURE_ORIGIN}/page`;
+    const result = await originGet(
+      proxy.endpoint.port,
+      listenerPath(proxy.responseBodyToken, "r-resp", digest, url),
+      { cookie: "session=1", authorization: "Bearer secret" },
+    );
+    expect(result.status).toBe(200);
+    expect(result.body).toContain("newValue");
+    expect(result.body).not.toContain("oldValue");
+    expect(result.body).toContain("<script>window.__ran = 1</script>");
+    expect(result.headers["content-security-policy"]).toBe(PROXY_DOCUMENT_CSP);
+    expect(result.headers["content-security-policy"]).not.toContain(
+      "allow-scripts",
+    );
+    expect(result.headers["content-security-policy"]).not.toContain(
+      "allow-same-origin",
+    );
+    expect(result.headers["x-content-type-options"]).toBe("nosniff");
+    expect(result.headers["content-security-policy-report-only"]).toBe(
+      undefined,
+    );
+    expect(result.headers["set-cookie"]).toBeUndefined();
+    expect(result.headers.cookie).toBeUndefined();
+    expect(result.headers.authorization).toBeUndefined();
+    expect(String(result.headers["content-type"])).toContain("text/html");
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.cookie).toBeUndefined();
+    expect(seen[0]?.authorization).toBeUndefined();
+    const call = spy.mock.calls[0];
+    expect(call?.[2]).toMatchObject({
+      groupId: "g1",
+      ruleId: "r-resp",
+      url,
+    });
+    expect(call?.[2]).not.toHaveProperty("resourceType");
+    expect(call?.[2]?.resourceType).not.toBe("main_frame");
+    spy.mockRestore();
+  });
+
+  it("rejects a response-body request without the token or with the wrong token", async () => {
+    const up = await listen((_req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end("secret");
+    });
+    upstream = up.server;
+    const project = buildProject(up.origin, [
+      {
+        id: "r-resp",
+        name: "resp",
+        urlRegex: "^http://fixture\\.example/page$",
+        origins: [],
+        resourceTypes: ["main_frame"],
+        priority: 10,
+        type: "response-body",
+        responseBody: {
+          replacements: [{ pattern: "secret", replacement: "public" }],
+        },
+      },
+    ]);
+    const digest = "sha256:abc";
+    proxy = await startInterceptProxy({
+      policy: {
+        project,
+        operations: compileOps(project),
+        presetDigest: digest,
+      },
+      resolver: publicResolver(),
+      dial: dialFixture(up.port),
+      outbound: {
+        resolver: publicResolver(),
+        transport: recordingTransport(up.port),
+      },
+    });
+    const url = `${FIXTURE_ORIGIN}/page`;
+    const missing = await originGet(
+      proxy.endpoint.port,
+      `/.rogatio/body/r-resp/${encodeURIComponent(digest)}/${url}`,
+    );
+    expect(missing.status).toBe(400);
+    expect(missing.body).toBe("");
+    const wrongToken = proxy.responseBodyToken.startsWith("0")
+      ? "f".repeat(64)
+      : "0".repeat(64);
+    const wrong = await originGet(
+      proxy.endpoint.port,
+      listenerPath(wrongToken, "r-resp", digest, url),
+    );
+    expect(wrong.status).toBe(403);
+    expect(wrong.body).toBe("");
+    const otherUrl = await originGet(
+      proxy.endpoint.port,
+      listenerPath(
+        proxy.responseBodyToken,
+        "r-resp",
+        digest,
+        `${FIXTURE_ORIGIN}/other`,
+      ),
+    );
+    expect(otherUrl.status).toBe(404);
+  });
 });
+
+function listenerPath(
+  token: string,
+  ruleId: string,
+  digest: string,
+  url: string,
+): string {
+  return `/.rogatio/body/${encodeURIComponent(token)}/${encodeURIComponent(ruleId)}/${encodeURIComponent(digest)}/${url}`;
+}
+
+function originGet(
+  port: number,
+  path: string,
+  headers: Record<string, string> = {},
+): Promise<{
+  status: number;
+  body: string;
+  headers: IncomingHttpHeaders;
+}> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      { host: "127.0.0.1", port, path, method: "GET", headers },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          resolve({
+            status: res.statusCode ?? 0,
+            body: Buffer.concat(chunks).toString("utf8"),
+            headers: res.headers,
+          });
+        });
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+function recordingTransport(
+  port: number,
+  onHeaders?: (headers: Record<string, string | undefined>) => void,
+): OutboundTransport {
+  return {
+    request(options: OutboundRequest): Promise<OutboundResponse> {
+      const flat: Record<string, string | undefined> = {};
+      for (const [name, value] of Object.entries(options.headers)) {
+        flat[name.toLowerCase()] = value;
+      }
+      onHeaders?.(flat);
+      return new Promise((resolve, reject) => {
+        const req = httpRequest(
+          {
+            host: "127.0.0.1",
+            port,
+            path: options.path,
+            method: options.method,
+            headers: options.headers,
+            agent: false,
+          },
+          (response) => {
+            const headerPairs: Array<[string, string]> = [];
+            for (
+              let index = 0;
+              index < response.rawHeaders.length;
+              index += 2
+            ) {
+              const name = response.rawHeaders[index];
+              const value = response.rawHeaders[index + 1];
+              if (name !== undefined && value !== undefined) {
+                headerPairs.push([name, value]);
+              }
+            }
+            resolve({
+              status: response.statusCode ?? 0,
+              headers: headerPairs,
+              body: response,
+            });
+          },
+        );
+        req.once("error", reject);
+        req.end();
+      });
+    },
+  };
+}
 
 describe("intercept-proxy upstream targets", () => {
   let upstream: Server | undefined;

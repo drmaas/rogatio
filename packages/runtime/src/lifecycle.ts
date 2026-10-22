@@ -56,7 +56,11 @@ export interface RuntimeActivation {
   readonly startedAt: number;
   readonly presetDigest: PresetDigest;
   readonly pacRoutes: readonly string[];
-  readonly proxy?: { readonly host: string; readonly port: number };
+  readonly proxy?: {
+    readonly host: string;
+    readonly port: number;
+    readonly responseBodyToken?: string;
+  };
   /** Exact local origins supplied when interception starts. */
   readonly localOrigins?: readonly string[];
 }

@@ -4,6 +4,8 @@ import { generatePacScript, pacRouteFromEntry } from "./pac.js";
 export interface ProxyEndpoint {
   readonly host: string;
   readonly port: number;
+  /** Unguessable token for response-body redirects on this listener. */
+  readonly responseBodyToken?: string;
 }
 
 export interface InterceptionProvider {

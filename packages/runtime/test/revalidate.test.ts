@@ -60,6 +60,37 @@ function buildBodyProject(): RogatioProject {
   } as RogatioProject;
 }
 
+function buildResponseProject(): RogatioProject {
+  return {
+    version: 2,
+    name: "response-project",
+    groups: [
+      {
+        id: "g1",
+        name: "group-one",
+        rules: [
+          {
+            id: "r1",
+            name: "body-rule",
+            source: {
+              key: "url",
+              operator: "regex",
+              value: "^https://example\\.com/.*",
+            },
+            resourceTypes: ["main_frame"],
+            priority: 1,
+            method: "GET",
+            type: "response-body",
+            responseBody: {
+              replacements: [{ pattern: "a", replacement: "b" }],
+            },
+          },
+        ],
+      },
+    ],
+  } as RogatioProject;
+}
+
 function compile(project: RogatioProject) {
   const result = compileProject(project);
   if (!result.ok) throw new Error("compile failed");
@@ -225,6 +256,54 @@ describe("revalidateAuthority", () => {
       baseRequest,
     );
     expect(decision).toEqual({ allowed: false, reason: "project-invalid" });
+  });
+
+  it("allows a response-body URL match when resource type is omitted", async () => {
+    const project = buildResponseProject();
+    const decision = await revalidateAuthority(project, compile(project), {
+      groupId: "g1",
+      ruleId: "r1",
+      url: "https://example.com/page",
+      method: "GET",
+      initiator: "https://example.com",
+      target: "https://example.com/page",
+    });
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("still denies a response-body request whose resource type is outside the rule", async () => {
+    const project = buildResponseProject();
+    const decision = await revalidateAuthority(project, compile(project), {
+      groupId: "g1",
+      ruleId: "r1",
+      url: "https://example.com/page",
+      method: "GET",
+      resourceType: "script",
+      initiator: "https://example.com",
+      target: "https://example.com/page",
+    });
+    expect(decision).toEqual({
+      allowed: false,
+      reason: "resource-type-unauthorized",
+    });
+  });
+
+  it("still denies a request-body operation when resource type is omitted", async () => {
+    const decision = await revalidateAuthority(
+      buildBodyProject(),
+      compile(buildBodyProject()),
+      {
+        groupId: "g1",
+        ruleId: "r1",
+        url: "https://example.com/page",
+        method: "POST",
+        initiator: "https://example.com",
+      },
+    );
+    expect(decision).toEqual({
+      allowed: false,
+      reason: "resource-type-unauthorized",
+    });
   });
 
   it("rejects symbol-keyed project shapes as project-invalid", async () => {

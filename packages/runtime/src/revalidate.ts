@@ -113,13 +113,18 @@ export async function revalidateAuthority(
   }
 
   if (matcher.resourceTypes.length > 0) {
-    const resourceType =
-      typeof request.resourceType === "string"
-        ? request.resourceType
-        : undefined;
-    if (
-      resourceType === undefined ||
-      !matcher.resourceTypes.includes(resourceType as ResourceType)
+    // The response-body listener omits resourceType. That HTTP entry point
+    // has none of its own, and copying the rule's resourceTypes would make
+    // this comparison agree with the rule. A supplied type still has to be
+    // one of the rule's types. Other operations still require one.
+    const supplied = request.resourceType;
+    if (supplied === undefined) {
+      if (operation.kind !== "response-body") {
+        return { allowed: false, reason: "resource-type-unauthorized" };
+      }
+    } else if (
+      typeof supplied !== "string" ||
+      !matcher.resourceTypes.includes(supplied as ResourceType)
     ) {
       return { allowed: false, reason: "resource-type-unauthorized" };
     }

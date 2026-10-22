@@ -119,7 +119,11 @@ export interface NativeSessionOptions {
     start(config: NativeRuntimeConfig): Promise<{
       state: string;
       message?: string;
-      proxy?: { readonly host: string; readonly port: number };
+      proxy?: {
+        readonly host: string;
+        readonly port: number;
+        readonly responseBodyToken?: string;
+      };
     }>;
     stop(): Promise<{ state: string }>;
     status(): Promise<{ state: string }>;
@@ -412,11 +416,22 @@ export async function startNativeSession(
       (op): op is Extract<RogatioOperation, { kind: "response-body" }> =>
         op.kind === "response-body",
     );
+    const responseBodyToken = proxy.responseBodyToken;
+    if (
+      responseOps.length > 0 &&
+      (typeof responseBodyToken !== "string" || responseBodyToken.length === 0)
+    ) {
+      await removeResponseBodyRedirects(redirectApi);
+      await rollbackBodyMarkers(options.bodyMarkers);
+      await options.nativeRuntime.stop();
+      return { ok: false, reason: "response-body-token-missing" };
+    }
     const installed = await installResponseBodyRedirects({
       api: redirectApi,
       operations: responseOps,
       port: proxy.port,
       digest: presetDigest,
+      token: responseBodyToken ?? "",
     });
     if (!installed.ok) {
       await removeResponseBodyRedirects(redirectApi);
