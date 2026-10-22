@@ -44,10 +44,20 @@ function appendCheck(
   list.append(line);
 }
 
+export interface DoctorReportRenderOptions {
+  /**
+   * Invoked by the Clear button to hide the report. Hosts wire it to their own
+   * state plus re-render, so each surface drops the report the way it refreshes
+   * the rest of its view. When omitted, no Clear button renders.
+   */
+  readonly onClear?: () => void;
+}
+
 /** Render UI checks, then the host report, with textContent only. */
 export function renderDoctorReport(
   parent: HTMLElement,
   report: CombinedDiagnostics | null,
+  options: DoctorReportRenderOptions = {},
 ): void {
   if (report === null) return;
   const list = document.createElement("div");
@@ -70,6 +80,21 @@ export function renderDoctorReport(
       void clipboard.writeText(json).catch(() => undefined);
     }
   });
-  list.append(copy);
+  const actions = document.createElement("div");
+  actions.className = "rogatio-doctor-actions";
+  actions.append(copy);
+  if (typeof options.onClear === "function") {
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.dataset.command = "clear-doctor";
+    clear.textContent = "Clear";
+    clear.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      options.onClear?.();
+    });
+    actions.append(clear);
+  }
+  list.append(actions);
   parent.append(list);
 }

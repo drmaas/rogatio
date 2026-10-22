@@ -260,7 +260,8 @@ browser can see (service worker, native connection, extension id, versions,
 proxy, site access, rules, and incognito; the popup also checks the current
 tab) and then the same six host checks as `rogatio doctor`. **Copy diagnostics**
 writes one JSON document with those UI checks and the host report nested under
-`host`. Release builds carry
+`host`, and **Clear** next to it hides the report until you run checks again.
+Release builds carry
 a public `key` in the extension manifest, so that ID stays the same when a new
 ZIP is unpacked into a different folder. If the host manifest is not installed,
 starting shows the ready-to-run install command with a one-click copy button

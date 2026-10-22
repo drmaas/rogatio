@@ -151,6 +151,45 @@ describe("doctor report", () => {
     ).toBe("Copy diagnostics");
   });
 
+  it("shows Clear only with a callback and invokes it on click", () => {
+    const plain = document.createElement("div");
+    renderDoctorReport(plain, shell(report()));
+    expect(plain.querySelector("[data-command='clear-doctor']")).toBeNull();
+
+    const parent = document.createElement("div");
+    const onClear = vi.fn();
+    renderDoctorReport(parent, shell(report()), { onClear });
+    const clear = parent.querySelector<HTMLButtonElement>(
+      "[data-command='clear-doctor']",
+    );
+    expect(clear?.textContent).toBe("Clear");
+    clear?.click();
+    expect(onClear).toHaveBeenCalledOnce();
+  });
+
+  it("wires the dashboard Clear button through the clear callback", () => {
+    let cleared = false;
+    const section = createDashboardSystemStatus({
+      phase: "stopped",
+      runtimeError: null,
+      extensionId: EXTENSION_ID,
+      aiSupported: false,
+      aiStatusChecked: true,
+      aiReported: true,
+      aiProvider: null,
+      doctorReport: workerUnreachableDiagnostics(),
+      doctorOnClear: () => {
+        cleared = true;
+      },
+    });
+    const clear = section.querySelector<HTMLButtonElement>(
+      "[data-command='clear-doctor']",
+    );
+    expect(clear?.textContent).toBe("Clear");
+    clear?.click();
+    expect(cleared).toBe(true);
+  });
+
   it("shows Run checks and the fix on the dashboard runtime card", () => {
     const section = createDashboardSystemStatus({
       phase: "stopped",

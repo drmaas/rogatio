@@ -9,7 +9,10 @@ import { type AiPreviewSummary, summarizeAiPreview } from "./ai-preview.js";
 import { attentionFromRuleStatuses } from "./attention.js";
 import { PROJECT_VERSION, validateProjectDetailed } from "./browser-schema.js";
 import { createDashboardSystemStatus } from "./dashboard-status.js";
-import { renderDoctorReport } from "./doctor-view.js";
+import {
+  type DoctorReportRenderOptions,
+  renderDoctorReport,
+} from "./doctor-view.js";
 import {
   nativeHostOriginMismatchMessage,
   runtimeInstallCommand,
@@ -215,6 +218,22 @@ function readRuleDeepLink(): { groupId: string; ruleId: string } | null {
 let diagnosticsOpen = false;
 let doctorReport: CombinedDiagnostics | null = null;
 let doctorRunning = false;
+
+/**
+ * Shared Clear callback for the doctor report's "Clear" button: drop the
+ * report so neither surface re-renders it.
+ */
+const clearDoctorReport: DoctorReportRenderOptions["onClear"] = () => {
+  doctorReport = null;
+  // Sidebar rebuild without `renderShell`, which would discard a dirty
+  // editor draft; the dashboard has no editor to preserve, so it rebuilds
+  // normally.
+  if (editor && editorTab(activeTab)) {
+    patchWorkspaceEnablementChrome();
+    return;
+  }
+  renderShell();
+};
 let diagnosticsData: {
   phase: string;
   extensionId: string | null;
@@ -473,7 +492,7 @@ function appendRuntimeCardBody(body: HTMLElement): void {
       }
     }
   }
-  renderDoctorReport(body, doctorReport);
+  renderDoctorReport(body, doctorReport, { onClear: clearDoctorReport });
 }
 
 /**
@@ -1409,6 +1428,7 @@ function renderOverview(shell: HTMLElement): void {
     aiProvider,
     doctorReport,
     doctorRunning,
+    doctorOnClear: clearDoctorReport,
   });
 
   overview.append(systemStatus, creationSection, projectsSection);

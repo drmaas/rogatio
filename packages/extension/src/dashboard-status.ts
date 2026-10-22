@@ -11,7 +11,10 @@
  * sidebar card has no recovery line. All strings render via `textContent`.
  */
 
-import { renderDoctorReport } from "./doctor-view.js";
+import {
+  type DoctorReportRenderOptions,
+  renderDoctorReport,
+} from "./doctor-view.js";
 import { runtimeInstallCommand } from "./extension-id.js";
 import { runtimeControlDisabled } from "./runtime-controls.js";
 import {
@@ -36,6 +39,8 @@ export interface DashboardStatusInput {
   readonly aiProvider: DashboardAiProvider | null;
   readonly doctorReport?: CombinedDiagnostics | null;
   readonly doctorRunning?: boolean;
+  /** Clear callback forwarded to the report; omits the button when unset. */
+  readonly doctorOnClear?: DoctorReportRenderOptions["onClear"];
 }
 
 function dashboardButton(label: string, command: string): HTMLButtonElement {
@@ -108,7 +113,9 @@ function appendDashboardRuntimeBlock(
     );
     block.append(recovery);
   }
-  renderDoctorReport(block, input.doctorReport ?? null);
+  renderDoctorReport(block, input.doctorReport ?? null, {
+    onClear: input.doctorOnClear,
+  });
 }
 
 function appendDashboardAiBlock(

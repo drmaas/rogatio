@@ -1310,6 +1310,14 @@ body {
 .rogatio-doctor-check[data-status="warn"] {
   color: var(--rogatio-warning);
 }
+.rogatio-doctor-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.rogatio-doctor-actions button {
+  flex: 1;
+  min-width: 0;
+}
 @media (prefers-reduced-motion: reduce) {
   .rogatio-shell *,
   .rogatio-shell *::before,
