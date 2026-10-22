@@ -44,7 +44,11 @@ interface NativeRuntimeAdapter {
   start(config: NativeRuntimeConfig): Promise<{
     state: NativeRuntimePhase | "unsupported";
     message?: string;
-    proxy?: { readonly host: string; readonly port: number };
+    proxy?: {
+      readonly host: string;
+      readonly port: number;
+      readonly responseBodyToken?: string;
+    };
   }>;
   stop(): Promise<{ state: NativeRuntimePhase | "unsupported" }>;
   status(): Promise<{ state: NativeRuntimePhase | "unsupported" }>;
@@ -267,7 +271,11 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
     async start(config: NativeRuntimeConfig): Promise<{
       state: NativeRuntimePhase | "unsupported";
       message?: string;
-      proxy?: { readonly host: string; readonly port: number };
+      proxy?: {
+        readonly host: string;
+        readonly port: number;
+        readonly responseBodyToken?: string;
+      };
     }> {
       try {
         console.log("[rogatio] background.start: ensurePort + runtime.start");
@@ -316,14 +324,25 @@ function createNativeRuntimeAdapter(): NativeRuntimeAdapter {
           };
         }
         const proxy = response.metadata.proxy;
+        const proxyRecord =
+          typeof proxy === "object" && proxy !== null
+            ? (proxy as {
+                host?: unknown;
+                port?: unknown;
+                responseBodyToken?: unknown;
+              })
+            : undefined;
         const endpoint =
-          typeof proxy === "object" &&
-          proxy !== null &&
-          typeof (proxy as { host?: unknown }).host === "string" &&
-          typeof (proxy as { port?: unknown }).port === "number"
+          proxyRecord !== undefined &&
+          typeof proxyRecord.host === "string" &&
+          typeof proxyRecord.port === "number"
             ? {
-                host: (proxy as { host: string }).host,
-                port: (proxy as { port: number }).port,
+                host: proxyRecord.host,
+                port: proxyRecord.port,
+                ...(typeof proxyRecord.responseBodyToken === "string" &&
+                proxyRecord.responseBodyToken.length > 0
+                  ? { responseBodyToken: proxyRecord.responseBodyToken }
+                  : {}),
               }
             : undefined;
         return {

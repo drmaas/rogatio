@@ -102,7 +102,11 @@ export interface ExtensionApplicationOptions {
     start(config: NativeRuntimeConfig): Promise<{
       readonly state: NativeRuntimePhase | "unsupported";
       readonly message?: string;
-      readonly proxy?: { readonly host: string; readonly port: number };
+      readonly proxy?: {
+        readonly host: string;
+        readonly port: number;
+        readonly responseBodyToken?: string;
+      };
     }>;
     stop(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;
     status(): Promise<{ readonly state: NativeRuntimePhase | "unsupported" }>;

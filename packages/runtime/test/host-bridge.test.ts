@@ -136,6 +136,7 @@ describe("host PAC install round-trip", () => {
     expect(started.metadata.proxy).toMatchObject({
       host: "127.0.0.1",
       port: expect.any(Number),
+      responseBodyToken: expect.stringMatching(/^[0-9a-f]{64}$/),
     });
     expect(pacScripts.length).toBeGreaterThanOrEqual(1);
     expect(pacScripts[0]).toContain("127.0.0.1:");

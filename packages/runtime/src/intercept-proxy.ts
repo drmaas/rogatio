@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { lookup as dnsLookup } from "node:dns/promises";
 import {
   createServer,
@@ -17,7 +18,7 @@ import {
 } from "./address-policy.js";
 import { sourceMatchesWithinDeadline } from "./deadline-match.js";
 import { RUNTIME_LIMITS } from "./limits.js";
-import type { RenderedMock } from "./mock.js";
+import { mintToken, type RenderedMock } from "./mock.js";
 import { MOCK_LISTENER_PREFIX, parseMockRedirect } from "./mock-listener.js";
 import { rewriteRequestBody } from "./request-body.js";
 import {
@@ -27,6 +28,7 @@ import {
 import { parseResponseBodyRedirect } from "./response-body-listener.js";
 import { revalidateAuthority } from "./revalidate.js";
 import type {
+  OutboundOptions,
   OutboundResolver,
   PresetDigest,
   ResolvedAddress,
@@ -64,12 +66,48 @@ export interface InterceptProxyOptions {
   readonly resolver?: OutboundResolver;
   /** Opens the pinned numeric address. Defaults to `net.connect`. */
   readonly dial?: InterceptDial;
+  /**
+   * Credential-free response-body fetch. Production uses the default
+   * resolver and transport. Tests can pin both at a local upstream.
+   */
+  readonly outbound?: OutboundOptions;
 }
 
 export interface InterceptProxyHandle {
   readonly endpoint: ProxyEndpoint;
+  /** 32-byte hex token required on every response-body redirect path. */
+  readonly responseBodyToken: string;
   setPolicy(policy: InterceptProxyPolicy | null): void;
   stop(): Promise<void>;
+}
+
+/**
+ * Document policy for responses served on this listener. Upstream content
+ * policy headers are removed first. `default-src 'none'` also blocks style
+ * and image loads: allowing those sources would let the document request
+ * more URLs on this origin. The transformed body is still returned.
+ */
+const PROXY_DOCUMENT_CSP =
+  "sandbox; default-src 'none'; script-src 'none'; connect-src 'none'; form-action 'none'; frame-src 'none'";
+
+const DROPPED_DOCUMENT_HEADERS = new Set([
+  "content-security-policy",
+  "content-security-policy-report-only",
+  "x-content-type-options",
+]);
+
+function sameToken(supplied: string, expected: string): boolean {
+  const left = Buffer.from(supplied);
+  const right = Buffer.from(expected);
+  if (left.byteLength !== right.byteLength) return false;
+  return timingSafeEqual(left, right);
+}
+
+function proxyDocumentHeaders(): Array<[string, string]> {
+  return [
+    ["content-security-policy", PROXY_DOCUMENT_CSP],
+    ["x-content-type-options", "nosniff"],
+  ];
 }
 
 type BodyOperation = RequestBodyOperation | ResponseBodyOperation;
@@ -607,7 +645,8 @@ async function authorizeOp(
 
 /**
  * Loopback listener for body-rule rewrite.
- * Response-body redirects arrive as origin-form `/.rogatio/body/...` and are
+ * Response-body redirects arrive as origin-form
+ * `/.rogatio/body/<token>/<ruleId>/<digest>/<originalUrl>` and are
  * revalidated, then fetched with a credential-free GET.
  * Absolute-form HTTP is port 80 only. CONNECT is port 443 only and stays a
  * blind tunnel: bytes are spliced with no TLS decryption, to the pinned address.
@@ -615,6 +654,8 @@ async function authorizeOp(
 export async function startInterceptProxy(
   options: InterceptProxyOptions = {},
 ): Promise<InterceptProxyHandle> {
+  const responseBodyToken = mintToken();
+  const outbound = options.outbound;
   let policy: InterceptProxyPolicy | null = options.policy ?? null;
   const serveMock = options.serveMock;
   const resolver = options.resolver ?? defaultResolver;
@@ -889,10 +930,13 @@ export async function startInterceptProxy(
         endEmpty(res, status);
         return;
       }
-      res.writeHead(
-        rendered.value.status,
-        rendered.value.headers.map(([name, value]) => [name, value]),
+      const mockHeaders = rendered.value.headers.flatMap(([name, value]) =>
+        DROPPED_DOCUMENT_HEADERS.has(name.toLowerCase())
+          ? []
+          : [[name, value] as [string, string]],
       );
+      mockHeaders.push(...proxyDocumentHeaders());
+      res.writeHead(rendered.value.status, mockHeaders);
       res.end(Buffer.from(rendered.value.bodyBytes));
     } catch {
       endEmpty(res, 502);
@@ -914,13 +958,19 @@ export async function startInterceptProxy(
       return;
     }
     const parsed = parseResponseBodyRedirect(rawUrl);
+    if (parsed === null) {
+      res.writeHead(400);
+      res.end();
+      return;
+    }
+    if (!sameToken(parsed.token, responseBodyToken)) {
+      res.writeHead(403);
+      res.end();
+      return;
+    }
     const active = policy;
-    if (
-      parsed === null ||
-      active === null ||
-      active.presetDigest === undefined
-    ) {
-      res.writeHead(parsed === null ? 400 : 403);
+    if (active === null || active.presetDigest === undefined) {
+      res.writeHead(403);
       res.end();
       return;
     }
@@ -971,7 +1021,6 @@ export async function startInterceptProxy(
         initiator:
           initiatorFromHeaders(req.headers, parsed.originalUrl) ??
           new URL(target).origin,
-        resourceType: operation.matcher.resourceTypes[0],
       },
     );
     if (!allowed.allowed) {
@@ -991,6 +1040,7 @@ export async function startInterceptProxy(
         presetDigest,
       },
       operation.responseBody,
+      outbound ?? {},
     );
     if (!fetched.ok) {
       res.writeHead(502);
@@ -1004,7 +1054,8 @@ export async function startInterceptProxy(
         lower === "set-cookie" ||
         lower === "cookie" ||
         lower === "authorization" ||
-        lower === "proxy-authorization"
+        lower === "proxy-authorization" ||
+        DROPPED_DOCUMENT_HEADERS.has(lower)
       ) {
         continue;
       }
@@ -1012,6 +1063,9 @@ export async function startInterceptProxy(
       if (existing === undefined) headers[lower] = value;
       else if (Array.isArray(existing)) existing.push(value);
       else headers[lower] = [existing, value];
+    }
+    for (const [name, value] of proxyDocumentHeaders()) {
+      headers[name] = value;
     }
     writeResponse(
       res,
@@ -1094,6 +1148,7 @@ export async function startInterceptProxy(
 
   return {
     endpoint,
+    responseBodyToken,
     setPolicy(next) {
       policy = next;
     },

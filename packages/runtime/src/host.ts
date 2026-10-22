@@ -272,7 +272,10 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
             signal: request.signal,
           }),
       });
-      return interceptProxy.endpoint;
+      return {
+        ...interceptProxy.endpoint,
+        responseBodyToken: interceptProxy.responseBodyToken,
+      };
     },
     async stopTlsProxy() {
       if (interceptProxy) {

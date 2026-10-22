@@ -23,10 +23,11 @@ export function isResponseBodyRedirectId(id: number): boolean {
 
 function responseBodyRedirectSubstitution(
   port: number,
+  token: string,
   ruleId: string,
   digest: string,
 ): string {
-  return `http://127.0.0.1:${port}${RESPONSE_BODY_LISTENER_PREFIX}${encodeURIComponent(ruleId)}/${encodeURIComponent(digest)}/\\0`;
+  return `http://127.0.0.1:${port}${RESPONSE_BODY_LISTENER_PREFIX}${encodeURIComponent(token)}/${encodeURIComponent(ruleId)}/${encodeURIComponent(digest)}/\\0`;
 }
 
 function buildResponseBodyRedirectRule(
@@ -34,6 +35,7 @@ function buildResponseBodyRedirectRule(
   id: number,
   port: number,
   digest: string,
+  token: string,
 ): {
   id: number;
   priority: number;
@@ -64,6 +66,7 @@ function buildResponseBodyRedirectRule(
       redirect: {
         regexSubstitution: responseBodyRedirectSubstitution(
           port,
+          token,
           operation.ruleId,
           digest,
         ),
@@ -85,6 +88,7 @@ export async function installResponseBodyRedirects(options: {
   readonly operations: readonly ResponseBodyOperation[];
   readonly port: number;
   readonly digest: string;
+  readonly token: string;
 }): Promise<{ ok: true } | { ok: false; reason: string }> {
   const dnr = options.api.declarativeNetRequest;
   if (
@@ -108,6 +112,7 @@ export async function installResponseBodyRedirects(options: {
       RESPONSE_BODY_REDIRECT_ID_MIN + index,
       options.port,
       options.digest,
+      options.token,
     ),
   );
   try {

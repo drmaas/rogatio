@@ -30,16 +30,25 @@ function mockPath(token: string, digest: string): string {
   return `${MOCK_LISTENER_PREFIX}${encodeURIComponent(token)}/${encodeURIComponent(digest)}`;
 }
 
+const PROXY_DOCUMENT_CSP =
+  "sandbox; default-src 'none'; script-src 'none'; connect-src 'none'; form-action 'none'; frame-src 'none'";
+
 async function hit(
   port: number,
   path: string,
   init?: RequestInit,
-): Promise<{ status: number; body: Uint8Array; contentLength: string | null }> {
+): Promise<{
+  status: number;
+  body: Uint8Array;
+  contentLength: string | null;
+  headers: Headers;
+}> {
   const response = await fetch(`http://127.0.0.1:${port}${path}`, init);
   return {
     status: response.status,
     body: new Uint8Array(await response.arrayBuffer()),
     contentLength: response.headers.get("content-length"),
+    headers: response.headers,
   };
 }
 
@@ -169,6 +178,43 @@ describe("loopback mock route", () => {
     );
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual(new Uint8Array());
+  });
+
+  it("serves an HTML mock with the sandbox content policy", async () => {
+    const html = "<html><script>window.__ran = 1</script>hello</html>";
+    const { proxy, digest, token } = await boot({
+      status: 200,
+      body: html,
+      headers: [
+        { name: "Content-Type", value: "text/html; charset=utf-8" },
+        {
+          name: "Content-Security-Policy",
+          value: "script-src 'unsafe-inline'",
+        },
+        {
+          name: "Content-Security-Policy-Report-Only",
+          value: "script-src 'unsafe-inline'",
+        },
+        { name: "X-Content-Type-Options", value: "sniff" },
+      ],
+    });
+    const response = await hit(proxy.endpoint.port, mockPath(token, digest));
+    expect(response.status).toBe(200);
+    expect(new TextDecoder().decode(response.body)).toBe(html);
+    expect(response.headers.get("content-security-policy")).toBe(
+      PROXY_DOCUMENT_CSP,
+    );
+    expect(response.headers.get("content-security-policy")).not.toContain(
+      "allow-scripts",
+    );
+    expect(response.headers.get("content-security-policy")).not.toContain(
+      "allow-same-origin",
+    );
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-security-policy-report-only")).toBe(
+      null,
+    );
+    expect(response.headers.get("content-type")).toContain("text/html");
   });
 
   it("rejects a stopped session and a token from the previous start", async () => {
