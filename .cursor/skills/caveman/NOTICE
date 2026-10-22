@@ -1,0 +1,9 @@
+Caveman
+Copyright 2026 Julius Brussee
+
+This directory contains an unmodified copy of the Cursor skill from
+https://github.com/JuliusBrussee/caveman at skills/caveman/SKILL.md
+(the skill path declared by .cursor-plugin/plugin.json).
+
+Licensed under the Apache License, Version 2.0. The license text is in
+the LICENSE file in this directory.
