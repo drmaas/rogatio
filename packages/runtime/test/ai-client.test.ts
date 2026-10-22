@@ -520,7 +520,9 @@ describe("ai-client stays on the configured URL", () => {
           }
           expect(caught).toBeInstanceOf(Error);
           const error = caught as Error;
-          expect(error.message).toBe(`HTTP ${status}`);
+          expect(error.message).toBe(
+            `HTTP ${status} for ${provider.origin}/chat/completions`,
+          );
           expect(error.message).not.toContain(sourceBody);
           expect(error.message).not.toContain(targetBody);
           expect(String(error)).not.toContain(target.origin);
@@ -558,7 +560,9 @@ describe("ai-client stays on the configured URL", () => {
         }
         expect(caught).toBeInstanceOf(Error);
         const error = caught as Error;
-        expect(error.message).toBe("HTTP 400");
+        expect(error.message).toBe(
+          `HTTP 400 for ${provider.origin}/chat/completions`,
+        );
         expect(error.message).not.toContain(body);
         expect(String(error)).not.toContain(body);
         expect(provider.requests).toHaveLength(1);
@@ -567,4 +571,100 @@ describe("ai-client stays on the configured URL", () => {
       }
     });
   }
+
+  it("reports the chat URL on a 404 and does not double an OpenRouter /api/v1 base", async () => {
+    let method: string | undefined;
+    let rawBody = "";
+    const provider = await listen((req, res) => {
+      method = req.method;
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+      req.on("end", () => {
+        rawBody = Buffer.concat(chunks).toString("utf8");
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: {
+              message: "No endpoints found for google/gemini-2.5-flash",
+              code: 404,
+            },
+          }),
+        );
+      });
+    });
+    const apiKey = "sk-test-key";
+    try {
+      const client = createAIClient({
+        providerUrl: `${provider.origin}/api/v1`,
+        model: "google/gemini-2.5-flash",
+        apiKey,
+      });
+      let caught: unknown;
+      try {
+        await client.complete({
+          messages: [{ role: "user", content: "Hello" }],
+          model: "google/gemini-2.5-flash",
+          temperature: 0,
+        });
+      } catch (error) {
+        caught = error;
+      }
+      const requested = `${provider.origin}/api/v1/chat/completions`;
+      expect(method).toBe("POST");
+      expect(provider.requests).toEqual([
+        {
+          url: "/api/v1/chat/completions",
+          authorization: `Bearer ${apiKey}`,
+        },
+      ]);
+      expect(JSON.parse(rawBody)).toEqual({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: "Hello" }],
+        temperature: 0,
+        stream: false,
+      });
+      expect(caught).toBeInstanceOf(Error);
+      const error = caught as Error;
+      expect(error.message).toBe(`HTTP 404 for ${requested}`);
+      expect(error.message).not.toContain(apiKey);
+      expect(error.message).not.toContain("No endpoints found");
+      expect(error.message).not.toContain("/api/v1/v1/");
+      expect(error.message).not.toContain("/api/v1/api/v1/");
+    } finally {
+      await closeServer(provider.server);
+    }
+  });
+
+  it("drops a query string from the URL in an HTTP error", async () => {
+    const apiKey = "test-api-key";
+    const provider = await listen((_req, res) => {
+      res.writeHead(404, { "content-type": "text/plain" });
+      res.end("missing");
+    });
+    try {
+      const client = createAIClient({
+        providerUrl: `${provider.origin}/api/v1?api_key=${apiKey}`,
+        model: "google/gemini-2.5-flash",
+        apiKey,
+      });
+      let caught: unknown;
+      try {
+        await client.complete({
+          messages: [{ role: "user", content: "Hello" }],
+          model: "google/gemini-2.5-flash",
+        });
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      const error = caught as Error;
+      expect(error.message).toBe(`HTTP 404 for ${provider.origin}/api/v1`);
+      expect(error.message).not.toContain(apiKey);
+      expect(error.message).not.toContain("api_key");
+    } finally {
+      await closeServer(provider.server);
+    }
+  });
 });
