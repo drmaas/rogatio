@@ -406,10 +406,11 @@ const application = createExtensionApplication({
   badge: (value) => setBadge(value, api),
   extensionId: api.runtime.id,
   chromeApi: api,
-  // Fail-closed: stripReservedMarkers is wired inside proxyRequest, but that
-  // helper has no live caller yet (no PAC / session-proxy routing). Claiming
-  // "available" would install DNR set markers that can reach the origin.
-  // Flip true only when session traffic actually traverses the strip path.
+  // Fail-closed: body-match markers install only when a strip path removes
+  // X-Rogatio-Dispatch-* before the origin. Production stays false.
+  // intercept-proxy drops that prefix on cleartext HTTP it forwards; CONNECT
+  // is a blind tunnel and does not. Flip true only when session traffic is
+  // guaranteed to traverse a strip.
   runtimeStripPathAvailable: false,
   nativeRuntime: createNativeRuntimeAdapter(),
 });

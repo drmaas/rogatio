@@ -90,7 +90,7 @@ MV3 output is browser-bundled from the approved browser-safe source graph. The e
 
 The common extension translator emits only a deterministic browser-neutral matcher projection. It preserves the normalized source condition, resource types, method, and priority, assigns deterministic numeric ids for future action translation, and rejects unsupported operation kinds without installation. Because the compiler's matcher operation has no action, the extension reports actionless rules as `unsupported` and never sends them to DNR; it must not invent an allow or no-op action that changes browser behavior. `InstallService` remains the atomicity/recovery seam for the action-bearing DNR adapters. Action-specific operation kinds (redirect, query, header) and their UI/editor extensions arrived in the later rule slices documented below.
 
-The extension emits no traffic diagnostics and no service-worker console traffic beyond existing debug logs. When Chrome authoritatively reports a Rogatio-installed DNR rule match via `chrome.declarativeNetRequest.onRuleMatchedDebug`, the service worker looks up the durable match index, notifies an in-process post-lookup append seam (console inject, then a session match-history append), then injects exactly one bounded, live-only lowercase `[rogatio]` line into the matched page's DevTools Console via `chrome.scripting.executeScript` in the ISOLATED world. The manifest adds `"declarativeNetRequestFeedback"` and `"scripting"` permissions; the match event is available only for **unpacked** extension loads — packed or store distribution omits the event and logging is a silent no-op. **Single pipeline:** `onRuleMatchedDebug` is the only match source — never native-host “matched” events for logging or history. Coverage is `redirect`, `query`, and `header` (dynamic DNR) plus `request-body` and `response-body` when session URL-match markers are installed and indexed, plus `mock` when session mock-redirect rules are installed and indexed (band `5_000_001+`; allow-guard id `6_000_000` never logs); `matcher` stays out (no fake DNR). Body markers are session-store `modifyHeaders` **set-only** rules on reserved `X-Rogatio-Dispatch-*` names with **inert** opaque values (band `3_000_001+`); strip is **non-DNR** runtime/proxy (`stripReservedMarkers`) — never DNR set + DNR strip of the same header. Install only when native session is active **and** `runtimeStripPathAvailable` is true (production stays fail-closed `false` until live traffic hits strip); no strip path → no markers → silence. Console line for body kinds means URL match ⇒ will attempt rewrite when the body path is live — not rewrite success; intended action is mode + ≤200 rewrite summary from rule config, never live body bytes or marker header values. Mock lines use the original request URL (pre-loopback redirect) with either the rule's logical mock file path (`file=…`) or `body=inline`; never the absolute mock folder or response bytes. Probe evidence: `test/browser/body-match-probe.test.ts`. **Live** fields from the event are URL, method, initiator, and resource type (`request.type`); **intended** redirect destination, query transforms, header ops, body rewrite summaries, or mock source come from a durable `rogatio.matchLogging.index` snapshot (`ruleId`, display `name`, kind, intent) written wholesale on successful dynamic DNR install (preserving body-marker and mock-redirect band entries) and merged with body-marker and mock-redirect ids on session start (failed install leaves the previous index; stop / start-failure drops owned body-marker and mock-redirect ids). The formatted line labels present fields as `method=`, `type=`, `url=`, then dim `ruleId=`, `name=` (when non-empty), `kind=`, intended action, and `initiator=` when supplied; absent fields omit their key rather than printing a placeholder. The line reports **matched** and **intended action**, never network success, and logs no live request/response bodies or wire-applied header values. Per logged string: drop URL userinfo/fragment; truncate to ≤200 characters; optional per-rule `redactSensitiveInLogs` (default off — absent or false; editor checkbox **Redact sensitive fields in logs** on all rule cards including body) applies a deny-list to query values, sensitive header values, and intended body rewrite text when true. A user **Match logging** toggle (`rogatio.matchLogging.enabled`, default **on** when the key is missing) in the popup action row and management sidebar controls injection; only boolean `false` or non-boolean garbage disables. Fail-closed silent no-ops apply for toggle off, missing APIs, `tabId === -1`, unknown or malformed index entry, rejected injection after retries, missing body markers / strip path, or the mock allow-guard id. For `main_frame` matches (redirect, query, main_frame headers, and mock redirects), a failed first `executeScript` is retried a few times with short delays so logging survives the navigation race that clears or blocks the first inject; other resource types remain single-shot. Injection targets the event tab only (no `allFrames`); iframe/subframe matches log only when Chrome supplies a real tab id and injection into that tab succeeds. A real-Chromium probe confirmed MV3 service-worker wake on smoke-origin navigation after CDP worker stop (no keepalive added). The extension does not add network, runtime, native messaging, proxy, TLS, or telemetry behavior beyond the session marker / strip path described above.
+The extension emits no traffic diagnostics and no service-worker console traffic beyond existing debug logs. When Chrome authoritatively reports a Rogatio-installed DNR rule match via `chrome.declarativeNetRequest.onRuleMatchedDebug`, the service worker looks up the durable match index, notifies an in-process post-lookup append seam (console inject, then a session match-history append), then injects exactly one bounded, live-only lowercase `[rogatio]` line into the matched page's DevTools Console via `chrome.scripting.executeScript` in the ISOLATED world. The manifest adds `"declarativeNetRequestFeedback"` and `"scripting"` permissions; the match event is available only for **unpacked** extension loads — packed or store distribution omits the event and logging is a silent no-op. **Single pipeline:** `onRuleMatchedDebug` is the only match source — never native-host “matched” events for logging or history. Coverage is `redirect`, `query`, and `header` (dynamic DNR) plus `request-body` and `response-body` when session URL-match markers are installed and indexed, plus `mock` when session mock-redirect rules are installed and indexed (band `5_000_001+`; allow-guard id `6_000_000` never logs); `matcher` stays out (no fake DNR). Body markers are session-store `modifyHeaders` **set-only** rules on reserved `X-Rogatio-Dispatch-*` names with **inert** opaque values (band `3_000_001+`); strip is **non-DNR**: `intercept-proxy.ts` omits `X-Rogatio-Dispatch-*` on cleartext HTTP it forwards, and CONNECT stays a blind tunnel — never DNR set + DNR strip of the same header. Install only when native session is active **and** `runtimeStripPathAvailable` is true (production stays fail-closed `false`); no strip path → no markers → silence. Console line for body kinds means URL match ⇒ will attempt rewrite when the body path is live — not rewrite success; intended action is mode + ≤200 rewrite summary from rule config, never live body bytes or marker header values. Mock lines use the original request URL (pre-loopback redirect) with either the rule's logical mock file path (`file=…`) or `body=inline`; never the absolute mock folder or response bytes. Probe evidence: `test/browser/body-match-probe.test.ts`. **Live** fields from the event are URL, method, initiator, and resource type (`request.type`); **intended** redirect destination, query transforms, header ops, body rewrite summaries, or mock source come from a durable `rogatio.matchLogging.index` snapshot (`ruleId`, display `name`, kind, intent) written wholesale on successful dynamic DNR install (preserving body-marker and mock-redirect band entries) and merged with body-marker and mock-redirect ids on session start (failed install leaves the previous index; stop / start-failure drops owned body-marker and mock-redirect ids). The formatted line labels present fields as `method=`, `type=`, `url=`, then dim `ruleId=`, `name=` (when non-empty), `kind=`, intended action, and `initiator=` when supplied; absent fields omit their key rather than printing a placeholder. The line reports **matched** and **intended action**, never network success, and logs no live request/response bodies or wire-applied header values. Per logged string: drop URL userinfo/fragment; truncate to ≤200 characters; optional per-rule `redactSensitiveInLogs` (default off — absent or false; editor checkbox **Redact sensitive fields in logs** on all rule cards including body) applies a deny-list to query values, sensitive header values, and intended body rewrite text when true. A user **Match logging** toggle (`rogatio.matchLogging.enabled`, default **on** when the key is missing) in the popup action row and management sidebar controls injection; only boolean `false` or non-boolean garbage disables. Fail-closed silent no-ops apply for toggle off, missing APIs, `tabId === -1`, unknown or malformed index entry, rejected injection after retries, missing body markers / strip path, or the mock allow-guard id. For `main_frame` matches (redirect, query, main_frame headers, and mock redirects), a failed first `executeScript` is retried a few times with short delays so logging survives the navigation race that clears or blocks the first inject; other resource types remain single-shot. Injection targets the event tab only (no `allFrames`); iframe/subframe matches log only when Chrome supplies a real tab id and injection into that tab succeeds. A real-Chromium probe confirmed MV3 service-worker wake on smoke-origin navigation after CDP worker stop (no keepalive added). The extension does not add network, runtime, native messaging, proxy, TLS, or telemetry behavior beyond the session marker / strip path described above.
 
 Match history is the second append-seam consumer. The service worker is the only writer. After the console path's gates pass (unpacked `onRuleMatchedDebug`, Match logging on, `tabId !== -1`, known index entry, not the mock allow-guard), it appends one redacted row to `chrome.storage.session` key `rogatio.matchHistory.entries`. The ring holds at most 100 rows and drops the oldest. Each row stores the same redacted live fields and intended action as the console line (rule id, name, kind, method, resource type, URL, initiator, intended action). It does not store request or response bodies or wire header values. URL userinfo and fragments are stripped, fields are bounded, and `redactSensitiveInLogs` uses the same deny-list as console logging. Turning Match logging off clears the ring, including a worker restart while the toggle is off. Clear on the Match history page sends `{ version: 1, command: "clear-match-history" }` to the service worker; that message is outside the project protocol and cannot touch the envelope. The page reads the session key and repaints the feed when it changes. The key is not written to `.rogatio.json`, `storage.local`, `storage.sync`, project export, or the native host. Packed or store loads never fire the match event, so the feed stays empty. The browser session ends the store.
 
@@ -896,51 +896,45 @@ malformed, or digest-mismatched staging never becomes active.
 
 ### Browser-to-proxy correlation
 
-The supported browser path uses ordinary MV3 APIs. Chrome does not generally grant
-`webRequestBlocking` to ordinary extensions, so the request-body rules do not make exact per-request
-initiator scheme/port or request-ID correlation a live prerequisite. The extension instead
-installs one ephemeral, session-bound DNR marker per request-body operation. The marker
-condition contains the operation URL matcher, method, `xmlhttprequest` resource type,
-and the initiator hostname projection available to DNR. This is a host-domain assertion,
-not exact initiator-origin proof: scheme, port, and some browser context details cannot
-be recovered at the native proxy boundary.
+The live listener is `packages/runtime/src/intercept-proxy.ts` (`startInterceptProxy`).
+It binds `127.0.0.1` on an ephemeral port. Chrome reaches it through the session PAC
+script from `pac.ts`. Host-key request-body rules return `PROXY 127.0.0.1:<port>`
+for every URL on that hostname (`host === "<hostname>"`). A literal-host URL regex
+returns `PROXY 127.0.0.1:<port>` only for `scheme://host/*`. `DIRECT` is the fallback
+when neither matches. Response-body rules are not PAC routes. The extension does
+not use `webRequestBlocking`. The proxy does not authorize a rewrite from a per-request
+capability marker or a pending-auth map.
 
-**Two marker roles share the reserved `X-Rogatio-Dispatch-*` name prefix but must not be
-conflated.** (1) **Logging-only URL-match markers** (`#163`): session-store set-only rules
-with inert opaque values so `onRuleMatchedDebug` fires for `request-body` and
-`response-body`; stripped by non-DNR runtime before upstream; never mint rewrite
-capability / pending-auth; never paired with a DNR remove of the same header. Owned by the
-session-body-marker helper (band `3_000_001+`), lifecycle-tied to native-session
-start/stop, installed only when `runtimeStripPathAvailable` is true (production
-wiring in `background.ts` is currently `false`). (2) **Rewrite
-capability markers** (request-body interception / `#170`): capability signals validated by
-the native runtime against policy digest and winner — design target below. Logging markers
-must not carry session capability, preset digest, or rewrite-auth material.
+An absolute-form `http:` request is accepted only for port 80. The listener matches the
+URL and method against the session policy's compiled `request-body` and `response-body`
+operations and keeps the highest-priority winner (`pickHighest`, ties broken by rule
+id). A winner is authorized with `revalidateAuthority`. The initiator is the `Origin`
+header when it is an `http:` or `https:` origin, otherwise the `Referer` origin,
+otherwise the target origin. An authorized request-body winner is rewritten with
+`rewriteRequestBody`. A denied authorization or a failed transform forwards the
+original body. `forwardRequestHeaders` rebuilds the upstream request: it sets `Host`
+and `Content-Length`, sends `Connection: close`, drops hop-by-hop and `proxy-*`
+headers, and drops any header whose name starts with `x-rogatio-dispatch-`. DNS
+pinning uses `address-policy.ts` (`classifyAddress` and `validateResolvedAddresses`).
+Public addresses are the default pin. A non-public pin is allowed only for an exact
+normalized origin listed in the policy's local origins. `CONNECT` is accepted only for
+port 443 and is a blind tunnel to that pinned address: the bytes are spliced, and TLS
+is not decrypted.
 
-The native runtime validates the rewrite-capability marker token, target, method, resource type, policy
-digest, and global winner against its immutable policy. A rewrite marker is a capability signal
-from the active extension session, not a trusted rule ID supplied by a page. Marker
-names use a runtime-owned reserved prefix, are rejected when duplicated or malformed,
-and are removed before upstream forwarding. A request with a valid body rewrite marker that
-fails framing, authority, or transformation is blocked before upstream; it never falls
-back to its original body.
+Response-body rules that the browser redirects to
+`/.rogatio/body/<token>/<ruleId>/<digest>/<originalUrl>` are a separate
+credential-free GET on this same listener. They are not a request-body client.
 
-Rewrite markers are static session rules, one per request-body operation. The request-body rules do not use
-request-ID keyed dynamic rules or a native pending-authorization map. The ordinary MV3
-boundary therefore cannot prove exact initiator scheme, port, or browser context at the
-proxy; the marker's initiator condition is limited to DNR's host-domain projection.
-
-The extension may send best-effort metadata-only `request.prepare` messages for status
-and diagnostics, but they are not required for authorization and never carry body bytes,
-headers, cookies, or authorization values. The listener explicitly copies safe metadata
-and never reads or spreads `details.requestBody`.
-
-A PAC-routed request without a body marker is treated as having no browser body
-authorization and is forwarded unchanged, as explicitly chosen by the user. Traffic
-outside exact PAC origins is `DIRECT`. This is the accepted ordinary-MV3 compromise:
-unmatched pass-through and marker-based body transformation remain safe at the wire
-boundary, but exact initiator-origin and missing-marker fail-closed guarantees are not
-available without a policy-installed blocking extension.
+**Logging markers are a separate, fail-closed path.** Session-store set-only rules on
+reserved `X-Rogatio-Dispatch-*` names (band `3_000_001+`) exist so
+`onRuleMatchedDebug` can fire for `request-body` and `response-body`. They carry inert
+opaque values, never mint rewrite capability, and are never paired with a DNR remove
+of the same header. The session-body-marker helper installs them only when
+`runtimeStripPathAvailable` is true. Production wiring in `background.ts` passes
+`false`, so those markers are not installed. The header drop in `forwardRequestHeaders`
+covers cleartext HTTP that this listener forwards. It does not cover `CONNECT`, which
+never sees the tunneled headers. This change does not add a marker-stripping
+implementation.
 
 ### Live lifecycle and rollback
 
@@ -982,30 +976,25 @@ re-resolution, racing, or retrying another address. The original hostname remain
 authority and HTTPS SNI. CONNECT is blind because bytes are spliced without TLS
 decryption; the destination is still that pinned address.
 
-Eligible requests require one valid decimal `Content-Length` at most 4 MiB. The runtime
-counts received bytes and requires an exact match. It rejects transfer encoding,
-chunking, trailers, `Expect`, `Upgrade`, pipelining, duplicate/conflicting framing,
-multipart, compression, binary content, invalid UTF-8, and unsupported client-certificate
-authentication. No upstream DNS or socket write occurs until validation and transformation
-complete.
+The listener reads the request body up to 4 MiB. A larger body is answered with 413 and
+is not forwarded. `forwardRequestHeaders` rebuilds `Host` and `Content-Length`, sends
+`Connection: close`, and drops hop-by-hop, `proxy-*`, and `X-Rogatio-Dispatch-*`
+headers. It does not require one decimal `Content-Length` on the inbound request, and
+it does not reject signature headers (`Content-MD5`, `Digest`, `Content-Digest`,
+`Signature`, `Signature-Input`). Cookie and Authorization headers are copied when
+present. The listener does not follow redirects. Credential values never enter native
+messages, logs, diagnostics, persisted state, or error responses.
 
-Accepted media types are `application/json`, valid `application/*+json`,
-`application/x-www-form-urlencoded`, and `text/*`, with no charset or UTF-8 only.
-`Content-Encoding` is absent or `identity` only. Replace mode still validates the input
-body before discarding it. Regex mode decodes strict UTF-8, constructs one ECMAScript
-`gu` regular expression, and uses standard `String.replace` replacement expansion.
-Output is UTF-8 and bounded to 4 MiB. Regex execution runs in an independently
-terminable boundary with a 250 ms deadline plus the complete operation timeout. A worker
-that fails to boot fails the operation closed and does not run the regex on the caller
-thread. Failure blocks before upstream and emits only a stable redacted error code.
-
-Cookie and Authorization headers are preserved unchanged when the request otherwise
-passes. Host/authority and Content-Length are reconstructed. Hop-by-hop, proxy,
-transfer, trailer, and conflicting framing headers are removed or rejected. Standard
-body-integrity/signature headers (`Content-MD5`, `Digest`, `Content-Digest`, `Signature`,
-`Signature-Input`) are rejected. The request-body rules do not recompute unknown application signatures.
-Credential values never enter native messages, logs, diagnostics, persisted state, or
-error responses.
+`rewriteRequestBody` accepts `application/json`, `application/*+json`,
+`application/x-www-form-urlencoded`, and `text/*`. `Content-Encoding` must be absent or
+`identity`. Both modes decode the input as strict UTF-8 before producing a replacement.
+Regex mode runs one replacement inside a 250 ms deadline and encodes the result as
+UTF-8 bounded to 4 MiB. A failed rewrite, including an unsupported media type, a
+non-identity content encoding, or invalid UTF-8, leaves the original body in place and
+still forwards upstream. Those three failures use
+`runtime.request-body-unsupported-mime-type`,
+`runtime.request-body-unsupported-content-encoding`, and
+`runtime.request-body-invalid-utf8`.
 
 ### Trust and target boundaries
 
@@ -1049,12 +1038,13 @@ paths, certificates, bodies, headers, credentials, or platform-tool output.
 
 Pure tests cover strict schema/browser-schema validation, compiler detachment and source
 order, global arbitration, editor fields, policy canonicalization/digest, native frame
-staging, and bounded transformation. Integration tests use raw HTTP/1.1 and fake Chrome
-adapters to prove framing rejection, zero upstream calls on failed transforms, marker
-stripping, credential preservation, policy races, PAC collisions, and stop rollback.
+staging, and bounded transformation. Runtime tests drive `intercept-proxy.ts` over raw
+HTTP/1.1 and prove rewrite-before-upstream, pass-through when nothing matches, a blind
+CONNECT tunnel, one pinned public address, and rejection of the wrong port or a mixed
+DNS answer. Extension tests cover session PAC and the fail-closed body-marker gate.
 The request-body-trust and response-body regressions cover X.509 trust and shared-provider behavior. A capable macOS
 runner must prove real Chrome native messaging, PAC, trusted TLS, HTTPS POST/XHR,
-credential preservation, winner selection, failure blocking, and stop teardown. Linux
+credential preservation, winner selection, pass-through of a failed transform, and stop teardown. Linux
 and Windows provide offline/capability-negative evidence unless equivalent adapters are
 injected and explicitly tested.
 
@@ -1062,11 +1052,11 @@ Rejected designs: browser-only DNR body rewriting; service-worker fetch forwardi
 sending observed bodies through native messaging; widening the runtime foundation; generic forward proxying;
 trusting browser-selected rule IDs or grants; relying on DNR ordering; composing rules;
 auto-start/trust; persisted policy or traffic; SPKI-as-CA; ad-hoc ASN.1; and unreviewed
-third-party proxy/TLS dependencies. Same-origin unmatched PAC traffic is the explicit
-exception to a blanket block because the user selected unchanged forwarding for that
-case; marker-selected request-body operations still fail closed. Exact initiator
-correlation through `webRequestBlocking` was considered but rejected for ordinary MV3
-availability; policy-installed Chrome is not required for the request-body rules' live status.
+third-party proxy/TLS dependencies. A request the listener does not rewrite — no
+matching operation, denied authority, or a failed transform — is forwarded with its
+original body. Exact initiator correlation through `webRequestBlocking` was considered
+but rejected for ordinary MV3 availability; policy-installed Chrome is not required
+for the request-body rules' live status.
 
 ## Documentation Site
 
@@ -1234,7 +1224,7 @@ Building the real journeys exposed defects that the mocked unit tests could not:
 
 ## Native runtime consolidation (feature/consolidated-native-runtime)
 
-> The faucet, `--mock-port`, envelope `mockBody`, and `needs proxy` status in this section were later removed. Current mock serving is the loopback route in [Mock Rules](#mock-rules).
+> The faucet, `--mock-port`, envelope `mockBody`, and `needs proxy` status in this section were later removed. Current mock serving is the loopback route in [Mock Rules](#mock-rules). The request-body client `proxy.ts`, `wire.ts`, and `target.ts` was later removed; live forwarding is `intercept-proxy.ts`.
 
 All F6 runtime behavior (pairing, authorization, mock delivery) now runs inside the F14
 native-messaging host instead of a separate CLI HTTP server. One process serves every
