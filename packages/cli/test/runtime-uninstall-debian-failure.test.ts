@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSpawn = vi.hoisted(() => vi.fn());
 const mockSpawnSync = vi.hoisted(() => vi.fn());
@@ -29,8 +29,24 @@ function createChild(code: number, stderrText = "") {
 
 describe("rogatio runtime uninstall when the Debian trust refresh fails", () => {
   let home = "";
+  let platformDescriptor: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    // defaultTrustInstallRoot follows process.platform. Pin linux so the
+    // Debian remover runs on macOS and Windows CI hosts too.
+    platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", {
+      value: "linux",
+      configurable: true,
+      enumerable: true,
+    });
+  });
 
   afterEach(async () => {
+    if (platformDescriptor) {
+      Object.defineProperty(process, "platform", platformDescriptor);
+      platformDescriptor = undefined;
+    }
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
     if (home.length > 0) await rm(home, { recursive: true, force: true });
