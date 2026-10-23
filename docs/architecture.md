@@ -898,8 +898,10 @@ malformed, or digest-mismatched staging never becomes active.
 
 The live listener is `packages/runtime/src/intercept-proxy.ts` (`startInterceptProxy`).
 It binds `127.0.0.1` on an ephemeral port. Chrome reaches it through the session PAC
-script from `pac.ts`: a request-body route whose URL regex names one literal host
-returns `PROXY 127.0.0.1:<port>`, and every other URL is `DIRECT`. The extension does
+script from `pac.ts`. Host-key request-body rules return `PROXY 127.0.0.1:<port>`
+for every URL on that hostname (`host === "<hostname>"`). A literal-host URL regex
+returns `PROXY 127.0.0.1:<port>` only for `scheme://host/*`. `DIRECT` is the fallback
+when neither matches. Response-body rules are not PAC routes. The extension does
 not use `webRequestBlocking`. The proxy does not authorize a rewrite from a per-request
 capability marker or a pending-auth map.
 
