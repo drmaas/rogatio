@@ -89,8 +89,9 @@ export interface ExtensionApplicationOptions {
   /**
    * Chrome adapter for session body-marker install (match logging).
    * When set, native-session start/stop owns markers + index merge.
-   * Strip path is available only when session traffic reaches
-   * `stripReservedMarkers` (fail-closed; no F17 capability mint / PAC).
+   * Strip path is not claimed by production. Markers install only when
+   * `runtimeStripPathAvailable` is explicitly true (fail-closed; no F17
+   * capability mint).
    */
   readonly chromeApi?: ChromeApi;
   /**

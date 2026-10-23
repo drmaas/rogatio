@@ -36,14 +36,12 @@ export {
   matchersFromOperations,
   mocksFromOperations,
 } from "./project-preset.js";
-export * from "./proxy.js";
 export { rewriteRequestBody } from "./request-body.js";
 export {
   fetchAndRewriteAuthorizedResponse,
   rewriteResponseBody,
 } from "./response-body.js";
 export * from "./revalidate.js";
-export * from "./target.js";
 export * from "./trust.js";
 export { selectTrustPlatformAdapter } from "./trust-platform/index.js";
 export type {
@@ -69,4 +67,3 @@ export type {
 } from "./types.js";
 export * from "./types.js";
 export * from "./url-captures.js";
-export * from "./wire.js";
