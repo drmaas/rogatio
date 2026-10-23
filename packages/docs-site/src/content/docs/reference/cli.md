@@ -74,7 +74,8 @@ Trust lifecycle and native-host entry (see [Local runtime](/guides/runtime/)):
   with a remediation hint and exits `1` after rolling the manifest back — nothing is
   half-installed, so re-run it with elevated privileges.
 - `rogatio runtime uninstall` — remove the host manifest, the device-local CA files, and
-  the trust installation (idempotent).
+  the trust installation (idempotent). If the OS trust-store refresh fails, the
+  command exits `1` and does not print `runtime uninstall complete`.
 - `rogatio runtime verify` — report whether the manifest, the `runtime-host` wrapper, the
   allowed origins, and the device-local CA trust are all present and valid, and whether
   `allowed_origins` includes the release ID. Exits `0` only

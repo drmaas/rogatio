@@ -28,7 +28,6 @@ vi.mock("node:fs", () => ({
   accessSync: vi.fn(),
   constants: { W_OK: 2 },
   mkdirSync: vi.fn(),
-  unlinkSync: vi.fn(),
 }));
 
 const CERT_PATH = "/usr/local/share/ca-certificates/rogatio-ca.crt";
@@ -51,6 +50,18 @@ function createChild(code: number, stderrText = "") {
     },
     on: (event: string, cb: (value: number) => void) => {
       if (event === "close") cb(code);
+    },
+  };
+}
+
+function createSpawnError(code: string) {
+  return {
+    stderr: { on: vi.fn() },
+    on: (event: string, cb: (err: NodeJS.ErrnoException) => void) => {
+      if (event !== "error") return;
+      const err = new Error(`spawn sudo ${code}`) as NodeJS.ErrnoException;
+      err.code = code;
+      cb(err);
     },
   };
 }
@@ -181,20 +192,108 @@ describe("linux CA installer/remover", () => {
     }
   });
 
-  it("caTrustRemover removes cert without calling update-ca-certificates", async () => {
-    mockSpawn.mockClear();
-
+  it("caTrustRemover removes the Debian cert with sudo rm and update-ca-certificates", async () => {
     const adapter = selectTrustPlatformAdapter("linux");
     await adapter.caTrustRemover();
 
-    expect(mockSpawn).not.toHaveBeenCalled();
+    expect(mockSpawn.mock.calls.map((call) => call.slice(0, 2))).toEqual([
+      ["sudo", ["rm", "-f", CERT_PATH]],
+      ["sudo", ["update-ca-certificates"]],
+    ]);
+    for (const call of mockSpawn.mock.calls) {
+      expect(call[2]).toEqual({ stdio: ["ignore", "ignore", "pipe"] });
+    }
+    expectNoShell();
   });
 
-  it("caTrustRemover ignores non-zero exit (idempotent)", async () => {
-    mockSpawn.mockImplementation(() => createChild(1));
+  it("caTrustRemover throws TrustError when sudo fails with EACCES", async () => {
+    mockSpawn.mockImplementation(() => createSpawnError("EACCES"));
 
     const adapter = selectTrustPlatformAdapter("linux");
-    await expect(adapter.caTrustRemover()).resolves.not.toThrow();
+    await expect(adapter.caTrustRemover()).rejects.toSatisfy(
+      (error: unknown) => {
+        expect(error).toBeInstanceOf(TrustError);
+        const trustError = error as TrustError;
+        expect(trustError.reasons).toContain("ca-store-unwritable");
+        expect(trustError.message).not.toContain(CERT_PATH);
+        expect(trustError.message).not.toContain("EACCES");
+        expect(trustError.message).not.toContain("BEGIN CERTIFICATE");
+        return true;
+      },
+    );
+    expect(mockSpawn.mock.calls.map((call) => call[1])).toEqual([
+      ["rm", "-f", CERT_PATH],
+    ]);
+    expectNoShell();
+  });
+
+  it("caTrustRemover throws when update-ca-certificates exits non-zero", async () => {
+    const codes = [0, 1];
+    let index = 0;
+    mockSpawn.mockImplementation(() =>
+      createChild(
+        codes[index++] ?? 1,
+        `update-ca-certificates: failed ${CERT_PATH}\n`,
+      ),
+    );
+
+    const adapter = selectTrustPlatformAdapter("linux");
+    await expect(adapter.caTrustRemover()).rejects.toSatisfy(
+      (error: unknown) => {
+        expect(error).toBeInstanceOf(TrustError);
+        const trustError = error as TrustError;
+        expect(trustError.reasons).toContain("ca-store-unwritable");
+        expect(trustError.message).not.toContain(CERT_PATH);
+        expect(trustError.message).not.toContain("update-ca-certificates");
+        expect(trustError.message).not.toContain("BEGIN CERTIFICATE");
+        return true;
+      },
+    );
+    expect(mockSpawn.mock.calls.map((call) => call[1])).toEqual([
+      ["rm", "-f", CERT_PATH],
+      ["update-ca-certificates"],
+    ]);
+    expectNoShell();
+  });
+
+  it("caTrustRemover throws elevation-required when the refresh needs a terminal", async () => {
+    let index = 0;
+    mockSpawn.mockImplementation(() => {
+      index += 1;
+      if (index === 1) return createChild(0);
+      return createChild(1, "sudo: a terminal is required\n");
+    });
+
+    const adapter = selectTrustPlatformAdapter("linux");
+    await expect(adapter.caTrustRemover()).rejects.toSatisfy(
+      (error: unknown) => {
+        expect(error).toBeInstanceOf(TrustError);
+        expect((error as TrustError).reasons).toContain("elevation-required");
+        return true;
+      },
+    );
+    expectNoShell();
+  });
+
+  it("refreshes Debian trust when the source file is already gone", async () => {
+    vi.mocked(accessSync).mockImplementation((path) => {
+      const target = String(path);
+      if (
+        target === CERT_PATH ||
+        target.startsWith("/etc/ca-certificates/trust-source") ||
+        target.startsWith("/etc/pki/ca-trust")
+      ) {
+        enoent();
+      }
+    });
+
+    const adapter = selectTrustPlatformAdapter("linux");
+    await expect(adapter.caTrustRemover()).resolves.toBeUndefined();
+    expect(mockSpawn.mock.calls.map((call) => call[1])).toEqual([
+      ["rm", "-f", CERT_PATH],
+      ["update-ca-certificates"],
+    ]);
+    expectNoShell();
   });
 
   it("caTrustInstaller error message hygiene - no stderr/cert paths", async () => {

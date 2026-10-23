@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { accessSync, constants, mkdirSync, unlinkSync } from "node:fs";
+import { accessSync, constants, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { join as posixJoin } from "node:path/posix";
 import type { TrustCapabilities } from "../trust.js";
@@ -273,15 +273,16 @@ const linuxAdapter: TrustPlatformAdapter = {
     throw new TrustError("trust.internal", reason, [reason]);
   },
   async caTrustRemover(): Promise<void> {
-    try {
-      unlinkSync(DEBIAN_CERT);
-    } catch {
-      // Ignore "not found" errors. Debian removal does not run
-      // update-ca-certificates.
+    if (caBackend() === "debian") {
+      // `rm -f` succeeds when the source file is already gone. The bundle
+      // refresh still has to run: deleting the source file does not drop
+      // the CA from the system trust store. Certificate bytes stay off argv.
+      await sudoOrThrow(["rm", "-f", DEBIAN_CERT]);
+      await sudoOrThrow(["update-ca-certificates"]);
+      return;
     }
     if (!toolOnPath("update-ca-trust")) return;
     const present = P11_CERTS.filter((path) => exists(path));
-    // Debian hosts refresh only when an anchors file is actually present.
     // A p11-kit host must refresh even after the file is gone: `sudo rm`
     // can succeed and `update-ca-trust` can fail, and the next retry would
     // otherwise leave the extracted bundle trusting the CA.

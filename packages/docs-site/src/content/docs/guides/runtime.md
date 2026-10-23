@@ -24,7 +24,8 @@ native-messaging envelope (spec REQ-001..REQ-005).
   `trust unsupported: <reasons>` with a remediation hint and exits `1` after rolling the
   manifest back. Nothing is half-installed; re-run it with elevated privileges.
   `rogatio runtime uninstall` removes the host manifest, the device-local CA files, and
-  the trust installation (idempotent).
+  the trust installation (idempotent). If the OS trust-store refresh fails, the
+  command exits `1` and does not print `runtime uninstall complete`.
 - `rogatio doctor` runs that host check together with Node, the project file, a loopback PAC answer, and optional AI Assist. `--json` is the report to paste into a bug. `--check-updates` is optional and is the only npm-registry call. The extension's **Run checks** button calls the same checks through the native host and shows browser-side checks first. Copy diagnostics nests the host report under `host`.
 - `rogatio runtime verify` reports whether the manifest, the `runtime-host` wrapper, the
   allowed origins, and the device-local CA trust are all present and valid. It exits `0`
