@@ -37,7 +37,11 @@ for Chromium when that browser's config directory exists.
 CA trust adapters exist for all three supported operating systems; each needs different
 privilege. Linux writes the CA certificate with argv-only `sudo tee` (PEM on standard
 input, stdout discarded). Debian and Ubuntu then run argv-only `sudo update-ca-certificates`
-after writing `/usr/local/share/ca-certificates/rogatio-ca.crt`. Arch, Fedora, and RHEL
+after writing `/usr/local/share/ca-certificates/rogatio-ca.crt`. Uninstall
+removes that file with argv-only `sudo rm -f` and runs
+`sudo update-ca-certificates` again, even when the file is already gone. If
+that refresh fails, `rogatio runtime uninstall` exits `1` and a later
+uninstall retries the removal. Arch, Fedora, and RHEL
 run argv-only `sudo update-ca-trust` after writing `rogatio-ca.crt` into the anchors
 directory that tool reads. The host manifest is registered for Google Chrome and
 Chromium when that browser's config directory is present. macOS uses

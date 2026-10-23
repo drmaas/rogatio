@@ -870,7 +870,7 @@ export function createRequestBodyTrustController(
     const live = await readPreviousRogatioCa(caCertFile);
     const caWasPresent = await existsFile(caKeyFile);
     // The local key is removed even when store removal throws. A marker
-    // keeps the next uninstall calling the remover, so a failed p11-kit
+    // keeps the next uninstall calling the remover, so a failed trust-store
     // refresh cannot report success while the CA stays trusted.
     if (caWasPresent && caTrustRemover) {
       await writeFileAtomic(storePendingPath, "1\n", 0o600);
