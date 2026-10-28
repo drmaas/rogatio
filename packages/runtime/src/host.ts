@@ -296,8 +296,8 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
   registerInterceptionProvider({
     platform: platformProvider.platform,
     detect: () => platformProvider.detect(),
-    async start(activation, pacRoutes) {
-      const endpoint = await platformProvider.start(activation, pacRoutes);
+    async start(activation) {
+      const endpoint = await platformProvider.start(activation);
       interceptProxy?.setPolicy(policyForProxy(activation));
       return endpoint;
     },
