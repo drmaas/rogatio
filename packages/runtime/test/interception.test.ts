@@ -44,7 +44,7 @@ describe(" interception provider", () => {
 
     expect(provider.status()).toBe("stopped");
     expect(provider.detect()).toEqual({ supported: true, reasons: [] });
-    const endpoint = await provider.start(activation, ["example.com"]);
+    const endpoint = await provider.start(activation);
     expect(endpoint).toEqual({ host: "127.0.0.1", port: 9999 });
     expect(provider.status()).toBe("running");
     expect(platform.startTlsProxy).toHaveBeenCalledWith(activation);
@@ -85,7 +85,10 @@ describe(" interception provider", () => {
     const provider = createPlatformInterceptionProvider(platform);
 
     await expect(
-      provider.start(activation, ["https://example.com"]),
+      provider.start({
+        ...activation,
+        pacRoutes: ["https://example.com"],
+      }),
     ).rejects.toThrow("platform failure");
     expect(provider.status()).toBe("stopped");
     expect(platform.installPac).not.toHaveBeenCalled();
@@ -101,7 +104,10 @@ describe(" interception provider", () => {
     const provider = createPlatformInterceptionProvider(platform);
 
     await expect(
-      provider.start(activation, ["https://example.com"]),
+      provider.start({
+        ...activation,
+        pacRoutes: ["https://example.com"],
+      }),
     ).rejects.toThrow("pac install failure");
     expect(provider.status()).toBe("stopped");
     expect(platform.startTlsProxy).toHaveBeenCalledOnce();
@@ -122,7 +128,7 @@ describe(" interception provider", () => {
       }),
     });
     const provider = createPlatformInterceptionProvider(platform);
-    const endpoint = await provider.start(activation, []);
+    const endpoint = await provider.start({ ...activation, pacRoutes: [] });
     expect(endpoint).toEqual({ host: "127.0.0.1", port: 9999 });
     expect(platform.installPac).not.toHaveBeenCalled();
     expect(platform.provisionOrVerifyCa).not.toHaveBeenCalled();
@@ -150,14 +156,17 @@ describe(" interception provider", () => {
       reasons: ["device-local-ca-untrusted"],
     });
     await expect(
-      provider.start(activation, ["https://example.com"]),
+      provider.start({
+        ...activation,
+        pacRoutes: ["https://example.com"],
+      }),
     ).rejects.toThrow("runtime.platform-unsupported");
     expect(platform.provisionOrVerifyCa).not.toHaveBeenCalled();
     expect(platform.installPac).not.toHaveBeenCalled();
     expect(provider.status()).toBe("unsupported");
   });
 
-  it("forwards startInterception pacRoutes to provider.start when activation.pacRoutes is empty", async () => {
+  it("forwards startInterception pacRoutes on activation when activation.pacRoutes is empty", async () => {
     const start = vi.fn(async () => ({ host: "127.0.0.1", port: 9 }));
     registerInterceptionProvider({
       platform: "test",
@@ -180,10 +189,11 @@ describe(" interception provider", () => {
       );
       expect(result.kind).toBe("active");
       expect(start).toHaveBeenCalledOnce();
-      expect(start).toHaveBeenCalledWith(
-        { ...emptyActivationPacRoutes, localOrigins: [] },
-        routes,
-      );
+      expect(start).toHaveBeenCalledWith({
+        ...emptyActivationPacRoutes,
+        localOrigins: [],
+        pacRoutes: routes,
+      });
     } finally {
       await stopInterception();
     }
@@ -210,10 +220,11 @@ describe(" interception provider", () => {
       );
       expect(listener.kind).toBe("active");
       expect(start).toHaveBeenCalledOnce();
-      expect(start).toHaveBeenCalledWith(
-        { ...activation, localOrigins: [] },
-        [],
-      );
+      expect(start).toHaveBeenCalledWith({
+        ...activation,
+        localOrigins: [],
+        pacRoutes: [],
+      });
 
       await stopInterception();
 

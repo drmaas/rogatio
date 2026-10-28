@@ -12,10 +12,7 @@ export interface InterceptionProvider {
   readonly platform: string;
   detect(): CapabilityProfile;
   /** Returns the loopback proxy endpoint when interception becomes active. */
-  start(
-    activation: RuntimeActivation,
-    pacRoutes: readonly string[],
-  ): Promise<ProxyEndpoint | undefined>;
+  start(activation: RuntimeActivation): Promise<ProxyEndpoint | undefined>;
   stop(): Promise<void>;
 }
 
@@ -98,13 +95,11 @@ export async function startInterception(
 
   let proxy: ProxyEndpoint;
   try {
-    const started = await registeredProvider.start(
-      {
-        ...activation,
-        localOrigins: targetPolicy.localOrigins,
-      },
+    const started = await registeredProvider.start({
+      ...activation,
+      localOrigins: targetPolicy.localOrigins,
       pacRoutes,
-    );
+    });
     if (
       started &&
       typeof started === "object" &&
@@ -186,10 +181,7 @@ export interface PlatformInterceptionAdapter {
 export interface PlatformInterceptionProvider {
   readonly platform: string;
   detect(): CapabilityProfile;
-  start(
-    activation: RuntimeActivation,
-    pacRoutes: readonly string[],
-  ): Promise<ProxyEndpoint>;
+  start(activation: RuntimeActivation): Promise<ProxyEndpoint>;
   stop(): Promise<void>;
   status(): "stopped" | "running" | "unsupported";
 }
@@ -221,7 +213,8 @@ export function createPlatformInterceptionProvider(
         reasons,
       };
     },
-    async start(activation, pacRoutes) {
+    async start(activation) {
+      const pacRoutes = activation.pacRoutes;
       const decoded = pacRoutes.flatMap((entry) => {
         const route = pacRouteFromEntry(entry);
         return route === null ? [] : [route];
