@@ -132,9 +132,9 @@ export function encodeNativeFrame(frame: NativeFrame): Uint8Array {
   return result;
 }
 
-export function decodeNativeFrame(
+export function readNativePayloadLength(
   buffer: Uint8Array,
-): RuntimeResult<NativeFrame> {
+): RuntimeResult<number> {
   if (buffer.byteLength < 4) {
     return failure("runtime.native-frame-too-small");
   }
@@ -145,6 +145,17 @@ export function decodeNativeFrame(
   if (length > NATIVE_FRAME_MAX_BYTES) {
     return failure("runtime.native-frame-too-large");
   }
+  return { ok: true, value: length };
+}
+
+export function decodeNativeFrame(
+  buffer: Uint8Array,
+): RuntimeResult<NativeFrame> {
+  const lengthResult = readNativePayloadLength(buffer);
+  if (!lengthResult.ok) {
+    return lengthResult;
+  }
+  const length = lengthResult.value;
   if (buffer.byteLength !== 4 + length) {
     return failure("runtime.native-frame-length-mismatch");
   }

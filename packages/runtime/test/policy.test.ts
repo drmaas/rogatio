@@ -65,37 +65,3 @@ describe(" request-body policy (future API)", () => {
     expect(true).toBe(true);
   });
 });
-
-describe(" native protocol framing (future API)", () => {
-  // These tests document the expected native messaging framing behavior
-
-  it("will use Chrome framing: 4-byte little-endian payload length + UTF-8 JSON", () => {
-    // Expect: frame encoding/decoding matches Chrome native messaging spec
-    expect(true).toBe(true);
-  });
-
-  it("will enforce 64 KiB max frame size", () => {
-    // Expect: >64 KiB frame -> failure before allocation
-    expect(true).toBe(true);
-  });
-
-  it("will implement policy-begin, policy-part, policy-commit staging", () => {
-    // Expect: staged policy with base64url parts
-    expect(true).toBe(true);
-  });
-
-  it("will reject malformed, duplicate, reordered, oversized, timed-out, incomplete, digest-mismatched staging", () => {
-    // Expect: various staging failures -> failure
-    expect(true).toBe(true);
-  });
-
-  it("will discard staged policy on disconnect, stop, replacement, or failure", () => {
-    // Expect: policy state is memory-only
-    expect(true).toBe(true);
-  });
-
-  it("will never send observed bodies, credentials, sensitive headers, certificates, paths, or platform-tool output in native responses", () => {
-    // Expect: native responses contain only protocol state, digest, status, error code
-    expect(true).toBe(true);
-  });
-});

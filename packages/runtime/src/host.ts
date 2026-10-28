@@ -33,7 +33,12 @@ import {
   type NativeFrame,
   NativeFrameType,
   type PolicyStageState,
+  readNativePayloadLength,
 } from "./native-framing.js";
+import {
+  createNativeInputPump,
+  feedNativeInputPump,
+} from "./native-input-pump.js";
 import {
   acceptProjectPart,
   beginProjectStage,
@@ -104,15 +109,16 @@ function encodeEnvelopeFrame(envelope: Envelope): Uint8Array {
 }
 
 function decodeEnvelopeFrame(buffer: Uint8Array): Envelope {
-  if (buffer.byteLength < 4) throw new Error("frame too small");
-  const length = new DataView(buffer.buffer, buffer.byteOffset, 4).getUint32(
-    0,
-    true,
-  );
-  if (buffer.byteLength !== 4 + length)
-    throw new Error("frame length mismatch");
+  const lengthResult = readNativePayloadLength(buffer);
+  if (!lengthResult.ok) {
+    throw new Error(lengthResult.error.code);
+  }
+  const length = lengthResult.value;
+  if (buffer.byteLength !== 4 + length) {
+    throw new Error("runtime.native-frame-length-mismatch");
+  }
   const json = new TextDecoder("utf-8", { fatal: true }).decode(
-    buffer.slice(4),
+    buffer.slice(4, 4 + length),
   );
   return parseEnvelope(json);
 }
@@ -400,7 +406,14 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
     },
     async processFrame(frame: Uint8Array): Promise<Uint8Array | null> {
       const native = decodeNativeFrame(frame);
-      if (native.ok && isProjectStageType(native.value.type)) {
+      if (!native.ok) {
+        console.error(
+          "[rogatio-host] decodeNativeFrame failed:",
+          native.error.code,
+        );
+        return null;
+      }
+      if (isProjectStageType(native.value.type)) {
         return handleProjectStage(native.value);
       }
 
@@ -528,13 +541,12 @@ export async function runNativeHost(
     console.error("[rogatio-host] stdout error:", error.message);
   });
 
-  let buffer = Buffer.alloc(0);
+  const inputPump = createNativeInputPump();
   // Extension commands run one at a time. A host- reply (PAC install/remove)
   // arrives while that command is still awaiting it, so replies bypass the
   // queue. The frame is copied out of `buffer` before any await; otherwise a
   // reply chunk re-reads the in-flight command and the reply is never parsed.
   let commandChain: Promise<void> = Promise.resolve();
-  let pumping = false;
 
   function writeResponse(response: Uint8Array | null): void {
     if (response && stdout.writable) {
@@ -583,21 +595,23 @@ export async function runNativeHost(
       });
   }
 
-  function pump(): void {
-    if (pumping) return;
-    pumping = true;
-    try {
-      for (;;) {
-        if (buffer.length < 4) break;
-        const length = buffer.readUInt32LE(0);
-        if (buffer.length < 4 + length) break;
-        const frame = Buffer.from(buffer.subarray(0, 4 + length));
-        buffer = buffer.subarray(4 + length);
-        dispatch(frame);
-      }
-    } finally {
-      pumping = false;
+  function dispatchFrames(frames: readonly Uint8Array[]): void {
+    for (const frame of frames) {
+      dispatch(frame);
     }
+  }
+
+  function ingestStdinChunk(buf: Buffer): void {
+    const discardBefore = inputPump.discardPayloadBytes;
+    const frames = feedNativeInputPump(inputPump, buf);
+    if (inputPump.discardPayloadBytes > discardBefore) {
+      console.error(
+        "[rogatio-host] dropping oversized native frame:",
+        inputPump.discardPayloadBytes,
+        "bytes",
+      );
+    }
+    dispatchFrames(frames);
   }
 
   stdin.on("data", (chunk: Buffer | string) => {
@@ -608,18 +622,18 @@ export async function runNativeHost(
       "[rogatio-host] stdin data:",
       buf.length,
       "bytes, buffer:",
-      buffer.length,
+      inputPump.buffer.length,
     );
-    buffer = Buffer.concat([buffer, buf]);
-    pump();
+    ingestStdinChunk(buf);
   });
 
   await new Promise<void>((resolve) => {
     stdin.on("end", () => {
+      dispatchFrames(feedNativeInputPump(inputPump, Buffer.alloc(0)));
       void commandChain.finally(() => host.stop()).then(() => resolve());
     });
     if (options.onReady) options.onReady();
-    pump();
+    dispatchFrames(feedNativeInputPump(inputPump, Buffer.alloc(0)));
   });
 }
 

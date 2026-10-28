@@ -891,8 +891,9 @@ start.
 Policies larger than one native frame use bounded `policy-begin`, `policy-part`, and
 `policy-commit` messages. Each Chrome native-messaging frame has a four-byte
 little-endian payload length and a maximum 64 KiB UTF-8 JSON payload. Parts carry only
-base64url canonical policy bytes. Incomplete, reordered, duplicated, oversized,
-malformed, or digest-mismatched staging never becomes active.
+base64url canonical policy bytes. Parts may arrive in any order; assembly uses
+part index. Incomplete, duplicated, invalid-index, oversized, malformed, or
+digest-mismatched staging never becomes active.
 
 ### Browser-to-proxy correlation
 
