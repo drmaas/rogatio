@@ -12,7 +12,10 @@ export interface InterceptionProvider {
   readonly platform: string;
   detect(): CapabilityProfile;
   /** Returns the loopback proxy endpoint when interception becomes active. */
-  start(activation: RuntimeActivation): Promise<ProxyEndpoint | undefined>;
+  start(
+    activation: RuntimeActivation,
+    pacRoutes: readonly string[],
+  ): Promise<ProxyEndpoint | undefined>;
   stop(): Promise<void>;
 }
 
@@ -95,10 +98,13 @@ export async function startInterception(
 
   let proxy: ProxyEndpoint;
   try {
-    const started = await registeredProvider.start({
-      ...activation,
-      localOrigins: targetPolicy.localOrigins,
-    });
+    const started = await registeredProvider.start(
+      {
+        ...activation,
+        localOrigins: targetPolicy.localOrigins,
+      },
+      pacRoutes,
+    );
     if (
       started &&
       typeof started === "object" &&
