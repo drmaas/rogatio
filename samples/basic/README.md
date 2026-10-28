@@ -175,8 +175,11 @@ pnpm test:browser -- test/browser/sample-basic-live.test.ts
 
 # Body rules (response-body + request-body): needs `LIVE_E2E=1` and
 # passwordless sudo for `rogatio runtime install` (CA trust on Linux).
-# Asserts live rewrites on public example.com URLs (response-body on port 80/443;
-# request-body on cleartext HTTP port 80), not through localhost:8080.
+# Uses the same rewriteSampleToValidateOrigin() helper as the DNR journey:
+# import a sample whose sources target http://127.0.0.1:8080, start the
+# in-process validate server from the test, run `rogatio runtime install`,
+# seed the native-messaging host, **Start runtime** from the extension, then
+# assert live response-body on /data.json and request-body on POST /submit.
 # Without `LIVE_E2E` (or sudo), body cases skip; offline dry-run + runtime
 # activation still covered in the default path.
 LIVE_E2E=1 pnpm test:browser -- test/browser/sample-basic-live.test.ts -t "body"
