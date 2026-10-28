@@ -157,6 +157,38 @@ describe(" interception provider", () => {
     expect(provider.status()).toBe("unsupported");
   });
 
+  it("forwards startInterception pacRoutes to provider.start when activation.pacRoutes is empty", async () => {
+    const start = vi.fn(async () => ({ host: "127.0.0.1", port: 9 }));
+    registerInterceptionProvider({
+      platform: "test",
+      detect: () => ({ supported: true, reasons: [] }),
+      start,
+      stop: vi.fn(async () => undefined),
+    });
+    try {
+      const emptyActivationPacRoutes = {
+        ...activation,
+        pacRoutes: [] as const,
+      };
+      const routes = ["https://runtime.start.example/path"];
+      const result = await startInterception(
+        emptyActivationPacRoutes,
+        "sha256:example",
+        "extension",
+        routes,
+        { public: true, localOrigins: [] },
+      );
+      expect(result.kind).toBe("active");
+      expect(start).toHaveBeenCalledOnce();
+      expect(start).toHaveBeenCalledWith(
+        { ...emptyActivationPacRoutes, localOrigins: [] },
+        routes,
+      );
+    } finally {
+      await stopInterception();
+    }
+  });
+
   it("starts a listener when the CA is untrusted and there are no PAC routes", async () => {
     const start = vi.fn(async () => ({ host: "127.0.0.1", port: 9 }));
     registerInterceptionProvider({
@@ -178,6 +210,10 @@ describe(" interception provider", () => {
       );
       expect(listener.kind).toBe("active");
       expect(start).toHaveBeenCalledOnce();
+      expect(start).toHaveBeenCalledWith(
+        { ...activation, localOrigins: [] },
+        [],
+      );
 
       await stopInterception();
 

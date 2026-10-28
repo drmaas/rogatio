@@ -287,18 +287,11 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
 
   const platformProvider = createPlatformInterceptionProvider(platformAdapter);
 
-  // Session-scoped InterceptionProvider closes over pacRoutes from the
-  // activation/session start path via PlatformInterceptionProvider.start.
-  // startInterception calls provider.start(activation); we wrap so routes
-  // come from the SessionProvider registration arguments stored on activation.
-  let pendingRoutes: readonly string[] = [];
   registerInterceptionProvider({
     platform: platformProvider.platform,
     detect: () => platformProvider.detect(),
-    async start(activation) {
-      const routes =
-        pendingRoutes.length > 0 ? pendingRoutes : activation.pacRoutes;
-      const endpoint = await platformProvider.start(activation, routes);
+    async start(activation, pacRoutes) {
+      const endpoint = await platformProvider.start(activation, pacRoutes);
       interceptProxy?.setPolicy(policyForProxy(activation));
       return endpoint;
     },
@@ -306,13 +299,6 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
       await platformProvider.stop();
     },
   });
-
-  // Hook startInterception pacRoutes: lifecycle passes them into
-  // startInterception which does not forward to provider.start. Capture via
-  // pendingRoutes before start by wrapping getCurrentSession path.
-  //
-  // The lifecycle stores pacRoutes on activation when provided in
-  // sessionConfig (activation.pacRoutes). Use that.
 
   let projectStage: PolicyStageState | undefined;
 
@@ -474,14 +460,6 @@ export function createNativeHost(options: NativeHostOptions): NativeHostHandle {
           pending.resolve(envelope);
           return null;
         }
-      }
-
-      // Capture pacRoutes before controller binds interception.
-      if (envelope.type === "runtime.start") {
-        const routes = envelope.metadata.pacRoutes;
-        pendingRoutes = Array.isArray(routes)
-          ? routes.filter((o): o is string => typeof o === "string")
-          : [];
       }
 
       console.error(
