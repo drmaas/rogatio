@@ -525,5 +525,31 @@ describe("native host framing", () => {
     expect(stageAckError(timedOut)).toBe(
       "runtime.request-body-policy-stage-timeout",
     );
+
+    await hostTimeout.stop();
+    vi.useFakeTimers();
+    const hostLateCommit = createNativeHost({});
+    hosts.push(hostLateCommit);
+    await hostLateCommit.start();
+    await runStage(hostLateCommit, "late", parts, digest);
+    vi.advanceTimersByTime(NATIVE_POLICY_STAGE_TIMEOUT_MS + 1);
+    const lateCommit = await hostLateCommit.processFrame(
+      encodeNativeFrame({
+        protocol: "v1",
+        type: NativeFrameType.PolicyCommit,
+        requestId: "late",
+      }),
+    );
+    expect(lateCommit).not.toBeNull();
+    if (lateCommit === null) throw new Error("expected late commit ack");
+    expect(stageAckError(lateCommit)).toBe(
+      "runtime.request-body-policy-stage-timeout",
+    );
+    const inlineSet = await hostLateCommit.processFrame(
+      smallProjectEnvelope("inline-after-timeout"),
+    );
+    expect(inlineSet).not.toBeNull();
+    if (inlineSet === null) throw new Error("expected inline project.set");
+    expect(decodeFrameData(inlineSet).metadata).toMatchObject({ ok: true });
   });
 });

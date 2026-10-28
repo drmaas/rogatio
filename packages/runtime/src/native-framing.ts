@@ -216,6 +216,9 @@ export function addPolicyPart(
 export function commitPolicyStage(
   state: PolicyStageState,
 ): RuntimeResult<Uint8Array> {
+  if (Date.now() - state.startTime > NATIVE_POLICY_STAGE_TIMEOUT_MS) {
+    return failure("runtime.request-body-policy-stage-timeout");
+  }
   if (state.receivedParts.size !== state.partCount) {
     return failure("runtime.request-body-policy-incomplete");
   }
