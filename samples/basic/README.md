@@ -117,8 +117,9 @@ There are two complementary paths:
   first.
 - **Live browser check** — proves the rule actually changes a request or response in Chrome.
   Redirect and query are observable against `https://example.com` with no extra
-  setup. Header, response-body, and request-body checks use a small local server you control
-  (recipe below).
+  setup. Header checks use a small local server you control (recipe below).
+  Response-body and request-body rules have stricter live limits (described below); use
+  `rogatio test` (section 7a) to validate the shipped body rules deterministically.
 
 ### 7a. Offline validation with `rogatio test`
 
@@ -174,7 +175,8 @@ pnpm test:browser -- test/browser/sample-basic-live.test.ts
 
 # Body rules (response-body + request-body): needs `LIVE_E2E=1` and
 # passwordless sudo for `rogatio runtime install` (CA trust on Linux).
-# Asserts live network rewrite through the F23 PAC / chrome.proxy path.
+# Asserts live rewrites on public example.com URLs (response-body on port 80/443;
+# request-body on cleartext HTTP port 80), not through localhost:8080.
 # Without `LIVE_E2E` (or sudo), body cases skip; offline dry-run + runtime
 # activation still covered in the default path.
 LIVE_E2E=1 pnpm test:browser -- test/browser/sample-basic-live.test.ts -t "body"
@@ -203,11 +205,24 @@ action, not proof of success). Body-rule matches are not logged.
 2. The address bar becomes `https://example.com/page?ref=rogatio` (the param is added only
    when missing; an existing `ref` value is replaced).
 
-**Header — set request** (`rule-header-set`), **Header — remove response**
-(`rule-header-remove`), **Response-body** (`rule-response-body`), and **Request-body**
-(`rule-request-body`) are simplest to verify against a target you control. Use the local
+**Header — set request** (`rule-header-set`) and **Header — remove response**
+(`rule-header-remove`) are simplest to verify against a target you control. Use the local
 server recipe below, then re-point the sample at `http://localhost:8080` (instructions
 follow) and repeat the import and enable steps.
+
+**Response-body** (`rule-response-body`) and **Request-body** (`rule-request-body`) are
+not live-tested against `http://localhost:8080` in this README. Live limits:
+
+- **Response-body** — only public `http` on port **80** or `https` on port **443**; GET
+  only; no credentials in the URL. Loopback and non-default ports are rejected by the
+  runtime.
+- **Request-body** — only cleartext **HTTP on port 80**; HTTPS `CONNECT` is a blind tunnel
+  (no TLS decryption), so the shipped `https://example.com/(submit)` rule cannot rewrite
+  the body live in the browser. A loopback origin must be listed in
+  `requestBodyPolicy.localOrigins` in the project file; the sample does not set that.
+
+Use **section 7a** (`rogatio test`) to confirm the shipped response-body and request-body
+rules match and preview their rewrites offline.
 
 #### Local validation server
 
@@ -276,12 +291,6 @@ the group again. Then:
 2. In the Network panel, select the `/api/page` response. The `X-Test-Header` response
    header is absent (the server sent it; Rogatio removed it).
 
-**Response-body** (`rule-response-body`):
-
-1. Visit `http://localhost:8080/data.json`.
-2. The displayed JSON is `{"value":"newValue"}` — `oldValue` was rewritten to `newValue` in
-   the response body (requires the runtime connected for response-body rules).
-
 **File mock** (`rule-mock-file`):
 
 The rule reads `samples/basic/fixture.txt`. That path is relative to a folder you choose.
@@ -296,14 +305,6 @@ The page shows `rogatio file mock`. The browser does not contact example.com.
 If you open this project with `rogatio edit samples/basic/.rogatio.json` and no
 root is saved yet, the root defaults to that same directory.
 
-**Request-body** (`rule-request-body`):
-
-1. With the runtime installed, trusted, and started (step 6), run from the Console:
-   `fetch("http://localhost:8080/submit", { method: "POST", body: '{"original":true}' })`.
-2. The `/submit` response JSON reports `"receivedBody": "{\"user\":\"submit\"}"` — the POST
-   body was replaced before it reached the server, with `$1` filled from the URL path
-   capture.
-
 ## File layout
 
 ```
@@ -311,7 +312,7 @@ samples/basic/
 ├── .rogatio.json          # canonical source of truth (every rule type)
 ├── fixture.txt            # body served by rule-mock-file
 ├── README.md              # this file
-└── validate-server.mjs    # optional local target for live header/body checks
+└── validate-server.mjs    # optional local target for live header checks
 ```
 
 Edit the project with `rogatio edit`, verify with `rogatio verify`, dry-run with
