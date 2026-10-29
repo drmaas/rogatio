@@ -166,7 +166,7 @@ describe(" interception provider", () => {
     expect(provider.status()).toBe("unsupported");
   });
 
-  it("forwards startInterception pacRoutes on activation when activation.pacRoutes is empty", async () => {
+  it("uses activation.pacRoutes for provider start and PAC gating", async () => {
     const start = vi.fn(async () => ({ host: "127.0.0.1", port: 9 }));
     registerInterceptionProvider({
       platform: "test",
@@ -175,24 +175,19 @@ describe(" interception provider", () => {
       stop: vi.fn(async () => undefined),
     });
     try {
-      const emptyActivationPacRoutes = {
-        ...activation,
-        pacRoutes: [] as const,
-      };
       const routes = ["https://runtime.start.example/path"];
       const result = await startInterception(
-        emptyActivationPacRoutes,
+        { ...activation, pacRoutes: routes },
         "sha256:example",
         "extension",
-        routes,
         { public: true, localOrigins: [] },
       );
       expect(result.kind).toBe("active");
       expect(start).toHaveBeenCalledOnce();
       expect(start).toHaveBeenCalledWith({
-        ...emptyActivationPacRoutes,
-        localOrigins: [],
+        ...activation,
         pacRoutes: routes,
+        localOrigins: [],
       });
     } finally {
       await stopInterception();
@@ -212,10 +207,9 @@ describe(" interception provider", () => {
     });
     try {
       const listener = await startInterception(
-        activation,
+        { ...activation, pacRoutes: [] },
         "sha256:example",
         "extension",
-        [],
         { public: true, localOrigins: [] },
       );
       expect(listener.kind).toBe("active");
@@ -232,7 +226,6 @@ describe(" interception provider", () => {
         activation,
         "sha256:example",
         "extension",
-        ["example.com"],
         { public: true, localOrigins: [] },
       );
       expect(routed).toEqual({
