@@ -34,7 +34,6 @@ export interface SessionProvider {
   readonly activation: RuntimeActivation;
   readonly policyDigest: string;
   readonly extensionId: string;
-  readonly pacRoutes: readonly string[];
   readonly targetPolicy: {
     readonly public: boolean;
     readonly localOrigins: readonly string[];
@@ -69,7 +68,6 @@ export async function startInterception(
   activation: RuntimeActivation,
   policyDigest: string,
   extensionId: string,
-  pacRoutes: readonly string[],
   targetPolicy: {
     readonly public: boolean;
     readonly localOrigins: readonly string[];
@@ -82,7 +80,7 @@ export async function startInterception(
   // A listener with no PAC routes does not install a proxy or use the
   // device-local CA. An untrusted CA must not block mock or response-body
   // serving.
-  if (pacRoutes.length > 0 && !capabilities.supported) {
+  if (activation.pacRoutes.length > 0 && !capabilities.supported) {
     return { kind: "unsupported", reasons: capabilities.reasons };
   }
 
@@ -98,7 +96,6 @@ export async function startInterception(
     const started = await registeredProvider.start({
       ...activation,
       localOrigins: targetPolicy.localOrigins,
-      pacRoutes,
     });
     if (
       started &&
@@ -126,10 +123,13 @@ export async function startInterception(
   currentSession = {
     sessionId,
     provider: registeredProvider,
-    activation: { ...activation, proxy, pacRoutes },
+    activation: {
+      ...activation,
+      proxy,
+      localOrigins: targetPolicy.localOrigins,
+    },
     policyDigest,
     extensionId,
-    pacRoutes,
     targetPolicy,
     startedAt: activation.startedAt,
   };

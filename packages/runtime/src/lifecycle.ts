@@ -259,11 +259,15 @@ export function createNativeRuntimeController(
         },
       };
     }
+    const activationForInterception: RuntimeActivation = {
+      ...current,
+      pacRoutes: sessionConfig.pacRoutes,
+      localOrigins: sessionConfig.targetPolicy.localOrigins,
+    };
     const result = await startInterception(
-      current,
+      activationForInterception,
       sessionConfig.policyDigest,
       sessionConfig.extensionId,
-      sessionConfig.pacRoutes,
       {
         public: sessionConfig.targetPolicy.public,
         localOrigins: sessionConfig.targetPolicy.localOrigins,
@@ -278,8 +282,7 @@ export function createNativeRuntimeController(
     }
     const session = getCurrentSession();
     const next: RuntimeActivation = {
-      ...current,
-      pacRoutes: sessionConfig.pacRoutes,
+      ...activationForInterception,
       proxy: result.proxy,
     };
     return {
