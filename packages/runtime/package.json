@@ -21,7 +21,7 @@
     "@peculiar/x509": "^2.2.0",
     "@rogatio/compiler": "workspace:*",
     "@rogatio/schema": "workspace:*",
-    "koffi": "3.3.3",
+    "koffi": "3.3.4",
     "reflect-metadata": "^0.2.2"
   }
 }
