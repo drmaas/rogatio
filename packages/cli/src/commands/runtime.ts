@@ -112,12 +112,62 @@ async function writeHostWrapper(
   }
 }
 
-function reportHostWrapperFailure(error: unknown): number {
+type HostWrapperRollbackOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly detail: string };
+
+function formatRollbackFailureDetail(error: unknown): string {
+  if (error instanceof Error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (typeof code === "string" && code.length > 0) {
+      return `${error.message} (${code})`;
+    }
+    return error.message;
+  }
+  return String(error);
+}
+
+async function rollbackTrustAfterHostWrapperFailure(controller: {
+  uninstall: () => Promise<{
+    ok: boolean;
+    state: string;
+    reasons?: readonly string[];
+  }>;
+}): Promise<HostWrapperRollbackOutcome> {
+  try {
+    const result = await controller.uninstall();
+    if (result.ok) {
+      return { ok: true };
+    }
+    const detail =
+      result.reasons !== undefined && result.reasons.length > 0
+        ? result.reasons.join(", ")
+        : result.state;
+    return { ok: false, detail };
+  } catch (error) {
+    return { ok: false, detail: formatRollbackFailureDetail(error) };
+  }
+}
+
+function reportHostWrapperFailure(
+  error: unknown,
+  rollback: HostWrapperRollbackOutcome,
+): number {
+  const wrapperDetail = formatHostWrapperError(error);
+  if (rollback.ok) {
+    console.error(
+      `runtime install failed: the runtime-host wrapper was not created: ${wrapperDetail}. Manifest and CA trust were rolled back.`,
+    );
+    console.error(
+      "Fix the error above, then re-run `rogatio runtime install` and `rogatio runtime verify`.",
+    );
+    return 1;
+  }
   console.error(
-    `runtime install failed: the runtime-host wrapper was not created: ${formatHostWrapperError(error)}. Manifest and CA trust were rolled back.`,
+    `runtime install failed: the runtime-host wrapper was not created: ${wrapperDetail}. Rollback of manifest and CA trust failed: ${rollback.detail}.`,
   );
   console.error(
-    "Fix the error above, then re-run `rogatio runtime install` and `rogatio runtime verify`.",
+    "Run `rogatio runtime uninstall` to remove any partial install, then fix the error above and re-run `rogatio runtime install` and `rogatio runtime verify`.",
   );
   return 1;
 }
@@ -220,12 +270,9 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
         try {
           await writeHostWrapper(hostPath, installRoot);
         } catch (error) {
-          try {
-            await controller.uninstall();
-          } catch {
-            // best-effort rollback after wrapper failure
-          }
-          return reportHostWrapperFailure(error);
+          const rollback =
+            await rollbackTrustAfterHostWrapperFailure(controller);
+          return reportHostWrapperFailure(error, rollback);
         }
       }
       return reportTrust(

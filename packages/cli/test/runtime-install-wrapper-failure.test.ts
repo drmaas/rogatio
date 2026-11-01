@@ -22,7 +22,13 @@ const rmMock = vi.hoisted(() =>
   ),
 );
 const uninstallMock = vi.hoisted(() =>
-  vi.fn(async () => ({ ok: true, state: "uninstalled" as const })),
+  vi.fn(
+    async (): Promise<{
+      ok: boolean;
+      state: string;
+      reasons?: readonly string[];
+    }> => ({ ok: true, state: "uninstalled" }),
+  ),
 );
 
 vi.mock("node:fs/promises", async () => {
@@ -221,6 +227,65 @@ describe("rogatio runtime install (host wrapper failures)", () => {
     const stderr = err.mock.calls.map((call) => call.join(" ")).join("\n");
     expect(stderr).toContain("operation not permitted (EPERM)");
     expect(stderr).toContain("runtime-host wrapper was not created");
+    expect(uninstallMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("exits 1 with rollback-failed messaging when uninstall throws after wrapper failure", async () => {
+    installRootOverride.value = await mkdtemp(
+      join(tmpdir(), "rogatio-wrapper-fail-"),
+    );
+    fsBehavior.openError = Object.assign(new Error("disk full"), {
+      code: "ENOSPC",
+    });
+    uninstallMock.mockImplementationOnce(async () => {
+      throw Object.assign(new Error("permission denied"), { code: "EACCES" });
+    });
+
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const code = await runtimeCommand([
+      "install",
+      "--extension-id",
+      "abcdefghijklmnopabcdefghijklmnop",
+    ]);
+
+    expect(code).toBe(1);
+    const stderr = err.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(stderr).toContain("disk full (ENOSPC)");
+    expect(stderr).toContain("Rollback of manifest and CA trust failed");
+    expect(stderr).toContain("permission denied (EACCES)");
+    expect(stderr).toContain("rogatio runtime uninstall");
+    expect(stderr).not.toContain("were rolled back");
+    expect(uninstallMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("exits 1 with rollback-failed messaging when uninstall returns ok: false", async () => {
+    installRootOverride.value = await mkdtemp(
+      join(tmpdir(), "rogatio-wrapper-fail-"),
+    );
+    fsBehavior.openError = Object.assign(new Error("disk full"), {
+      code: "ENOSPC",
+    });
+    uninstallMock.mockImplementationOnce(async () => ({
+      ok: false,
+      state: "unsupported" as const,
+      reasons: ["trust.write-failed"],
+    }));
+
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const code = await runtimeCommand([
+      "install",
+      "--extension-id",
+      "abcdefghijklmnopabcdefghijklmnop",
+    ]);
+
+    expect(code).toBe(1);
+    const stderr = err.mock.calls.map((call) => call.join(" ")).join("\n");
+    expect(stderr).toContain("Rollback of manifest and CA trust failed");
+    expect(stderr).toContain("trust.write-failed");
+    expect(stderr).toContain("rogatio runtime uninstall");
+    expect(stderr).not.toContain("were rolled back");
     expect(uninstallMock).toHaveBeenCalledTimes(1);
   });
 
