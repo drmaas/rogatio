@@ -12,15 +12,15 @@ Audience: agent. Issue #208. Workflow: doit + lean-build.
 
 ## Models
 
-| Role        | Choice                                        | Rationale                                                                                  |
-| ----------- | --------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| reasoning   | inherit (orchestrator)                        | Opus/GPT subagents hit usage limits; primary brainstorm done in-session with file evidence |
-| adversarial | inherit (in-session)                          | Same limit; self-challenge recorded in notes risks                                         |
-| plan        | inherit                                       | Narrow wire-up                                                                             |
-| coding      | inherit                                       | Editor package edit                                                                        |
-| verify      | inherit                                       | `pnpm validate`                                                                            |
-| review      | `composer-2.5-fast` (fallback if GPT limited) | Fresh Task review; prefer different family when available                                  |
-| docs        | inherit                                       | Minimal living-doc touch                                                                   |
+| Role | Choice | Rationale |
+| --- | --- | --- |
+| reasoning | inherit (orchestrator) | Opus/GPT subagents hit usage limits; primary brainstorm done in-session with file evidence |
+| adversarial | inherit (in-session) | Same limit; self-challenge recorded in notes risks |
+| plan | inherit | Narrow wire-up |
+| coding | inherit | Editor package edit |
+| verify | inherit | `pnpm validate` |
+| review | `composer-2.5-fast` (fallback if GPT limited) | Fresh Task review; prefer different family when available |
+| docs | inherit | Minimal living-doc touch |
 
 ## Graphify
 

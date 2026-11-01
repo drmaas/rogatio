@@ -1,5 +1,4 @@
 ---
-
 title: Request & response headers
 description: Set, append, or remove headers subject to forbidden-header lists and browser limits.
 ---

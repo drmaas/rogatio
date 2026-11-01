@@ -126,18 +126,18 @@ Diagnostics retain the F2 `instancePath` as the compiler `path`, including an em
 
 The default mapping is:
 
-| F2 issue keyword                                                                      | Compiler code                |
-| ------------------------------------------------------------------------------------- | ---------------------------- |
-| `required`                                                                            | `schema.required`            |
-| `additionalProperties`                                                                | `schema.unknown-property`    |
-| `type`                                                                                | `schema.invalid-type`        |
-| `format`                                                                              | `schema.invalid-format`      |
-| `const`, `enum`, `pattern`                                                            | `schema.invalid-value`       |
-| `minLength`, `maxLength`, `minItems`, `maxItems`, `minimum`, `maximum`, `uniqueItems` | `schema.out-of-range`        |
-| `ownProperties`                                                                       | `schema.invalid-structure`   |
-| `uniqueId`                                                                            | `schema.duplicate-id`        |
-| `effectiveOrigin`                                                                     | `schema.no-effective-origin` |
-| `maxRulesPerProject`                                                                  | `schema.rule-limit`          |
+| F2 issue keyword | Compiler code |
+| --- | --- |
+| `required` | `schema.required` |
+| `additionalProperties` | `schema.unknown-property` |
+| `type` | `schema.invalid-type` |
+| `format` | `schema.invalid-format` |
+| `const`, `enum`, `pattern` | `schema.invalid-value` |
+| `minLength`, `maxLength`, `minItems`, `maxItems`, `minimum`, `maximum`, `uniqueItems` | `schema.out-of-range` |
+| `ownProperties` | `schema.invalid-structure` |
+| `uniqueId` | `schema.duplicate-id` |
+| `effectiveOrigin` | `schema.no-effective-origin` |
+| `maxRulesPerProject` | `schema.rule-limit` |
 
 An unrecognized structural keyword maps to `schema.invalid-value`; a failure in an internal post-validation invariant maps to `compiler.invariant` at the relevant JSON-pointer path. Diagnostic ordering is deterministic by path, code, and message using code-unit comparison.
 

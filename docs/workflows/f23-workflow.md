@@ -26,20 +26,20 @@
 
 ## Stage status
 
-| Stage                 | Status  | Notes                                                                                            |
-| --------------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| 0 Worktree            | done    | Dedicated feature worktree confirmed before edits.                                               |
-| 1 Brainstorm          | done    | Synthesized current runtime, CLI, extension, and architecture; adversarial omissions considered. |
-| 2 Architecture        | done    | Unified host-owned proxy/TLS/session boundary recorded in F23 spec and plan.                     |
-| 3 Specification       | done    | `docs/specs/f23-unified-native-host-runtime.md` created.                                         |
-| 4 Human review gate   | done    | User approved the specification and instructed continuation.                                     |
-| 5 Implementation plan | done    | `docs/plans/f23-unified-native-host-runtime.md` created.                                         |
-| 6 Tests first         | pending | Must author tests before production implementation.                                              |
-| 7 Implementation      | pending | Not started.                                                                                     |
-| 8 Verification        | pending | Canonical validation required.                                                                   |
-| 9 Independent review  | pending | Fresh-context review, maximum three rounds.                                                      |
-| 10 Documentation      | pending | Synchronize architecture, README, and affected runtime docs after behavior stabilizes.           |
-| 11 Release            | pending | No commit/push/cleanup authorization.                                                            |
+| Stage | Status | Notes |
+| --- | --- | --- |
+| 0 Worktree | done | Dedicated feature worktree confirmed before edits. |
+| 1 Brainstorm | done | Synthesized current runtime, CLI, extension, and architecture; adversarial omissions considered. |
+| 2 Architecture | done | Unified host-owned proxy/TLS/session boundary recorded in F23 spec and plan. |
+| 3 Specification | done | `docs/specs/f23-unified-native-host-runtime.md` created. |
+| 4 Human review gate | done | User approved the specification and instructed continuation. |
+| 5 Implementation plan | done | `docs/plans/f23-unified-native-host-runtime.md` created. |
+| 6 Tests first | pending | Must author tests before production implementation. |
+| 7 Implementation | pending | Not started. |
+| 8 Verification | pending | Canonical validation required. |
+| 9 Independent review | pending | Fresh-context review, maximum three rounds. |
+| 10 Documentation | pending | Synchronize architecture, README, and affected runtime docs after behavior stabilizes. |
+| 11 Release | pending | No commit/push/cleanup authorization. |
 
 ## Approved architecture summary
 

@@ -22,20 +22,20 @@
 
 ## Stage status
 
-| Stage                | Status           | Evidence or next action                                                                                                            |
-| -------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Worktree           | Done             | Dedicated clean worktree and `feature/f17` branch created from main.                                                               |
-| 1 Brainstorm         | Done (ephemeral) | Primary and distinct adversarial passes completed; no brainstorm file retained.                                                    |
-| 2 Architecture       | Done             | F17 section added to `docs/architecture.md`.                                                                                       |
-| 3 Specification      | Done             | `docs/specs/f17-request-body-rules.md` written.                                                                                    |
-| 4 Human review gate  | Approved         | User explicitly reapproved the revised ordinary-MV3 authority contract on 2026-08-25.                                              |
-| 5 Plan               | Done             | `docs/plans/f17-request-body-rules.md` written against revised specification.                                                      |
-| 6 Tests first        | Done             | All test files authored; format, lint, build, and tests pass (typecheck errors in test files for unimplemented APIs are expected). |
-| 7 Implementation     | Done             | All packages implemented; canonical validation green (typecheck/build/format/test/validate).                                       |
-| 8 Verification       | Done             | Canonical validation rerun after fixes; 546 tests pass, 14 browser specs pass.                                                     |
-| 9 Independent review | Done             | Fresh-context self-review, round 1; findings A/B/C/D fixed and re-verified; passed.                                                |
-| 10 Documentation     | Done             | Architecture F17 section present/consistent; README lists request-body; AGENTS unaffected; workflow log reconciled.                |
-| 11 Release           | Blocked          | Requires separate explicit user authorization for commit/push/PR/merge/cleanup.                                                    |
+| Stage | Status | Evidence or next action |
+| --- | --- | --- |
+| 0 Worktree | Done | Dedicated clean worktree and `feature/f17` branch created from main. |
+| 1 Brainstorm | Done (ephemeral) | Primary and distinct adversarial passes completed; no brainstorm file retained. |
+| 2 Architecture | Done | F17 section added to `docs/architecture.md`. |
+| 3 Specification | Done | `docs/specs/f17-request-body-rules.md` written. |
+| 4 Human review gate | Approved | User explicitly reapproved the revised ordinary-MV3 authority contract on 2026-08-25. |
+| 5 Plan | Done | `docs/plans/f17-request-body-rules.md` written against revised specification. |
+| 6 Tests first | Done | All test files authored; format, lint, build, and tests pass (typecheck errors in test files for unimplemented APIs are expected). |
+| 7 Implementation | Done | All packages implemented; canonical validation green (typecheck/build/format/test/validate). |
+| 8 Verification | Done | Canonical validation rerun after fixes; 546 tests pass, 14 browser specs pass. |
+| 9 Independent review | Done | Fresh-context self-review, round 1; findings A/B/C/D fixed and re-verified; passed. |
+| 10 Documentation | Done | Architecture F17 section present/consistent; README lists request-body; AGENTS unaffected; workflow log reconciled. |
+| 11 Release | Blocked | Requires separate explicit user authorization for commit/push/PR/merge/cleanup. |
 
 ## Stage 1 synthesis
 

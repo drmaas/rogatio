@@ -2,21 +2,21 @@
 
 ## Tier and role assignment (Free tier)
 
-| Stage | Phase             | Model                                           |
-| ----- | ----------------- | ----------------------------------------------- |
-| 0     | Worktree          | (session) `opencode/hy3-free`                   |
-| 1     | Brainstorm        | `opencode/nemotron-3-ultra-free`                |
-| 1a    | Adversarial       | `opencode/hy3-free` (cross-model; free catalog) |
-| 2     | Architecture      | `opencode/nemotron-3-ultra-free`                |
-| 3     | Specification     | `opencode/nemotron-3-ultra-free`                |
-| 4     | Human review gate | user                                            |
-| 5     | Plan              | `opencode/mimo-v2.5-free`                       |
-| 6     | Tests             | `opencode/muse-spark-1.2-contributor-free`      |
-| 7     | Implementation    | `opencode/x-preview-f-free`                     |
-| 8     | Verification      | `opencode/hy3-free`                             |
-| 9     | Review            | `opencode/big-pickle`                           |
-| 10    | Docs              | `opencode/hy3-free`                             |
-| 11    | Release           | user authorization                              |
+| Stage | Phase | Model |
+| --- | --- | --- |
+| 0 | Worktree | (session) `opencode/hy3-free` |
+| 1 | Brainstorm | `opencode/nemotron-3-ultra-free` |
+| 1a | Adversarial | `opencode/hy3-free` (cross-model; free catalog) |
+| 2 | Architecture | `opencode/nemotron-3-ultra-free` |
+| 3 | Specification | `opencode/nemotron-3-ultra-free` |
+| 4 | Human review gate | user |
+| 5 | Plan | `opencode/mimo-v2.5-free` |
+| 6 | Tests | `opencode/muse-spark-1.2-contributor-free` |
+| 7 | Implementation | `opencode/x-preview-f-free` |
+| 8 | Verification | `opencode/hy3-free` |
+| 9 | Review | `opencode/big-pickle` |
+| 10 | Docs | `opencode/hy3-free` |
+| 11 | Release | user authorization |
 
 Models verified available from the free catalog. Single session model is `hy3-free`; used only for the brainstorm adversarial pass, verification, and docs (all distinct role passes).
 

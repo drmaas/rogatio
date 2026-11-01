@@ -1,5 +1,4 @@
 ---
-
 title: Redirects
 description: Send matching requests to an absolute destination with controlled capture substitution.
 ---

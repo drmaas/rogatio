@@ -28,13 +28,13 @@ The controller surface at HEAD `db5661b` (post-PR-#79) is **four methods** (`ins
 
 #### Current controller surface at HEAD `db5661b` (post-PR-#79)
 
-| Method                 | File:line          | Current behavior                                                                                                                                                                                                                    | After this PR                                                                                                  |
-| ---------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `install(extensionId)` | `trust.ts:249-319` | Validates extensionId, writes manifest only as step 1; PR #79 widened this to do CA + installer work transactionally with rollback; calls private `trust()` helper which calls private `runCaTrust()` helper at `trust.ts:321-350`. | (Untouched by this PR.)                                                                                        |
-| `uninstall()`          | `trust.ts:352-363` | `rm(manifestPath(), { force: true })`, returns `uninstalled`. No-op when absent.                                                                                                                                                    | **WIDENED**: removes manifest + calls `caTrustRemover` (if present) + `rm` for the three CA files. Idempotent. |
-| `trust()`              | `trust.ts:365-376` | Now a private closure helper (called by `install` via `runCaTrust()` at `trust.ts:301`). Generates CA, writes key/pub/cert, invokes `caTrustInstaller`.                                                                             | (Untouched by this PR.)                                                                                        |
-| `untrust()`            | `trust.ts:378-395` | If CA files exist, calls `caTrustRemover()`; `rm` key, pub, cert; resets `installerCalled`. Returns `untrusted`. Idempotent.                                                                                                        | **REMOVED from public surface**. No private helper kept — the new `uninstall` does the work directly.          |
-| `status()`             | `trust.ts:397-415` | `installed` from manifest presence + well-formedness; `trusted` from CA key + cert file presence. Never leaks paths.                                                                                                                | (Unchanged.)                                                                                                   |
+| Method | File:line | Current behavior | After this PR |
+| --- | --- | --- | --- |
+| `install(extensionId)` | `trust.ts:249-319` | Validates extensionId, writes manifest only as step 1; PR #79 widened this to do CA + installer work transactionally with rollback; calls private `trust()` helper which calls private `runCaTrust()` helper at `trust.ts:321-350`. | (Untouched by this PR.) |
+| `uninstall()` | `trust.ts:352-363` | `rm(manifestPath(), { force: true })`, returns `uninstalled`. No-op when absent. | **WIDENED**: removes manifest + calls `caTrustRemover` (if present) + `rm` for the three CA files. Idempotent. |
+| `trust()` | `trust.ts:365-376` | Now a private closure helper (called by `install` via `runCaTrust()` at `trust.ts:301`). Generates CA, writes key/pub/cert, invokes `caTrustInstaller`. | (Untouched by this PR.) |
+| `untrust()` | `trust.ts:378-395` | If CA files exist, calls `caTrustRemover()`; `rm` key, pub, cert; resets `installerCalled`. Returns `untrusted`. Idempotent. | **REMOVED from public surface**. No private helper kept — the new `uninstall` does the work directly. |
+| `status()` | `trust.ts:397-415` | `installed` from manifest presence + well-formedness; `trusted` from CA key + cert file presence. Never leaks paths. | (Unchanged.) |
 
 Factory return at `trust.ts:417` becomes `{ install, uninstall, status }` (three methods) after both #79 and this PR land.
 
@@ -246,14 +246,10 @@ function reportTrust(
     return 0;
   }
   if (result.state === "unsupported") {
-    console.error(
-      `trust unsupported: ${(result.reasons ?? ["unknown"]).join(", ")}`,
-    );
+    console.error(`trust unsupported: ${(result.reasons ?? ["unknown"]).join(", ")}`);
     return 0;
   }
-  console.error(
-    `trust ${subcommand} failed: ${(result.reasons ?? ["unknown"]).join(", ")}`,
-  );
+  console.error(`trust ${subcommand} failed: ${(result.reasons ?? ["unknown"]).join(", ")}`);
   return 1;
 }
 ```
@@ -362,7 +358,7 @@ Verified via grep: no `untrust` references in this file. This PR does NOT add a 
 
 #### `docs/specs/f19-docs-site.md` (129 lines) — frozen **(MISSED BY PRIOR RESEARCH)**
 
-**New drift discovered during this re-verification.** L68 contains the verb-list: `Reference: CLI (\`edit\`, \`verify\`, \`runtime install|status|trust|untrust|uninstall\`), extension, supported platforms & capabilities, security & privacy model, architecture.`—`untrust`is about to be removed. PR #79 did NOT add a footer here. **This PR's footer list must include L68** (with reason: "verb-list enumeration;`untrust` removed by this PR").
+**New drift discovered during this re-verification.** L68 contains the verb-list: `Reference: CLI (\`edit\`, \`verify\`, \`runtime install|status|trust|untrust|uninstall\`), extension, supported platforms & capabilities, security & privacy model, architecture.` — `untrust` is about to be removed. PR #79 did NOT add a footer here. **This PR's footer list must include L68** (with reason: "verb-list enumeration; `untrust` removed by this PR").
 
 #### `docs/specs/consolidated-native-runtime.md` (261 lines) — frozen **(MISSED BY PRIOR RESEARCH)**
 
@@ -370,17 +366,17 @@ Verified via grep: no `untrust` references in this file. This PR does NOT add a 
 
 #### `docs/plans/consolidated-native-runtime.md` (123 lines) — frozen **(MISSED BY PRIOR RESEARCH)**
 
-**New drift discovered during this re-verification.** L61 contains: `\`trust.ts\`: keep CA install/uninstall/trust/untrust/status; manifest stays \`v1\`.`—`untrust`is about to be removed. PR #79 did NOT add a footer here. **This PR's footer list must include L61** (with reason: "verb-list enumeration;`untrust` removed by this PR").
+**New drift discovered during this re-verification.** L61 contains: `\`trust.ts\`: keep CA install/uninstall/trust/untrust/status; manifest stays \`v1\`.` — `untrust` is about to be removed. PR #79 did NOT add a footer here. **This PR's footer list must include L61** (with reason: "verb-list enumeration; `untrust` removed by this PR").
 
 #### `docs/plans/cli-activate-deactivate-removal.md` — frozen **(MISSED BY PRIOR RESEARCH)**
 
-**New drift discovered during this re-verification.** L96 contains: `keep \`install|trust|untrust|uninstall\` and \`host\``—`untrust`is about to be removed. PR #79 did NOT add a footer here. **This PR's footer list must include L96** (with reason: "verb-list enumeration;`untrust` removed by this PR").
+**New drift discovered during this re-verification.** L96 contains: `keep \`install|trust|untrust|uninstall\` and \`host\`` — `untrust` is about to be removed. PR #79 did NOT add a footer here. **This PR's footer list must include L96** (with reason: "verb-list enumeration; `untrust` removed by this PR").
 
 #### `docs/plans/f17-request-body-rules.md` — frozen **(MISSED BY PRIOR RESEARCH)**
 
 **New drift discovered during this re-verification.**
-- **L201** — `Preserve explicit \`trust\`, \`untrust\`, \`install\`, \`uninstall\`; do not auto-run from \`runtime start\`.`—`untrust` is about to be removed. PR #79 did NOT add a footer here. **This PR's footer list must include L201**.
-- **L460** — `\`untrust\` and \`uninstall\` remain explicit user actions.`—`untrust` is about to be removed. **This PR's footer list must include L460**.
+- **L201** — `Preserve explicit \`trust\`, \`untrust\`, \`install\`, \`uninstall\`; do not auto-run from \`runtime start\`.` — `untrust` is about to be removed. PR #79 did NOT add a footer here. **This PR's footer list must include L201**.
+- **L460** — `\`untrust\` and \`uninstall\` remain explicit user actions.` — `untrust` is about to be removed. **This PR's footer list must include L460**.
 
 ### 6. Live documentation updates
 
@@ -473,30 +469,30 @@ The plan phase picks one; recommendation: **#2** for symmetry with PR #79.
 
 Append `> Superseded by: feat/collapse-runtime-uninstall-and-untrust` to:
 
-| File                                            | Line     | Reason                                                                                  |
-| ----------------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
-| `docs/specs/f16-request-body-trust.md`          | L18-19   | `install                                                                                | status | trust   | untrust                 | uninstall`enumeration;`untrust` about to be removed |
-| `docs/specs/f16-request-body-trust.md`          | L30-31   | CLI surface enumeration; `untrust` removed                                              |
-| `docs/specs/f16-request-body-trust.md`          | L58-59   | `CLI operator` enumeration                                                              |
-| `docs/specs/f16-request-body-trust.md`          | L104-106 | REQ-004 enumeration                                                                     |
-| `docs/specs/f16-request-body-trust.md`          | L134-136 | REQ-011: `uninstall()` semantic widens                                                  |
-| `docs/specs/f16-request-body-trust.md`          | L141-143 | REQ-013: `untrust()` is removed                                                         |
-| `docs/specs/f16-request-body-trust.md`          | L147-149 | REQ-015: `uninstall()` no longer capability-gated                                       |
-| `docs/specs/f16-request-body-trust.md`          | L289-291 | `uninstall/untrust are idempotent` clause                                               |
-| `docs/specs/f16-request-body-trust.md`          | L316-318 | AC-006: `untrust()` reference                                                           |
-| `docs/plans/f16-request-body-trust.md`          | L29-40   | T4 controller lifecycle; `untrust` removed                                              |
-| `docs/plans/f16-request-body-trust.md`          | L45-51   | T6 CLI surface                                                                          |
-| `docs/plans/f16-request-body-trust.md`          | L79-81   | Rollback note; rollback now also covers uninstall widening                              |
-| `docs/specs/cli-activate-deactivate-removal.md` | L33      | `install                                                                                | trust  | untrust | uninstall` enumeration  |
-| `docs/specs/cli-activate-deactivate-removal.md` | L42      | "We are not removing `rogatio runtime install                                           | trust  | untrust | uninstall`"             |
-| `docs/specs/cli-activate-deactivate-removal.md` | L66      | "`rogatio runtime install                                                               | trust  | untrust | uninstall` → unchanged" |
-| `docs/specs/cli-activate-deactivate-removal.md` | L131     | "`rogatio runtime install                                                               | trust  | untrust | uninstall               | host` continue to work"                             |
-| `docs/specs/f19-docs-site.md`                   | L68      | (NEW — missed by prior research) `runtime install                                       | status | trust   | untrust                 | uninstall` enumeration                              |
-| `docs/specs/consolidated-native-runtime.md`     | L119     | (NEW — missed by prior research) `install/uninstall/trust/untrust/status` enumeration   |
-| `docs/plans/consolidated-native-runtime.md`     | L61      | (NEW — missed by prior research) `install/uninstall/trust/untrust/status` enumeration   |
-| `docs/plans/cli-activate-deactivate-removal.md` | L96      | (NEW — missed by prior research) `keep install                                          | trust  | untrust | uninstall and host`     |
-| `docs/plans/f17-request-body-rules.md`          | L201     | (NEW — missed by prior research) `Preserve explicit trust, untrust, install, uninstall` |
-| `docs/plans/f17-request-body-rules.md`          | L460     | (NEW — missed by prior research) `untrust and uninstall remain explicit user actions`   |
+| File | Line | Reason |
+| --- | --- | --- |
+| `docs/specs/f16-request-body-trust.md` | L18-19 | `install | status | trust | untrust | uninstall` enumeration; `untrust` about to be removed |
+| `docs/specs/f16-request-body-trust.md` | L30-31 | CLI surface enumeration; `untrust` removed |
+| `docs/specs/f16-request-body-trust.md` | L58-59 | `CLI operator` enumeration |
+| `docs/specs/f16-request-body-trust.md` | L104-106 | REQ-004 enumeration |
+| `docs/specs/f16-request-body-trust.md` | L134-136 | REQ-011: `uninstall()` semantic widens |
+| `docs/specs/f16-request-body-trust.md` | L141-143 | REQ-013: `untrust()` is removed |
+| `docs/specs/f16-request-body-trust.md` | L147-149 | REQ-015: `uninstall()` no longer capability-gated |
+| `docs/specs/f16-request-body-trust.md` | L289-291 | `uninstall/untrust are idempotent` clause |
+| `docs/specs/f16-request-body-trust.md` | L316-318 | AC-006: `untrust()` reference |
+| `docs/plans/f16-request-body-trust.md` | L29-40 | T4 controller lifecycle; `untrust` removed |
+| `docs/plans/f16-request-body-trust.md` | L45-51 | T6 CLI surface |
+| `docs/plans/f16-request-body-trust.md` | L79-81 | Rollback note; rollback now also covers uninstall widening |
+| `docs/specs/cli-activate-deactivate-removal.md` | L33 | `install|trust|untrust|uninstall` enumeration |
+| `docs/specs/cli-activate-deactivate-removal.md` | L42 | "We are not removing `rogatio runtime install|trust|untrust|uninstall`" |
+| `docs/specs/cli-activate-deactivate-removal.md` | L66 | "`rogatio runtime install|trust|untrust|uninstall` → unchanged" |
+| `docs/specs/cli-activate-deactivate-removal.md` | L131 | "`rogatio runtime install|trust|untrust|uninstall|host` continue to work" |
+| `docs/specs/f19-docs-site.md` | L68 | (NEW — missed by prior research) `runtime install|status|trust|untrust|uninstall` enumeration |
+| `docs/specs/consolidated-native-runtime.md` | L119 | (NEW — missed by prior research) `install/uninstall/trust/untrust/status` enumeration |
+| `docs/plans/consolidated-native-runtime.md` | L61 | (NEW — missed by prior research) `install/uninstall/trust/untrust/status` enumeration |
+| `docs/plans/cli-activate-deactivate-removal.md` | L96 | (NEW — missed by prior research) `keep install|trust|untrust|uninstall and host` |
+| `docs/plans/f17-request-body-rules.md` | L201 | (NEW — missed by prior research) `Preserve explicit trust, untrust, install, uninstall` |
+| `docs/plans/f17-request-body-rules.md` | L460 | (NEW — missed by prior research) `untrust and uninstall remain explicit user actions` |
 
 `docs/workflows/f16-workflow.md` is **not** footnoted (no per-line verb enumeration; same conclusion as PR #79).
 `docs/specs/f17-request-body-rules.md` (spec, not plan) has no `untrust` references outside of the L405-406 line already footnoted by PR #79 (the `trust` line, not `untrust`); this PR does not add new footers to the F17 spec.
@@ -611,7 +607,6 @@ Extending the prior `runtime-install-collapse` AC list with the analog for the u
 ---
 
 > **Implementation review (research-review re-verification, 2026-09-04, free tier `openrouter`).** Verdict: **RESEARCH RE-VERIFIED WITH CORRECTIONS**. The research was re-verified against post-#79 HEAD `db5661b` after the worktree was rebased. **28 file:line citations drifted** (controller, CLI, frozen specs, live docs) and **17 citations remained accurate** (x509, `install(extensionId)` overload union internals, `installerCalled`, `caTrustInstaller`, `caTrustRemover`, `DEFAULT_CAPABILITIES`, `detectTrustCapabilities`, runtime `index.ts:23`, runtime `runtime.test.ts` length and content). **4 citations needed substantive updates** beyond line shifts: (1) the controller surface is now four methods post-#79 (not five), with `trust` as a closure-private helper; (2) `docs/architecture.md` retains the `status` bullet post-#79 (PR #79 did not delete it); (3) `README.md:128` still says `<install|trust|untrust|uninstall>` post-#79 (PR #79 did not update it); (4) `runtime-command-gating.test.ts:49-54` "trust command remains explicit" test was already absent pre-#79 (PR #79's commit message was inaccurate). **Six new frozen-doc footer locations were discovered** that the original research missed (`docs/specs/f19-docs-site.md:68`, `docs/specs/consolidated-native-runtime.md:119`, `docs/plans/consolidated-native-runtime.md:61`, `docs/plans/cli-activate-deactivate-removal.md:96`, `docs/plans/f17-request-body-rules.md:201`, `:460`); the implementation must footnote all six. The `runCaTrust` private helper at `trust.ts:321-350` (added by PR #79) is a new seam that the new `uninstall` does not consume (it consumes `caTrustRemover` directly at `trust.ts:166`). All other claims, constraints, and acceptance criteria remain substantively correct. The plan phase may proceed with these corrections applied.
-
 ---
 
 > **Human-gate decisions (2026-09-04):**

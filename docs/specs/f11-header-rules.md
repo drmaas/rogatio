@@ -5,7 +5,7 @@
 Rogatio currently defines rules only as matcher envelopes (URL/origin/resource-type/priority
 selection) with no action. Per `rogatio-overview.md`, users need **request and response
 header rules**: set, append, or remove a named header, subject to immutable forbidden-header
-lists and browser limits. This is the first _action_ slice and establishes the rule-type
+lists and browser limits. This is the first *action* slice and establishes the rule-type
 discriminant, the neutral `HeaderOperation`, and the Chrome DNR `modifyHeaders` translation
 that later slices (F9 redirect, F10 query) will follow.
 
@@ -125,7 +125,7 @@ Non-goals (deferred):
 ## 7. Security, privacy, performance, accessibility, operational
 
 - Forbidden-header enforcement prevents tampering with security-sensitive headers
-  (cookie, origin, content-length, host, sec-_, proxy-_). Validation runs at both the Node
+  (cookie, origin, content-length, host, sec-*, proxy-*). Validation runs at both the Node
   schema and the duplicated browser schema to avoid a validation gap.
 - Header names/values are bounded by `LIMITS` to avoid abuse; single modification per rule
   keeps DNR `modifyHeaders` within Chrome's per-rule header limit.

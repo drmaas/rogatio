@@ -80,12 +80,12 @@ The Rule type `<select>` is built only from `this.extensions` (`packages/editor/
 
 `builtInRuleTypes` today (`packages/editor/src/rule-types/index.ts:12-17`):
 
-| id              | label                     | file                                                    |
-| --------------- | ------------------------- | ------------------------------------------------------- |
-| `query`         | `"Query parameters"`      | `packages/editor/src/rule-types/query.ts:42-44`         |
-| `mock`          | `"Mock response"`         | `packages/editor/src/rule-types/mock.ts:51-54`          |
+| id | label | file |
+| --- | --- | --- |
+| `query` | `"Query parameters"` | `packages/editor/src/rule-types/query.ts:42-44` |
+| `mock` | `"Mock response"` | `packages/editor/src/rule-types/mock.ts:51-54` |
 | `response-body` | `"Response body rewrite"` | `packages/editor/src/rule-types/response-body.ts:31-34` |
-| `request-body`  | `"Request body"`          | `packages/editor/src/rule-types/request-body.ts:51-54`  |
+| `request-body` | `"Request body"` | `packages/editor/src/rule-types/request-body.ts:51-54` |
 
 Header and redirect are **not** in that array. `createHeaderRuleType` and `createRedirectRuleType` are implemented and exported (`packages/editor/src/index.ts:2-10`, `packages/editor/src/rule-types/header.ts:111-114`, `packages/editor/src/rule-types/redirect.ts:9-12`).
 
@@ -98,7 +98,7 @@ ruleTypes: [
   createRedirectRuleType(),
   createMockRuleType(),
   createResponseBodyRuleType(),
-];
+]
 ```
 
 CLI `edit` page template passes the same three (`packages/cli/src/commands/edit.ts:314`, `:363-364`). Neither host imports or passes `createHeaderRuleType`. `createRequestBodyRuleType` is omitted from the host list because it is already built-in.
@@ -132,7 +132,7 @@ The header value input is always rendered, including for `remove` (`packages/edi
 
 There is no `packages/editor/test` file for the header extension. Redirect, mock, query, request-body, and response-body each have tests (`packages/editor/test/*.ts`). `builtInRuleTypes` tests assert `query` and `mock` ids only (`packages/editor/test/editor.test.ts:66-68`, `packages/editor/test/mock.test.ts:24`).
 
-### Selecting a type is gated on `defaultAction`; several types cannot be _added_
+### Selecting a type is gated on `defaultAction`; several types cannot be *added*
 
 `setRuleType` (`packages/editor/src/editor.ts:1130-1156`):
 
@@ -150,7 +150,7 @@ New rules from Add rule have no `type` and no action payload (`packages/editor/s
 
 `setValueAtPath` will create only these missing keys: `description`, `method`, `type`, `action`, `redirect`, `mock` (`packages/editor/src/editor.ts:299-307`). It will **not** create `requestBody`, `responseBody`, `headerDirection`, `headerName`, `headerOperation`, or `headerValue`. Selecting request-body or response-body on a brand-new rule therefore sets `type` but fails to write the default payload. Request-body and response-body mounts then bail if the payload is missing (`packages/editor/src/rule-types/request-body.ts:184-186`, `packages/editor/src/rule-types/response-body.ts:94-96`). Editing the sample's existing body rules still works because those objects are already on the rule.
 
-Extension `setField` _can_ create new keys via `Object.defineProperty` (`packages/editor/src/editor.ts:2585-2591`). `headerDirection` is not in `COMMON_RULE_FIELDS` (`packages/editor/src/editor.ts:49-58`), so the header form can persist those siblings **after** it is mounted. The blocker for adding is registration + `defaultAction` + `setRuleType`/`setValueAtPath`, not `setField`.
+Extension `setField` *can* create new keys via `Object.defineProperty` (`packages/editor/src/editor.ts:2585-2591`). `headerDirection` is not in `COMMON_RULE_FIELDS` (`packages/editor/src/editor.ts:49-58`), so the header form can persist those siblings **after** it is mounted. The blocker for adding is registration + `defaultAction` + `setRuleType`/`setValueAtPath`, not `setField`.
 
 `clearActionFields` only deletes `redirect`, `action`, and `mock` (`packages/editor/src/editor.ts:401-414`). Switching types does not clear `requestBody`, `responseBody`, or the four header siblings.
 
@@ -209,3 +209,4 @@ Human approved research with these answers to open questions:
 6. Default header payload on add: yes (direction `request`, operation `set`, empty name/value as appropriate; remove must omit `headerValue`).
 7. **Remove** mock concept altogether; superseded by response-body replace. Drop mock from dropdown, schema surface for new authoring, and related editor/host paths as planned (migration/compat for existing mock rules to be decided in plan).
 8. On Operation `remove`: **hide and clear** the header value input (do not leave empty string that fails validation).
+

@@ -63,12 +63,12 @@ Default open state: `<details>` created without `open` attribute → collapsed u
 
 ### 4. Toolbar controls: layout vs full-page language
 
-| Control           | Popup today                                                  | Full-page analogue                                                                                                                                              |
-| ----------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Brand             | `h1` Rogatio in header                                       | `.rogatio-topbar h1` (`extension.css` L151–L156)                                                                                                                |
+| Control | Popup today | Full-page analogue |
+| --- | --- | --- |
+| Brand | `h1` Rogatio in header | `.rogatio-topbar h1` (`extension.css` L151–L156) |
 | Project switch UI | Disabled full-width `<select data-project-picker>` in header | Dashboard `[data-project-selector]` + "Switch project" in `.rogatio-dashboard-section-actions` (`extension-page-entry.ts` L682–L698; `extension.css` L409–L422) |
-| Open app          | Pill under picker (grid-stretched)                           | N/A (already on management page)                                                                                                                                |
-| New / Import      | Equal flex buttons in `[data-project-actions]`               | Compact density of section-actions / neutral buttons — **not** the large Dashboard create tiles (`.rogatio-create-project` min-height 7.5rem)                   |
+| Open app | Pill under picker (grid-stretched) | N/A (already on management page) |
+| New / Import | Equal flex buttons in `[data-project-actions]` | Compact density of section-actions / neutral buttons — **not** the large Dashboard create tiles (`.rogatio-create-project` min-height 7.5rem) |
 
 Shared visual system (do not invent a new brand): identical `--rogatio-*` tokens and dotted radial background (`popup.css` L40–L84; `extension.css` L41–L83). Popup group cards use inset surface + border (`popup.css` L237–L241); management project cards use raised surface (`extension.css` L431–L447). Buttons share neutral fill + border hover pattern. Consistency target = token parity + control grouping density, not copying Dashboard creation-grid chrome into the 600px popup.
 

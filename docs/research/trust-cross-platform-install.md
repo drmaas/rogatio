@@ -31,7 +31,6 @@ All paths are relative to the worktree root unless noted.
   - `ErrorCode` and `class TrustError extends Error` (`trust.ts:50-72`).
 
 - **Hard-coded negative default (`trust.ts:76-80`):**
-
   ```ts
   const DEFAULT_CAPABILITIES: TrustCapabilities = {
     manifest: false,
@@ -70,7 +69,6 @@ All paths are relative to the worktree root unless noted.
 ### 3. CLI surface — `packages/cli/src/commands/runtime.ts`
 
 - **`makeTrustController()` (`runtime.ts:103-113`)**:
-
   ```ts
   function makeTrustController() {
     const platform = process.platform;
@@ -84,7 +82,6 @@ All paths are relative to the worktree root unless noted.
     });
   }
   ```
-
   **No `detectCapabilities`, no `caTrustInstaller`, no `caTrustRemover`** are injected. Result: defaults to the negative `DEFAULT_CAPABILITIES` for every OS.
 
 - **`reportTrust(subcommand, result, okMessage)` (`runtime.ts:115-134`)** — `state === "unsupported"` → `console.error("trust unsupported: <reasons>")` + exit 0; otherwise → exit 1 on failure.

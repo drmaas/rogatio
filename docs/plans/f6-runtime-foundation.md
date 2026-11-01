@@ -59,7 +59,6 @@ actions.
   limits and stable error serialization.
 
 ### T4 - Implement hostile-input snapshots, target normalization, preset
-
 normalization, canonical bytes, and digest
 
 - **Files:** `packages/runtime/src/snapshot.ts`,

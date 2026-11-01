@@ -31,13 +31,11 @@ lifecycle; changes nothing about management-page controls, save/import defaults,
 ## Tasks (ordered)
 
 ### T1 — Manifest: popup becomes the action surface  `packages/extension/public/manifest.json`
-
 - Change `action.default_popup` from `index.html` to `popup.html`.
 - Keep `index.html` referenced nowhere in `action`; it remains reachable via `chrome.tabs.create`.
 - AC: `AC-001`, `AC-003`.
 
 ### T2 — Build wiring  `scripts/build.ts`
-
 - Add an esbuild target `popup.ts` → `dist/popup.js` mirroring the `extension-page-entry.ts` target
   (format esm, platform browser, target es2022, bundle, sourcemap) with the same alias set
   (`@rogatio/schema`→`src/browser-schema.ts`, `@rogatio/compiler`→`src`, `@rogatio/browser-core`→`src`, `@rogatio/editor`→`src`).
@@ -45,13 +43,11 @@ lifecycle; changes nothing about management-page controls, save/import defaults,
 - AC: `AC-001` (packaging), build emits `dist/popup.js` + `dist/popup.html`.
 
 ### T3 — Popup HTML  `packages/extension/public/popup.html`
-
 - Minimal accessible document: linked `popup.js` (module), `lang`, viewport, title "Rogatio".
 - No editor markup; only a root container the controller populates.
 - AC: `AC-001`, `AC-002`.
 
 ### T4 — Editor deep-link  `packages/editor/src/types.ts`, `packages/editor/src/editor.ts`
-
 - Add `navigateToGroup(groupId: string): void` to `EditorController` interface (additive; no existing member removed).
 - Implement in `createEditor` by reusing the private `navigate("group", groupId)` logic; fallback to Overview when the group id is absent from the draft.
 - `extension-page-entry.ts`: after creating the editor, read `?group=<id>` (URLSearchParams) and, if present, call `editor.navigateToGroup(id)`.
@@ -59,7 +55,6 @@ lifecycle; changes nothing about management-page controls, save/import defaults,
 - Tests: editor unit test asserting `navigateToGroup` routes to the group route and falls back to Overview for an unknown id; `extension-page-entry` deep-link wiring covered by existing/added page test where feasible.
 
 ### T5 — Popup controller  `packages/extension/src/popup.ts` (new)
-
 - Establish a message client to the service worker mirroring `extension-page-entry.ts`
   (`chrome.runtime.sendMessage` with the same envelope protocol).
 - On open: `get-state`; render header (Rogatio + active project name) and "Open app" button.
@@ -77,25 +72,21 @@ lifecycle; changes nothing about management-page controls, save/import defaults,
 - Tests: popup model/unit test covering (a) only active-project persisted groups listed in source order; (b) every listed group eligible + toggle present; (c) aggregated status precedence; (d) toggle sends `set-group-enabled`; (e) "Open app" and pencil URLs.
 
 ### T6 — Service-worker get-state envelope completeness  `packages/extension/src/service-worker.ts`
-
 - Verify `get-state` returns `projects[activeProjectId].data.groups` (id, name, rules array) and `enabledGroupIds`, plus top-level `ruleStatuses` (group id, rule id, status, diagnostics) and `badge`.
 - If any field missing for the popup's needs, add it (no behavioral change to install/permission/badge).
 - Confirm `set-group-enabled` returns `{ok, value}` and installs only redirect/query ops whose origins are granted (unchanged).
 - AC: `AC-003`, `AC-005`, `AC-006`.
 
 ### T7 — Verification  (Stage 8)
-
 - Run repo canonical validation: Biome format/lint, `tsc` strict typecheck, Vitest unit/integration (new popup + editor + sw tests), and the build (`scripts/build.ts`) to confirm `dist/popup.js`/`dist/popup.html` emit.
 - E2E if available for popup toggle journey; otherwise document manual check in workflow log.
 
 ### T8 — Docs  (Stage 10)
-
 - `docs/architecture.md`: note popup surface + reused `set-group-enabled`; no management-page behavior change.
 - `README.md`: mention toolbar popup lists groups + toggle; "Open app" / pencil behavior.
 - `AGENTS.md` orientation: optional note that F21 popup exists.
 
 ## Acceptance-criteria → task map
-
 - AC-001 → T1, T2, T3, T5
 - AC-002 → T3, T5
 - AC-003 → T1, T5, T6
@@ -107,6 +98,5 @@ lifecycle; changes nothing about management-page controls, save/import defaults,
 - AC-009 → T4
 
 ## Risks / rollback
-
 - Single-model session: keep brainstorm/architecture/spec/plan/tests/impl/verify/review passes distinct; self-review at Stage 9 with fresh context.
 - Rollback: revert manifest `default_popup` to `index.html`, delete `popup.ts`/`popup.html` build target. No storage or protocol change, so no migration.

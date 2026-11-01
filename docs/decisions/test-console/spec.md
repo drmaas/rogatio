@@ -80,23 +80,24 @@ The handler may return a `DryRunResult` or `{ ok: false, diagnostics }`. A body 
 - Default case: GET and a page load (`main_frame`). The form says "Checking these as page loads (GET)." If the person changes the selects, the sentence updates so it stays true.
 - Resource types use plain names. Schema values stay on the option value.
 
-| Value            | Label        |
-| ---------------- | ------------ |
-| `main_frame`     | Page         |
-| `sub_frame`      | Frame        |
-| `stylesheet`     | Stylesheet   |
-| `script`         | Script       |
-| `image`          | Image        |
-| `font`           | Font         |
-| `object`         | Plugin       |
-| `media`          | Media        |
-| `xmlhttprequest` | Fetch        |
-| `ping`           | Ping         |
-| `csp_report`     | CSP report   |
-| `websocket`      | WebSocket    |
-| `webtransport`   | WebTransport |
-| `webbundle`      | Web Bundle   |
-| `other`          | Other        |
+| Value | Label |
+| --- | --- |
+| `main_frame` | Page |
+| `sub_frame` | Frame |
+| `stylesheet` | Stylesheet |
+| `script` | Script |
+| `image` | Image |
+| `font` | Font |
+| `object` | Plugin |
+| `media` | Media |
+| `xmlhttprequest` | Fetch |
+| `ping` | Ping |
+| `csp_report` | CSP report |
+| `websocket` | WebSocket |
+| `webtransport` | WebTransport |
+| `webbundle` | Web Bundle |
+| `other` | Other |
+
 - "Any method" and "Any resource type" are explicit options. They are not the default. A match under that choice adds "The method was not tested." and/or "The resource type was not tested."
 - One Run test control, on the panel. The command bar and the bottom ledger do not repeat it. Project actions still repeat under the results.
 - The 256-case cap stays. The "Max test cases" field is removed. The cap is mentioned only when the list is too long: "Only 256 URLs can be checked at once."
@@ -112,12 +113,12 @@ The rule name is a button that opens that rule. The type name comes from the dra
 
 The second sentence is the preview summary `rogatio test` prints:
 
-| Preview kind    | Sentence                              |
-| --------------- | ------------------------------------- |
-| `redirect`      | The browser would go to {summary}.    |
-| `query`         | The query would be {summary}.         |
-| `header`        | The header would be {summary}.        |
-| `request-body`  | The request body would be {summary}.  |
+| Preview kind | Sentence |
+| --- | --- |
+| `redirect` | The browser would go to {summary}. |
+| `query` | The query would be {summary}. |
+| `header` | The header would be {summary}. |
+| `request-body` | The request body would be {summary}. |
 | `response-body` | The response body would be {summary}. |
 
 Matching rules only are in that list. The rest sit in a closed disclosure: "3 rules did not match" (or "1 rule did not match"). Each row is the rule name plus one reason, the first unmatched dimension in this order: "URL pattern", "method", "resource type". The rule name opens that rule.

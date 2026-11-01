@@ -14,15 +14,15 @@
 
 ## Model selection
 
-| Role        | Choice                                            | Rationale                                                    |
-| ----------- | ------------------------------------------------- | ------------------------------------------------------------ |
-| reasoning   | inherit                                           | Spec written from the approved plan                          |
-| adversarial | skipped                                           | Plan gate already approved the interaction; no separate pass |
-| plan        | inherit                                           | The approved plan is the implementation plan                 |
-| coding      | inherit                                           | Same session implements tests and code                       |
-| verify      | inherit                                           | Canonical `pnpm validate`                                    |
-| review      | fresh generalPurpose, different family each round | Round 1 claude-sonnet, round 2 gpt, round 3 gemini           |
-| docs        | inherit                                           | Living docs in the same change                               |
+| Role | Choice | Rationale |
+| --- | --- | --- |
+| reasoning | inherit | Spec written from the approved plan |
+| adversarial | skipped | Plan gate already approved the interaction; no separate pass |
+| plan | inherit | The approved plan is the implementation plan |
+| coding | inherit | Same session implements tests and code |
+| verify | inherit | Canonical `pnpm validate` |
+| review | fresh generalPurpose, different family each round | Round 1 claude-sonnet, round 2 gpt, round 3 gemini |
+| docs | inherit | Living docs in the same change |
 
 ## Stage checklist
 

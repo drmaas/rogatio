@@ -8,24 +8,24 @@ Workflow: doit
 
 ## Stage checklist
 
-| Stage                      | Status                                                                                                             |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 0 Worktree                 | done — `~/Projects/github/drmaas/rogatio-editor-copy-rule-group`, `feature/editor-copy-rule-group`, base `a12f4b2` |
-| 1 Brainstorm + adversarial | done — recommendations locked by user                                                                              |
-| 2 Architecture + plan      | done — this folder                                                                                                 |
-| 3 Tests first              | done — `packages/editor/test/copy.test.ts`                                                                         |
-| 4 Implementation           | done — `copyRule`/`copyGroup` + UI + commands                                                                      |
-| 5 Verify                   | done — `pnpm validate` exit 0 (945 unit, 54 browser)                                                               |
-| 6 Fresh review             | done — REVIEW PASSED (optional test/docs nits addressed)                                                           |
-| 7 Docs                     | done — architecture + overview + docs-site editor guide                                                            |
-| 8 Freeze / release         | pending                                                                                                            |
+| Stage | Status |
+| --- | --- |
+| 0 Worktree | done — `~/Projects/github/drmaas/rogatio-editor-copy-rule-group`, `feature/editor-copy-rule-group`, base `a12f4b2` |
+| 1 Brainstorm + adversarial | done — recommendations locked by user |
+| 2 Architecture + plan | done — this folder |
+| 3 Tests first | done — `packages/editor/test/copy.test.ts` |
+| 4 Implementation | done — `copyRule`/`copyGroup` + UI + commands |
+| 5 Verify | done — `pnpm validate` exit 0 (945 unit, 54 browser) |
+| 6 Fresh review | done — REVIEW PASSED (optional test/docs nits addressed) |
+| 7 Docs | done — architecture + overview + docs-site editor guide |
+| 8 Freeze / release | pending |
 
 ## Model lock
 
-| Role                                      | Model                       | Rationale                                   |
-| ----------------------------------------- | --------------------------- | ------------------------------------------- |
-| reasoning / plan / coding / verify / docs | `inherit`                   | Claude/GPT quota exhausted; parent Composer |
-| adversarial / review                      | `cursor-grok-4.6-high-fast` | Different family from authoring             |
+| Role | Model | Rationale |
+| --- | --- | --- |
+| reasoning / plan / coding / verify / docs | `inherit` | Claude/GPT quota exhausted; parent Composer |
+| adversarial / review | `cursor-grok-4.6-high-fast` | Different family from authoring |
 
 ## Notes
 

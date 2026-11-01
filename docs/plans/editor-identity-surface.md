@@ -547,25 +547,25 @@ the commit restores acceptance. No stored data is rewritten by this change.
 
 ## Task-to-AC coverage check
 
-| AC                      | Task           |
-| ----------------------- | -------------- |
-| AC-001 … AC-013         | T10            |
-| AC-014                  | T8             |
-| AC-015                  | T8, T11        |
-| AC-016                  | T13            |
-| AC-017, AC-018          | T14            |
-| AC-019                  | T14            |
-| AC-020                  | T15            |
-| AC-021                  | T8, T9         |
-| AC-022                  | T9, T10        |
-| AC-023 … AC-025, AC-028 | T11            |
-| AC-026, AC-027, AC-033  | T1             |
-| AC-029                  | T11            |
-| AC-030                  | T11, T12       |
-| AC-031, AC-032          | T2, T4, T5, T6 |
-| AC-034, AC-035          | T7             |
-| AC-036, AC-037          | T3             |
-| AC-038                  | T5             |
-| AC-039                  | T16            |
+| AC | Task |
+| --- | --- |
+| AC-001 … AC-013 | T10 |
+| AC-014 | T8 |
+| AC-015 | T8, T11 |
+| AC-016 | T13 |
+| AC-017, AC-018 | T14 |
+| AC-019 | T14 |
+| AC-020 | T15 |
+| AC-021 | T8, T9 |
+| AC-022 | T9, T10 |
+| AC-023 … AC-025, AC-028 | T11 |
+| AC-026, AC-027, AC-033 | T1 |
+| AC-029 | T11 |
+| AC-030 | T11, T12 |
+| AC-031, AC-032 | T2, T4, T5, T6 |
+| AC-034, AC-035 | T7 |
+| AC-036, AC-037 | T3 |
+| AC-038 | T5 |
+| AC-039 | T16 |
 
 No AC is unmapped. No task maps to an AC outside the approved specification.

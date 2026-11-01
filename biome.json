@@ -11,8 +11,8 @@
       "!!test/fixtures",
       "!!.opencode",
       "!!graphify-out",
-      "!!docs/plans/dnr-install-reconcile.md",
-      "!!docs/plans/editor-rule-types-refactor.md"
+      "!!**/*.md",
+      "!!pnpm-lock.yaml"
     ]
   },
   "formatter": {

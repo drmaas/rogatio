@@ -47,7 +47,7 @@ Quick orientation rule: locate the feature in `docs/architecture.md` (which pack
 
 ## Durable Documentation
 
-- The code is the source of truth for what the system does. Decision records (research, specs, plans, workflow logs) describe _why_ a feature is the way it is, _what was rejected_, and _what was approved_ — not what the system currently does.
+- The code is the source of truth for what the system does. Decision records (research, specs, plans, workflow logs) describe *why* a feature is the way it is, *what was rejected*, and *what was approved* — not what the system currently does.
 - **One active tree for every feature workflow:** `docs/decisions/<feature>/` with lowercase filenames (`research.md`, `spec.md`, `plan.md`, `workflow.md`, `checklist.md`, `refactor.md` as applicable).
 - **On release or supersession**, move durable files (not copy, not edit) and remove the feature folder:
   - `research.md` → `docs/research/<feature>.md`

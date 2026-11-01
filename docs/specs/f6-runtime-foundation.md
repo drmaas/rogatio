@@ -67,9 +67,9 @@ features:
   it is not an upstream request body.
 
 F6 does not evaluate the F3 URL regular expression, effective-origin matcher,
-priority, or rule precedence. A trusted controller selects a rule and
-constructs the exact grant; F6 verifies that the grant is present in the
-immutable preset and that the caller supplied the same complete tuple.
+  priority, or rule precedence. A trusted controller selects a rule and
+  constructs the exact grant; F6 verifies that the grant is present in the
+  immutable preset and that the caller supplied the same complete tuple.
 
 ## Actors And Environments
 
@@ -267,27 +267,27 @@ an HTTP framework, proxy agent, or third-party canonical serializer.
 - **REQ-035:** F6 shall export one immutable resource-limit profile and shall
   enforce these proposed F6-v1 defaults:
 
-  | Resource                                 |    Default |
-  | ---------------------------------------- | ---------: |
-  | Maximum preset bytes                     |    262,144 |
-  | Request-line bytes                       |      8,192 |
-  | Header count                             |         64 |
-  | Aggregate request-header bytes           |     32,768 |
-  | Control JSON body bytes                  |     65,536 |
-  | Aggregate upstream response-header bytes |     32,768 |
-  | Maximum upstream response bytes          |  4,194,304 |
-  | Maximum confined-file bytes              |  4,194,304 |
-  | Maximum concurrent sessions              |         16 |
-  | Maximum concurrent operations            |         32 |
-  | Maximum operations per session           |          4 |
-  | Maximum DNS addresses                    |         32 |
-  | Bootstrap capability lifetime            |  60,000 ms |
-  | Session lifetime                         | 600,000 ms |
-  | Connect timeout                          |   2,000 ms |
-  | Response-header timeout                  |   5,000 ms |
-  | Body idle timeout                        |  10,000 ms |
-  | Total operation timeout                  |  30,000 ms |
-  | Maximum redirects                        |          0 |
+  | Resource | Default |
+  | --- | ---: |
+  | Maximum preset bytes | 262,144 |
+  | Request-line bytes | 8,192 |
+  | Header count | 64 |
+  | Aggregate request-header bytes | 32,768 |
+  | Control JSON body bytes | 65,536 |
+  | Aggregate upstream response-header bytes | 32,768 |
+  | Maximum upstream response bytes | 4,194,304 |
+  | Maximum confined-file bytes | 4,194,304 |
+  | Maximum concurrent sessions | 16 |
+  | Maximum concurrent operations | 32 |
+  | Maximum operations per session | 4 |
+  | Maximum DNS addresses | 32 |
+  | Bootstrap capability lifetime | 60,000 ms |
+  | Session lifetime | 600,000 ms |
+  | Connect timeout | 2,000 ms |
+  | Response-header timeout | 5,000 ms |
+  | Body idle timeout | 10,000 ms |
+  | Total operation timeout | 30,000 ms |
+  | Maximum redirects | 0 |
 
 - **REQ-036:** Limits shall be checked from declared lengths before buffering
   and enforced again while streaming. Content length shall not be trusted as a
@@ -629,7 +629,7 @@ The body must be the canonical F6-v1 JSON representation of the exact
 descriptor. A successful decision returns only:
 
 ```json
-{ "ok": true, "authorized": true }
+{"ok":true,"authorized":true}
 ```
 
 F6 has no HTTP execution route in this stage. The server-side decision is the
@@ -643,22 +643,22 @@ Failures use this fixed shape and contain no message, target, path, header,
 body, address, or third-party error text:
 
 ```json
-{ "ok": false, "error": { "code": "runtime.authorization-denied" } }
+{"ok":false,"error":{"code":"runtime.authorization-denied"}}
 ```
 
 The proposed status mapping is:
 
-| Condition                                           | Status | Code                                                       |
-| --------------------------------------------------- | -----: | ---------------------------------------------------------- |
-| Malformed route, method, headers, transfer, or JSON |    400 | `runtime.request-malformed`                                |
-| Oversized request line or headers                   |    431 | `runtime.headers-too-large`                                |
-| Oversized control body                              |    413 | `runtime.body-too-large`                                   |
-| Pairing or session authentication failure           |    401 | `runtime.pairing-denied` or `runtime.authorization-denied` |
-| Exact grant or primitive policy denial              |    403 | `runtime.authorization-denied`                             |
-| Unknown route                                       |    404 | `runtime.request-malformed`                                |
-| Timeout                                             |    408 | `runtime.timeout`                                          |
-| Concurrency admission failure                       |    429 | `runtime.overloaded`                                       |
-| Internal failure                                    |    500 | `runtime.internal`                                         |
+| Condition | Status | Code |
+| --- | ---: | --- |
+| Malformed route, method, headers, transfer, or JSON | 400 | `runtime.request-malformed` |
+| Oversized request line or headers | 431 | `runtime.headers-too-large` |
+| Oversized control body | 413 | `runtime.body-too-large` |
+| Pairing or session authentication failure | 401 | `runtime.pairing-denied` or `runtime.authorization-denied` |
+| Exact grant or primitive policy denial | 403 | `runtime.authorization-denied` |
+| Unknown route | 404 | `runtime.request-malformed` |
+| Timeout | 408 | `runtime.timeout` |
+| Concurrency admission failure | 429 | `runtime.overloaded` |
+| Internal failure | 500 | `runtime.internal` |
 
 Responses use a fixed JSON content type, `Cache-Control: no-store`, bounded
 content length, and `Connection: close`; server-identifying and permissive
@@ -931,7 +931,7 @@ the current Stage 3 worktree.
 - **Follow-and-reauthorize redirects, rejected:** F6 has no need for a second
   DNS and authorization decision; rejecting all redirects is narrower and
   avoids a second TOCTOU surface.
-- **Default`fetch`/proxy client, rejected:** The connector needs explicit
+- **Default `fetch`/proxy client, rejected:** The connector needs explicit
   numeric-address pinning, no proxy environment, no address racing, no retries,
   and no automatic decompression.
 - **`realpath`-only file confinement, rejected:** It does not prove no-follow

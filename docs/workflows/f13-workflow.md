@@ -159,10 +159,10 @@ the editor, the extension, and a single user-clicked Check-and-connect.
    approved file snapshot). Bounded because content is user-configured/approved and the
    route is loopback-only; the runtime must not log tokens or place them in error
    responses. Flagged as a gate decision (open loopback vs. shared-secret handshake).
-4. **Digest/stability:** mock _config_ is covered by the F6 preset digest; per-rule
+4. **Digest/stability:** mock *config* is covered by the F6 preset digest; per-rule
    tokens are capability-like and excluded (stable digest per project). The extension
    cannot cheaply recompute the F6 digest in the browser, so Check-and-connect verifies
-   _rule coverage_ (every enabled mock rule has a token) rather than the digest; a rule
+   *rule coverage* (every enabled mock rule has a token) rather than the digest; a rule
    missing from the runtime (project changed after start) reports a stable error and the
    message directs restarting `rogatio runtime`.
 5. **Fixed-port conflict:** a second `rogatio runtime` or a stale process must fail
@@ -216,7 +216,7 @@ approved specification (REQ-001..027 / AC-001..024):
 - `packages/runtime/test/mock.test.ts` (9 cases): serves inline + file mocks, applies
   delay, returns configured status/headers/CORS, 404 on unknown token, 405 on non-GET,
   redacted errors for invalid UTF-8 / unreadable file, connection endpoint returns tokens
-  - digest, no-upstream invariant.
+  + digest, no-upstream invariant.
 - `packages/extension/test/mock-status.test.ts` (8 cases): Check-and-connect probes the
   runtime `/v1/connection`, verifies rule coverage, stores tokens, installs mock DNR
   rules with loop-protection allow rule, transitions `RuntimeStateController` mock state

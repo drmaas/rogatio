@@ -1,5 +1,4 @@
 ---
-
 title: Using the editor
 description: The shared framework-free Rogatio editor for editing, validating, and saving projects.
 ---

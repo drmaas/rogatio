@@ -1,5 +1,4 @@
 ---
-
 title: Installation
 description: Install the Rogatio CLI from npm and manually load the Chrome extension.
 ---

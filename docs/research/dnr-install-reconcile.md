@@ -78,8 +78,8 @@ Unit: `packages/extension/test/dnr.test.ts` (no Chrome-held-ids + empty `tracked
 
 ## Open questions
 
-| ID  | Question                                                                 | Owner              | Note                                                                                                                       |
-| --- | ------------------------------------------------------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | Reuse `rogatio.matchLogging.index` for install identity, or sibling key? | Plan / ADR         | PRD recommends reuse or tight couple; one durable map. `current()` still needs compiled ops (index has no full operation). |
-| Q2  | One PR vs stacked PRs?                                                   | Human at plan gate | Deferred.                                                                                                                  |
-| Q3  | Contracts for this feature?                                              | —                  | Skipped per PRD gate.                                                                                                      |
+| ID | Question | Owner | Note |
+| --- | --- | --- | --- |
+| Q1 | Reuse `rogatio.matchLogging.index` for install identity, or sibling key? | Plan / ADR | PRD recommends reuse or tight couple; one durable map. `current()` still needs compiled ops (index has no full operation). |
+| Q2 | One PR vs stacked PRs? | Human at plan gate | Deferred. |
+| Q3 | Contracts for this feature? | — | Skipped per PRD gate. |

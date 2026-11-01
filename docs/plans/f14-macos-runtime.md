@@ -6,7 +6,6 @@ Worktree: `/home/drmaas/.local/share/opencode/worktree/rogatio/feature/f14-macos
 Branch: `feature/f14-macos-runtime` (base `main` `b8c8ab6`).
 
 ## Scope (matches approved spec `docs/specs/f14-macos-runtime.md`)
-
 Testable runtime control plane + revalidation core + `f14-v1` envelope + deterministic PAC
 generation + capability-gated interception seam. Live TLS proxy / device-local CA trust
 install are DEFERRED (unverifiable in headless Linux CI; land with F15/F17 on capable
@@ -14,7 +13,6 @@ platforms). Activation is **capability-based**, never OS-name-hard-gated: `unsup
 is returned only when capability/collision checks fail, independent of OS.
 
 ## Package additions — `@rogatio/runtime`
-
 1. `src/f14-types.ts` — shared F14 types/limits: `F14_PROTOCOL="f14-v1"`,
    `F14_ENVELOPE_MAX_BYTES=64KiB`, `F14_MAX_PAC_ORIGINS=256`,
    `F14_MAX_CONCURRENT_TRANSFORMS=32`, `F14_REVALIDATION_INTERVAL_MS=5000`,
@@ -48,7 +46,6 @@ is returned only when capability/collision checks fail, independent of OS.
 7. `src/index.ts` — re-export the six new modules.
 
 ## CLI — `@rogatio/cli`
-
 8. Add `@rogatio/runtime` to `packages/cli/package.json` dependencies.
 9. Rewrite `packages/cli/src/commands/runtime.ts` from stub to a real command with
    subcommands `start | stop | status` plus `--help`. Wires `createNativeRuntimeController`
@@ -56,7 +53,6 @@ is returned only when capability/collision checks fail, independent of OS.
 10. Update `showRuntimeHelp` + top-level help line in `packages/cli/src/index.ts`.
 
 ## Tests (Stage 6, written before production code that they cover)
-
 - `packages/runtime/test/f14-revalidate.test.ts` — allowed happy path (uses real
   `compileProject` from `@rogatio/compiler`); denies for url-mismatch, target-unauthorized,
   initiator-unauthorized, method-mismatch, resource-type-unauthorized, operation-unknown,
@@ -75,13 +71,11 @@ is returned only when capability/collision checks fail, independent of OS.
   subcommand → 2.
 
 ## Verification (Stage 8)
-
 `pnpm install` (once, to link `@rogatio/runtime` into cli), then root
 `pnpm format:check && pnpm lint && pnpm typecheck && pnpm build && pnpm test && pnpm validate`.
 All new tests must pass; no regression in existing suites.
 
 ## AC traceability
-
 - Explicit control / no auto-start / idempotent stop → lifecycle tests + REQ-001..005.
 - Body never crosses envelope → envelope tests (structural) + REQ-006..010.
 - Independent revalidation (no grant trust) → revalidate tests + REQ-014..023.
@@ -89,7 +83,6 @@ All new tests must pass; no regression in existing suites.
 - Capability-based activation (unsupported, not OS-gated) → lifecycle + interception tests + REQ-028..031.
 
 ## Out of scope (deferred, per approval)
-
 Live TLS interception, device-local CA trust install, macOS PAC/extension collision probe
 implementation. Seams (`detectCapabilities`, `registerInterceptionProvider`) exist so F15/F17
 fill them without core changes.

@@ -85,34 +85,34 @@ docs.
 
 ## 5. Acceptance criteria
 
-- **AC-001** _(REQ-001, REQ-002)_ Host unit test: `ai.status` with a full provider.json returns
+- **AC-001** *(REQ-001, REQ-002)* Host unit test: `ai.status` with a full provider.json returns
   `{ configured: true, providerUrl, model }` matching the file; with no config file returns
   `{ configured: false }` and no `providerUrl`/`model` keys.
-- **AC-002** _(REQ-001, REQ-002 — adversarial)_ The serialized `ai.status` envelope, scanned
+- **AC-002** *(REQ-001, REQ-002 — adversarial)* The serialized `ai.status` envelope, scanned
   recursively, contains no `apiKey` (or case/separator variant) key and no value equal to the
   configured key, on every response path including malformed-config paths.
-- **AC-003** _(REQ-003)_ Host unit test: rewriting provider.json (as `rogatio ai setup` does)
+- **AC-003** *(REQ-003)* Host unit test: rewriting provider.json (as `rogatio ai setup` does)
   without restarting the host is reflected by the next `ai.status`, and a subsequent
   `ai.complete` uses the new model; deleting the file yields `configured: false` and
   `ai.not-configured` on the next completion.
-- **AC-004** _(REQ-004)_ Extension unit test: the check sends exactly one `ai.status`
+- **AC-004** *(REQ-004)* Extension unit test: the check sends exactly one `ai.status`
   envelope and zero `ai.complete` envelopes, on success and on failure paths.
-- **AC-005** _(REQ-007 — adversarial, A1)_ Integration/browser test with a host-faithful stub
+- **AC-005** *(REQ-007 — adversarial, A1)* Integration/browser test with a host-faithful stub
   that rejects unknown envelope types the way `envelope.ts` does (not a null-returning mock):
   the card shows "AI: not reported", no error card appears, and other native-session traffic
   still works after the failed check.
-- **AC-006** _(REQ-001, REQ-006)_ Extension unit test: `check-ai-support` response carries the
+- **AC-006** *(REQ-001, REQ-006)* Extension unit test: `check-ai-support` response carries the
   host-reported providerUrl/model additively; reported unconfigured maps to the Not configured
   card state.
-- **AC-007** _(REQ-005 — flips sidebar-cards.test.ts:266)_ Browser test: with a host reporting
+- **AC-007** *(REQ-005 — flips sidebar-cards.test.ts:266)* Browser test: with a host reporting
   configured metadata, the AI card renders `[data-ai-provider]` and `[data-ai-model]` with the
   reported values; with no report they have count 0 and the card degrades per REQ-007.
-- **AC-008** _(REQ-010 — adversarial)_ Browser test: the management page DOM contains no
+- **AC-008** *(REQ-010 — adversarial)* Browser test: the management page DOM contains no
   element whose text or attribute equals the API key, in any card state.
-- **AC-009** _(REQ-005)_ The model shown equals the model used when a request supplies none
+- **AC-009** *(REQ-005)* The model shown equals the model used when a request supplies none
   (host config model); extension call paths that send `model: ""` are covered by a unit test
   pinning the fallback chain.
-- **AC-010** _(REQ-004, REQ-007)_ The "needs runtime" state keeps precedence when the native
+- **AC-010** *(REQ-004, REQ-007)* The "needs runtime" state keeps precedence when the native
   runtime phase is not `started`, and the check is not attempted in that state (no envelope
   sent).
 - **AC-011** Regression: `generate-project` and `ai-assist` flows pass unchanged, including

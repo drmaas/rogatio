@@ -21,10 +21,10 @@ Probe rule ids: `9_000_001` (`rule-header-set`), `9_000_002` (`rule-header-remov
 
 ### Outcomes
 
-| Sample rule          | Direction | Emitted defect under test                                                                                                       | Outcome      | Chrome message (verbatim)                                                                     |
-| -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------- |
-| `rule-header-set`    | request   | `responseHeaders: []` plus `excludedInitiatorDomains: undefined`                                                                | **rejected** | `Rule with id 9000001 cannot have an empty list as the value for action.responseHeaders key.` |
-| `rule-header-remove` | response  | `requestHeaders: []` (remove action without `value`) plus `excludedInitiatorDomains: undefined` and `requestMethods: undefined` | **rejected** | `Rule with id 9000002 cannot have an empty list as the value for action.requestHeaders key.`  |
+| Sample rule | Direction | Emitted defect under test | Outcome | Chrome message (verbatim) |
+| --- | --- | --- | --- | --- |
+| `rule-header-set` | request | `responseHeaders: []` plus `excludedInitiatorDomains: undefined` | **rejected** | `Rule with id 9000001 cannot have an empty list as the value for action.responseHeaders key.` |
+| `rule-header-remove` | response | `requestHeaders: []` (remove action without `value`) plus `excludedInitiatorDomains: undefined` and `requestMethods: undefined` | **rejected** | `Rule with id 9000002 cannot have an empty list as the value for action.requestHeaders key.` |
 
 Chrome rejects on the empty modify-header list before reaching any `undefined` `condition` key, so the probe establishes the empty-list defect only. Whether the present-with-`undefined` `condition` keys are independently rejected is unproven; Phase 2 fixes both but may claim evidence only for the empty list.
 

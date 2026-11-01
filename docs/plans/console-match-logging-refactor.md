@@ -103,16 +103,16 @@ Existing `packages/editor/test/redact-sensitive-in-logs.test.ts`: `change` write
 
 ## Skipped (self-review)
 
-| Idea                                                             | Why skip                                                                                                                                       |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shared `ownRecord` / format `readProperty`                       | Index uses `Object.hasOwn`; formatter must catch accessors on already-parsed entries. Different trust edges; AC requires format-time re-apply. |
-| `toMatcherOperations` on `@rogatio/compiler`                     | Three 6-line maps (cli runtime/test/routes + dry-run test). New public export for a fixture sweep.                                             |
-| Merge `match-format.ts` + `match-log-redaction.ts`               | Plan split: pure redaction vs record shape. Tests already target that seam.                                                                    |
-| UI `loadMatchLoggingEnabled` → `readMatchLoggingEnabled(chrome)` | Eight duplicated lines; helper already exists. One-liner, not leverage.                                                                        |
-| `syncHeaderMatchIndex` on `RuleInstallerAdapter`                 | Plan: `browser-core` untouched. Duck-type stays the extension boundary.                                                                        |
-| chrome.storage CAS on the index key                              | Envelope CAS exists because many pages write `rogatio`. Index has one SW writer; in-process lock is enough. CAS would invent a retry protocol. |
-| Probe / Playwright fixture extract                               | `header-match-probe.spec.ts` is P6 evidence, not a product module. Toggle spec seeds are local.                                                |
-| Validate stored direction/operation against schema enums         | Behavior change: tampered strings become unknown-id no-ops instead of truncated log text. Fail-closed already covers malformed entries.        |
+| Idea | Why skip |
+| --- | --- |
+| Shared `ownRecord` / format `readProperty` | Index uses `Object.hasOwn`; formatter must catch accessors on already-parsed entries. Different trust edges; AC requires format-time re-apply. |
+| `toMatcherOperations` on `@rogatio/compiler` | Three 6-line maps (cli runtime/test/routes + dry-run test). New public export for a fixture sweep. |
+| Merge `match-format.ts` + `match-log-redaction.ts` | Plan split: pure redaction vs record shape. Tests already target that seam. |
+| UI `loadMatchLoggingEnabled` → `readMatchLoggingEnabled(chrome)` | Eight duplicated lines; helper already exists. One-liner, not leverage. |
+| `syncHeaderMatchIndex` on `RuleInstallerAdapter` | Plan: `browser-core` untouched. Duck-type stays the extension boundary. |
+| chrome.storage CAS on the index key | Envelope CAS exists because many pages write `rogatio`. Index has one SW writer; in-process lock is enough. CAS would invent a retry protocol. |
+| Probe / Playwright fixture extract | `header-match-probe.spec.ts` is P6 evidence, not a product module. Toggle spec seeds are local. |
+| Validate stored direction/operation against schema enums | Behavior change: tampered strings become unknown-id no-ops instead of truncated log text. Fail-closed already covers malformed entries. |
 
 ---
 

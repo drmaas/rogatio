@@ -53,21 +53,21 @@ are identifiers, not authorization.
 Each item below is a published surface. Treat a change here as breaking unless
 it is purely additive.
 
-| Surface                                     | Change                                                                                                 |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `RuleType` enum and JSON Schema `rule.type` | Add `"mock"`, with a `required: ["mock"]` conditional                                                  |
-| `RogatioRule`                               | Add optional `mock?: MockAction`                                                                       |
-| `MockAction`                                | New public type: `status`, optional `headers`, `delayMs`, and exactly one of `body` or `file`          |
-| `RogatioOperation`                          | Add `MockOperation { kind: "mock"; matcher; mock }`                                                    |
-| `CompilerDiagnosticCode`                    | Add mock-specific codes for forbidden headers and body-source violations                               |
-| `ActionPreview` for mocks                   | New stable `kind: "mock"` summary text; the format is pinned by a contract test                        |
-| `runtime.project.set` metadata              | Add optional `fileRoot` and `enabledGroupIds`; host validates both and presets only enabled mocks      |
-| `runtime.start` metadata                    | Reuse the existing `contentListener` flag and `proxy` endpoint for mocks                               |
-| `mock.connect` metadata                     | Reuse the internal post-start exchange for per-rule session tokens; add no UI connection state         |
-| Loopback listener path                      | Add `/.rogatio/mock/<token>/<digest>` beside `/.rogatio/body/`                                         |
-| Session DNR ID bands                        | Bound the response-body band and open a new mock band (amends ADR 0009)                                |
-| Local project metadata                      | Add an optional root to extension project records and CLI device-local config; exclude it from exports |
-| `rogatio runtime host`                      | Remove `--mock-port`; require `--root` for stdin projects with file mocks                              |
+| Surface | Change |
+| --- | --- |
+| `RuleType` enum and JSON Schema `rule.type` | Add `"mock"`, with a `required: ["mock"]` conditional |
+| `RogatioRule` | Add optional `mock?: MockAction` |
+| `MockAction` | New public type: `status`, optional `headers`, `delayMs`, and exactly one of `body` or `file` |
+| `RogatioOperation` | Add `MockOperation { kind: "mock"; matcher; mock }` |
+| `CompilerDiagnosticCode` | Add mock-specific codes for forbidden headers and body-source violations |
+| `ActionPreview` for mocks | New stable `kind: "mock"` summary text; the format is pinned by a contract test |
+| `runtime.project.set` metadata | Add optional `fileRoot` and `enabledGroupIds`; host validates both and presets only enabled mocks |
+| `runtime.start` metadata | Reuse the existing `contentListener` flag and `proxy` endpoint for mocks |
+| `mock.connect` metadata | Reuse the internal post-start exchange for per-rule session tokens; add no UI connection state |
+| Loopback listener path | Add `/.rogatio/mock/<token>/<digest>` beside `/.rogatio/body/` |
+| Session DNR ID bands | Bound the response-body band and open a new mock band (amends ADR 0009) |
+| Local project metadata | Add an optional root to extension project records and CLI device-local config; exclude it from exports |
+| `rogatio runtime host` | Remove `--mock-port`; require `--root` for stdin projects with file mocks |
 
 ### Architecture decisions
 
@@ -116,26 +116,26 @@ back to the current path-only mock reader.
 Each phase maps to one checklist section in `checklist.md`. Phases run in order.
 Phases 1 through 6 are pure and testable without a running host.
 
-| Phase | Package                           | Intent                                                            |
-| ----- | --------------------------------- | ----------------------------------------------------------------- |
-| 1     | `schema`                          | Add the public mock shape to the types and the JSON Schema        |
-| 2     | `schema`                          | Add mock semantic validation with stable diagnostic paths         |
-| 3     | `extension` (`browser-schema.ts`) | Mirror mock validation in the browser-safe validator              |
-| 4     | `compiler`                        | Emit `MockOperation` with stable diagnostics                      |
-| 5     | `dry-run`                         | Preview the intended mock action without touching files           |
-| 6     | `editor`                          | Author, edit, copy, and remove mock rules                         |
-| 7A    | `runtime`                         | Prove confined binary file reads under race and platform limits   |
-| 7B    | `runtime`                         | Render status, headers, body, delay, and method semantics         |
-| 8A    | `runtime`                         | Build enabled mock presets and validate the confined root         |
-| 8B    | `runtime`, `cli`                  | Carry large bounded config through native framing and CLI startup |
-| 9A    | `runtime`                         | Serve authorized mocks on the loopback listener                   |
-| 9B    | `runtime`                         | Report and clear redacted file errors; retire obsolete protocol   |
-| 10A   | `extension`                       | Install and remove session DNR redirects with a loop guard        |
-| 10B   | `extension`, repo                 | Prove mock routing and method preservation in real Chrome         |
-| 11A   | `extension`                       | Report mock rule status and the file-error signal                 |
-| 11B   | `extension`, `browser-core`       | Store and manage the device-local confined root                   |
-| 12    | `cli`                             | Surface the confined root and mock preview in CLI workflows       |
-| 13    | repo                              | Contract test, docs sync, and full validation                     |
+| Phase | Package | Intent |
+| --- | --- | --- |
+| 1 | `schema` | Add the public mock shape to the types and the JSON Schema |
+| 2 | `schema` | Add mock semantic validation with stable diagnostic paths |
+| 3 | `extension` (`browser-schema.ts`) | Mirror mock validation in the browser-safe validator |
+| 4 | `compiler` | Emit `MockOperation` with stable diagnostics |
+| 5 | `dry-run` | Preview the intended mock action without touching files |
+| 6 | `editor` | Author, edit, copy, and remove mock rules |
+| 7A | `runtime` | Prove confined binary file reads under race and platform limits |
+| 7B | `runtime` | Render status, headers, body, delay, and method semantics |
+| 8A | `runtime` | Build enabled mock presets and validate the confined root |
+| 8B | `runtime`, `cli` | Carry large bounded config through native framing and CLI startup |
+| 9A | `runtime` | Serve authorized mocks on the loopback listener |
+| 9B | `runtime` | Report and clear redacted file errors; retire obsolete protocol |
+| 10A | `extension` | Install and remove session DNR redirects with a loop guard |
+| 10B | `extension`, repo | Prove mock routing and method preservation in real Chrome |
+| 11A | `extension` | Report mock rule status and the file-error signal |
+| 11B | `extension`, `browser-core` | Store and manage the device-local confined root |
+| 12 | `cli` | Surface the confined root and mock preview in CLI workflows |
+| 13 | repo | Contract test, docs sync, and full validation |
 
 ## Risks
 
@@ -263,20 +263,20 @@ Each criterion is observable through a test or a command.
 
 ### Acceptance evidence map
 
-| Criterion | Checklist phase | Required evidence                                                              |
-| --------- | --------------- | ------------------------------------------------------------------------------ |
-| 1–2       | 1–3             | Schema cases, adversarial semantic cases, and browser-validator parity         |
-| 3         | 4, 8A           | Compiler field assertions, enabled-group filtering, and digest tests           |
-| 4         | 6               | Editor lifecycle tests and browser-bundle import check                         |
-| 5         | 5, 12           | Dry-run unit tests plus built CLI, HTTP, and extension-command parity          |
-| 6         | 9A, 10B         | Loopback integration and Chrome journey with an upstream request trap          |
-| 7         | 7A–7B, 9B       | Confinement races, binary reads, stable errors, and path-redaction checks      |
-| 8         | 7B, 9A, 10A–10B | Runtime method tests and required Chrome `POST` preservation journey           |
-| 9         | 10A–10B         | Session cleanup tests and real-Chrome broad-regex recursion journey            |
-| 10–11     | 9B, 11A         | Status transition and file-error clearing tests through `get-state`            |
-| 12        | 8A, 11B, 12     | Missing-root tests that place a tempting file in the process working directory |
-| 13        | 8B, 9A          | Maximum inline config through native framing; response bytes over loopback     |
-| 14        | 13              | Canonical `pnpm validate` and emitted-bundle dependency check                  |
+| Criterion | Checklist phase | Required evidence |
+| --- | --- | --- |
+| 1–2 | 1–3 | Schema cases, adversarial semantic cases, and browser-validator parity |
+| 3 | 4, 8A | Compiler field assertions, enabled-group filtering, and digest tests |
+| 4 | 6 | Editor lifecycle tests and browser-bundle import check |
+| 5 | 5, 12 | Dry-run unit tests plus built CLI, HTTP, and extension-command parity |
+| 6 | 9A, 10B | Loopback integration and Chrome journey with an upstream request trap |
+| 7 | 7A–7B, 9B | Confinement races, binary reads, stable errors, and path-redaction checks |
+| 8 | 7B, 9A, 10A–10B | Runtime method tests and required Chrome `POST` preservation journey |
+| 9 | 10A–10B | Session cleanup tests and real-Chrome broad-regex recursion journey |
+| 10–11 | 9B, 11A | Status transition and file-error clearing tests through `get-state` |
+| 12 | 8A, 11B, 12 | Missing-root tests that place a tempting file in the process working directory |
+| 13 | 8B, 9A | Maximum inline config through native framing; response bytes over loopback |
+| 14 | 13 | Canonical `pnpm validate` and emitted-bundle dependency check |
 
 ## Contracts
 
@@ -287,13 +287,13 @@ source of truth.
 
 Contract verification stays with the phase that owns each surface:
 
-| Contract surface                 | Verification                                            | Phase     |
-| -------------------------------- | ------------------------------------------------------- | --------- |
-| Public schema and limits         | Schema contract pin against source schema               | 13        |
-| Browser validator parity         | Shared-fixture ordered diagnostic comparison            | 3         |
-| Compiler operation               | Field-by-field compiler test and exhaustive union check | 4         |
-| Preview summary                  | Dry-run contract pin and three-surface parity           | 5, 12, 13 |
-| Native metadata and frame bound  | Host-bridge protocol and maximum-config tests           | 8A–8B     |
-| Capability route and error codes | Loopback authorization, framing, and status tests       | 9A–9B     |
-| Session DNR lifecycle            | Band, rollback, cleanup, recursion, and Chrome tests    | 10A–10B   |
-| Device-local roots               | Export-exclusion and storage round-trip tests           | 11B, 12   |
+| Contract surface | Verification | Phase |
+| --- | --- | --- |
+| Public schema and limits | Schema contract pin against source schema | 13 |
+| Browser validator parity | Shared-fixture ordered diagnostic comparison | 3 |
+| Compiler operation | Field-by-field compiler test and exhaustive union check | 4 |
+| Preview summary | Dry-run contract pin and three-surface parity | 5, 12, 13 |
+| Native metadata and frame bound | Host-bridge protocol and maximum-config tests | 8A–8B |
+| Capability route and error codes | Loopback authorization, framing, and status tests | 9A–9B |
+| Session DNR lifecycle | Band, rollback, cleanup, recursion, and Chrome tests | 10A–10B |
+| Device-local roots | Export-exclusion and storage round-trip tests | 11B, 12 |

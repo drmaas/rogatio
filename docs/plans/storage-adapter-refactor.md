@@ -93,17 +93,17 @@ Proposal only. No implementation in this phase.
 
 ## Rejected (self-review)
 
-| Idea                                                                          | Why rejected                                                                                          |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Shared path-or-stdin loader across verify/test/runtime                        | Command-structure refactor; PLAN scope-creep flag; stdin shapes differ (buffered vs stream).          |
-| Private `requireJsonFileId` only                                              | Two near-identical blocks; benefit too small to stand alone (may fold into Candidate 1 mechanically). |
-| Module-level singleton storage for all commands                               | Fights intentional optionless/stateless factory; worse for Candidate 2.                               |
-| Throw `ProjectStorageError` instead of `ProjectFileError` inside JSON adapter | PLAN wants path compat via subclass; current throws already satisfy `instanceof` both ways.           |
-| Generic errno/`mapFsError` helper                                             | Pattern matches the rest of CLI; low leverage.                                                        |
-| Change `list` to rethrow non-parse failures                                   | Behavior change, not a refactor.                                                                      |
-| browser-core / `ProjectRepository` unification                                | Explicit non-goal.                                                                                    |
-| DB/API adapters, CLI list/import/delete commands, entity CRUD                 | New features, not refactors.                                                                          |
-| `edit.ts` dynamic `import("node:fs/promises")` → static import                | Pre-existing style nit; unrelated leverage.                                                           |
+| Idea | Why rejected |
+| --- | --- |
+| Shared path-or-stdin loader across verify/test/runtime | Command-structure refactor; PLAN scope-creep flag; stdin shapes differ (buffered vs stream). |
+| Private `requireJsonFileId` only | Two near-identical blocks; benefit too small to stand alone (may fold into Candidate 1 mechanically). |
+| Module-level singleton storage for all commands | Fights intentional optionless/stateless factory; worse for Candidate 2. |
+| Throw `ProjectStorageError` instead of `ProjectFileError` inside JSON adapter | PLAN wants path compat via subclass; current throws already satisfy `instanceof` both ways. |
+| Generic errno/`mapFsError` helper | Pattern matches the rest of CLI; low leverage. |
+| Change `list` to rethrow non-parse failures | Behavior change, not a refactor. |
+| browser-core / `ProjectRepository` unification | Explicit non-goal. |
+| DB/API adapters, CLI list/import/delete commands, entity CRUD | New features, not refactors. |
+| `edit.ts` dynamic `import("node:fs/promises")` → static import | Pre-existing style nit; unrelated leverage. |
 
 ---
 

@@ -14,12 +14,12 @@ The product already has two injected-or-helper persistence seams, neither of whi
 
 ### Two persistence surfaces today (not one)
 
-Rogatio persists project/group/rule _source_ in two different places with different shapes and ports. Neither surface exposes group- or rule-level CRUD; groups and rules are nested fields inside a whole-project document.
+Rogatio persists project/group/rule *source* in two different places with different shapes and ports. Neither surface exposes group- or rule-level CRUD; groups and rules are nested fields inside a whole-project document.
 
-| Surface                    | Shape                                          | Port / I/O                                   | Production implementation              |
-| -------------------------- | ---------------------------------------------- | -------------------------------------------- | -------------------------------------- |
-| Canonical file (CLI / VCS) | `RogatioProject` (schema v1)                   | `readProject` / `writeProject`               | Single `.rogatio.json` on disk         |
-| Browser profile store      | `StoredEnvelope` wrapping many `StoredProject` | `StorageAdapter` (`read` + `compareAndSwap`) | Chrome `storage.local` key `"rogatio"` |
+| Surface | Shape | Port / I/O | Production implementation |
+| --- | --- | --- | --- |
+| Canonical file (CLI / VCS) | `RogatioProject` (schema v1) | `readProject` / `writeProject` | Single `.rogatio.json` on disk |
+| Browser profile store | `StoredEnvelope` wrapping many `StoredProject` | `StorageAdapter` (`read` + `compareAndSwap`) | Chrome `storage.local` key `"rogatio"` |
 
 Product overview states the repository file is canonical and that import/export is explicit between file and browser (`rogatio-overview.md:5`).
 

@@ -37,10 +37,10 @@ Implement GitHub issue #219: remove group/rule `origins`, adopt a source conditi
 
 ## Model lock (per role)
 
-| Role                                                             | Chosen model         | Fit / complexity / constraints                                                                                                |
-| ---------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `reasoning` / hard design                                        | `grok-4.7-high-fast` | **Only** for most complex seams (PAC/authz/compiler cross-cuts). User 2026-09-25: no fast-variant cost-saving; Grok sparingly |
-| `plan` / `coding` / `verify` / `review` / `docs` / `adversarial` | `composer-2.5-fast`  | Default for everything else (only Composer id in Cursor pool)                                                                 |
+| Role | Chosen model | Fit / complexity / constraints |
+| --- | --- | --- |
+| `reasoning` / hard design | `grok-4.7-high-fast` | **Only** for most complex seams (PAC/authz/compiler cross-cuts). User 2026-09-25: no fast-variant cost-saving; Grok sparingly |
+| `plan` / `coding` / `verify` / `review` / `docs` / `adversarial` | `composer-2.5-fast` | Default for everything else (only Composer id in Cursor pool) |
 
 Do **not** spawn Grok for fixture churn, schema mirrors, or mechanical renames. Main-thread Composer preferred over background agents after stuck-subagent failure.
 
@@ -73,12 +73,12 @@ pnpm exec vitest run --config vitest.browser.config.ts test/browser/pac-regexp-s
 
 Exit code: **1** (2026-09-25)
 
-| Probe                      | Result       | Notes                                                                                                   |
-| -------------------------- | ------------ | ------------------------------------------------------------------------------------------------------- |
-| 1 RegExp exists            | **unproven** | `chrome.proxy` undefined on extension page. `--proxy-pac-url` + loopback bypass still **0** proxy hits. |
-| 2 case-sensitive           | **unproven** | same                                                                                                    |
-| 3 lastIndex / fresh RegExp | **unproven** | same                                                                                                    |
-| 4 `new URL`                | **unproven** | same                                                                                                    |
+| Probe | Result | Notes |
+| --- | --- | --- |
+| 1 RegExp exists | **unproven** | `chrome.proxy` undefined on extension page. `--proxy-pac-url` + loopback bypass still **0** proxy hits. |
+| 2 case-sensitive | **unproven** | same |
+| 3 lastIndex / fresh RegExp | **unproven** | same |
+| 4 `new URL` | **unproven** | same |
 
 **T13 gate:** RegExp-in-PAC **not approved**. Use fail-closed branch until spike passes. Literal-host PAC may still ship.
 

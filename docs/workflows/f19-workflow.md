@@ -6,20 +6,20 @@
 
 ## Stage status
 
-| Stage          | Role model                        | Result                                                           |
-| -------------- | --------------------------------- | ---------------------------------------------------------------- |
-| 0 Worktree     | —                                 | Created; shell operating in worktree.                            |
-| 1 Brainstorm   | `nemotron-3-ultra-free` (primary) | Ephemeral; decision: Astro 7 + Starlight isolated package.       |
-| 2 Architecture | `nemotron-3-ultra-free`           | Appended `## F19: Documentation Site` to `docs/architecture.md`. |
-| 3 Spec         | `nemotron-3-ultra-free`           | `docs/specs/f19-docs-site.md` (REQ-001..007, AC-001..007).       |
-| 4 Human gate   | —                                 | User approved via "do F19 using sdd".                            |
-| 5 Plan         | `hy3-free`                        | `docs/plans/f19-docs-site.md` (T1..T5).                          |
-| 6 Tests        | `laguna-s-2.1:free`               | N/A — content-only site; no unit-testable logic (documented).    |
-| 7 Impl         | `laguna-s-2.1:free`               | `packages/docs-site` created; 19 pages authored.                 |
-| 8 Verify       | `nemotron-3.5-lightning-free`     | All green (see evidence).                                        |
-| 9 Review       | `nemotron-3-ultra-free`           | Round 1: minor doc fix (REQ-002 wording); passed.                |
-| 10 Docs        | `hy3-free`                        | architecture.md + README updated; spec wording fixed.            |
-| 11 Release     | —                                 | Awaiting explicit user authorization.                            |
+| Stage | Role model | Result |
+| --- | --- | --- |
+| 0 Worktree | — | Created; shell operating in worktree. |
+| 1 Brainstorm | `nemotron-3-ultra-free` (primary) | Ephemeral; decision: Astro 7 + Starlight isolated package. |
+| 2 Architecture | `nemotron-3-ultra-free` | Appended `## F19: Documentation Site` to `docs/architecture.md`. |
+| 3 Spec | `nemotron-3-ultra-free` | `docs/specs/f19-docs-site.md` (REQ-001..007, AC-001..007). |
+| 4 Human gate | — | User approved via "do F19 using sdd". |
+| 5 Plan | `hy3-free` | `docs/plans/f19-docs-site.md` (T1..T5). |
+| 6 Tests | `laguna-s-2.1:free` | N/A — content-only site; no unit-testable logic (documented). |
+| 7 Impl | `laguna-s-2.1:free` | `packages/docs-site` created; 19 pages authored. |
+| 8 Verify | `nemotron-3.5-lightning-free` | All green (see evidence). |
+| 9 Review | `nemotron-3-ultra-free` | Round 1: minor doc fix (REQ-002 wording); passed. |
+| 10 Docs | `hy3-free` | architecture.md + README updated; spec wording fixed. |
+| 11 Release | — | Awaiting explicit user authorization. |
 
 ## Verification evidence (Stage 8)
 

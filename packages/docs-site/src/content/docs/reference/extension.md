@@ -1,5 +1,4 @@
 ---
-
 title: Extension reference
 description: The Chrome MV3 extension boundary and its DNR translation.
 ---

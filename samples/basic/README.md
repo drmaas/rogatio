@@ -6,15 +6,15 @@ end-to-end.
 
 ## Rule types covered
 
-| Rule type       | Rule ID              | What it does                              |
-| --------------- | -------------------- | ----------------------------------------- |
-| `redirect`      | `rule-redirect`      | Redirects `/old/` to `/new/`              |
-| `query`         | `rule-query`         | Adds `ref=rogatio` param                  |
-| `header`        | `rule-header-set`    | Sets `X-Rogatio-Sample` request header    |
-| `header`        | `rule-header-remove` | Removes `X-Test-Header` response header   |
-| `request-body`  | `rule-request-body`  | Replaces the POST body (URL capture `$1`) |
-| `response-body` | `rule-response-body` | Replaces response body text               |
-| `mock`          | `rule-mock-file`     | Serves `fixture.txt` for `/mock-file`     |
+| Rule type         | Rule ID             | What it does                              |
+| ----------------- | ------------------- | ------------------------------------------ |
+| `redirect`        | `rule-redirect`     | Redirects `/old/` to `/new/`               |
+| `query`           | `rule-query`        | Adds `ref=rogatio` param                  |
+| `header`          | `rule-header-set`   | Sets `X-Rogatio-Sample` request header     |
+| `header`          | `rule-header-remove`| Removes `X-Test-Header` response header    |
+| `request-body`    | `rule-request-body` | Replaces the POST body (URL capture `$1`) |
+| `response-body`   | `rule-response-body`| Replaces response body text             |
+| `mock`            | `rule-mock-file`    | Serves `fixture.txt` for `/mock-file`   |
 
 The shipped sample targets `https://example.com`. `example.com` is a real, publicly
 reachable domain, which makes a few rules observable **live in the browser without any
@@ -266,9 +266,7 @@ const server = createServer((req, res) => {
   res.writeHead(200, { "content-type": "text/plain" });
   res.end("ok");
 });
-server.listen(PORT, () =>
-  console.log(`validation server on http://localhost:${PORT}`),
-);
+server.listen(PORT, () => console.log(`validation server on http://localhost:${PORT}`));
 ```
 
 #### Point the sample at the local server

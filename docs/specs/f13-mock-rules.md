@@ -54,7 +54,7 @@ Explicit non-goals (deferred):
   process; response-body rewriting (F15) and request-body rules (F17).
 - Multiple files per mock rule, path-based routing (different content per request URL),
   or template/placeholder substitution in mock bodies.
-- Editing file _content_ or picking files from the browser (the editor stores a
+- Editing file *content* or picking files from the browser (the editor stores a
   validated path string; existence is validated by the CLI at runtime start).
 - Continuous runtime monitoring or auto-discovery beyond the fixed default port.
 - The bounded `[Rogatio]` DevTools console record (deferred to a later feature).

@@ -1,5 +1,4 @@
 ---
-
 title: Offline dry-run
 description: Test rules against a bounded batch of URLs without contacting them.
 ---

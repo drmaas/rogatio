@@ -8,7 +8,7 @@
 ## 1. Problem statement and goals
 
 Rogatio users define redirect, query, header, mock, and body rules, but today they
-cannot confirm _which_ rules would apply to a concrete request before saving or
+cannot confirm *which* rules would apply to a concrete request before saving or
 installing. F12 adds an offline, read-only **dry run**: given a project and a bounded
 batch of test URLs (optionally with a method and resource type), it reports, per URL and
 per rule, the matcher match dimensions — URL regular expression, effective origin,
@@ -148,7 +148,7 @@ F2, F3, F5, F8. The current `@rogatio/compiler` emits matcher-only operations wi
 action payload, so there is nothing for F12 to preview today.
 
 **Gate decision (2026-08-23): Option A approved.** F12 ships the full matcher-level dry
-run plus the `previewAction` extension seam (REQ-008). Redirect/query _previews_ are
+run plus the `previewAction` extension seam (REQ-008). Redirect/query *previews* are
 implemented by F9/F10 when they define their action operations and pass a preview
 function into the engine. This keeps F12 strictly within its declared dependencies.
 F12 does not implement or assume any action payload on `MatcherOperation`.

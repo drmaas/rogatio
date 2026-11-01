@@ -366,7 +366,7 @@ arguments exit `2`.
 2. Device-local CA provisioning uses OS tooling (macOS keychain reference platform);
    cross-platform tooling paths are capability-detected, not hard-coded by OS name.
 3. F16 ships the capability-gated module and manifest generation; the live TLS proxy that
-   _consumes_ the trusted CA is completed by F17 on capable platforms.
+   *consumes* the trusted CA is completed by F17 on capable platforms.
 4. The trust-limit defaults (manifest ≤ 4,096 bytes, origins ≤ 64, CA ≥ 2048 bits) are
    proposed; confirm the tradeoff.
 

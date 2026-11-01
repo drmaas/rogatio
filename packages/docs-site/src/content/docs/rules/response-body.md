@@ -1,5 +1,4 @@
 ---
-
 title: Response body
 description: Full replace or bounded regex rewrite on authorized public GETs through the local runtime.
 ---

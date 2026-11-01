@@ -80,9 +80,8 @@ Verification commands and results:
 ## Hardening and Review Record
 
 ### Review Round 1
-
 - **Focus:** Spec compliance, security boundaries, missing functionality
-- **Findings:**
+- **Findings:** 
   - All F5-REQ and F5-AC items trace to implementation and tests
   - Defensive snapshots reject accessors, proxies, cycles, sparse arrays, inherited properties, symbols, oversized arrays without invoking hostile getters
   - No Node-only F2/F3 runtime imports in browser entry; host adapters used instead
@@ -93,7 +92,6 @@ Verification commands and results:
 - **Evidence:** `pnpm validate` passed; all 39 Vitest + 12 Playwright tests passed
 
 ### Review Round 2
-
 - **Focus:** Edge cases, error handling, race conditions
 - **Findings:**
   - Validator throws caught → stable `editor.validation-failed` diagnostic
@@ -109,7 +107,6 @@ Verification commands and results:
 - **Evidence:** Playwright tests for save failure, pending save, cancel confirmation, hostile input all pass
 
 ### Review Round 3
-
 - **Focus:** Performance, accessibility, multi-instance isolation
 - **Findings:**
   - Keyed region updates via `data-editor-key`; no full-document replacement on keystroke

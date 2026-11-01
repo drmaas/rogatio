@@ -39,23 +39,23 @@ Corrections go in a `spec-NN-<topic>.md` sibling or in `workflow.md`.
 These resolve spec sentences an implementer could read two ways.
 They do not change the approved spec.
 
-| Topic                 | Execute this                                                                                                                                                                                                                                                         |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1–Q6                 | Adopt every recommendation in spec §9.                                                                                                                                                                                                                               |
+| Topic | Execute this |
+| --- | --- |
+| Q1–Q6 | Adopt every recommendation in spec §9. |
 | Q7 / REQ-032 / AC-012 | After the URL matches `source`, `originOf(request.target ?? request.url)` must be same-origin with `originOf(request.url)`. Outbound HTTP grant targets follow that same rule against the matched request URL. Do not also require the target URL to match `source`. |
-| Q2 / REQ-033          | Body transforms require a present `http:` or `https:` initiator. Missing or non-http(s) initiator denies with `initiator-unauthorized`. Do not keep an origins allowlist.                                                                                            |
-| REQ-010 dry-run       | Delete result fields `urlRegex` and `effectiveOrigin`. The match axes are `source`, `method`, and `resourceType`.`source` explains match or miss. Origin membership is not an axis. Do not add a fourth axis.                                                        |
-| Spike fail            | URL-regex body rules are not put in PAC. Status is `needs runtime`. Traffic stays `DIRECT`.                                                                                                                                                                          |
+| Q2 / REQ-033 | Body transforms require a present `http:` or `https:` initiator. Missing or non-http(s) initiator denies with `initiator-unauthorized`. Do not keep an origins allowlist. |
+| REQ-010 dry-run | Delete result fields `urlRegex` and `effectiveOrigin`. The match axes are `source`, `method`, and `resourceType`. `source` explains match or miss. Origin membership is not an axis. Do not add a fourth axis. |
+| Spike fail | URL-regex body rules are not put in PAC. Status is `needs runtime`. Traffic stays `DIRECT`. |
 
 ## Classification
 
-| Kind           | Tasks                                      | Meaning                                                                               |
-| -------------- | ------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Foundational   | T02–T07, T08–T12, T15                      | Schema, compiler, dry-run, native checks, PAC route model, storage/status types       |
-| Gate           | T01                                        | Chrome PAC probe. Blocks only T13.                                                    |
-| Integration    | T13, T14, T16–T22                          | Wire PAC branch, proxy, extension, editor, CLI, samples                               |
-| Cleanup        | inside the task that replaces the behavior | Delete the old symbol in that same task. No compatibility shim.                       |
-| Docs / release | T23, T24                                   | Stage 10 writes living docs. Stage 8/11 run validate and the breaking release marker. |
+| Kind | Tasks | Meaning |
+| --- | --- | --- |
+| Foundational | T02–T07, T08–T12, T15 | Schema, compiler, dry-run, native checks, PAC route model, storage/status types |
+| Gate | T01 | Chrome PAC probe. Blocks only T13. |
+| Integration | T13, T14, T16–T22 | Wire PAC branch, proxy, extension, editor, CLI, samples |
+| Cleanup | inside the task that replaces the behavior | Delete the old symbol in that same task. No compatibility shim. |
+| Docs / release | T23, T24 | Stage 10 writes living docs. Stage 8/11 run validate and the breaking release marker. |
 
 ## Execution order
 
@@ -92,34 +92,34 @@ It is a different recognizer (old URL regex prefix, not `key: "host"`).
 
 Stable codes to lock in the first test that asserts them:
 
-| Code                             | When                                                                                   |
-| -------------------------------- | -------------------------------------------------------------------------------------- |
-| `url-mismatch`                   | Request URL does not match `source`. Keep this reason string.                          |
-| `target-unauthorized`            | Same-origin target check fails.                                                        |
-| `initiator-unauthorized`         | Body transform initiator missing or not http(s).                                       |
+| Code | When |
+| --- | --- |
+| `url-mismatch` | Request URL does not match `source`. Keep this reason string. |
+| `target-unauthorized` | Same-origin target check fails. |
+| `initiator-unauthorized` | Body transform initiator missing or not http(s). |
 | `extension.source-unprojectable` | Rule cannot be projected to DNR or session markers. Status `error`. Do not install it. |
-| `runtime.pac-unroutable`         | Enabled body rule has no PAC route. Status `needs runtime`. Request stays `DIRECT`.    |
-| `runtime.pac-route-limit`        | Route count exceeds the PAC bound. Fail closed. No PAC script.                         |
-| `migration.possible-scope-widen` | Per-rule side-channel notice.                                                          |
-| `migration.initiator-policy`     | One project-level side-channel notice.                                                 |
+| `runtime.pac-unroutable` | Enabled body rule has no PAC route. Status `needs runtime`. Request stays `DIRECT`. |
+| `runtime.pac-route-limit` | Route count exceeds the PAC bound. Fail closed. No PAC script. |
+| `migration.possible-scope-widen` | Per-rule side-channel notice. |
+| `migration.initiator-policy` | One project-level side-channel notice. |
 
 Delete `schema.no-effective-origin` and `runtime.request-body-empty-origins`.
 Rename lifecycle reason `no-pac-origins` to `no-pac-routes`.
 
 ## Generated and migration surfaces
 
-| Surface                                    | What changes                                                                                                                    | Commit?                                |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| `PROJECT_VERSION`                          | `1` → `2` in `packages/schema/src/types.ts`                                                                                     | Yes (source)                           |
-| `ENVELOPE_VERSION`                         | `1` → `2` in `packages/browser-core/src/types.ts`                                                                               | Yes (source)                           |
-| `packages/schema/src/migrate-v1.ts`        | Pure v1 → v2 function plus notices                                                                                              | Yes                                    |
-| `packages/extension/src/browser-schema.ts` | Hand-maintained mirror. Not generated. Re-export migrate via a relative import, same pattern as `clone.ts`.                     | Yes                                    |
-| `packages/extension/dist/**`               | esbuild output                                                                                                                  | No                                     |
-| Preset canonical bytes                     | `packages/runtime/src/canonical.ts` `matcherValue` uses `source`                                                                | Yes. Digest change once is expected.   |
-| Native policy JSON                         | Drop `grantedOrigins` from `buildNativePolicy` and `RequestBodyPolicyV1`                                                        | Yes. Host and extension ship together. |
-| CLI `.rogatio.json`                        | Migrate in memory on load. Write v2 only on explicit save.                                                                      | —                                      |
-| `chrome.storage` envelope                  | `loadEnvelope` returns v2 and writes the migrated envelope back once. That write is storage migration, not a user-file rewrite. | —                                      |
-| Feature flag                               | None                                                                                                                            | —                                      |
+| Surface | What changes | Commit? |
+| --- | --- | --- |
+| `PROJECT_VERSION` | `1` → `2` in `packages/schema/src/types.ts` | Yes (source) |
+| `ENVELOPE_VERSION` | `1` → `2` in `packages/browser-core/src/types.ts` | Yes (source) |
+| `packages/schema/src/migrate-v1.ts` | Pure v1 → v2 function plus notices | Yes |
+| `packages/extension/src/browser-schema.ts` | Hand-maintained mirror. Not generated. Re-export migrate via a relative import, same pattern as `clone.ts`. | Yes |
+| `packages/extension/dist/**` | esbuild output | No |
+| Preset canonical bytes | `packages/runtime/src/canonical.ts` `matcherValue` uses `source` | Yes. Digest change once is expected. |
+| Native policy JSON | Drop `grantedOrigins` from `buildNativePolicy` and `RequestBodyPolicyV1` | Yes. Host and extension ship together. |
+| CLI `.rogatio.json` | Migrate in memory on load. Write v2 only on explicit save. | — |
+| `chrome.storage` envelope | `loadEnvelope` returns v2 and writes the migrated envelope back once. That write is storage migration, not a user-file rewrite. | — |
+| Feature flag | None | — |
 
 Rollback is revert the release.
 v2 files do not load on v1 software.
@@ -933,22 +933,22 @@ Stage 10 checklist in `workflow.md` names each file touched.
 
 ## Acceptance map
 
-| AC     | Tasks                                                 |
-| ------ | ----------------------------------------------------- |
-| AC-001 | T02, T03, T05, T06, T15, T18                          |
-| AC-002 | T16                                                   |
-| AC-003 | T11, T15, T18                                         |
-| AC-004 | T15, T18, T19                                         |
+| AC | Tasks |
+| --- | --- |
+| AC-001 | T02, T03, T05, T06, T15, T18 |
+| AC-002 | T16 |
+| AC-003 | T11, T15, T18 |
+| AC-004 | T15, T18, T19 |
 | AC-005 | T02, T06, T07, T08, T10, T11, T14, T17, T18, T20, T21 |
-| AC-006 | T04, T05, T15, T20, T21, T22                          |
-| AC-007 | T02, T03, T04, T06, T07, T17, T22                     |
-| AC-008 | T12, T13, T14                                         |
-| AC-009 | T12, T13                                              |
-| AC-010 | T23                                                   |
-| AC-011 | T24                                                   |
-| AC-012 | T06, T08, T09                                         |
-| AC-013 | T01, T13                                              |
-| AC-014 | T24                                                   |
+| AC-006 | T04, T05, T15, T20, T21, T22 |
+| AC-007 | T02, T03, T04, T06, T07, T17, T22 |
+| AC-008 | T12, T13, T14 |
+| AC-009 | T12, T13 |
+| AC-010 | T23 |
+| AC-011 | T24 |
+| AC-012 | T06, T08, T09 |
+| AC-013 | T01, T13 |
+| AC-014 | T24 |
 
 ## Test default
 

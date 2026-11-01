@@ -1,5 +1,4 @@
 ---
-
 title: Platforms & capabilities
 description: Supported operating systems, browsers, and capability-based activation.
 ---
@@ -12,12 +11,12 @@ for Chromium when that browser's config directory exists.
 
 ## Where rules run
 
-| Rule type                                                    | Runs in                                                                                                                                 |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Static redirects, query parameters, request/response headers | Entirely in the browser (DNR).                                                                                                          |
-| Capture-dependent query and header values                    | Native runtime path; never installed as literal `$1` text.                                                                              |
-| Response-body replacement/rewriting                          | Local runtime via native messaging.                                                                                                     |
-| Request-body replacement/modification                        | Local runtime via native messaging. Cleartext HTTP on port 80 can be rewritten. HTTPS `CONNECT` is a blind tunnel and is not decrypted. |
+| Rule type | Runs in |
+|-----------|---------|
+| Static redirects, query parameters, request/response headers | Entirely in the browser (DNR). |
+| Capture-dependent query and header values | Native runtime path; never installed as literal `$1` text. |
+| Response-body replacement/rewriting | Local runtime via native messaging. |
+| Request-body replacement/modification | Local runtime via native messaging. Cleartext HTTP on port 80 can be rewritten. HTTPS `CONNECT` is a blind tunnel and is not decrypted. |
 
 ## Host install and Start/Stop
 

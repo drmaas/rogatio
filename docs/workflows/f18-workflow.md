@@ -18,20 +18,20 @@
 
 ## Stage status
 
-| Stage                | Status           | Evidence or next action                                                                                                           |
-| -------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Worktree           | Done             | Clean worktree + `feature/f18-e2e-tests` branch created from main; `pnpm install` green.                                          |
-| 1 Brainstorm         | Done (ephemeral) | Primary + adversarial passes completed; feasibility spikes run (see below); no brainstorm file retained.                          |
-| 2 Architecture       | Done             | F18 section added to `docs/architecture.md` (123 lines).                                                                          |
-| 3 Specification      | Done             | `docs/specs/f18-e2e-tests.md` written.                                                                                            |
-| 4 Human review gate  | Approved         | User approved the F18 specification and architecture.                                                                             |
-| 5 Plan               | Done             | `docs/plans/f18-e2e-tests.md` written.                                                                                            |
-| 6 Tests first        | Done             | Integration, browser, and regression tests authored before final implementation.                                                  |
-| 7 Implementation     | Done             | Permission, editor, CLI packaging, query-DNR, and activation wiring repairs completed.                                            |
-| 8 Verification       | Done             | `pnpm validate` passed: 73 Vitest files / 550 tests; 15 Playwright passes, 3 gated skips; build/typecheck/artifact checks passed. |
-| 9 Independent review | Done             | Fresh-context diff review found and corrected stale expectations, formatting, and documentation drift.                            |
-| 10 Documentation     | Done             | Workflow, specification status, architecture, and README synchronized.                                                            |
-| 11 Release           | Ready            | Worktree audited; commit/merge remains user-authorized work only.                                                                 |
+| Stage | Status | Evidence or next action |
+| --- | --- | --- |
+| 0 Worktree | Done | Clean worktree + `feature/f18-e2e-tests` branch created from main; `pnpm install` green. |
+| 1 Brainstorm | Done (ephemeral) | Primary + adversarial passes completed; feasibility spikes run (see below); no brainstorm file retained. |
+| 2 Architecture | Done | F18 section added to `docs/architecture.md` (123 lines). |
+| 3 Specification | Done | `docs/specs/f18-e2e-tests.md` written. |
+| 4 Human review gate | Approved | User approved the F18 specification and architecture. |
+| 5 Plan | Done | `docs/plans/f18-e2e-tests.md` written. |
+| 6 Tests first | Done | Integration, browser, and regression tests authored before final implementation. |
+| 7 Implementation | Done | Permission, editor, CLI packaging, query-DNR, and activation wiring repairs completed. |
+| 8 Verification | Done | `pnpm validate` passed: 73 Vitest files / 550 tests; 15 Playwright passes, 3 gated skips; build/typecheck/artifact checks passed. |
+| 9 Independent review | Done | Fresh-context diff review found and corrected stale expectations, formatting, and documentation drift. |
+| 10 Documentation | Done | Workflow, specification status, architecture, and README synchronized. |
+| 11 Release | Ready | Worktree audited; commit/merge remains user-authorized work only. |
 
 ## Stage 1 findings (synthesized)
 

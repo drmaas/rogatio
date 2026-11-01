@@ -1,5 +1,4 @@
 ---
-
 title: Projects & rules
 description: How Rogatio organizes projects, groups, and rules in .rogatio.json.
 ---

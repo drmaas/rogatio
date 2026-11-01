@@ -25,15 +25,15 @@ paths and group B depends on group A.
 
 ## Model selection
 
-| Role        | Choice                                              | Rationale                                                                                                                                         |
-| ----------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| reasoning   | parent / inherit                                    | Primary brainstorm and specification in-session                                                                                                   |
+| Role | Choice | Rationale |
+| --- | --- | --- |
+| reasoning | parent / inherit | Primary brainstorm and specification in-session |
 | adversarial | `general` subagent (fresh context, inherited model) | Independent pass; the host exposes one review-capable subagent type, so family separation is unavailable — recorded as a constraint, not a choice |
-| plan        | inherit                                             | Same worktree and package set as the specification                                                                                                |
-| coding      | inherit                                             | Same                                                                                                                                              |
-| verify      | inherit                                             | Canonical `pnpm validate` plus the browser suite                                                                                                  |
-| review      | `general` subagent (fresh context, inherited model) | Same constraint as the adversarial pass                                                                                                           |
-| docs        | inherit                                             | Same                                                                                                                                              |
+| plan | inherit | Same worktree and package set as the specification |
+| coding | inherit | Same |
+| verify | inherit | Canonical `pnpm validate` plus the browser suite |
+| review | `general` subagent (fresh context, inherited model) | Same constraint as the adversarial pass |
+| docs | inherit | Same |
 
 ## Approved decisions (human gate input, pre-spec)
 
@@ -77,14 +77,14 @@ against the code rather than taken on trust.
   inventing arbitrary keys. So a group with `name` **deleted** opened, reported
   `schema.required`, opened the inline editor, and then committed nothing
   ("Name unchanged."). This is precisely the case REQ-034 exists for, and my
-  own AC-013 test missed it by using a project whose name was _present_ with a
+  own AC-013 test missed it by using a project whose name was *present* with a
   synthetic diagnostic. Fixed with `writeEntityName`, which writes the property
   onto a record resolved by id — which also removes the dependency on a stale
   index. Two tests added with the property genuinely deleted.
 - **An uncommitted rename buffer could be committed into a different entity.**
   `renameTarget` was cleared on route change but not on removal or discard, and
   `commitRename` trusted a stored index path. A proven sequence renamed a group,
-  removed it, then submitted the form and had the _other_ group renamed from the
+  removed it, then submitted the form and had the *other* group renamed from the
   dead buffer. Fixed: the target is cleared on removal and on discard, and the
   commit re-resolves by identity and refuses when the entity is gone.
 
@@ -96,7 +96,7 @@ against the code rather than taken on trust.
   actively depended on the old label. The input is now `Rename group One` /
   `Rename rule First rule`; the unit test collects accessible names as well, and
   the browser locator was updated.
-- An AI _fix_ proposal that restated a rule's current name appended " 2" to it,
+- An AI *fix* proposal that restated a rule's current name appended " 2" to it,
   because the reserved set included the very rule being repaired. It now uses the
   same exclusion the rename path uses.
 - `copyGroup` skipped a copied rule's ID reassignment when the rule's name was
@@ -172,17 +172,17 @@ negative typecheck fixtures, and **76 browser tests** (8 skipped, 0 failed).
 `pnpm validate` (`node scripts/validate.ts`) exit 0 on
 `feature/editor-identity-surface` at `e8b1410` + this change.
 
-| Step                           | Result                                       |
-| ------------------------------ | -------------------------------------------- |
-| `format:check`                 | pass, 361 files                              |
-| `lint`                         | pass                                         |
-| `typecheck` (`tsc --noEmit`)   | pass                                         |
-| `build`                        | pass, 18 artifacts                           |
-| `vitest` unit + integration    | **1153 passed**, 0 failed, 128 files         |
-| `checkArtifacts`               | pass                                         |
-| `checkEmittedModules`          | pass after a fixture fix, see below          |
-| `checkBoundaries`              | pass                                         |
-| 3 negative typecheck fixtures  | pass                                         |
+| Step | Result |
+| --- | --- |
+| `format:check` | pass, 361 files |
+| `lint` | pass |
+| `typecheck` (`tsc --noEmit`) | pass |
+| `build` | pass, 18 artifacts |
+| `vitest` unit + integration | **1153 passed**, 0 failed, 128 files |
+| `checkArtifacts` | pass |
+| `checkEmittedModules` | pass after a fixture fix, see below |
+| `checkBoundaries` | pass |
+| 3 negative typecheck fixtures | pass |
 | browser suite (`test:browser`) | **75 passed**, 8 skipped, 0 failed, 15 files |
 
 Chrome for Testing 154.0.8037.57 was installed into the worktree with
@@ -206,7 +206,7 @@ Four defects were found by writing the tests before the code, not by review:
    advertised `aria-describedby` pointing at an element that did not exist.
 2. `reservedNameKeys` skipped a renamed group with `continue`, which also
    skipped that group's rules — so a group could take a rule's name. Now only
-   the group's own _name_ is excluded; its rules are still reserved.
+   the group's own *name* is excluded; its rules are still reserved.
 3. `copyGroup` stopped setting the route, so a copied group was no longer the
    open group and the copy's inline editor never rendered. `openRename` now
    navigates to the entity it edits.
@@ -369,7 +369,6 @@ specification was written.
    disambiguation of two equal install reasons. Rewritten naively to assert name
    text, it would pass even if two rows rendered identically. AC-018 pins the
    distinctness explicitly.
-
 - [ ] 5 Implementation plan
 - [ ] 6 Tests first
 - [ ] 7 Implementation

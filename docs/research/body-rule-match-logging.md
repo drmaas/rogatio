@@ -55,11 +55,11 @@ Architecture summary of the same path: `docs/architecture.md:91-93`.
 
 ### ADR 0001 / 0006 implications
 
-| ADR  | Current text                                                                                                                                                 | Must amend                                                                                                                                                  |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0001 | Only `onRuleMatchedDebug`; do not log native-runtime body activity; “Body-kind rules stay silent… #163” (`docs/adrs/0001-dnr-on-rule-matched-debug.md:9-18`) | Keep single Chrome signal; drop “body silent”; record URL-match ⇒ attempt-to-rewrite via session markers; keep reject native-host match logging.            |
-| 0006 | Body kinds out of scope; “Intended body… never produce this event” (`docs/adrs/0006-match-logging-rule-kind-coverage.md:9-13`)                               | Extend coverage to body kinds once markers indexed; intended body action from index (not live bytes); cite probe evidence for response-body like P6 header. |
-| Also | 0007 (no body checkbox); 0009 (body never DNR)                                                                                                               | Align with PRD Q3 + marker install.                                                                                                                         |
+| ADR | Current text | Must amend |
+| --- | --- | --- |
+| 0001 | Only `onRuleMatchedDebug`; do not log native-runtime body activity; “Body-kind rules stay silent… #163” (`docs/adrs/0001-dnr-on-rule-matched-debug.md:9-18`) | Keep single Chrome signal; drop “body silent”; record URL-match ⇒ attempt-to-rewrite via session markers; keep reject native-host match logging. |
+| 0006 | Body kinds out of scope; “Intended body… never produce this event” (`docs/adrs/0006-match-logging-rule-kind-coverage.md:9-13`) | Extend coverage to body kinds once markers indexed; intended body action from index (not live bytes); cite probe evidence for response-body like P6 header. |
+| Also | 0007 (no body checkbox); 0009 (body never DNR) | Align with PRD Q3 + marker install. |
 
 Prior research assumed body kinds have no Chrome signal (`docs/research/console-match-logging.md:76`) — superseded by #163 / this PRD once markers exist.
 

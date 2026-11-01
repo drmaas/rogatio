@@ -10,14 +10,14 @@ Shared editor AI Assist panel invokes host `options.aiAssist`, streams into the 
 
 ## Acceptance
 
-| ID     | Check                                                                                                                                                  |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| AC-001 | Send builds `AIAssistRequest` (`generate` or `fix` from diagnostics) and calls `options.aiAssist`                                                      |
-| AC-002 | Token chunks update panel; error chunks surface in panel                                                                                               |
-| AC-003 | Done/complete proposal Apply → `applyAIProposal` updates draft                                                                                         |
+| ID | Check |
+| --- | --- |
+| AC-001 | Send builds `AIAssistRequest` (`generate` or `fix` from diagnostics) and calls `options.aiAssist` |
+| AC-002 | Token chunks update panel; error chunks surface in panel |
+| AC-003 | Done/complete proposal Apply → `applyAIProposal` updates draft |
 | AC-004 | `applyAIProposal` maps `redirect`, `query`, `header`, `response-body`, `requestBody`/`request-body` to real DraftRule / schema fields including `type` |
-| AC-005 | Unit tests: send → handler; apply maps kinds; mock `aiAssist` drives panel                                                                             |
-| AC-006 | `pnpm validate` passes                                                                                                                                 |
+| AC-005 | Unit tests: send → handler; apply maps kinds; mock `aiAssist` drives panel |
+| AC-006 | `pnpm validate` passes |
 
 ## Non-goals
 
@@ -25,13 +25,13 @@ CLI `/api/ai`, extension `aiAssist` host (#209), Create-using-AI gate (#207), fr
 
 ## Field map (kind → draft)
 
-| RuleProposal.kind | `type`          | Payload                                                                                                                                                      |
-| ----------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `redirect`        | `redirect`      | `redirect` ← `action`                                                                                                                                        |
-| `query`           | `query`         | `action` ← `action`                                                                                                                                          |
-| `header`          | `header`        | flat `headerDirection` / `headerOperation` / `headerName` / `headerValue` from `action` (accept schema keys or short `direction`/`operation`/`name`/`value`) |
-| `response-body`   | `response-body` | `responseBody` ← `action`                                                                                                                                    |
-| `request-body`    | `request-body`  | `requestBody` ← `action`                                                                                                                                     |
+| RuleProposal.kind | `type` | Payload |
+| --- | --- | --- |
+| `redirect` | `redirect` | `redirect` ← `action` |
+| `query` | `query` | `action` ← `action` |
+| `header` | `header` | flat `headerDirection` / `headerOperation` / `headerName` / `headerValue` from `action` (accept schema keys or short `direction`/`operation`/`name`/`value`) |
+| `response-body` | `response-body` | `responseBody` ← `action` |
+| `request-body` | `request-body` | `requestBody` ← `action` |
 
 ## Risks
 

@@ -83,3 +83,4 @@ Run `pnpm validate` to confirm format, lint, typecheck, unit tests, and integrat
 ## Implementation strategy
 
 **Code first with targeted tests.** The changes are small and isolated (two function bodies in two files, plus tests). TDD is unnecessary overhead for removing a field and widening a guard condition. Each phase will be verified by running the existing test suite plus the new targeted tests.
+

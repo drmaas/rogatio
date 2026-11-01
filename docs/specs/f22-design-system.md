@@ -31,7 +31,7 @@ In scope:
   navigation unchanged.
 - `packages/extension/src/extension.css` + shell rework in `extension-page-entry.ts`
   (top bar, sidebar, project-cards Overview) and `packages/extension/src/popup.css`
-  - popup restyle on the design-system card.
+  + popup restyle on the design-system card.
 - Build/CI pipeline: esbuild CSS outputs recorded in `build-manifest.json`, font
   copies, MIME types in `scripts/serve-smoke.ts`, `scripts/validate.ts` artifact
   checks, CLI `/vendor/editor.css` + `/vendor/fonts/*` routes, host HTML `<link>`
@@ -66,26 +66,26 @@ Non-goals:
 
 Custom properties defined once per stylesheet root:
 
-| Token                      | Value                       | Usage                                         |
-| -------------------------- | --------------------------- | --------------------------------------------- |
-| `--rogatio-bg`             | `#121417`                   | Page background with dot grid                 |
-| `--rogatio-surface`        | `#161B22`                   | Cards, containers, editor window              |
-| `--rogatio-surface-raised` | `#1C222C`                   | Hover, active controls                        |
-| `--rogatio-surface-inset`  | `#10131A`                   | Inset stats/console boxes                     |
-| `--rogatio-primary`        | `#007AFF`                   | Accent, links, active states, focus           |
-| `--rogatio-primary-strong` | `#0066D6`                   | Filled button background (AA with white text) |
-| `--rogatio-secondary`      | `#64748B`                   | Secondary accents, faint text                 |
-| `--rogatio-tertiary`       | `#0F172A`                   | Deep sidebar/nav surfaces                     |
-| `--rogatio-neutral`        | `#1E293B`                   | Rail/secondary button surfaces                |
-| `--rogatio-text`           | `#F8FAFC`                   | Primary text                                  |
-| `--rogatio-muted`          | `#94A3B8`                   | Secondary text                                |
-| `--rogatio-faint`          | `#64748B`                   | Tertiary text, placeholders                   |
-| `--rogatio-border`         | `rgba(148, 163, 184, 0.16)` | Hairline borders                              |
-| `--rogatio-danger`         | `#F87171`                   | Errors, remove actions                        |
-| `--rogatio-danger-bg`      | `rgba(248, 113, 113, 0.12)` | Danger tinted surfaces                        |
-| `--rogatio-success`        | `#4ADE80`                   | Active/matched states                         |
-| `--rogatio-warning`        | `#FBBF24`                   | Attention states                              |
-| `--rogatio-radius`         | `0.75rem`                   | Card radius (controls 0.5rem, pills full)     |
+| Token | Value | Usage |
+| --- | --- | --- |
+| `--rogatio-bg` | `#121417` | Page background with dot grid |
+| `--rogatio-surface` | `#161B22` | Cards, containers, editor window |
+| `--rogatio-surface-raised` | `#1C222C` | Hover, active controls |
+| `--rogatio-surface-inset` | `#10131A` | Inset stats/console boxes |
+| `--rogatio-primary` | `#007AFF` | Accent, links, active states, focus |
+| `--rogatio-primary-strong` | `#0066D6` | Filled button background (AA with white text) |
+| `--rogatio-secondary` | `#64748B` | Secondary accents, faint text |
+| `--rogatio-tertiary` | `#0F172A` | Deep sidebar/nav surfaces |
+| `--rogatio-neutral` | `#1E293B` | Rail/secondary button surfaces |
+| `--rogatio-text` | `#F8FAFC` | Primary text |
+| `--rogatio-muted` | `#94A3B8` | Secondary text |
+| `--rogatio-faint` | `#64748B` | Tertiary text, placeholders |
+| `--rogatio-border` | `rgba(148, 163, 184, 0.16)` | Hairline borders |
+| `--rogatio-danger` | `#F87171` | Errors, remove actions |
+| `--rogatio-danger-bg` | `rgba(248, 113, 113, 0.12)` | Danger tinted surfaces |
+| `--rogatio-success` | `#4ADE80` | Active/matched states |
+| `--rogatio-warning` | `#FBBF24` | Attention states |
+| `--rogatio-radius` | `0.75rem` | Card radius (controls 0.5rem, pills full) |
 
 Type: `--rogatio-font-display`/`--rogatio-font-body` = `"Hanken Grotesk", system-ui,
 -apple-system, "Segoe UI", sans-serif`; `--rogatio-font-mono` = `"JetBrains Mono",

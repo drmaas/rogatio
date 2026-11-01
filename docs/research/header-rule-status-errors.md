@@ -19,7 +19,7 @@ Branch: `feature/header-rule-status-errors`
 - `ruleId` not present in `input.installedRuleIds` → `error` with a `core.rule-not-installed` diagnostic (`packages/browser-core/src/status.ts:62-74`)
 - otherwise → `active` (`packages/browser-core/src/status.ts:76-80`)
 
-So `error` has exactly one meaning in browser-core: _the rule is enabled and permitted, but its id is not in the installed set._ The diagnostic message is "The rule is enabled with granted site access but is not installed." (`packages/browser-core/src/diagnostics.ts:41-42`).
+So `error` has exactly one meaning in browser-core: *the rule is enabled and permitted, but its id is not in the installed set.* The diagnostic message is "The rule is enabled with granted site access but is not installed." (`packages/browser-core/src/diagnostics.ts:41-42`).
 
 `RuleStatus` carries an optional `diagnostics` array (`packages/browser-core/src/types.ts:70-75`), and `computeBadge` flips `attention` for any status that is neither `active` nor `disabled` (`packages/browser-core/src/status.ts:85-96`).
 

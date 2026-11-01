@@ -1,5 +1,4 @@
 ---
-
 title: CLI reference
 description: The rogatio CLI commands edit, verify, test, doctor, runtime, ai, and import.
 ---

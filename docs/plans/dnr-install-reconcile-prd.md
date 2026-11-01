@@ -55,14 +55,14 @@ For every DNR-backed rule kind (redirect, query, header):
 
 Each row traces to an Outcome number.
 
-| ID  | Requirement                                                                                                                                                                                                                                                                 | Outcome |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| R1  | After an MV3 service-worker restart, enabled+granted redirect and query rules report `active` when still present in Chrome dynamic rules, or they reinstall cleanly without a duplicate-id failure.                                                                         | 1       |
-| R2  | Header rules use the same install and reconcile authority as redirect and query. One notion of “installed.”                                                                                                                                                                 | 1       |
-| R3  | When a DNR add or update fails, Workspace surfaces `extension.dnr-error` (or equivalent) with Chrome’s reason for that rule when Chrome provides one.                                                                                                                       | 2       |
-| R4  | Attention copy must not treat “re-activate the group” or “restart the runtime” as the primary fix when those steps cannot clear orphaned DNR ids. Prefer guidance that works (for example reload the extension), or automatic reconcile that makes those steps unnecessary. | 3       |
-| R5  | Browser journey: import or activate sample → force worker restart → reopen management → redirect, query, and header sample rules are `active` given prior grants and enablement.                                                                                            | 4       |
-| R6  | Body rules remain `needs runtime` until native phase `started`, then `active`. This feature must not mark them installed via DNR.                                                                                                                                           | 5       |
+| ID | Requirement | Outcome |
+| --- | --- | --- |
+| R1 | After an MV3 service-worker restart, enabled+granted redirect and query rules report `active` when still present in Chrome dynamic rules, or they reinstall cleanly without a duplicate-id failure. | 1 |
+| R2 | Header rules use the same install and reconcile authority as redirect and query. One notion of “installed.” | 1 |
+| R3 | When a DNR add or update fails, Workspace surfaces `extension.dnr-error` (or equivalent) with Chrome’s reason for that rule when Chrome provides one. | 2 |
+| R4 | Attention copy must not treat “re-activate the group” or “restart the runtime” as the primary fix when those steps cannot clear orphaned DNR ids. Prefer guidance that works (for example reload the extension), or automatic reconcile that makes those steps unnecessary. | 3 |
+| R5 | Browser journey: import or activate sample → force worker restart → reopen management → redirect, query, and header sample rules are `active` given prior grants and enablement. | 4 |
+| R6 | Body rules remain `needs runtime` until native phase `started`, then `active`. This feature must not mark them installed via DNR. | 5 |
 
 ## Metrics
 
@@ -70,8 +70,8 @@ Omit. No sourced baseline or owner date for install-error rates.
 
 ## Open questions
 
-| ID  | Question                                                                           | Owner                                      | Recommendation                                                                                                    |
-| --- | ---------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| Q1  | Reuse `rogatio.matchLogging.index` for install identity, or a sibling storage key? | Plan / ADR                                 | Reuse or tightly couple to the existing durable index so one map survives restart. Avoid a third source of truth. |
-| Q2  | Ship as one PR or stacked PRs per slice?                                           | Human at plan gate                         | One feature branch. Prefer one PR if review load is acceptable, else stacked PRs.                                 |
-| Q3  | Contracts (`docs/contracts.md`) for this feature?                                  | Human at contracts gate after PRD approval | Skip unless a machine-readable extension contract already exists and needs a section.                             |
+| ID | Question | Owner | Recommendation |
+| --- | --- | --- | --- |
+| Q1 | Reuse `rogatio.matchLogging.index` for install identity, or a sibling storage key? | Plan / ADR | Reuse or tightly couple to the existing durable index so one map survives restart. Avoid a third source of truth. |
+| Q2 | Ship as one PR or stacked PRs per slice? | Human at plan gate | One feature branch. Prefer one PR if review load is acceptable, else stacked PRs. |
+| Q3 | Contracts (`docs/contracts.md`) for this feature? | Human at contracts gate after PRD approval | Skip unless a machine-readable extension contract already exists and needs a section. |

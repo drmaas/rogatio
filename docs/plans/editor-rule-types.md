@@ -54,14 +54,8 @@ Header Operation `<select>` lists **set** and **remove** only (`packages/editor/
 Current shape (`packages/schema/src/types.ts`, `packages/schema/src/schema.ts` `$defs.queryParam`):
 
 ```ts
-interface RogatioQueryParam {
-  name: string;
-  value: string;
-}
-interface RogatioQueryAction {
-  type: "query";
-  params: RogatioQueryParam[];
-}
+interface RogatioQueryParam { name: string; value: string }
+interface RogatioQueryAction { type: "query"; params: RogatioQueryParam[] }
 ```
 
 Compiler `queryParamsToDNR` maps every param to DNR `addOrReplaceParams` with `replaceOnly: false` (`packages/compiler/src/query.ts`). Extension projection writes only that array (`packages/extension/src/projection.ts`, `packages/extension/src/dnr.ts`). `applyQueryTransform` only add-or-replaces. Semantic validation only rejects duplicate names (`packages/schema/src/validation.ts`). Editor always requires a non-empty `value` (`packages/editor/src/rule-types/query.ts`). Browser-schema allowlists `QUERY_PARAM_KEYS = ["name", "value"]` (`packages/extension/src/browser-schema.ts`).
@@ -74,7 +68,7 @@ type QueryParamOperation = "set" | "remove";
 interface RogatioQueryParam {
   name: string;
   operation?: QueryParamOperation; // omit => "set" (existing files, including samples/basic rule-query)
-  value?: string; // required for set; omit for remove
+  value?: string;                  // required for set; omit for remove
 }
 ```
 

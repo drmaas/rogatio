@@ -22,23 +22,22 @@
 
 ## Stage Status
 
-| Stage               | Status                     | Notes                                                                                                                                                 |
-| ------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 Worktree          | Done                       | worktree `feature/f16-request-body-trust` created from main                                                                                           |
-| 1 Brainstorm        | Done (ephemeral)           | synthesized below; no brainstorm file retained                                                                                                        |
-| 2 Architecture      | Done                       | `## F16: Request-Body Trust Lifecycle` added to `docs/architecture.md`                                                                                |
-| 3 Specification     | Done                       | `docs/specs/f16-request-body-trust.md` written                                                                                                        |
-| 4 Human review gate | **PENDING — STOP**         | awaiting explicit approval before plan/tests/code                                                                                                     |
-| 5 Plan              | Blocked                    | after approval                                                                                                                                        |
-| 6 Tests             | Blocked                    | after plan                                                                                                                                            |
-| 7 Implementation    | Blocked                    | after tests                                                                                                                                           |
-| 8 Verification      | **Done**                   | typecheck clean; format:check clean; lint clean; `pnpm validate` (browser tests) pass; `pnpm test` = 374 passed (49 files). F16 module + CLI covered. |
-| 9 Review            | **Done (round 1, passed)** | fresh-context self-review, see below                                                                                                                  |
-| 10 Documentation    | **Done**                   | README command table updated; architecture F16 section in place; AGENTS.md unaffected (no workflow change)                                            |
-| 11 Release          | Blocked                    | after approval                                                                                                                                        |
+| Stage | Status | Notes |
+| --- | --- | --- |
+| 0 Worktree | Done | worktree `feature/f16-request-body-trust` created from main |
+| 1 Brainstorm | Done (ephemeral) | synthesized below; no brainstorm file retained |
+| 2 Architecture | Done | `## F16: Request-Body Trust Lifecycle` added to `docs/architecture.md` |
+| 3 Specification | Done | `docs/specs/f16-request-body-trust.md` written |
+| 4 Human review gate | **PENDING — STOP** | awaiting explicit approval before plan/tests/code |
+| 5 Plan | Blocked | after approval |
+| 6 Tests | Blocked | after plan |
+| 7 Implementation | Blocked | after tests |
+| 8 Verification | **Done** | typecheck clean; format:check clean; lint clean; `pnpm validate` (browser tests) pass; `pnpm test` = 374 passed (49 files). F16 module + CLI covered. |
+| 9 Review | **Done (round 1, passed)** | fresh-context self-review, see below |
+| 10 Documentation | **Done** | README command table updated; architecture F16 section in place; AGENTS.md unaffected (no workflow change) |
+| 11 Release | Blocked | after approval |
 
 ## Stage 8 verification evidence (canonical commands)
-
 - `pnpm typecheck` → TS: No errors found.
 - `pnpm format:check` → Checked 186 files, no fixes applied.
 - `pnpm lint` → Checked 186 files, no fixes applied.
@@ -47,7 +46,6 @@
   `packages/runtime/test/f16-trust.test.ts`.
 
 ## Stage 9 independent fresh-context review (round 1)
-
 Single-model session; reviewer = session model with spec/architecture/plan/final
 diff/verification supplied as fresh context. Findings ordered by severity:
 
@@ -70,7 +68,6 @@ diff/verification supplied as fresh context. Findings ordered by severity:
 **Result:** round 1 passed with no actionable findings. No further rounds required.
 
 ## Stage 10 documentation
-
 - README.md: `rogatio runtime` table extended with `install|trust|untrust|uninstall` and combined
   `status` behavior.
 - docs/architecture.md F16 section already present (written at Stage 2).

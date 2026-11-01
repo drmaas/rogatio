@@ -75,11 +75,11 @@ Affected users: operators managing a project in the Chrome extension management 
 - **AC-009** The `Match logging` checkbox keeps its accessible name and its independent
   storage behavior.
 - **AC-010** No API key or secret ever reaches the management page DOM.
-- **AC-011** _(deferred to #241)_ The native host reports AI provider URL and model when
+- **AC-011** *(deferred to #241)* The native host reports AI provider URL and model when
   configured, and never the API key.
-- **AC-012** _(deferred to #241)_ The AI card shows provider and model when the host reports
+- **AC-012** *(deferred to #241)* The AI card shows provider and model when the host reports
   them, and falls back to status only when it does not.
-- **AC-013** _(deferred to #241)_ A host that does not report the new AI fields produces "not
+- **AC-013** *(deferred to #241)* A host that does not report the new AI fields produces "not
   reported", not an error state and not a broken card.
 
 AC-011 to AC-013 belong to issue #241 and are not satisfiable in this branch. This branch

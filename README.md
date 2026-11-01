@@ -137,16 +137,16 @@ rogatio verify path/to/.rogatio.json
 cat .rogatio.json | rogatio verify - --json
 ```
 
-| Command                                        | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rogatio edit [path]`                          | Opens the browser editor bound to `127.0.0.1` at `/e/<session>/editor.html`; `--port <n>` fixes the port; `--no-open` prints that address without opening a browser.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `rogatio test [path]`                          | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `rogatio verify [path]`                        | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `rogatio doctor [path]`                        | Checks Node, the project file, the native host, the device CA, a loopback PAC answer, and optional AI Assist. Prints `pass` / `warn` / `fail` and a copy-paste fix. `--json` prints a stable report. `--check-updates` is the only npm-registry call.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `rogatio import requestly <export.json>`       | Migrates a Requestly export into `.rogatio.json` (default `--out`). `--merge` appends onto an existing project. Prints imported, changed, and skipped rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `rogatio ai <setup\|ls\|show\|delete\|test>`   | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Command | Description |
+| --- | --- |
+| `rogatio edit [path]` | Opens the browser editor bound to `127.0.0.1` at `/e/<session>/editor.html`; `--port <n>` fixes the port; `--no-open` prints that address without opening a browser. |
+| `rogatio test [path]` | Run offline dry-run tests. `--urls` comma-separated; `--urls-file` JSON array path or `-` for stdin; `--method`/`--resource-type` defaults; `--max-cases` limit (default 256); `--json` for machine-readable output. |
+| `rogatio verify [path]` | Validates a file with the schema and compiler. `-` reads stdin; `--json` for diagnostics. |
+| `rogatio doctor [path]` | Checks Node, the project file, the native host, the device CA, a loopback PAC answer, and optional AI Assist. Prints `pass` / `warn` / `fail` and a copy-paste fix. `--json` prints a stable report. `--check-updates` is the only npm-registry call. |
+| `rogatio import requestly <export.json>` | Migrates a Requestly export into `.rogatio.json` (default `--out`). `--merge` appends onto an existing project. Prints imported, changed, and skipped rules. |
+| `rogatio ai <setup\|ls\|show\|delete\|test>` | AI provider configuration. `setup` interactive; `ls` list; `show` redacted; `delete` remove; `test` connection. |
 | `rogatio runtime <install\|uninstall\|verify>` | Request-body trust lifecycle. `install` registers the native-messaging host manifest **and** provisions and trusts the device-local CA in a single, transactional call: it needs elevated privileges (Linux `sudo`, macOS keychain authorization, Windows Administrator) and capability-gates the OS trust step, rolling the manifest back and exiting `1` with `trust unsupported: <reasons>` when a capability or elevation is missing. `uninstall` removes the host manifest, the device-local CA files, and the trust installation (idempotent). `verify` reports whether the manifest, the `runtime-host` wrapper, the allowed origins, and the CA trust are all present and valid (exit `0` only when all pass). |
-| `rogatio runtime host [path]`                  | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Pairing, authorization, body transforms, and mock responses flow through this single host. `--root <dir>` overrides the confined mock file root. When omitted, a saved device-local root for that project file is used, otherwise the project directory. A stdin project that contains a file mock requires `--root`.                                                                                                                                                                                                        |
+| `rogatio runtime host [path]` | Runs the consolidated native-messaging host for the project on stdio. Launched automatically by the browser extension via the native-messaging manifest; run manually only for debugging. Pairing, authorization, body transforms, and mock responses flow through this single host. `--root <dir>` overrides the confined mock file root. When omitted, a saved device-local root for that project file is used, otherwise the project directory. A stdin project that contains a file mock requires `--root`. |
 
 Typical workflow: run `rogatio edit`, build and test rules with `rogatio test`, `rogatio verify`, then import
 the file into Chrome and enable the groups you need.
@@ -196,11 +196,11 @@ On POSIX the config directory is `700` and the config file is `600` (owner read/
 
 ### AI Capabilities
 
-| Feature      | Description                                                                                                                                                                                                                                                                                                    |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Generate** | Create new rules from natural language                                                                                                                                                                                                                                                                         |
-| **Fix**      | Repair schema validation errors in place: the rules that carry diagnostics are replaced (keeping their rule ids), and the host validates the repaired project before accepting the proposal (up to 3 fix iterations on CLI; the extension validates once and rejects proposals that do not repair the project) |
-| **Explain**  | Describe what a rule or project does                                                                                                                                                                                                                                                                           |
+| Feature | Description |
+|---------|-------------|
+| **Generate** | Create new rules from natural language |
+| **Fix** | Repair schema validation errors in place: the rules that carry diagnostics are replaced (keeping their rule ids), and the host validates the repaired project before accepting the proposal (up to 3 fix iterations on CLI; the extension validates once and rejects proposals that do not repair the project) |
+| **Explain** | Describe what a rule or project does |
 
 ### In the Chrome Extension
 
@@ -291,19 +291,19 @@ for development (a local unpacked build without the release key) and for forks.
 
 This is a strict-TypeScript 7, ESM/NodeNext pnpm monorepo.
 
-| Package                 | Purpose                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------ |
-| `@rogatio/schema`       | Version-2 JSON schema, validation, source conditions, bounds, forbidden headers, v1 migration.   |
-| `@rogatio/compiler`     | Transforms validated source into browser-neutral operations and stable diagnostics.              |
-| `@rogatio/dry-run`      | Pure-offline bounded URL batch test engine (3-dim matching, preview seam).                       |
-| `@rogatio/browser-core` | Versioned storage, migrations, enablement, lifecycle, and the shared `NativeRuntimePhase` type.  |
-| `@rogatio/editor`       | Shared framework-free DOM controller and accessible view.                                        |
-| `@rogatio/extension`    | Chrome MV3 service worker and extension page (WebExtensions/DNR translation).                    |
-| `@rogatio/runtime`      | Reusable response-body and request-body transformation components.                               |
-| `@rogatio/cli`          | Editor host, file verification, test runner, AI config, and runtime dispatch (`rogatio` binary). |
-| `@rogatio/docs-site`    | Astro + Starlight user documentation site (not on the product package DAG).                      |
-| `@rogatio/smoke`        | Tiny workspace stub used by package wiring checks.                                               |
-| `@rogatio/sanity`       | Tiny workspace stub that depends on `@rogatio/smoke`.                                            |
+| Package | Purpose |
+| --- | --- |
+| `@rogatio/schema` | Version-2 JSON schema, validation, source conditions, bounds, forbidden headers, v1 migration. |
+| `@rogatio/compiler` | Transforms validated source into browser-neutral operations and stable diagnostics. |
+| `@rogatio/dry-run` | Pure-offline bounded URL batch test engine (3-dim matching, preview seam). |
+| `@rogatio/browser-core` | Versioned storage, migrations, enablement, lifecycle, and the shared `NativeRuntimePhase` type. |
+| `@rogatio/editor` | Shared framework-free DOM controller and accessible view. |
+| `@rogatio/extension` | Chrome MV3 service worker and extension page (WebExtensions/DNR translation). |
+| `@rogatio/runtime` | Reusable response-body and request-body transformation components. |
+| `@rogatio/cli` | Editor host, file verification, test runner, AI config, and runtime dispatch (`rogatio` binary). |
+| `@rogatio/docs-site` | Astro + Starlight user documentation site (not on the product package DAG). |
+| `@rogatio/smoke` | Tiny workspace stub used by package wiring checks. |
+| `@rogatio/sanity` | Tiny workspace stub that depends on `@rogatio/smoke`. |
 
 ## Local development
 
@@ -324,16 +324,16 @@ Browser e2e uses Selenium WebDriver against [Chrome for Testing](https://develop
 
 Common scripts:
 
-| Script                              | What it does                                                                 |
-| ----------------------------------- | ---------------------------------------------------------------------------- |
-| `pnpm format` / `pnpm format:check` | Write or check Biome formatting.                                             |
-| `pnpm lint`                         | Run Biome linting.                                                           |
-| `pnpm typecheck`                    | Run the pinned strict TypeScript compiler.                                   |
-| `pnpm build`                        | Build and verify Node and browser ESM artifacts.                             |
-| `pnpm test`                         | Build and run the Vitest unit and real-process integration suites.           |
-| `pnpm test:browser`                 | Build and run Selenium browser journeys (Chrome for Testing).                |
-| `pnpm browser:install`              | Download Chrome for Testing into `.browser-cache/`.                          |
-| `pnpm validate`                     | Run the complete fail-fast validation sequence (includes negative fixtures). |
+| Script | What it does |
+| --- | --- |
+| `pnpm format` / `pnpm format:check` | Write or check Biome formatting. |
+| `pnpm lint` | Run Biome linting. |
+| `pnpm typecheck` | Run the pinned strict TypeScript compiler. |
+| `pnpm build` | Build and verify Node and browser ESM artifacts. |
+| `pnpm test` | Build and run the Vitest unit and real-process integration suites. |
+| `pnpm test:browser` | Build and run Selenium browser journeys (Chrome for Testing). |
+| `pnpm browser:install` | Download Chrome for Testing into `.browser-cache/`. |
+| `pnpm validate` | Run the complete fail-fast validation sequence (includes negative fixtures). |
 
 Use `pnpm validate` before opening a pull request.
 
