@@ -136,15 +136,33 @@ function stableParams(params: Readonly<Record<string, unknown>>): string {
 const MOCK_HEADER_NAME_PATH =
   /^\/groups\/\d+\/rules\/\d+\/mock\/headers\/\d+\/name$/;
 
+const RULE_HEADER_NAME_PATH = /^\/groups\/\d+\/rules\/\d+\/headerName$/;
+
 function validationIssueCode(issue: ValidationIssue): CompilerDiagnosticCode {
   if (issue.keyword === "mock-body-source") {
     return "compiler.mock-body-source";
   }
+  if (issue.keyword === "forbiddenHeader") {
+    if (MOCK_HEADER_NAME_PATH.test(issue.instancePath)) {
+      return "compiler.mock-forbidden-header";
+    }
+    if (RULE_HEADER_NAME_PATH.test(issue.instancePath)) {
+      return "compiler.forbidden-header";
+    }
+  }
+  if (issue.keyword === "enum") {
+    if (issue.instancePath.endsWith("/headerDirection")) {
+      return "compiler.invalid-header-direction";
+    }
+    if (issue.instancePath.endsWith("/headerOperation")) {
+      return "compiler.invalid-header-operation";
+    }
+  }
   if (
-    issue.keyword === "forbiddenHeader" &&
-    MOCK_HEADER_NAME_PATH.test(issue.instancePath)
+    issue.keyword === "required" &&
+    issue.instancePath.endsWith("/headerValue")
   ) {
-    return "compiler.mock-forbidden-header";
+    return "compiler.header-value-required";
   }
   if (Object.hasOwn(ISSUE_CODES, issue.keyword)) {
     return ISSUE_CODES[issue.keyword];

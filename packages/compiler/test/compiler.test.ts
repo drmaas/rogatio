@@ -665,5 +665,101 @@ describe("@rogatio/compiler", () => {
         expect(op.matcher.priority).toBe(500);
       }
     });
+
+    it("maps header validation failures to compiler header diagnostic codes", () => {
+      const forbidden = compileProject(
+        makeProject(
+          {},
+          {
+            ...makeHeaderRule(1),
+            headerName: "Content-Length",
+            headerDirection: "response" as HeaderDirection,
+          },
+        ),
+      );
+      expectFailure(forbidden);
+      expect(forbidden.diagnostics).toEqual([
+        expect.objectContaining({
+          code: "compiler.forbidden-header",
+          path: "/groups/0/rules/0/headerName",
+          message: "The header name is forbidden for this direction.",
+          params: {
+            headerName: "Content-Length",
+            headerDirection: "response",
+          },
+        }),
+      ]);
+
+      const badDirection = compileProject(
+        makeProject(
+          {},
+          {
+            ...makeHeaderRule(1),
+            headerDirection: "upstream" as HeaderDirection,
+          },
+        ),
+      );
+      expectFailure(badDirection);
+      expect(badDirection.diagnostics).toEqual([
+        expect.objectContaining({
+          code: "compiler.invalid-header-direction",
+          path: "/groups/0/rules/0/headerDirection",
+          message: "Invalid header direction.",
+        }),
+      ]);
+
+      const badOperation = compileProject(
+        makeProject(
+          {},
+          {
+            ...makeHeaderRule(1),
+            headerOperation: "delete" as HeaderOperationKind,
+          },
+        ),
+      );
+      expectFailure(badOperation);
+      expect(badOperation.diagnostics).toEqual([
+        expect.objectContaining({
+          code: "compiler.invalid-header-operation",
+          path: "/groups/0/rules/0/headerOperation",
+          message: "Invalid header operation.",
+        }),
+      ]);
+
+      const missingValue = compileProject(
+        makeProject(
+          {},
+          {
+            ...makeHeaderRule(1),
+            headerOperation: "append",
+            headerValue: undefined,
+          },
+        ),
+      );
+      expectFailure(missingValue);
+      expect(missingValue.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: "compiler.header-value-required",
+            path: "/groups/0/rules/0/headerValue",
+            message: "Header value is required for set and append operations.",
+            params: { missingProperty: "headerValue" },
+          }),
+        ]),
+      );
+    });
+
+    it("compiles remove with a headerValue present", () => {
+      const project = makeProject(
+        {},
+        {
+          ...makeHeaderRule(1),
+          headerOperation: "remove",
+          headerValue: "ignored",
+        },
+      );
+      const result = compileProject(project);
+      expect(result.ok).toBe(true);
+    });
   });
 });
