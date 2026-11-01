@@ -4,6 +4,7 @@ Vertical slice across schema → compiler → editor → extension. Worktree:
 `feature/f9-redirect-rules`.
 
 ## Step 1 — schema package
+
 - `types.ts`: add `RuleType = "redirect"`, `RedirectAction { destination: string }`; extend
   `RogatioRule` with optional `type?`, `redirect?`.
 - `limits.ts`: add `maxRedirectDestinationLength: 2048`, `maxCaptureGroups: 9`.
@@ -15,17 +16,20 @@ Vertical slice across schema → compiler → editor → extension. Worktree:
 - `index.ts`: export helper if needed.
 
 ## Step 2 — compiler package
+
 - `types.ts`: add `RedirectOperation`, `RogatioOperation = MatcherOperation | RedirectOperation`;
   `CompileResult.operations: readonly RogatioOperation[]`.
 - `compile.ts`: `compileOperations` emits `RedirectOperation` when `rule.type === "redirect"`.
 - `index.ts`: export new types.
 
 ## Step 3 — browser-core package
+
 - `types.ts`: `RuleInstallerAdapter.current(): Promise<readonly RogatioOperation[]>`; related types
   widen `MatcherOperation[]` → `RogatioOperation[]` where only groupId/ruleId/matcher are used.
 - `status.ts`, `install.ts`: accept `RogatioOperation[]` (mechanical type widen; logic unchanged).
 
 ## Step 4 — editor package
+
 - `editor.ts`: when `ruleTypes` provided, render rule-type `<select>` bound to `type`; on change set
   `type` and clear incompatible action fields (e.g. delete `redirect` when leaving redirect). Add
   `type` to editable common-field handling.
@@ -35,6 +39,7 @@ Vertical slice across schema → compiler → editor → extension. Worktree:
 - `index.ts`: export `createRedirectRuleType`.
 
 ## Step 5 — extension package
+
 - NEW `dnr.ts`: `translateRedirectToDnr(op, id)` → DNR `Rule` (action `redirect`, `regexFilter`,
   `resourceTypes`, `initiatorDomains` from origin hostnames); `createDnrInstaller(api)` implements
   `RuleInstallerAdapter` using `api.declarativeNetRequest.updateDynamicRules` / `getDynamicRules`.
@@ -47,6 +52,7 @@ Vertical slice across schema → compiler → editor → extension. Worktree:
 - `extension-page.ts` + CLI editor host: register `createRedirectRuleType()`.
 
 ## Step 6 — tests (tests-first ordering)
+
 - `schema/test/schema.test.ts`: redirect valid/invalid cases.
 - `compiler/test/compiler.test.ts`: RedirectOperation emission.
 - `extension/test/dnr.test.ts` (NEW): translateRedirectToDnr + installer payload (mock DNR).
@@ -54,7 +60,9 @@ Vertical slice across schema → compiler → editor → extension. Worktree:
 - `extension/test/service-worker.test.ts`: status mapping.
 
 ## Step 7 — validation
+
 - `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm test`, `pnpm format:check`, `pnpm test:browser`.
 
 ## Step 8 — docs
+
 - `docs/architecture.md` update (RogatioOperation union, DNR installer, status mapping).

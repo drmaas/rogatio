@@ -14,20 +14,20 @@ model served every role in a single-model environment.
 
 ## Stage status
 
-| Stage | Status | Notes |
-| --- | --- | --- |
-| 0 Worktree | done | `/home/drmaas/.local/share/opencode/worktree/rogatio/feature/popup-group-toggle`, branch `feature/popup-group-toggle` from `main` (clean). |
-| 1 Brainstorm | done (ephemeral) | User-supplied approved design; no retained brainstorm files. |
-| 2 Architecture | done | Reuses `set-group-enabled`; popup reads `get-state` envelope; per-group status aggregation precedence. |
-| 3 Spec | done | `docs/specs/f21-popup-group-toggle.md` approved at Stage 4. |
-| 4 Human review gate | done | User approved spec + architecture as written. Eligibility = popup lists only persisted active-project groups; every listed group eligible; no ineligible rows. |
-| 5 Plan | done | `docs/plans/f21-popup-group-toggle.md`, tasks T1-T8 mapped to AC-001..AC-009. |
-| 6 Tests first | done | `popup-model.test.ts`, `popup-envelope.test.ts`, `editor/test/navigate.test.ts`. |
-| 7 Implementation | done | `popup-model.ts`, `popup.ts`, `popup.html`, editor `navigateToGroup`, manifest `default_popup`, `build.ts`, `validate.ts` contract update. |
-| 8 Verification | done | `pnpm validate` green (format, lint 0 errors, tsc, build, 561 unit tests, MV3 manifest contract, forbidden-dep guard incl. `popup.js`, 15 browser E2E). |
-| 9 Review | done | Fresh-context self-review: no actionable defects; one low-severity test-gap noted (popup DOM not auto-covered; covered by build/typecheck + manual). |
-| 10 Docs | done | `docs/architecture.md` F21 note, `README.md` popup note. |
-| 11 Release | pending | Awaiting user authorization. |
+| Stage               | Status           | Notes                                                                                                                                                          |
+| ------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Worktree          | done             | `/home/drmaas/.local/share/opencode/worktree/rogatio/feature/popup-group-toggle`, branch `feature/popup-group-toggle` from `main` (clean).                     |
+| 1 Brainstorm        | done (ephemeral) | User-supplied approved design; no retained brainstorm files.                                                                                                   |
+| 2 Architecture      | done             | Reuses `set-group-enabled`; popup reads `get-state` envelope; per-group status aggregation precedence.                                                         |
+| 3 Spec              | done             | `docs/specs/f21-popup-group-toggle.md` approved at Stage 4.                                                                                                    |
+| 4 Human review gate | done             | User approved spec + architecture as written. Eligibility = popup lists only persisted active-project groups; every listed group eligible; no ineligible rows. |
+| 5 Plan              | done             | `docs/plans/f21-popup-group-toggle.md`, tasks T1-T8 mapped to AC-001..AC-009.                                                                                  |
+| 6 Tests first       | done             | `popup-model.test.ts`, `popup-envelope.test.ts`, `editor/test/navigate.test.ts`.                                                                               |
+| 7 Implementation    | done             | `popup-model.ts`, `popup.ts`, `popup.html`, editor `navigateToGroup`, manifest `default_popup`, `build.ts`, `validate.ts` contract update.                     |
+| 8 Verification      | done             | `pnpm validate` green (format, lint 0 errors, tsc, build, 561 unit tests, MV3 manifest contract, forbidden-dep guard incl. `popup.js`, 15 browser E2E).        |
+| 9 Review            | done             | Fresh-context self-review: no actionable defects; one low-severity test-gap noted (popup DOM not auto-covered; covered by build/typecheck + manual).           |
+| 10 Docs             | done             | `docs/architecture.md` F21 note, `README.md` popup note.                                                                                                       |
+| 11 Release          | pending          | Awaiting user authorization.                                                                                                                                   |
 
 ## Verification evidence (Stage 8)
 

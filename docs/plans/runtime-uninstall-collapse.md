@@ -75,9 +75,9 @@ async function removeCa(): Promise<void> {
 }
 ```
 
-The helper does **not** wrap its own `try`/`catch` — any throw from `caTrustRemover` or `rm` propagates to `uninstall`, which converts it to `unsupported`. Per **locked decision #4**, this is best-effort: if `caTrustRemover` throws, the file `rm` calls have not yet run for the CA files (they run *after* the remover call inside the helper); the manifest `rm` in `uninstall` is after `removeCa()`, so if the helper throws, the manifest remains on disk and the throw is surfaced. This is acceptable per locked decision #4: "best-effort, surfaced as `unsupported` with the throw message."
+The helper does **not** wrap its own `try`/`catch` — any throw from `caTrustRemover` or `rm` propagates to `uninstall`, which converts it to `unsupported`. Per **locked decision #4**, this is best-effort: if `caTrustRemover` throws, the file `rm` calls have not yet run for the CA files (they run _after_ the remover call inside the helper); the manifest `rm` in `uninstall` is after `removeCa()`, so if the helper throws, the manifest remains on disk and the throw is surfaced. This is acceptable per locked decision #4: "best-effort, surfaced as `unsupported` with the throw message."
 
-Wait — the locked decision reads: "If `caTrustRemover` throws, the file-system side effects (manifest, CA) have already been removed." This requires the helper to perform the `rm` calls *before* the `caTrustRemover` invocation, OR for `removeCa()` to be invoked before any state has been touched (which it is, since it's the first thing `uninstall` does). Reading the locked decision literally: the manifest and CA files should already be gone by the time the throw is surfaced. The cleanest realization:
+Wait — the locked decision reads: "If `caTrustRemover` throws, the file-system side effects (manifest, CA) have already been removed." This requires the helper to perform the `rm` calls _before_ the `caTrustRemover` invocation, OR for `removeCa()` to be invoked before any state has been touched (which it is, since it's the first thing `uninstall` does). Reading the locked decision literally: the manifest and CA files should already be gone by the time the throw is surfaced. The cleanest realization:
 
 ```ts
 async function removeCa(): Promise<void> {
@@ -130,30 +130,30 @@ Append `> Superseded by: feat/collapse-runtime-uninstall-and-untrust` to the **s
 
 **File:line enumeration (per research, with the six newly-discovered locations flagged):**
 
-| File | Line | Reason |
-| --- | --- | --- |
-| `docs/specs/f16-request-body-trust.md` | L18-19 | `install | status | trust | untrust | uninstall` enumeration |
-| `docs/specs/f16-request-body-trust.md` | L30-31 | CLI surface enumeration |
-| `docs/specs/f16-request-body-trust.md` | L58-59 | `CLI operator` enumeration |
-| `docs/specs/f16-request-body-trust.md` | L104-106 | REQ-004 enumeration |
-| `docs/specs/f16-request-body-trust.md` | L134-136 | REQ-011: `uninstall()` semantic widens |
-| `docs/specs/f16-request-body-trust.md` | L141-143 | REQ-013: `untrust()` removed |
-| `docs/specs/f16-request-body-trust.md` | L289-291 | `uninstall/untrust are idempotent` clause |
-| `docs/specs/f16-request-body-trust.md` | L316-318 | AC-006: `untrust()` reference |
-| `docs/specs/f16-request-body-trust.md` | L324-326 | AC-008 enumeration |
-| `docs/plans/f16-request-body-trust.md` | L29-40 | T4 controller lifecycle |
-| `docs/plans/f16-request-body-trust.md` | L45-51 | T6 CLI surface |
-| `docs/plans/f16-request-body-trust.md` | L79-81 | Rollback note |
-| `docs/specs/cli-activate-deactivate-removal.md` | L33 | trust lifecycle enumeration |
-| `docs/specs/cli-activate-deactivate-removal.md` | L42 | "We are not removing `install|trust|untrust|uninstall`" |
-| `docs/specs/cli-activate-deactivate-removal.md` | L66 | "`install|trust|untrust|uninstall` → unchanged" |
-| `docs/specs/cli-activate-deactivate-removal.md` | L131 | "`install|trust|untrust|uninstall|host` continue to work" |
-| `docs/specs/f19-docs-site.md` | L68 | **(NEW — missed by prior research)** runtime install verb list |
-| `docs/specs/consolidated-native-runtime.md` | L119 | **(NEW — missed by prior research)** CA verb list |
-| `docs/plans/consolidated-native-runtime.md` | L61 | **(NEW — missed by prior research)** `trust.ts` controller surface |
-| `docs/plans/cli-activate-deactivate-removal.md` | L96 | **(NEW — missed by prior research)** `keep install|trust|untrust|uninstall and host` |
-| `docs/plans/f17-request-body-rules.md` | L201 | **(NEW — missed by prior research)** `Preserve explicit trust, untrust, install, uninstall` |
-| `docs/plans/f17-request-body-rules.md` | L460 | **(NEW — missed by prior research)** `untrust and uninstall remain explicit user actions` |
+| File                                            | Line     | Reason                                                                                      |
+| ----------------------------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `docs/specs/f16-request-body-trust.md`          | L18-19   | `install                                                                                    | status | trust   | untrust                 | uninstall` enumeration  |
+| `docs/specs/f16-request-body-trust.md`          | L30-31   | CLI surface enumeration                                                                     |
+| `docs/specs/f16-request-body-trust.md`          | L58-59   | `CLI operator` enumeration                                                                  |
+| `docs/specs/f16-request-body-trust.md`          | L104-106 | REQ-004 enumeration                                                                         |
+| `docs/specs/f16-request-body-trust.md`          | L134-136 | REQ-011: `uninstall()` semantic widens                                                      |
+| `docs/specs/f16-request-body-trust.md`          | L141-143 | REQ-013: `untrust()` removed                                                                |
+| `docs/specs/f16-request-body-trust.md`          | L289-291 | `uninstall/untrust are idempotent` clause                                                   |
+| `docs/specs/f16-request-body-trust.md`          | L316-318 | AC-006: `untrust()` reference                                                               |
+| `docs/specs/f16-request-body-trust.md`          | L324-326 | AC-008 enumeration                                                                          |
+| `docs/plans/f16-request-body-trust.md`          | L29-40   | T4 controller lifecycle                                                                     |
+| `docs/plans/f16-request-body-trust.md`          | L45-51   | T6 CLI surface                                                                              |
+| `docs/plans/f16-request-body-trust.md`          | L79-81   | Rollback note                                                                               |
+| `docs/specs/cli-activate-deactivate-removal.md` | L33      | trust lifecycle enumeration                                                                 |
+| `docs/specs/cli-activate-deactivate-removal.md` | L42      | "We are not removing `install                                                               | trust  | untrust | uninstall`"             |
+| `docs/specs/cli-activate-deactivate-removal.md` | L66      | "`install                                                                                   | trust  | untrust | uninstall` → unchanged" |
+| `docs/specs/cli-activate-deactivate-removal.md` | L131     | "`install                                                                                   | trust  | untrust | uninstall               | host` continue to work" |
+| `docs/specs/f19-docs-site.md`                   | L68      | **(NEW — missed by prior research)** runtime install verb list                              |
+| `docs/specs/consolidated-native-runtime.md`     | L119     | **(NEW — missed by prior research)** CA verb list                                           |
+| `docs/plans/consolidated-native-runtime.md`     | L61      | **(NEW — missed by prior research)** `trust.ts` controller surface                          |
+| `docs/plans/cli-activate-deactivate-removal.md` | L96      | **(NEW — missed by prior research)** `keep install                                          | trust  | untrust | uninstall and host`     |
+| `docs/plans/f17-request-body-rules.md`          | L201     | **(NEW — missed by prior research)** `Preserve explicit trust, untrust, install, uninstall` |
+| `docs/plans/f17-request-body-rules.md`          | L460     | **(NEW — missed by prior research)** `untrust and uninstall remain explicit user actions`   |
 
 **Removed from research's frozen-doc list (over-engineering).** Four additional entries that the plan previously enumerated are dropped because the research's verification standard (CHECKLIST 3.28) accepts PR #79's footers, and the research explicitly stated some were redundant:
 - `docs/specs/f16-request-body-trust.md` L213-222, L226-234, L249-256 — all already footnoted by PR #79 (L224, L236, L258); adding new footers here is double-coverage and out of the research's recommended scope.
@@ -170,20 +170,20 @@ Per AGENTS.md "Source-of-truth priority," these are the files that describe curr
 
 **Locked decision #5a:** root `README.md:128` pipe list is updated in Phase 4. This is the only Phase 4 task PR #79 missed.
 
-| File | Line(s) | Edit |
-| --- | --- | --- |
-| `README.md` | L128 | `<install\|trust\|untrust\|uninstall>` → `<install\|uninstall>`; rewrite description |
-| `docs/architecture.md` | L341 | `install \| untrust \| uninstall` → `install \| uninstall` |
-| `docs/architecture.md` | L344 | delete the `untrust` bullet |
-| `docs/architecture.md` | L345 | rewrite the `uninstall` bullet to describe the unified semantic |
-| `docs/architecture.md` | L352 | `install/uninstall/untrust/status` → `install/uninstall/status` |
-| `rogatio-overview.md` | L35 | drop `rogatio runtime untrust to remove the CA trust, and` clause |
-| `samples/basic/README.md` | L117-118 | `remove trust/host with rogatio runtime untrust and rogatio runtime uninstall` → `remove the host and CA trust with rogatio runtime uninstall` |
-| `packages/cli/README.md` | L42 | `<install\|untrust\|uninstall>` → `<install\|uninstall>` |
-| `packages/docs-site/src/content/docs/guides/runtime.md` | L16 | drop `untrust` from pipe list |
-| `packages/docs-site/src/content/docs/reference/cli.md` | L34 | drop `untrust` from pipe list |
-| `packages/docs-site/src/content/docs/reference/platforms.md` | L25 | drop `untrust` from pipe list |
-| `packages/docs-site/src/content/docs/rules/request-body.md` | L26 | already post-#79 wording; no edit needed (verified by research) |
+| File                                                         | Line(s)  | Edit                                                                                                                                           |
+| ------------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `README.md`                                                  | L128     | `<install\|trust\|untrust\|uninstall>` → `<install\|uninstall>`; rewrite description                                                           |
+| `docs/architecture.md`                                       | L341     | `install \| untrust \| uninstall` → `install \| uninstall`                                                                                     |
+| `docs/architecture.md`                                       | L344     | delete the `untrust` bullet                                                                                                                    |
+| `docs/architecture.md`                                       | L345     | rewrite the `uninstall` bullet to describe the unified semantic                                                                                |
+| `docs/architecture.md`                                       | L352     | `install/uninstall/untrust/status` → `install/uninstall/status`                                                                                |
+| `rogatio-overview.md`                                        | L35      | drop `rogatio runtime untrust to remove the CA trust, and` clause                                                                              |
+| `samples/basic/README.md`                                    | L117-118 | `remove trust/host with rogatio runtime untrust and rogatio runtime uninstall` → `remove the host and CA trust with rogatio runtime uninstall` |
+| `packages/cli/README.md`                                     | L42      | `<install\|untrust\|uninstall>` → `<install\|uninstall>`                                                                                       |
+| `packages/docs-site/src/content/docs/guides/runtime.md`      | L16      | drop `untrust` from pipe list                                                                                                                  |
+| `packages/docs-site/src/content/docs/reference/cli.md`       | L34      | drop `untrust` from pipe list                                                                                                                  |
+| `packages/docs-site/src/content/docs/reference/platforms.md` | L25      | drop `untrust` from pipe list                                                                                                                  |
+| `packages/docs-site/src/content/docs/rules/request-body.md`  | L26      | already post-#79 wording; no edit needed (verified by research)                                                                                |
 
 **`packages/extension/src/diagnostics.ts:57` and `packages/extension/src/extension-page-entry.ts:820-828`** are NOT edited — PR #79's scope.
 
@@ -226,7 +226,7 @@ Run `pnpm validate` (canonical pre-commit/CI gate per AGENTS.md: format:check �
 4. Grep `untrust` across `docs/specs/*.md` and `docs/plans/*.md`; every match must sit on a `> Superseded by:` footer line.
 5. Document any remaining known-failures in the verify output.
 6. Fix mechanical failures in place (formatting, imports, unused-variable warnings surfaced by `pnpm validate`).
-→ **CHECKLIST.md Phase 5.**
+   → **CHECKLIST.md Phase 5.**
 
 ## Risks
 
@@ -237,7 +237,7 @@ Run `pnpm validate` (canonical pre-commit/CI gate per AGENTS.md: format:check �
 - **Idempotency.** The new `uninstall` must remain idempotent: re-running on a clean install must be a no-op exit-0. The `force: true` flag on every `rm` plus the `existsFile` guard on `caTrustRemover` invocation enforces this. Phase 1 AC-2 covers it; the test must call `uninstall` twice in sequence and assert no errors.
 - **Over-engineering.** This is a single-verb-collapse. Any new helper beyond `removeCa`, any new export, any new config, any new docs file is out of scope. The implementation review must flag and reject: (a) new packages; (b) new exports from `@rogatio/runtime`; (c) new CLI flags; (d) a migration guide document; (e) capability-gating the new `uninstall`; (f) extending `runtimeCommand` to handle other verbs; (g) `trust.*` literal churn beyond the locked decisions; (h) a parallel `runtime-uninstall-success.test.ts` file (the symmetric `runtime-install-success.test.ts` for PR #79 exists, but adding a sibling would be asymmetric and over-engineered — the uninstall success is covered by `runtime-command.test.ts` and `trust.test.ts`).
 - **Help-text duplication drift.** Both copies of `showRuntimeHelp` (`runtime.ts:20-51` and `index.ts:162-198`) must stay byte-identical after the edit. If only one is updated, the post-#-79 invariant is broken. The implementation review must `diff` them.
-- **Six newly-discovered frozen-doc locations.** The research review found six `untrust` references in frozen docs that the original research missed. If the implementation review's grep uncovers a *seventh*, the human gate must decide whether to footnote it in this PR or in a follow-up.
+- **Six newly-discovered frozen-doc locations.** The research review found six `untrust` references in frozen docs that the original research missed. If the implementation review's grep uncovers a _seventh_, the human gate must decide whether to footnote it in this PR or in a follow-up.
 - **`reportTrust` `trust ${subcommand} failed:` literal awkwardness.** After both #79 and this PR, the literal produces `"trust install failed:"` and `"trust uninstall failed:"`. This is out of scope; flagged for follow-up.
 
 ## Acceptance criteria
@@ -262,6 +262,7 @@ Extending PR #79's `runtime-install-collapse` AC list with the symmetric uninsta
 ---
 
 > **Implementation review (plan-review, 2026-09-04, free tier `openrouter` primary `inkling-small:free`, fallback `nemotron-3-ultra-free`).** Verdict: **PLAN REVIEWED WITH LOCKED-DECISION INTEGRATION**. All five locked decisions are honored: (1) `removeCa()` private closure helper mirrors PR #79's `runCaTrust` pattern; (2) success message is locked; (3) `first === "untrust"` is dropped from routing; (4) `caTrustRemover` throw is best-effort with files removed first; (5) `README.md:128` and `editor-asset-paths.test.ts` are in-scope. The seven ACs cover the user's stated problem ("untrust needs to be fully removed, combined with uninstall") and the symmetric-with-PR-#79 framing: AC-1 (transactional uninstall), AC-2 (idempotency), AC-3 (capability gating unchanged), AC-4 (best-effort `caTrustRemover` throw), AC-5 (status non-leakage + public-surface narrowing), AC-6 (zero `untrust` in live files), AC-7 (CLI surface). Phases are ordered and each has a verifiable test (Phase 1: `trust.test.ts` AC-1..AC-5 tests; Phase 2: `runtime-command.test.ts` `untrust → exit 2` test; Phase 3: grep across `docs/specs/*.md`/`docs/plans/*.md` returns footer-only matches; Phase 4: grep for `untrust` across live files returns zero; Phase 5: `pnpm validate` and dedicated `editor-asset-paths.test.ts` investigation). Over-engineering risk is listed. Phase 4 explicitly calls out the `README.md:128` pipe list update. Phase 5 has a dedicated task to investigate `editor-asset-paths.test.ts`. The plan respects all five locked decisions throughout.
+
 ---
 
 > **Plan-review gate decisions (2026-09-04):**

@@ -50,6 +50,7 @@ No new tokens. No new colors.
 ## 5. Functional Requirements (REQ-IDs)
 
 ### Sidebar Group Activation Visibility
+
 - **REQ-GAV-001:** Each group in `GROUP ACTIVATION` shows a clear active/inactive visual state.
   - Active (checked, in `enabledGroupIds`): checkbox + label highlighted with `--rogatio-success` tint or primary accent border; label text remains readable.
   - Inactive (unchecked, not in `enabledGroupIds`): muted (`--rogatio-muted` or `--rogatio-neutral` surface), no success tint.
@@ -57,6 +58,7 @@ No new tokens. No new colors.
 - **REQ-GAV-003:** Preserve accessibility: checkbox remains native `input[type="checkbox"]`, label remains native `label`, no drag-and-drop.
 
 ### Badge / Status Message Attention Explanation
+
 - **REQ-GAV-004:** When `badge.attention === true`, the badge pill text explains the reason concisely and points to the fix.
   - Example patterns (derived from `ruleStatuses`):
     - Rules need permission: `"0 active (needs permission — grant access)"`
@@ -67,6 +69,7 @@ No new tokens. No new colors.
 - **REQ-GAV-006:** The status line (`.rogatio-status`) should optionally echo the same explanation or link to the fix action (e.g., reference the permission summary or action buttons). Keep it minimal to avoid overload.
 
 ### Compatibility and Constraints
+
 - **REQ-GAV-007:** No change to `packages/extension/src/service-worker.ts`, `popup-model.ts`, or popup (`f21`).
 - **REQ-GAV-008:** No new dependencies; no change to build pipeline besides normal CSS/JS updates.
 - **REQ-GAV-009:** All `data-*` attributes (`groupToggle`, `permissionSummary`, `badgeState`, `ruleStatuses`) preserved.

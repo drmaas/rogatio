@@ -72,13 +72,13 @@ Goals:
 
 ## Actors and supported environments
 
-| Actor | Responsibility |
-| --- | --- |
-| CI (Ubuntu, Windows, macOS) | Runs the canonical validation, including the new suites. |
-| Developer | Runs `pnpm test:browser` / `pnpm validate` locally; grants permissions manually when the browser journey requires it. |
-| Packaged CLI | Real binary produced by `pnpm pack` + `npm install --offline`. |
-| Real Chromium | Headless `channel: "chromium"` with the real unpacked extension. |
-| Mock runtime | Real `rogatio runtime` process over loopback HTTP. |
+| Actor                       | Responsibility                                                                                                        |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| CI (Ubuntu, Windows, macOS) | Runs the canonical validation, including the new suites.                                                              |
+| Developer                   | Runs `pnpm test:browser` / `pnpm validate` locally; grants permissions manually when the browser journey requires it. |
+| Packaged CLI                | Real binary produced by `pnpm pack` + `npm install --offline`.                                                        |
+| Real Chromium               | Headless `channel: "chromium"` with the real unpacked extension.                                                      |
+| Mock runtime                | Real `rogatio runtime` process over loopback HTTP.                                                                    |
 
 Supported on Node.js `>=24`, TypeScript 7, ESM/NodeNext, Linux, Windows, macOS. Chrome is
 the browser target; the browser journeys run in the Ubuntu CI job (`pnpm validate`), and
@@ -227,12 +227,12 @@ stable messages.
 
 ## Required test mapping
 
-| Test level | Coverage |
-| --- | --- |
-| Integration (Vitest) | AC-001, AC-002, AC-003, AC-004, AC-010, AC-012, AC-013 |
-| Browser E2E (Playwright) | AC-005, AC-006, AC-007, AC-008, AC-009 |
-| Unit regression | AC-010, AC-011, AC-012, AC-013 |
-| Package validation | AC-015 |
+| Test level               | Coverage                                               |
+| ------------------------ | ------------------------------------------------------ |
+| Integration (Vitest)     | AC-001, AC-002, AC-003, AC-004, AC-010, AC-012, AC-013 |
+| Browser E2E (Playwright) | AC-005, AC-006, AC-007, AC-008, AC-009                 |
+| Unit regression          | AC-010, AC-011, AC-012, AC-013                         |
+| Package validation       | AC-015                                                 |
 
 ## Open questions and assumptions
 

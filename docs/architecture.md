@@ -188,9 +188,9 @@ interface EditorOptions {
   root: HTMLElement;
   initialProject: unknown;
   validate: (value: unknown) => readonly EditorDiagnostic[];
-  save: (project: EditorProjectSnapshot) =>
-    | EditorSaveResult
-    | Promise<EditorSaveResult>;
+  save: (
+    project: EditorProjectSnapshot,
+  ) => EditorSaveResult | Promise<EditorSaveResult>;
   onCancel?: () => void;
   ruleTypes?: readonly RuleTypeFieldExtension[];
 }
@@ -337,13 +337,13 @@ The complete proposed contract and acceptance criteria are in `docs/specs/f14-ma
 
 ## Request-Body Trust Lifecycle
 
-The **request-body trust lifecycle** that request-body interception (the request-body rules) requires before any network interception can happen: it manages the native-messaging host registration and the device-local CA trust that the macOS runtime's interception gate depends on. It is a distinct concern from the macOS runtime's `start`/`stop`/`status` (which govern a running runtime *process*); the request-body trust lifecycle governs the *installed/trusted* standing of the host on the device. It depends only on the macOS runtime (REP-001) and adds no response-body or request-body rule behavior, only the trust surface those slices pre-condition.
+The **request-body trust lifecycle** that request-body interception (the request-body rules) requires before any network interception can happen: it manages the native-messaging host registration and the device-local CA trust that the macOS runtime's interception gate depends on. It is a distinct concern from the macOS runtime's `start`/`stop`/`status` (which govern a running runtime _process_); the request-body trust lifecycle governs the _installed/trusted_ standing of the host on the device. It depends only on the macOS runtime (REP-001) and adds no response-body or request-body rule behavior, only the trust surface those slices pre-condition.
 
 ### Ownership and data flow
 
 `@rogatio/runtime` gains a `trust` module with a `createRequestBodyTrustController` controller and pure helper functions. `@rogatio/cli` extends `rogatio runtime` with `install | uninstall | verify`. Three owned controller operations:
 
-- **install:** register the native-messaging host and provision the device-local CA in a single, **fully transactional** call. Writes the native-messaging host manifest (`com.rogatio.runtime.json`) into the platform native-messaging directory, pointing at the installed runtime host. On Linux that is every Google Chrome or Chromium config directory that can host the file; later checks use the directories recorded at install, not a new scan. On macOS and Windows it is the Google Chrome directory.  then, capability-gated, generates the device-local CA key + certificate (reusing an existing pair only when both files are regular files, the certificate is a CA, and the key can sign as that certificate's private key; on POSIX the key must also be mode `0600` and owned by the current user), writes them under the install root with the private key mode `0600` on POSIX, and invokes the platform-native `caTrustInstaller` to record the CA in the OS trust store. When that install replaces an older certificate, and the previous file is a regular file whose certificate is the Rogatio Request-Body CA, that certificate is saved as `.rogatio-ca.previous.crt` (mode `0600` on POSIX) before the live file is replaced. macOS then removes the previous anchor with argv-only `security remove-trusted-cert -d <certificate>` and `security delete-certificate -Z <sha1>`, and Windows removes it with argv-only `certutil -delstore Root <sha1>`. The saved copy is deleted after that removal attempt. A saved certificate whose fingerprint differs from the certificate that remains installed is removed before that copy is replaced, including when the stored CA is reused. Failure to remove the previous anchor is reported and does not fail the install. Linux replaces the certificate file and rebuilds the bundle. There is no partial-success state: when the manifest capability or the CA-trust capability is missing, or when the OS trust installer fails, the manifest is rolled back and the call returns `unsupported`. A fresh install removes only the CA files whose writes completed. The new CA files are removed only when `.rogatio-ca.previous.crt` still validates as the replaced certificate, the new certificate write finished, and the live file is a different certificate. If that copy is missing, the live CA files stay. A reusable CA is left unchanged when the installer fails. If the new certificate is not written, including when the live file is not that CA, a saved key or public certificate is written back, and a file this attempt replaced without a saved copy is removed. Before any previous anchor is removed or `.rogatio-ca.previous.crt` is written, a regular certificate, key, or public file that could not be read is left in place. A readable certificate that is not the Rogatio CA is still replaced. When the copy is kept, the next successful install can still remove that anchor. The CLI prints `trust unsupported: <reasons>` with a per-reason remediation hint and **exits 1**; the user re-runs with elevated privileges. On success it returns `installed` and the CLI prints `runtime install complete: manifest + device-local CA trusted + runtime-host wrapper created` and exits 0. Idempotent across repeated calls with the same extension ID. Install uses the release extension ID derived from the public `key` in the extension manifest. `--extension-id` is only for development (a local unpacked build without the release key) and for forks. Release users never need it. CA trust needs root/admin privileges per platform: Linux `sudo`, macOS login-keychain authorization, Windows Administrator.
+- **install:** register the native-messaging host and provision the device-local CA in a single, **fully transactional** call. Writes the native-messaging host manifest (`com.rogatio.runtime.json`) into the platform native-messaging directory, pointing at the installed runtime host. On Linux that is every Google Chrome or Chromium config directory that can host the file; later checks use the directories recorded at install, not a new scan. On macOS and Windows it is the Google Chrome directory. then, capability-gated, generates the device-local CA key + certificate (reusing an existing pair only when both files are regular files, the certificate is a CA, and the key can sign as that certificate's private key; on POSIX the key must also be mode `0600` and owned by the current user), writes them under the install root with the private key mode `0600` on POSIX, and invokes the platform-native `caTrustInstaller` to record the CA in the OS trust store. When that install replaces an older certificate, and the previous file is a regular file whose certificate is the Rogatio Request-Body CA, that certificate is saved as `.rogatio-ca.previous.crt` (mode `0600` on POSIX) before the live file is replaced. macOS then removes the previous anchor with argv-only `security remove-trusted-cert -d <certificate>` and `security delete-certificate -Z <sha1>`, and Windows removes it with argv-only `certutil -delstore Root <sha1>`. The saved copy is deleted after that removal attempt. A saved certificate whose fingerprint differs from the certificate that remains installed is removed before that copy is replaced, including when the stored CA is reused. Failure to remove the previous anchor is reported and does not fail the install. Linux replaces the certificate file and rebuilds the bundle. There is no partial-success state: when the manifest capability or the CA-trust capability is missing, or when the OS trust installer fails, the manifest is rolled back and the call returns `unsupported`. A fresh install removes only the CA files whose writes completed. The new CA files are removed only when `.rogatio-ca.previous.crt` still validates as the replaced certificate, the new certificate write finished, and the live file is a different certificate. If that copy is missing, the live CA files stay. A reusable CA is left unchanged when the installer fails. If the new certificate is not written, including when the live file is not that CA, a saved key or public certificate is written back, and a file this attempt replaced without a saved copy is removed. Before any previous anchor is removed or `.rogatio-ca.previous.crt` is written, a regular certificate, key, or public file that could not be read is left in place. A readable certificate that is not the Rogatio CA is still replaced. When the copy is kept, the next successful install can still remove that anchor. The CLI prints `trust unsupported: <reasons>` with a per-reason remediation hint and **exits 1**; the user re-runs with elevated privileges. On success it returns `installed` and the CLI prints `runtime install complete: manifest + device-local CA trusted + runtime-host wrapper created` and exits 0. Idempotent across repeated calls with the same extension ID. Install uses the release extension ID derived from the public `key` in the extension manifest. `--extension-id` is only for development (a local unpacked build without the release key) and for forks. Release users never need it. CA trust needs root/admin privileges per platform: Linux `sudo`, macOS login-keychain authorization, Windows Administrator.
 - **uninstall:** remove the native-messaging host manifest, the three device-local CA files (`caKeyFile`, `caPubFile`, `caCertFile`) under the install root, and the OS trust-store trust installation via the capability-provided `caTrustRemover` when present. Unconditional on capabilities and idempotent across repeated calls (no-op exit-0 once the manifest and CA are gone). Returns `runtime uninstall complete: manifest + device-local CA removed` on success. The store removal runs when the CA key file is present, or when `.rogatio-ca-store-pending` remains from a failed removal. It is skipped only when neither is present. On Debian and Ubuntu, removal is argv-only `sudo rm -f /usr/local/share/ca-certificates/rogatio-ca.crt` followed by `sudo update-ca-certificates`, including when that source file is already absent. Certificate bytes are never placed on the command line. A non-zero exit throws `TrustError` (`ca-store-unwritable` or `elevation-required`), `uninstall` returns `unsupported`, the pending marker stays, and the CLI exits 1 without printing `runtime uninstall complete`. The next uninstall calls the remover again. p11-kit removal stays argv-only `sudo rm -f` of the anchors file plus `sudo update-ca-trust`. A saved `.rogatio-ca.previous.crt` that validates as the Rogatio Request-Body CA is removed by fingerprint when the key is absent or its fingerprint differs from the live certificate, and uninstall fails if that removal throws. The copy is deleted after the removal. A symlink or other certificate at that path is left in place.
 - **status:** report `{ installed, trusted, platform, capabilityReasons }` without side effects; reads the manifest (present + well-formed) and the CA trust standing. It never leaks paths, key material, or platform tooling text.
 
@@ -503,6 +503,7 @@ rogatio edit [path]
 ```
 
 ### Security Boundaries
+
 - Server binds only to `127.0.0.1` (never `0.0.0.0`)
 - CSRF token required for mutating endpoints (`/api/save`, `/api/cancel`, `/api/dry-run`, `/api/doctor`, `/api/ai/complete`, `/api/ai/stream`, `/api/ai/assist`)
 - No authentication (local-only, short-lived)
@@ -511,6 +512,7 @@ rogatio edit [path]
 - No other network requests except browser launch and optional AI provider calls the user configured
 
 ### Error Handling
+
 - Schema validation errors → structured diagnostics
 - Compiler diagnostics → included in verify output
 - IO errors → exit code 2 with stderr message
@@ -518,6 +520,7 @@ rogatio edit [path]
 - Port conflict → no retry. A fixed `--port` that cannot be bound fails with exit 2; the default path asks the OS for an ephemeral port (port 0) because random high ports can land on WHATWG/undici blocked ports that `fetch()` rejects
 
 ### Testing Seams
+
 - HTTP server: unit test with `fetch` against running server
 - Edit command: integration test with temp file, mock browser launch
 - Verify command: unit test with various valid/invalid inputs
@@ -526,26 +529,26 @@ rogatio edit [path]
 
 ## Decisions
 
-| Decision | Rationale |
-|----------|-----------|
-| HTTP server + browser for `edit` | Shares editor code with extension; no Electron dependency |
-| `127.0.0.1` binding | Prevents LAN exposure; matches runtime server pattern |
-| CSRF token | Mitigates localhost CSRF from malicious pages |
-| Atomic file write | Prevents corruption on crash/kill |
-| Random port | Avoids conflicts; no config needed |
-| Minimal deps (stdlib only) | Faster install; smaller attack surface; matches repo philosophy |
-| Exit codes for verify | Scriptable CI/CD integration |
-| JSON output option | Machine-readable for tooling |
+| Decision                         | Rationale                                                       |
+| -------------------------------- | --------------------------------------------------------------- |
+| HTTP server + browser for `edit` | Shares editor code with extension; no Electron dependency       |
+| `127.0.0.1` binding              | Prevents LAN exposure; matches runtime server pattern           |
+| CSRF token                       | Mitigates localhost CSRF from malicious pages                   |
+| Atomic file write                | Prevents corruption on crash/kill                               |
+| Random port                      | Avoids conflicts; no config needed                              |
+| Minimal deps (stdlib only)       | Faster install; smaller attack surface; matches repo philosophy |
+| Exit codes for verify            | Scriptable CI/CD integration                                    |
+| JSON output option               | Machine-readable for tooling                                    |
 
 ## Rejected Alternatives
 
-| Alternative | Reason |
-|-------------|--------|
-| Electron/Tauri | Heavy binary; contradicts "npm package" distribution |
-| Terminal UI (ink) | Editor is DOM-based; would require rewrite |
-| WebSocket for editor comms | HTTP sufficient; simpler; no WS dependency |
-| Fixed port | Conflicts common; random + open browser is UX standard |
-| Long-lived server | Edit is single-session; no need for daemon |
+| Alternative                | Reason                                                 |
+| -------------------------- | ------------------------------------------------------ |
+| Electron/Tauri             | Heavy binary; contradicts "npm package" distribution   |
+| Terminal UI (ink)          | Editor is DOM-based; would require rewrite             |
+| WebSocket for editor comms | HTTP sufficient; simpler; no WS dependency             |
+| Fixed port                 | Conflicts common; random + open browser is UX standard |
+| Long-lived server          | Edit is single-session; no need for daemon             |
 
 ## Offline Dry-Run / Test Feature
 
@@ -657,16 +660,16 @@ rogatio test / POST /api/dry-run / extension dry-run
 
 ### Acceptance Criteria Coverage
 
-| AC | Description | Test |
-|----|-------------|------|
-| AC-001 | Simple match | `dryrun.test.ts` |
-| AC-002 | Three dimensions with states | `dryrun.test.ts` |
+| AC     | Description                        | Test             |
+| ------ | ---------------------------------- | ---------------- |
+| AC-001 | Simple match                       | `dryrun.test.ts` |
+| AC-002 | Three dimensions with states       | `dryrun.test.ts` |
 | AC-003 | Invalid case → dryrun.invalid-case | `dryrun.test.ts` |
-| AC-004 | Invalid URL → dryrun.invalid-url | `dryrun.test.ts` |
-| AC-005 | Default maxCases 256 | `dryrun.test.ts` |
-| AC-006 | Configurable maxCases | `dryrun.test.ts` |
-| AC-007 | Summary counts | `dryrun.test.ts` |
-| AC-008 | previewAction seam | `dryrun.test.ts` |
+| AC-004 | Invalid URL → dryrun.invalid-url   | `dryrun.test.ts` |
+| AC-005 | Default maxCases 256               | `dryrun.test.ts` |
+| AC-006 | Configurable maxCases              | `dryrun.test.ts` |
+| AC-007 | Summary counts                     | `dryrun.test.ts` |
+| AC-008 | previewAction seam                 | `dryrun.test.ts` |
 
 ### Open Questions Resolved
 
@@ -676,7 +679,7 @@ rogatio test / POST /api/dry-run / extension dry-run
 
 ## Redirect Rules (action slice)
 
-Redirect rules are the first *action* slice introducing a browser-side effect. It adds the rule-type
+Redirect rules are the first _action_ slice introducing a browser-side effect. It adds the rule-type
 discriminant `type: "redirect"`, the redirect payload, and translates it to Chrome DNR
 `redirect` rules.
 
@@ -817,16 +820,16 @@ plan or code may rely on them until that gate passes.
 
 The request-body rules extend the existing package boundaries without turning the runtime foundation into a forward proxy:
 
-| Package | Request-body-rule responsibility | Request-body rules do not own |
-| --- | --- | --- |
-| `@rogatio/schema` | Version-1 rule and exact-local-origin validation | Network, proxy, credentials |
-| `@rogatio/compiler` | Detached ordered `RequestBodyOperation` values | Chrome, TLS, persistence |
-| `@rogatio/browser-core` | Generic enablement, permission, and status seams | Native messaging, body bytes |
-| `@rogatio/editor` | Request-body fields and project local-origin fields | Runtime or filesystem access |
-| `@rogatio/extension` | Chrome metadata, policy session, PAC, markers, lifecycle | Request bodies, TLS, upstream forwarding |
-| `@rogatio/runtime` | Policy validation, authority, loopback listener, transform, forwarding | Browser storage and editor state |
-| The request-body-trust layer | Native-host manifest and X.509 CA trust lifecycle | Request transformation |
-| `@rogatio/cli` | Offline validation/edit/test and explicit trust/install diagnostics | Ownership of live browser sessions |
+| Package                      | Request-body-rule responsibility                                       | Request-body rules do not own            |
+| ---------------------------- | ---------------------------------------------------------------------- | ---------------------------------------- |
+| `@rogatio/schema`            | Version-1 rule and exact-local-origin validation                       | Network, proxy, credentials              |
+| `@rogatio/compiler`          | Detached ordered `RequestBodyOperation` values                         | Chrome, TLS, persistence                 |
+| `@rogatio/browser-core`      | Generic enablement, permission, and status seams                       | Native messaging, body bytes             |
+| `@rogatio/editor`            | Request-body fields and project local-origin fields                    | Runtime or filesystem access             |
+| `@rogatio/extension`         | Chrome metadata, policy session, PAC, markers, lifecycle               | Request bodies, TLS, upstream forwarding |
+| `@rogatio/runtime`           | Policy validation, authority, loopback listener, transform, forwarding | Browser storage and editor state         |
+| The request-body-trust layer | Native-host manifest and X.509 CA trust lifecycle                      | Request transformation                   |
+| `@rogatio/cli`               | Offline validation/edit/test and explicit trust/install diagnostics    | Ownership of live browser sessions       |
 
 The runtime-foundation GET/HEAD authorization, the mock rules, and the response-body rules remain separate.
 The response-body rules may use the shared live provider seam, but the request-body rules must not widen the runtime-foundation transport to carry
@@ -1157,7 +1160,6 @@ packed tarballs, and the real extension service worker.
    and MV3 artifact hygiene remain enforced by `scripts/validate.ts`.
 
 3. **Selenium headless browser journeys (`test/browser/`, Chrome for Testing):**
-
    - **CLI `edit` journey:** the real built CLI process serves the editor; a headless
      Chrome for Testing page edits a project, validates, saves, and the file is verified on disk and
      the server shuts down.
@@ -1232,6 +1234,7 @@ native-messaging host instead of a separate CLI HTTP server. One process serves 
 runtime need (spec REQ-001).
 
 ### Components affected (this pass)
+
 - `packages/runtime/src/`: removed `server.ts` (F6 HTTP mock/pair server); `mock.ts` now
   renders bytes for envelope transport; `envelope.ts` allows base64 `mockBody` only on
   `mock.response`; `lifecycle.ts` integrates pair/authorize/mock dispatch and starts
@@ -1265,6 +1268,7 @@ runtime need (spec REQ-001).
   status line reports the current phase next to the Start/Stop controls.
 
 ### Components affected (follow-up, NOT in this pass)
+
 - `packages/extension/src/mock-runtime.ts`: the HTTP `fetchMockConnection`/`DEFAULT_MOCK_PORT`
   path is now dead (legacy fallback only); `createMockConnectionHolder` is retained as the
   connection holder.
@@ -1272,6 +1276,7 @@ runtime need (spec REQ-001).
   supersedes them by scope).
 
 ### Protocol design
+
 Only stdio native-messaging (`f14-v1` extended). New envelope message types:
 `pair.request`, `pair.response`, `authorize.request`, `authorize.response`,
 `mock.connect`, `mock.request`, `mock.response`. Pair/auth reuse the F6 capability (random
@@ -1279,6 +1284,7 @@ token) + preset digest authorization within the envelope handshake. Mock respons
 base64 `mockBody` field (max 64KB, `ENVELOPE_MAX_BYTES`).
 
 ### Security boundaries (unified)
+
 - Pairing capability + preset digest authorizes the session.
 - Authority revalidation (`revalidateAuthority`) applies to all transforms (mock + body +
   header).
@@ -1288,7 +1294,7 @@ base64 `mockBody` field (max 64KB, `ENVELOPE_MAX_BYTES`).
 - The native host starts unconditionally (no `unsupported` state from adapter absence).
 
 ### State transitions
+
 - Native host: `idle` → `running` (start) → `stopped` (stop). No `unsupported` state.
 - Extension service-worker: mock discovery and control both run through the single native
   host (the HTTP mock server is removed); phase states remain for status reporting.
-

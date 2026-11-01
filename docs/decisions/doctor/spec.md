@@ -51,14 +51,14 @@ Project validation is `diagnoseProjectData` in `@rogatio/runtime` (schema, then 
 
 Checks always run, in this order, even after an earlier failure. `id` values are stable.
 
-| Order | id | Title | Required |
-| --- | --- | --- | --- |
-| 1 | `node` | Node and CLI | yes |
-| 2 | `project` | Project file | yes |
-| 3 | `host` | Native host | yes |
-| 4 | `ca` | Device CA | yes |
-| 5 | `pac` | Runtime PAC | yes |
-| 6 | `ai` | AI Assist | no (`optional: true`) |
+| Order | id        | Title        | Required              |
+| ----- | --------- | ------------ | --------------------- |
+| 1     | `node`    | Node and CLI | yes                   |
+| 2     | `project` | Project file | yes                   |
+| 3     | `host`    | Native host  | yes                   |
+| 4     | `ca`      | Device CA    | yes                   |
+| 5     | `pac`     | Runtime PAC  | yes                   |
+| 6     | `ai`      | AI Assist    | no (`optional: true`) |
 
 Status is `pass`, `warn`, or `fail`. A required `fail` makes the process exit 1. A `warn` does not. The AI check is the only optional check. A newer CLI release is a `warn` on `node`, not a failure.
 
@@ -76,24 +76,24 @@ Status is `pass`, `warn`, or `fail`. A required `fail` makes the process exit 1.
 
 The CLI reads `[path]`, defaulting to `./.rogatio.json`. The read uses the same JSON-file storage as `verify`, including v1 migration. Doctor does not read stdin.
 
-| Read result | Summary | Fix |
-| --- | --- | --- |
-| missing | `Project file not found: <path>` | `rogatio edit <path>` |
-| not JSON, or JSON that is not an object | `Project file is not JSON: <path>` | `rogatio edit <path>` |
-| unreadable | `Project file could not be read: <path>` | `rogatio edit <path>` |
-| schema or compiler diagnostics | `Project file is invalid: <path>` plus the verify lines `path: message (code)` | `rogatio verify <path>` |
-| valid | `Project file is valid: <path>` | none |
+| Read result                             | Summary                                                                        | Fix                     |
+| --------------------------------------- | ------------------------------------------------------------------------------ | ----------------------- |
+| missing                                 | `Project file not found: <path>`                                               | `rogatio edit <path>`   |
+| not JSON, or JSON that is not an object | `Project file is not JSON: <path>`                                             | `rogatio edit <path>`   |
+| unreadable                              | `Project file could not be read: <path>`                                       | `rogatio edit <path>`   |
+| schema or compiler diagnostics          | `Project file is invalid: <path>` plus the verify lines `path: message (code)` | `rogatio verify <path>` |
+| valid                                   | `Project file is valid: <path>`                                                | none                    |
 
 Paths that are not a bare shell word are wrapped in POSIX single quotes. At most 20 diagnostics are included.
 
 The native host does not accept a path. It validates the active project object on the envelope, with the same `diagnoseProjectData` function.
 
-| Active project | Summary | Fix |
-| --- | --- | --- |
+| Active project                                  | Summary                                                             | Fix              |
+| ----------------------------------------------- | ------------------------------------------------------------------- | ---------------- |
 | omitted because it does not fit in the envelope | `The active project is too large to check through the native host.` | `rogatio doctor` |
-| absent | `No active project.` | `rogatio edit` |
-| invalid | `Active project is invalid.` plus the same diagnostic lines | `rogatio edit` |
-| valid | `Active project is valid.` | none |
+| absent                                          | `No active project.`                                                | `rogatio edit`   |
+| invalid                                         | `Active project is invalid.` plus the same diagnostic lines         | `rogatio edit`   |
+| valid                                           | `Active project is valid.`                                          | none             |
 
 A validator throw becomes `Project file could not be checked.` The thrown message is not copied into the report.
 
@@ -101,17 +101,17 @@ A validator throw becomes `Project file could not be checked.` The thrown messag
 
 This is `createInstalledTrustController().verify()`, the same controller as `rogatio runtime verify`, plus `extensionOriginListed` from the stable-extension-id work (#263). The first matching row wins.
 
-| Condition | Summary | Fix |
-| --- | --- | --- |
-| verify throws | `Native host could not be checked.` | `rogatio runtime install` |
-| extension id is not 32 characters from `a` through `p` | `Extension ID is not a Chrome extension ID.` | `rogatio runtime install` |
-| manifest missing | `Native host manifest was not found.` | `rogatio runtime install` |
-| manifest invalid | `Native host manifest is invalid.` | `rogatio runtime install` |
-| `runtime-host` wrapper missing | `runtime-host wrapper was not found.` | `rogatio runtime install` |
-| wrapper not executable | `runtime-host wrapper is not executable.` | `rogatio runtime install` |
-| no `allowed_origins` | `Native host manifest has no allowed_origins.` | `rogatio runtime install` |
-| origins omit the id | `Extension ID <id> is not in the host manifest allowed_origins.` | `extensionIdInstallCommand(id)` |
-| match | `allowed_origins includes chrome-extension://<id>/` | none |
+| Condition                                              | Summary                                                          | Fix                             |
+| ------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------- |
+| verify throws                                          | `Native host could not be checked.`                              | `rogatio runtime install`       |
+| extension id is not 32 characters from `a` through `p` | `Extension ID is not a Chrome extension ID.`                     | `rogatio runtime install`       |
+| manifest missing                                       | `Native host manifest was not found.`                            | `rogatio runtime install`       |
+| manifest invalid                                       | `Native host manifest is invalid.`                               | `rogatio runtime install`       |
+| `runtime-host` wrapper missing                         | `runtime-host wrapper was not found.`                            | `rogatio runtime install`       |
+| wrapper not executable                                 | `runtime-host wrapper is not executable.`                        | `rogatio runtime install`       |
+| no `allowed_origins`                                   | `Native host manifest has no allowed_origins.`                   | `rogatio runtime install`       |
+| origins omit the id                                    | `Extension ID <id> is not in the host manifest allowed_origins.` | `extensionIdInstallCommand(id)` |
+| match                                                  | `allowed_origins includes chrome-extension://<id>/`              | none                            |
 
 `extensionIdInstallCommand` is `rogatio runtime install` for the release id and `rogatio runtime install --extension-id <id>` otherwise. Release users never pass `--extension-id`. The flag is only for development (a local unpacked build without the release key) and for forks.
 
@@ -138,18 +138,18 @@ The error text from the socket is not copied into the report.
 
 This is the Hello completion `rogatio ai test` sends, with a 10000ms abort. It runs only when a provider config file exists. The provider's error text and the API key are not copied into the report.
 
-| Result | Status | Summary | Fix |
-| --- | --- | --- | --- |
-| no config | `warn` | `Optional. No AI provider is configured.` | `rogatio ai setup` |
-| config, no answer | `warn` | `Optional. The configured AI provider did not respond.` | `rogatio ai test` |
-| answer | `pass` | `AI provider responded.` | none |
+| Result            | Status | Summary                                                 | Fix                |
+| ----------------- | ------ | ------------------------------------------------------- | ------------------ |
+| no config         | `warn` | `Optional. No AI provider is configured.`               | `rogatio ai setup` |
+| config, no answer | `warn` | `Optional. The configured AI provider did not respond.` | `rogatio ai test`  |
+| answer            | `pass` | `AI provider responded.`                                | none               |
 
 ## 5. Network
 
-| Call | When |
-| --- | --- |
+| Call                                    | When                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------- |
 | npm registry `GET /@rogatio/cli/latest` | `--check-updates` only, and only when Node and the CLI version are usable |
-| configured AI provider chat completion | a provider config file exists |
+| configured AI provider chat completion  | a provider config file exists                                             |
 
 No telemetry. No call on a timer. The extension sets `checkUpdates` to false, so **Run checks** does not contact the registry. It does contact a configured AI provider, because that check is part of doctor.
 
@@ -192,11 +192,11 @@ The title column is the table in section 4. Usage errors go to stderr and do not
 
 ## 8. Exit codes
 
-| Code | Meaning |
-| --- | --- |
-| 0 | Every required check passed. Warnings are allowed. |
-| 1 | One or more required checks failed. |
-| 2 | Usage error: unknown flag, extra path, or a bad `--extension-id`. No report is printed. |
+| Code | Meaning                                                                                 |
+| ---- | --------------------------------------------------------------------------------------- |
+| 0    | Every required check passed. Warnings are allowed.                                      |
+| 1    | One or more required checks failed.                                                     |
+| 2    | Usage error: unknown flag, extra path, or a bad `--extension-id`. No report is printed. |
 
 `--help` exits 0.
 

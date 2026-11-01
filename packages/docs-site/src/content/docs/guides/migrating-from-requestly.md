@@ -1,4 +1,5 @@
 ---
+
 title: Migrating from Requestly
 description: Turn a Requestly rule export into a Rogatio project with rogatio import requestly.
 ---
@@ -24,15 +25,15 @@ rogatio import requestly requestly-export.json --merge
 
 ## What is imported
 
-| Requestly rule | Rogatio rule |
-| --- | --- |
-| Redirect to an absolute http(s) URL | Redirect. `$1`–`$9` in the destination become `\1`–`\9`. |
-| Replace, when the text to replace is a fixed part of an http(s) URL | Redirect that substitutes the first literal occurrence. |
-| Query parameter add or remove | Query parameter set or remove. |
-| Header add, remove, or modify | One header rule per modification. |
-| User agent | Request header `User-Agent`. |
-| Static request body | Request-body replace, for `xmlhttprequest` and `POST`, `PUT`, or `PATCH`. |
-| Static response body | Response-body replace. Rogatio still fetches the upstream response and keeps its status and headers. |
+| Requestly rule                                                      | Rogatio rule                                                                                         |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Redirect to an absolute http(s) URL                                 | Redirect. `$1`–`$9` in the destination become `\1`–`\9`.                                             |
+| Replace, when the text to replace is a fixed part of an http(s) URL | Redirect that substitutes the first literal occurrence.                                              |
+| Query parameter add or remove                                       | Query parameter set or remove.                                                                       |
+| Header add, remove, or modify                                       | One header rule per modification.                                                                    |
+| User agent                                                          | Request header `User-Agent`.                                                                         |
+| Static request body                                                 | Request-body replace, for `xmlhttprequest` and `POST`, `PUT`, or `PATCH`.                            |
+| Static response body                                                | Response-body replace. Rogatio still fetches the upstream response and keeps its status and headers. |
 
 Requestly source operators (`Equals`, `Contains`, `Wildcard`, `Matches`) are
 lowered to a Rogatio regular expression. A host condition that is a literal

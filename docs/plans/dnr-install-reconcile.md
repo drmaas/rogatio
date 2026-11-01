@@ -39,11 +39,11 @@ After MV3 service-worker restart, Workspace status for redirect, query, and head
 
 ### Locked ADRs
 
-| ADR | Choice |
-| --- | --- |
-| [0008](../../adrs/0008-reuse-match-index-for-install-identity.md) | Reuse `rogatio.matchLogging.index` as `numericId → ruleId`. No sibling key. Compiled project supplies operations. |
-| [0009](../../adrs/0009-unified-dnr-reconciler-kind-scoped-bands.md) | One reconciler; kind-scoped bands; fail closed if live set unreadable. |
-| [0010](../../adrs/0010-dnr-install-diagnostics-fill.md) | Fill existing `install` diagnostics; overlay `extension.dnr-error`; no adapter / core-code change. |
+| ADR                                                                 | Choice                                                                                                            |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [0008](../../adrs/0008-reuse-match-index-for-install-identity.md)   | Reuse `rogatio.matchLogging.index` as `numericId → ruleId`. No sibling key. Compiled project supplies operations. |
+| [0009](../../adrs/0009-unified-dnr-reconciler-kind-scoped-bands.md) | One reconciler; kind-scoped bands; fail closed if live set unreadable.                                            |
+| [0010](../../adrs/0010-dnr-install-diagnostics-fill.md)             | Fill existing `install` diagnostics; overlay `extension.dnr-error`; no adapter / core-code change.                |
 
 ### Public API / wire-format
 
@@ -54,13 +54,13 @@ After MV3 service-worker restart, Workspace status for redirect, query, and head
 
 Map to product intent A–D. Stay inside extension + tests.
 
-| Phase | Intent | Deliverable |
-| --- | --- | --- |
-| **P1 (A)** | Remove via Chrome ∩ Rogatio ids | Live Chrome ids ∩ owned bands; fail closed if live set unreadable; no empty-remove-then-duplicate-add after restart. **TDD first:** empty `tracked` + Chrome-held ids in `dnr.test.ts`. |
-| **P2 (B)** | `current()` / installed ids survive restart | ADR 0008 join (Chrome ∩ index ∩ compiled). Hydrate; do not rebuild ops from index. **TDD first:** empty `tracked` + Chrome-held ids + seeded index. |
-| **P3a (C)** | Fold headers | Same reconciler for header remove/install/`installedRuleIds` as redirect/query. Unit: unified path + empty `tracked` + Chrome-held header ids (`2_000_001+`). |
-| **P3b (C)** | Shared diagnostics + attention | ADR 0010: total-fail diagnostics + Workspace overlay for all DNR kinds; attention drops primary re-activate/restart-runtime for this class; no unproven reload string. |
-| **P4 (D)** | Browser journey | New focused test (not bolted onto `sample-basic-live`). Seed grants → import/enable sample → baseline `statusFor` → CDP SW stop proven dead → reopen Workspace → DNR `active`, body `needs runtime`. |
+| Phase       | Intent                                      | Deliverable                                                                                                                                                                                          |
+| ----------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P1 (A)**  | Remove via Chrome ∩ Rogatio ids             | Live Chrome ids ∩ owned bands; fail closed if live set unreadable; no empty-remove-then-duplicate-add after restart. **TDD first:** empty `tracked` + Chrome-held ids in `dnr.test.ts`.              |
+| **P2 (B)**  | `current()` / installed ids survive restart | ADR 0008 join (Chrome ∩ index ∩ compiled). Hydrate; do not rebuild ops from index. **TDD first:** empty `tracked` + Chrome-held ids + seeded index.                                                  |
+| **P3a (C)** | Fold headers                                | Same reconciler for header remove/install/`installedRuleIds` as redirect/query. Unit: unified path + empty `tracked` + Chrome-held header ids (`2_000_001+`).                                        |
+| **P3b (C)** | Shared diagnostics + attention              | ADR 0010: total-fail diagnostics + Workspace overlay for all DNR kinds; attention drops primary re-activate/restart-runtime for this class; no unproven reload string.                               |
+| **P4 (D)**  | Browser journey                             | New focused test (not bolted onto `sample-basic-live`). Seed grants → import/enable sample → baseline `statusFor` → CDP SW stop proven dead → reopen Workspace → DNR `active`, body `needs runtime`. |
 
 P3a→P3b stay one product intent (C); split only so each slice stays ≤~8 tasks. Stacked PR option may cut after P3a or after P3b.
 
@@ -70,29 +70,29 @@ P3a→P3b stay one product intent (C); split only so each slice stays ≤~8 task
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| Third durable map (over-engineering) | ADR 0008: reuse match index only. |
-| `current()` rebuilds ops from index | Forbidden (0003/0008); join compiled project this turn. |
-| `getDynamicRules` throw treated as `[]` | ADR 0009: fail closed; do not empty-remove then add. |
-| Cross-band remove | ADR 0009 bands; tests for both. |
-| Partial-add `ok: true` hides Chrome reasons | ADR 0010: overlay per-rule `extension.dnr-error`; do not flip `ok: false`. |
-| `ok: false` on partial → InstallService rollback | ADR 0010: `ok: false` only when zero desired rules landed. |
-| Touching browser-core status formulas | Out of scope unless documented tiny plumbing. |
-| Oversized “god reconciler” | Fold headers by call-path; no unrelated dnr.ts cleanup. |
-| Unproven “reload extension” copy | Automatic reconcile first; change attention only after behavior works. |
+| Risk                                             | Mitigation                                                                 |
+| ------------------------------------------------ | -------------------------------------------------------------------------- |
+| Third durable map (over-engineering)             | ADR 0008: reuse match index only.                                          |
+| `current()` rebuilds ops from index              | Forbidden (0003/0008); join compiled project this turn.                    |
+| `getDynamicRules` throw treated as `[]`          | ADR 0009: fail closed; do not empty-remove then add.                       |
+| Cross-band remove                                | ADR 0009 bands; tests for both.                                            |
+| Partial-add `ok: true` hides Chrome reasons      | ADR 0010: overlay per-rule `extension.dnr-error`; do not flip `ok: false`. |
+| `ok: false` on partial → InstallService rollback | ADR 0010: `ok: false` only when zero desired rules landed.                 |
+| Touching browser-core status formulas            | Out of scope unless documented tiny plumbing.                              |
+| Oversized “god reconciler”                       | Fold headers by call-path; no unrelated dnr.ts cleanup.                    |
+| Unproven “reload extension” copy                 | Automatic reconcile first; change attention only after behavior works.     |
 
 ## Acceptance criteria
 
-| ID | Criterion | Phase | Tests |
-| --- | --- | --- | --- |
-| AC1 | Post-restart install remove uses Chrome ∩ Rogatio ids; no duplicate-id failure when Chrome still holds desired rules. | P1 | **TDD:** `packages/extension/test/dnr.test.ts` — new installer (empty `tracked`), `getDynamicRules` returns Chrome-held desired numeric ids → remove set includes those ids; `install` `ok: true` (no duplicate-id). |
-| AC2 | After SW restart, reported `installedRuleIds` / hydrated `current()` include still-present redirect/query (and later header) compiler ids via Chrome ∩ index ∩ compiled (not index-alone ops). | P2 | **TDD:** same empty-`tracked` + Chrome-held setup + seeded `rogatio.matchLogging.index` + compiled ops this turn → `current()` / reported ids non-empty, same compiled op identity. Negatives: no index → not reported (no hash guess); index-only / Chrome-missing → not reported. |
-| AC3 | Header install/remove/`installed` go through same reconciler authority as redirect/query. | P3a | Unit: unified path; empty `tracked` + Chrome-held header ids in `2_000_001+` band. |
-| AC4 | DNR add/update failure surfaces `extension.dnr-error` with Chrome reason when provided (overlay; adapter fill on total fail). Partial success stays `ok: true`. | P3b | Unit: total-fail diagnostics (redirect/query + header); partial-success `ok: true` + overlay reason on failed sibling. |
-| AC5 | Attention does not primary-push re-activate/restart-runtime for false “not installed” when reconcile fixes it; no unproven reload string. | P3b | Unit: extract/test a pure helper (today `attentionFromStatuses` is unexported and closes over page `state`). Must **not** return “Re-activate the group, or restart the native runtime” as primary fix for this class; no “reload the extension” string. |
-| AC6 | Browser: sample → SW restart → redirect, query, header sample rules `active` given prior grants/enablement. | P4 | Browser: `test/browser/dnr-install-reconcile.test.ts`. Observe per-rule via `getExtensionState` + `statusFor` on `rule-redirect`, `rule-query`, `rule-header-set`, `rule-header-remove`. Prove SW death before reopen (see checklist). |
-| AC7 | Body rules remain `needs runtime` until native `started`, then `active`; never DNR-installed. | P4 (+ regression if SW overlay touched earlier) | Same journey: `statusFor` on `rule-response-body`, `rule-request-body` stays `needs runtime`. |
+| ID  | Criterion                                                                                                                                                                                      | Phase                                           | Tests                                                                                                                                                                                                                                                                               |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC1 | Post-restart install remove uses Chrome ∩ Rogatio ids; no duplicate-id failure when Chrome still holds desired rules.                                                                          | P1                                              | **TDD:** `packages/extension/test/dnr.test.ts` — new installer (empty `tracked`), `getDynamicRules` returns Chrome-held desired numeric ids → remove set includes those ids; `install` `ok: true` (no duplicate-id).                                                                |
+| AC2 | After SW restart, reported `installedRuleIds` / hydrated `current()` include still-present redirect/query (and later header) compiler ids via Chrome ∩ index ∩ compiled (not index-alone ops). | P2                                              | **TDD:** same empty-`tracked` + Chrome-held setup + seeded `rogatio.matchLogging.index` + compiled ops this turn → `current()` / reported ids non-empty, same compiled op identity. Negatives: no index → not reported (no hash guess); index-only / Chrome-missing → not reported. |
+| AC3 | Header install/remove/`installed` go through same reconciler authority as redirect/query.                                                                                                      | P3a                                             | Unit: unified path; empty `tracked` + Chrome-held header ids in `2_000_001+` band.                                                                                                                                                                                                  |
+| AC4 | DNR add/update failure surfaces `extension.dnr-error` with Chrome reason when provided (overlay; adapter fill on total fail). Partial success stays `ok: true`.                                | P3b                                             | Unit: total-fail diagnostics (redirect/query + header); partial-success `ok: true` + overlay reason on failed sibling.                                                                                                                                                              |
+| AC5 | Attention does not primary-push re-activate/restart-runtime for false “not installed” when reconcile fixes it; no unproven reload string.                                                      | P3b                                             | Unit: extract/test a pure helper (today `attentionFromStatuses` is unexported and closes over page `state`). Must **not** return “Re-activate the group, or restart the native runtime” as primary fix for this class; no “reload the extension” string.                            |
+| AC6 | Browser: sample → SW restart → redirect, query, header sample rules `active` given prior grants/enablement.                                                                                    | P4                                              | Browser: `test/browser/dnr-install-reconcile.test.ts`. Observe per-rule via `getExtensionState` + `statusFor` on `rule-redirect`, `rule-query`, `rule-header-set`, `rule-header-remove`. Prove SW death before reopen (see checklist).                                              |
+| AC7 | Body rules remain `needs runtime` until native `started`, then `active`; never DNR-installed.                                                                                                  | P4 (+ regression if SW overlay touched earlier) | Same journey: `statusFor` on `rule-response-body`, `rule-request-body` stays `needs runtime`.                                                                                                                                                                                       |
 
 ## Contracts note
 

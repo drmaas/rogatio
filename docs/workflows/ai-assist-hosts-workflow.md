@@ -18,15 +18,15 @@ Audience: agent
 
 ## Models
 
-| Role | Model | Rationale |
-| --- | --- | --- |
-| reasoning | inherit (orchestrator) | explore agents timed out; orchestrator + code evidence |
-| adversarial | cursor-grok-4.6-high-fast | different family; protocol/envelope critique |
-| plan | inherit | same as coding continuity |
-| coding | inherit | implementation |
-| verify | inherit | validate loops |
-| review | composer-2.5-fast | fresh review |
-| docs | inherit | docs-accuracy-sync |
+| Role        | Model                     | Rationale                                              |
+| ----------- | ------------------------- | ------------------------------------------------------ |
+| reasoning   | inherit (orchestrator)    | explore agents timed out; orchestrator + code evidence |
+| adversarial | cursor-grok-4.6-high-fast | different family; protocol/envelope critique           |
+| plan        | inherit                   | same as coding continuity                              |
+| coding      | inherit                   | implementation                                         |
+| verify      | inherit                   | validate loops                                         |
+| review      | composer-2.5-fast         | fresh review                                           |
+| docs        | inherit                   | docs-accuracy-sync                                     |
 
 ## Graphify
 

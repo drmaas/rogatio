@@ -21,7 +21,7 @@ Four problems follow.
 1. The name is authored twice — once in the heading, once in a field — so the
    heading can disagree with the field and the user has to hunt for the field.
 2. Ids are exposed on surfaces where they are noise, and in one case they are
-   the *only* label a user gets: the extension Workspace sidebar prints
+   the _only_ label a user gets: the extension Workspace sidebar prints
    `groupId/ruleId` (`packages/extension/src/extension-page-entry.ts:378`), the
    install-error card prints the same (`:702`), the editor test console prints
    the same (`editor.ts:2030`), and `rogatio test` prints the same
@@ -74,7 +74,7 @@ Out of scope, explicitly.
   require an id to equal `PascalCase(name)`. Enforcing that would reject every
   existing project and every fixture in the repository, all of which use ids
   like `group-one` and `rule-one`. The convention governs what the program
-  *mints*; the schema governs what is *accepted*.
+  _mints_; the schema governs what is _accepted_.
 - N3. The compiler's operation types, the dry-run engine's public types
   (`packages/dry-run/src/types.ts`), and `rogatio test --json` output. Names are
   resolved at each presentation site from data already in hand.
@@ -84,7 +84,7 @@ Out of scope, explicitly.
   Chrome's numeric id (`extension-page-entry.ts:703-708`;
   `test/browser/extension.test.ts:634` pins
   `"Rule with id 2000001 cannot have an empty list"`). Ids are therefore not
-  fully absent from the management page; the guarantee is about *Rogatio's own*
+  fully absent from the management page; the guarantee is about _Rogatio's own_
   identifiers.
 - N6. The dashboard project `ID:` line (`extension-page-entry.ts:874`) and the
   project-id fallbacks used as display names (`:827,1035,542`). Project-level
@@ -385,8 +385,8 @@ Cross-cutting.
   - `deriveEntityId(name, kind, reserved): string` — REQ-023, REQ-027.
   - `normalizeNameKey(name): string` — REQ-024 comparison key.
   - `uniqueName(base, reserved): string` — REQ-029 name selection.
-  `kind` is `"group" | "rule"`. All three treat `reserved` as a mutable set and
-  add what they return, so a caller can allocate repeatedly against one set.
+    `kind` is `"group" | "rule"`. All three treat `reserved` as a mutable set and
+    add what they return, so a caller can allocate repeatedly against one set.
 - **New diagnostic code** `schema.duplicate-name` in
   `packages/compiler/src/types.ts` and `packages/compiler/src/diagnostics.ts`,
   mapped from a new `uniqueName` keyword in

@@ -106,9 +106,7 @@ export type EditorSaveResult =
 export interface EditorOptions {
   readonly root: HTMLElement;
   readonly initialProject: unknown;
-  readonly validate: (
-    value: unknown,
-  ) => readonly EditorDiagnostic[];
+  readonly validate: (value: unknown) => readonly EditorDiagnostic[];
   readonly save: (
     project: EditorProjectSnapshot,
   ) => EditorSaveResult | Promise<EditorSaveResult>;
@@ -130,12 +128,8 @@ export class EditorInitializationError extends Error {
 export interface RuleTypeFieldExtension {
   readonly id: string;
   readonly label: string;
-  readonly matches: (
-    rule: Readonly<Record<string, unknown>>,
-  ) => boolean;
-  readonly mount: (
-    context: RuleTypeFieldContext,
-  ) => RuleTypeFieldMount;
+  readonly matches: (rule: Readonly<Record<string, unknown>>) => boolean;
+  readonly mount: (context: RuleTypeFieldContext) => RuleTypeFieldMount;
   readonly validate: (
     rule: Readonly<Record<string, unknown>>,
     rulePath: string,
@@ -149,10 +143,7 @@ export interface RuleTypeFieldContext {
   readonly getField: (name: string) => unknown;
   readonly setField: (name: string, value: unknown) => void;
   readonly deleteField: (name: string) => void;
-  readonly registerControl: (
-    fieldPath: string,
-    control: HTMLElement,
-  ) => void;
+  readonly registerControl: (fieldPath: string, control: HTMLElement) => void;
 }
 
 export interface RuleTypeFieldMount {

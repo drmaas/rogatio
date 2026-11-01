@@ -107,7 +107,7 @@ Existing schema / editor / runtime / browser-schema replace-body and request-bod
 
 ---
 
-## 4. Editor header/query bounds from `LIMITS` — *marginal*
+## 4. Editor header/query bounds from `LIMITS` — _marginal_
 
 ### Candidate
 
@@ -133,7 +133,7 @@ Existing header/query length tests; optional: one assertion that the input `maxL
 
 ---
 
-## 5. Schema-owned response-body replace vs regex discriminators — *marginal*
+## 5. Schema-owned response-body replace vs regex discriminators — _marginal_
 
 ### Candidate
 
@@ -165,19 +165,19 @@ Schema untagged-regex + tagged-regex + replace cases; runtime `fetchAndRewriteAu
 
 ## Skipped (self-review)
 
-| Idea | Why skip |
-| --- | --- |
-| Shared header/query “operation + hide/clear value” widget | Different models (siblings vs `action.params[]`); header does not remount, query does. Behavior/focus risk. |
-| Shared request-body / response-body mode form | Regex UI differs (one pair vs replacement rows); response-body must preserve untagged `{ replacements }` on edit. Callback soup worse than two files. Candidate 1 covers the only cheap overlap (the `<select>`). |
-| Unify query/response-body validation across schema, editor, browser-schema | Documented split: Ajv + semantic vs editor diagnostics vs MV3 mirror. Merging would pull Ajv into the extension bundle or weaken editor draft messages. |
-| `queryParamOperation(param)` exported from schema | One `?? "set"` line; four call sites by design across packages. Abstraction cost > savings. |
-| Convert `queryRuleType` singleton to `createQueryRuleType()` | Pre-existing; no second instance; churn for hosts/tests. |
-| Compile/save normalize untagged response-body to tagged `mode: "regex"` | Wire-format change, not a refactor. Plan: untagged stays valid. |
-| Delete mock keys from `LIMITS` | Native mock protocol still uses them (`packages/runtime/src/preset.ts`). Plan non-goal. |
-| Import `isForbiddenHeader` into editor header.ts | Pre-existing F11 copy; this feature did not worsen it. Fine follow-up, not high leverage here. |
-| Align body `matches()` to `rule.type` only (like query) | Behavior change for leftover payloads; type-switch already clears via `ACTION_FIELDS`. |
-| Shared test `createMountContext` | Three near-identical helpers; tiny. Fold mechanically if candidate 1 already edits those tests; do not stand alone. |
-| Header `destroy()` no-op `removeEventListener(() => {})` | Pre-existing; empty lambdas never unregister. Fix is a tiny bug, not this feature’s duplication. |
+| Idea                                                                       | Why skip                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shared header/query “operation + hide/clear value” widget                  | Different models (siblings vs `action.params[]`); header does not remount, query does. Behavior/focus risk.                                                                                                       |
+| Shared request-body / response-body mode form                              | Regex UI differs (one pair vs replacement rows); response-body must preserve untagged `{ replacements }` on edit. Callback soup worse than two files. Candidate 1 covers the only cheap overlap (the `<select>`). |
+| Unify query/response-body validation across schema, editor, browser-schema | Documented split: Ajv + semantic vs editor diagnostics vs MV3 mirror. Merging would pull Ajv into the extension bundle or weaken editor draft messages.                                                           |
+| `queryParamOperation(param)` exported from schema                          | One `?? "set"` line; four call sites by design across packages. Abstraction cost > savings.                                                                                                                       |
+| Convert `queryRuleType` singleton to `createQueryRuleType()`               | Pre-existing; no second instance; churn for hosts/tests.                                                                                                                                                          |
+| Compile/save normalize untagged response-body to tagged `mode: "regex"`    | Wire-format change, not a refactor. Plan: untagged stays valid.                                                                                                                                                   |
+| Delete mock keys from `LIMITS`                                             | Native mock protocol still uses them (`packages/runtime/src/preset.ts`). Plan non-goal.                                                                                                                           |
+| Import `isForbiddenHeader` into editor header.ts                           | Pre-existing F11 copy; this feature did not worsen it. Fine follow-up, not high leverage here.                                                                                                                    |
+| Align body `matches()` to `rule.type` only (like query)                    | Behavior change for leftover payloads; type-switch already clears via `ACTION_FIELDS`.                                                                                                                            |
+| Shared test `createMountContext`                                           | Three near-identical helpers; tiny. Fold mechanically if candidate 1 already edits those tests; do not stand alone.                                                                                               |
+| Header `destroy()` no-op `removeEventListener(() => {})`                   | Pre-existing; empty lambdas never unregister. Fix is a tiny bug, not this feature’s duplication.                                                                                                                  |
 
 ---
 

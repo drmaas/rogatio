@@ -49,23 +49,23 @@ When a `request-body` or `response-body` rule’s URL matcher hits a live reques
 
 **Public / wire changes:**
 
-| Surface | Change | Risk |
-| --- | --- | --- |
-| Project schema / `.rogatio.json` | None for redact flag (already optional boolean on rules) | Low — no project wire bump |
-| Match-index storage (`rogatio.matchLogging.index`) | New kinds + body intent shape (local Chrome storage only) | Sanitize unknown kinds fail-closed; not a project file |
-| `ChromeApi` | Session-rule methods (`updateSessionRules` / `getSessionRules`) | Internal adapter; harness-injectable |
-| Runtime proxy markers | Reuse reserved **name** prefix; logging values inert (no rewrite auth) | Must not collide with future #170 capability markers without an explicit join |
-| Editor | Body cards gain checkbox (draft/save already round-trip schema field) | UI only |
-| Native messaging / history | None | — |
+| Surface                                            | Change                                                                 | Risk                                                                          |
+| -------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Project schema / `.rogatio.json`                   | None for redact flag (already optional boolean on rules)               | Low — no project wire bump                                                    |
+| Match-index storage (`rogatio.matchLogging.index`) | New kinds + body intent shape (local Chrome storage only)              | Sanitize unknown kinds fail-closed; not a project file                        |
+| `ChromeApi`                                        | Session-rule methods (`updateSessionRules` / `getSessionRules`)        | Internal adapter; harness-injectable                                          |
+| Runtime proxy markers                              | Reuse reserved **name** prefix; logging values inert (no rewrite auth) | Must not collide with future #170 capability markers without an explicit join |
+| Editor                                             | Body cards gain checkbox (draft/save already round-trip schema field)  | UI only                                                                       |
+| Native messaging / history                         | None                                                                   | —                                                                             |
 
 ### ADR candidates
 
-| Candidate | Choice | Status |
-| --- | --- | --- |
-| Amend ADR 0001 (DNR match signal) | Keep `onRuleMatchedDebug` only; drop “body silent”; URL-match ⇒ attempt-to-rewrite via markers; keep reject native-host match logging | Amended at plan review |
-| Amend ADR 0006 (kind coverage) | Extend coverage to body kinds once markers indexed; probe-gated (cite evidence when Phase 1 lands) | Amended at plan review |
-| Amend ADR 0007 (per-rule redaction) | Body cards get `redactSensitiveInLogs` checkbox (PRD Q3) | Amended at plan review |
-| Amend ADR 0009 (id bands) | Body markers get session band; session DNR for match logging; no cross-store wipe | Amended at plan review |
+| Candidate                           | Choice                                                                                                                                | Status                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| Amend ADR 0001 (DNR match signal)   | Keep `onRuleMatchedDebug` only; drop “body silent”; URL-match ⇒ attempt-to-rewrite via markers; keep reject native-host match logging | Amended at plan review |
+| Amend ADR 0006 (kind coverage)      | Extend coverage to body kinds once markers indexed; probe-gated (cite evidence when Phase 1 lands)                                    | Amended at plan review |
+| Amend ADR 0007 (per-rule redaction) | Body cards get `redactSensitiveInLogs` checkbox (PRD Q3)                                                                              | Amended at plan review |
+| Amend ADR 0009 (id bands)           | Body markers get session band; session DNR for match logging; no cross-store wipe                                                     | Amended at plan review |
 
 ## Phases
 
@@ -131,33 +131,33 @@ Focused extension/editor/browser tests + `pnpm validate`. Optional thin live jou
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
-| **Over-engineering:** full F17 capability-token / proxy auth for logging-only | Logging = DNR set for signal + existing reserved-header strip; no pending-auth map, no rewrite gate, no #170 PAC |
-| Capability leak via marker value | Inert logging values; never embed session capability / digest / rewrite auth; #170 may later replace or join with real capability markers under a separate decision |
-| DNR set + DNR strip dual-assert fail | **Locked:** never ship that pair; runtime strip only |
-| Cross-store / cross-band wipe | Session helper owns body band in session store only; dynamic reconciler unchanged for redirect/query/header (ADR 0009) |
-| Marker leak if strip path missing | Do not install markers without active runtime strip; fail-closed silence |
-| Orphan markers after stop | Remove owned session rules on stop / start-failure; index drop those ids |
-| Index race (dynamic install vs session markers) | Explicit merge on session start/stop; document order |
-| Coupling to #170 | Need strip scaffolding only, not PAC rewrite; lines mean attempt, not rewrite success |
-| Match-index storage shape drift | Sanitize unknown kinds fail-closed (existing pattern) |
-| Response-body probe inconclusive | Both shapes passed §1; keep gates if future probes regress |
+| Risk                                                                          | Mitigation                                                                                                                                                          |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Over-engineering:** full F17 capability-token / proxy auth for logging-only | Logging = DNR set for signal + existing reserved-header strip; no pending-auth map, no rewrite gate, no #170 PAC                                                    |
+| Capability leak via marker value                                              | Inert logging values; never embed session capability / digest / rewrite auth; #170 may later replace or join with real capability markers under a separate decision |
+| DNR set + DNR strip dual-assert fail                                          | **Locked:** never ship that pair; runtime strip only                                                                                                                |
+| Cross-store / cross-band wipe                                                 | Session helper owns body band in session store only; dynamic reconciler unchanged for redirect/query/header (ADR 0009)                                              |
+| Marker leak if strip path missing                                             | Do not install markers without active runtime strip; fail-closed silence                                                                                            |
+| Orphan markers after stop                                                     | Remove owned session rules on stop / start-failure; index drop those ids                                                                                            |
+| Index race (dynamic install vs session markers)                               | Explicit merge on session start/stop; document order                                                                                                                |
+| Coupling to #170                                                              | Need strip scaffolding only, not PAC rewrite; lines mean attempt, not rewrite success                                                                               |
+| Match-index storage shape drift                                               | Sanitize unknown kinds fail-closed (existing pattern)                                                                                                               |
+| Response-body probe inconclusive                                              | Both shapes passed §1; keep gates if future probes regress                                                                                                          |
 
 ## Acceptance criteria
 
-| ID | Criterion | Check how | Checklist |
-| --- | --- | --- | --- |
-| AC1 | Live URL match of request-body or response-body rule emits one `[rogatio]` console line when match logging on | Format + listener tests with body kind indexed; optional live journey in §8 | §4, §5, §8 |
-| AC2 | Same signal, toggle, fail-closed, field/style, redaction as DNR kinds; no native-host match log | Listener fail-closed matrix + redact on body format; code/docs never add native match feed | §4, §5, §7, §8 |
-| AC3 | Line has live URL, method, initiator, resource type + intended mode + ≤200 rewrite text; no live body bytes | `match-format` asserts fields; assert no live `body` / marker values in output | §4, §8 |
-| AC4 | Request-body markers via session DNR (or documented dynamic fallback); response-body only after probe | Probe two asserts; lifecycle skips gated kinds | §1, §3, §8 |
-| AC5 | ADRs/architecture record single pipeline + reject native-host match logging | Doc gate + ADR 0006 probe cite | §7 |
-| AC6 | Post-lookup append seam usable by #204; no history UI | Seam unit test; no history store/UI | §5 |
-| AC7 | Body editor cards expose `redactSensitiveInLogs` | Editor test visible + toggle | §6 |
-| AC8 | New body id band; existing bands not wiped | Helper unit tests: band math + no dynamic wipe | §2, §3 |
-| AC9 | Independent of #170 | Lifecycle/helper tests + review: no PAC, pending-auth, or capability mint | §3, §8 |
-| AC10 | Logging markers inert (no rewrite capability / digest in values); removed on session stop / start-failure | Inert-value assert on built rules; orphan-on-stop + start-failure tests | §1, §2, §3, §8 |
+| ID   | Criterion                                                                                                     | Check how                                                                                  | Checklist      |
+| ---- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------- |
+| AC1  | Live URL match of request-body or response-body rule emits one `[rogatio]` console line when match logging on | Format + listener tests with body kind indexed; optional live journey in §8                | §4, §5, §8     |
+| AC2  | Same signal, toggle, fail-closed, field/style, redaction as DNR kinds; no native-host match log               | Listener fail-closed matrix + redact on body format; code/docs never add native match feed | §4, §5, §7, §8 |
+| AC3  | Line has live URL, method, initiator, resource type + intended mode + ≤200 rewrite text; no live body bytes   | `match-format` asserts fields; assert no live `body` / marker values in output             | §4, §8         |
+| AC4  | Request-body markers via session DNR (or documented dynamic fallback); response-body only after probe         | Probe two asserts; lifecycle skips gated kinds                                             | §1, §3, §8     |
+| AC5  | ADRs/architecture record single pipeline + reject native-host match logging                                   | Doc gate + ADR 0006 probe cite                                                             | §7             |
+| AC6  | Post-lookup append seam usable by #204; no history UI                                                         | Seam unit test; no history store/UI                                                        | §5             |
+| AC7  | Body editor cards expose `redactSensitiveInLogs`                                                              | Editor test visible + toggle                                                               | §6             |
+| AC8  | New body id band; existing bands not wiped                                                                    | Helper unit tests: band math + no dynamic wipe                                             | §2, §3         |
+| AC9  | Independent of #170                                                                                           | Lifecycle/helper tests + review: no PAC, pending-auth, or capability mint                  | §3, §8         |
+| AC10 | Logging markers inert (no rewrite capability / digest in values); removed on session stop / start-failure     | Inert-value assert on built rules; orphan-on-stop + start-failure tests                    | §1, §2, §3, §8 |
 
 ## Contracts
 

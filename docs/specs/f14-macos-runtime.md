@@ -8,8 +8,8 @@
 
 > **Platform boundary (revised):** Activation is **capability-based**, not
 > OS-hard-gated. The runtime activates wherever it can provision a trusted
-> device-local CA and use Chrome PAC routing *without colliding with an
-> existing controlling proxy, PAC, extension, or enterprise policy*. macOS is
+> device-local CA and use Chrome PAC routing _without colliding with an
+> existing controlling proxy, PAC, extension, or enterprise policy_. macOS is
 > the reference supported platform; Linux/Windows may also activate when those
 > capabilities are present. This revises the macOS-only wording in
 > `rogatio-overview.md`.
@@ -220,7 +220,7 @@ successful regex match, or an initiator string as sufficient authority.
   the in-process transform operation.
 - **REQ-022:** Transform intents (`transform-request-meta`,
   `transform-response-meta`) shall carry only bounded metadata and the transform
-  *instruction*; the actual body bytes are processed in-process by the runtime
+  _instruction_; the actual body bytes are processed in-process by the runtime
   and are not placed on the wire.
 - **REQ-023:** A diagnostic sink, if present, shall receive only redacted
   lifecycle/counter events, never bodies, URLs' sensitive parts, capabilities,
@@ -244,13 +244,13 @@ successful regex match, or an initiator string as sufficient authority.
 
 - **REQ-027:** F14 shall export one immutable control-limit profile:
 
-  | Resource | Default |
-  | --- | ---: |
-  | Control envelope bytes | 65,536 |
-  | Envelope count per session | 1,024 |
-  | Max concurrent transforms | 32 |
-  | Revalidation timeout | 5,000 ms |
-  | Max granted origins in PAC | 256 |
+  | Resource                   |  Default |
+  | -------------------------- | -------: |
+  | Control envelope bytes     |   65,536 |
+  | Envelope count per session |    1,024 |
+  | Max concurrent transforms  |       32 |
+  | Revalidation timeout       | 5,000 ms |
+  | Max granted origins in PAC |      256 |
 
 - **REQ-028:** Limits shall be checked before allocation and again while
   streaming; a violation aborts the operation with a stable code.
@@ -269,7 +269,12 @@ successful regex match, or an initiator string as sufficient authority.
 ## Public API And Data Contracts
 
 ```ts
-export type RuntimeActivation = "stopped" | "starting" | "started" | "stopping" | "unsupported";
+export type RuntimeActivation =
+  | "stopped"
+  | "starting"
+  | "started"
+  | "stopping"
+  | "unsupported";
 
 export interface RuntimeStatus {
   readonly activation: RuntimeActivation;
@@ -278,14 +283,14 @@ export interface RuntimeStatus {
 }
 
 export interface AuthorityContext {
-  readonly project: unknown;          // validated F2 RogatioProject
-  readonly operation: unknown;        // compiled F3 MatcherOperation for group/rule
+  readonly project: unknown; // validated F2 RogatioProject
+  readonly operation: unknown; // compiled F3 MatcherOperation for group/rule
   readonly request: {
     readonly url: string;
     readonly method: string;
-    readonly initiator: string;       // origin
+    readonly initiator: string; // origin
     readonly resourceType: string;
-    readonly target: string;          // resolved upstream URL
+    readonly target: string; // resolved upstream URL
   };
 }
 
@@ -316,7 +321,10 @@ export function createNativeRuntimeController(options: {
   readonly clock?: () => number;
 }): NativeRuntimeController;
 
-export function generatePacScript(origins: readonly string[], proxyEndpoint: string): string;
+export function generatePacScript(
+  origins: readonly string[],
+  proxyEndpoint: string,
+): string;
 
 export type F14ErrorCode =
   | "runtime.invalid-context"
@@ -333,10 +341,20 @@ export type F14ErrorCode =
 ## Control Envelope
 
 ```json
-{ "protocol": "f14-v1", "intent": "authorize", "requestId": "r1",
-  "payload": { "groupId":"g","ruleId":"r","url":"https://x.test/a","method":"POST",
-               "initiator":"https://x.test","resourceType":"xmlhttprequest",
-               "target":"https://x.test/a" } }
+{
+  "protocol": "f14-v1",
+  "intent": "authorize",
+  "requestId": "r1",
+  "payload": {
+    "groupId": "g",
+    "ruleId": "r",
+    "url": "https://x.test/a",
+    "method": "POST",
+    "initiator": "https://x.test",
+    "resourceType": "xmlhttprequest",
+    "target": "https://x.test/a"
+  }
+}
 ```
 
 A successful `authorize` returns only `{"ok":true,"authorized":true}`. A denied
@@ -350,8 +368,10 @@ to the in-process policy core for diagnostics.
 
 ```javascript
 function FindProxyForURL(url, host) {
-  const granted = ["x.test","y.test"];
-  for (const o of granted) { if (host === o || host.endsWith("." + o)) return "PROXY <endpoint>"; }
+  const granted = ["x.test", "y.test"];
+  for (const o of granted) {
+    if (host === o || host.endsWith("." + o)) return "PROXY <endpoint>";
+  }
   return "DIRECT";
 }
 ```

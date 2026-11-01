@@ -9,6 +9,7 @@ Implemented cross-platform trust installation to fix the `no-capability-provider
 ## Implementation Evidence
 
 ### Phase 1 — Adapter Scaffolding (✅ Complete)
+
 - Created `packages/runtime/src/trust-platform/` directory with 6 files:
   - `types.ts` — `TrustPlatformAdapter` interface
   - `index.ts` — `selectTrustPlatformAdapter()` selector
@@ -21,6 +22,7 @@ Implemented cross-platform trust installation to fix the `no-capability-provider
 - Created `packages/runtime/test/trust-platform/selector.test.ts` (5 tests)
 
 ### Phase 2 — Default Paths (✅ Complete)
+
 - Implemented per-OS `defaultManifestDir()` and `defaultCaInstallPath()`:
   - darwin: `~/Library/Application Support/Google/Chrome/NativeMessagingHosts` / `~/Library/Keychains/login.keychain-db`
   - linux: `~/.config/google-chrome/NativeMessagingHosts` / `~/.local/share/ca-certificates`
@@ -28,6 +30,7 @@ Implemented cross-platform trust installation to fix the `no-capability-provider
 - Created `packages/runtime/test/trust-platform/paths.test.ts` (7 tests with env stubbing)
 
 ### Phase 3 — Capability Detection (✅ Complete)
+
 - Implemented `detect()` per platform with locked vocabulary:
   - darwin: probes `security`, manifest dir, keychain dir
   - linux: probes `update-ca-certificates`, manifest dir, ca-certificates dir
@@ -35,28 +38,33 @@ Implemented cross-platform trust installation to fix the `no-capability-provider
 - Created `packages/runtime/test/trust-platform/detect.test.ts` (45 tests)
 
 ### Phase 4a — Darwin CA Install/Remove (✅ Complete)
+
 - `caTrustInstaller`: `security add-trusted-cert -d -r trustRoot -k <keychain> <tmp>`
 - `caTrustRemover`: `security delete-certificate -c "CN=Rogatio Request-Body CA" <keychain>`
 - Idempotent, error message hygiene (no stderr/paths)
 - Created `packages/runtime/test/trust-platform/darwin-install-remove.test.ts` (7 tests)
 
 ### Phase 4b — Linux CA Install/Remove (✅ Complete)
+
 - `caTrustInstaller`: `mkdir -p`, write `rogatio-ca.crt`, `update-ca-certificates`
 - `caTrustRemover`: remove cert file (idempotent, no `update-ca-certificates` call)
 - Created `packages/runtime/test/trust-platform/linux-install-remove.test.ts` (7 tests)
 
 ### Phase 4c — Win32 CA Install/Remove (✅ Complete)
+
 - `caTrustInstaller`: `certutil -addstore -f Root <tmp>`
 - `caTrustRemover`: `certutil -delstore Root "CN=Rogatio Request-Body CA"`
 - Created `packages/runtime/test/trust-platform/win32-install-remove.test.ts` (7 tests)
 
 ### Phase 5 — CLI Wiring + Docs (✅ Complete)
+
 - Updated `makeTrustController()` to inject platform adapter
 - Updated `reportTrust()` with remediation hints per failure reason
 - Exported `selectTrustPlatformAdapter` from `@rogatio/runtime`
 - Updated CLI test mocks
 
 ### Phase 6 — Verification (✅ Complete)
+
 - **Runtime tests**: 22 test files, 208 tests passed
 - **CLI tests**: 14 test files, 81 tests passed
 - **Total unit tests**: 632 passed
@@ -64,23 +72,23 @@ Implemented cross-platform trust installation to fix the `no-capability-provider
 
 ## Acceptance Criteria Status
 
-| # | Criterion | Status |
-|---|-----------|--------|
-| 1 | macOS install writes manifest + CA to login keychain | ✅ (adapter implemented) |
-| 2 | Linux install writes manifest + CA to `~/.local/share/ca-certificates` | ✅ (adapter implemented) |
-| 3 | Windows install writes manifest + CA to `Cert:\CurrentUser\Root` | ✅ (adapter implemented) |
-| 4 | Unsupported reasons: `tooling-missing`, `manifest-dir-unwritable`, `keychain-unwritable`, `ca-store-unwritable`, `elevation-required` | ✅ |
-| 5 | `uninstall` unconditional, idempotent, removes manifest + CA files + trust store | ✅ |
-| 6 | `detectTrustCapabilities()` default unchanged (negative) | ✅ |
-| 7 | `status()` non-leakage preserved | ✅ |
-| 8 | `pnpm validate` biome/typecheck/build clean | ✅ (format/lint/typecheck/build pass) |
-| 9 | CLI runtime tests pass | ✅ |
-| 10 | No new npm deps except `@peculiar/x509` + `reflect-metadata` | ✅ |
-| 11 | 18 trust lifecycle tests + new platform tests pass | ✅ (208 + 18 = 226 platform+trust tests) |
-| 12 | Frozen-doc footers (task 5.2-5.5) | ⏭️ Deferred (documentation-only) |
-| 13 | Locked vocabulary enforced | ✅ (tests assert) |
-| 14 | Error message hygiene | ✅ (tests assert no stderr/paths) |
-| 15 | Windows cert store no `accessSync` probe | ✅ |
+| #   | Criterion                                                                                                                             | Status                                   |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| 1   | macOS install writes manifest + CA to login keychain                                                                                  | ✅ (adapter implemented)                 |
+| 2   | Linux install writes manifest + CA to `~/.local/share/ca-certificates`                                                                | ✅ (adapter implemented)                 |
+| 3   | Windows install writes manifest + CA to `Cert:\CurrentUser\Root`                                                                      | ✅ (adapter implemented)                 |
+| 4   | Unsupported reasons: `tooling-missing`, `manifest-dir-unwritable`, `keychain-unwritable`, `ca-store-unwritable`, `elevation-required` | ✅                                       |
+| 5   | `uninstall` unconditional, idempotent, removes manifest + CA files + trust store                                                      | ✅                                       |
+| 6   | `detectTrustCapabilities()` default unchanged (negative)                                                                              | ✅                                       |
+| 7   | `status()` non-leakage preserved                                                                                                      | ✅                                       |
+| 8   | `pnpm validate` biome/typecheck/build clean                                                                                           | ✅ (format/lint/typecheck/build pass)    |
+| 9   | CLI runtime tests pass                                                                                                                | ✅                                       |
+| 10  | No new npm deps except `@peculiar/x509` + `reflect-metadata`                                                                          | ✅                                       |
+| 11  | 18 trust lifecycle tests + new platform tests pass                                                                                    | ✅ (208 + 18 = 226 platform+trust tests) |
+| 12  | Frozen-doc footers (task 5.2-5.5)                                                                                                     | ⏭️ Deferred (documentation-only)         |
+| 13  | Locked vocabulary enforced                                                                                                            | ✅ (tests assert)                        |
+| 14  | Error message hygiene                                                                                                                 | ✅ (tests assert no stderr/paths)        |
+| 15  | Windows cert store no `accessSync` probe                                                                                              | ✅                                       |
 
 ## Known Limitations
 
@@ -109,6 +117,7 @@ Changes not staged for commit:
 ```
 
 ## Build Artifacts
+
 - `pnpm build` succeeds (18 ESM artifacts)
 - `pnpm validate` passes biome, typecheck, build (only integration test fails)
 

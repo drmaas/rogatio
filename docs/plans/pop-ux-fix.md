@@ -37,12 +37,12 @@ Make the Chrome action popup match the management page’s visual language and f
 
 **Public API / wire-format flags.**
 
-| Change | Kind | Notes |
-| --- | --- | --- |
+| Change                                                          | Kind                               | Notes                                                                                                       |
+| --------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `PopupModel.switchProject(projectId: string): Promise<boolean>` | **Public TS API** of `popup-model` | Pin this name; send `{ version: 1, command: "switch-project", projectId }`; return `response?.ok === true`. |
-| `switch-project` message | No wire change | Already in `protocol.ts` / SW. |
-| Management URL / `?project=` | **Out of scope** | Avoid unless open-app acceptance fails without it. |
-| Envelope / `PopupGroupRow` | No change | Subtitle uses `activeProjectName` with id fallback. |
+| `switch-project` message                                        | No wire change                     | Already in `protocol.ts` / SW.                                                                              |
+| Management URL / `?project=`                                    | **Out of scope**                   | Avoid unless open-app acceptance fails without it.                                                          |
+| Envelope / `PopupGroupRow`                                      | No change                          | Subtitle uses `activeProjectName` with id fallback.                                                         |
 
 **Toolbar layout.**
 
@@ -93,21 +93,21 @@ Enable the picker when shown; on change send `switch-project` via the model, ref
 
 ## Risks
 
-| Risk | Mitigation |
-| --- | --- |
+| Risk                                                                 | Mitigation                                                                                                                                           |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Over-engineering: `?project=` deep-link + management-page parser** | Out of scope; storage active project already satisfies “open active project.” Flag if implementer starts editing `extension-page-entry.ts` for this. |
-| **Over-engineering: toolbar component framework / shared helpers** | Keep imperative DOM in `render()`; CSS-only layout. |
-| **Over-engineering: custom expand state machine / DOM chevron node** | CSS chevron on native `<details>` only. |
-| **Over-engineering: new tokens or brand accents** | Reuse `--rogatio-*` only. |
-| **Over-engineering: new switch-failure status UX** | Return `false` / fail closed; no new status strings. |
-| **Public API: `PopupModel.switchProject`** | Explicit addition; pin name and message shape; unit-test send payload and ok/false. No wire-format change. |
-| **Picker hide threshold vs stale research (“show when > 0”)** | Human gate wins: show only when `>= 2`. |
-| **Browser fixture always seeds two projects** | Phase 1 must add 0/1-project init scripts; do not weaken the ≥2 assertion without replacement. |
-| **Over-engineering: expand chrome mock to mutate on create/import** | Unnecessary for picker-hide proof; 0/1 seeded envelopes suffice. |
-| **Open app as `<a>` inside flex action row** | Style as sibling of buttons without breaking navigation or `data-open-app` selectors. |
-| **Browser mock switch only mutates `activeProjectId`** | Sufficient for Project B empty-groups fixture; do not expand mock into a full repository. |
-| **Proving “Open app lands on active project”** | Popup switch + storage-backed active id is enough; do not open management page in this feature’s tests. |
-| **Forced-colors / reduced-motion** | Extend chevron rules under existing media queries in `popup.css`. |
+| **Over-engineering: toolbar component framework / shared helpers**   | Keep imperative DOM in `render()`; CSS-only layout.                                                                                                  |
+| **Over-engineering: custom expand state machine / DOM chevron node** | CSS chevron on native `<details>` only.                                                                                                              |
+| **Over-engineering: new tokens or brand accents**                    | Reuse `--rogatio-*` only.                                                                                                                            |
+| **Over-engineering: new switch-failure status UX**                   | Return `false` / fail closed; no new status strings.                                                                                                 |
+| **Public API: `PopupModel.switchProject`**                           | Explicit addition; pin name and message shape; unit-test send payload and ok/false. No wire-format change.                                           |
+| **Picker hide threshold vs stale research (“show when > 0”)**        | Human gate wins: show only when `>= 2`.                                                                                                              |
+| **Browser fixture always seeds two projects**                        | Phase 1 must add 0/1-project init scripts; do not weaken the ≥2 assertion without replacement.                                                       |
+| **Over-engineering: expand chrome mock to mutate on create/import**  | Unnecessary for picker-hide proof; 0/1 seeded envelopes suffice.                                                                                     |
+| **Open app as `<a>` inside flex action row**                         | Style as sibling of buttons without breaking navigation or `data-open-app` selectors.                                                                |
+| **Browser mock switch only mutates `activeProjectId`**               | Sufficient for Project B empty-groups fixture; do not expand mock into a full repository.                                                            |
+| **Proving “Open app lands on active project”**                       | Popup switch + storage-backed active id is enough; do not open management page in this feature’s tests.                                              |
+| **Forced-colors / reduced-motion**                                   | Extend chevron rules under existing media queries in `popup.css`.                                                                                    |
 
 ## Acceptance criteria
 

@@ -97,18 +97,18 @@ An origin must be an absolute HTTP or HTTPS origin:
 
 The package exports the limits as `LIMITS` so callers and tests do not duplicate numeric policy:
 
-| Value | Limit |
-| --- | ---: |
-| Project groups | 64 |
-| Rules per group | 256 |
-| Rules per project | 4,096 |
-| Origins per group or rule | 32 |
-| Stable ID length | 64 |
-| Project, group, or rule name length | 100 |
-| Project description length | 1,000 |
-| URL-regex length | 2,048 |
-| Resource types per rule | 16 |
-| Priority | 1 through 1,000 |
+| Value                               |           Limit |
+| ----------------------------------- | --------------: |
+| Project groups                      |              64 |
+| Rules per group                     |             256 |
+| Rules per project                   |           4,096 |
+| Origins per group or rule           |              32 |
+| Stable ID length                    |              64 |
+| Project, group, or rule name length |             100 |
+| Project description length          |           1,000 |
+| URL-regex length                    |           2,048 |
+| Resource types per rule             |              16 |
+| Priority                            | 1 through 1,000 |
 
 IDs use `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`. Resource types use the browser-neutral names `main_frame`, `sub_frame`, `stylesheet`, `script`, `image`, `font`, `object`, `media`, `xmlhttprequest`, `ping`, `csp_report`, `websocket`, `webtransport`, `webbundle`, or `other`. Methods use `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, `CONNECT`, or `TRACE`.
 

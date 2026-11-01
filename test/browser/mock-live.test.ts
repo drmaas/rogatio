@@ -205,7 +205,7 @@ test("serves inline and file mocks, preserves POST, and removes session rules", 
     const visit = (path: string) =>
       withNewTab(context.driver, async (page) => {
         await page.goto(`http://127.0.0.1:${port}${path}`);
-        return page.evaluate(() => document.body?.innerText?.trim() ?? "");
+        return page.evaluate(() => document.body?.textContent?.trim() ?? "");
       });
     expect(await visit("/inline")).toBe("inline-body");
     expect(await visit("/file")).toBe("file-bytes");
@@ -221,7 +221,7 @@ test("serves inline and file mocks, preserves POST, and removes session rules", 
       await cdp.send("Network.enable");
       await page.goto(`http://127.0.0.1:${port}/broad`);
       const body = await page.evaluate(
-        () => document.body?.innerText?.trim() ?? "",
+        () => document.body?.textContent?.trim() ?? "",
       );
       await cdp.close();
       return { body, mockRequests: requests.length };

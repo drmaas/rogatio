@@ -15,66 +15,65 @@
 - Do not widen `packages/runtime/src/server.ts` into a forward proxy.
 - Package boundaries stay unchanged:
 
-| Package | F17 boundary | F17 does not own |
-|---|---|---|
-| `schema` | Version-1 rule and exact-local-origin validation | Network, proxy, credentials |
-| `compiler` | Detached ordered `RequestBodyOperation` values | Chrome, TLS, persistence |
-| `browser-core` | Generic enablement, permission, status seams | Native messaging, body bytes |
-| `editor` | Request-body fields and project local-origin fields | Runtime or filesystem access |
-| `extension` | Chrome metadata, policy session, PAC, markers, lifecycle | Request bodies, TLS, upstream |
-| `runtime` | Policy validation, authority, proxy, TLS, transform, forwarding | Browser storage, editor state |
-| F16 trust layer | Native-host manifest and X.509 CA trust lifecycle | Request transformation |
-| `cli` | Offline verify/edit/test and explicit trust/install diagnostics | Ownership of live browser sessions |
-| `dry-run` | Additive F12 selector extension | F12 breaking change |
-
+| Package         | F17 boundary                                                    | F17 does not own                   |
+| --------------- | --------------------------------------------------------------- | ---------------------------------- |
+| `schema`        | Version-1 rule and exact-local-origin validation                | Network, proxy, credentials        |
+| `compiler`      | Detached ordered `RequestBodyOperation` values                  | Chrome, TLS, persistence           |
+| `browser-core`  | Generic enablement, permission, status seams                    | Native messaging, body bytes       |
+| `editor`        | Request-body fields and project local-origin fields             | Runtime or filesystem access       |
+| `extension`     | Chrome metadata, policy session, PAC, markers, lifecycle        | Request bodies, TLS, upstream      |
+| `runtime`       | Policy validation, authority, proxy, TLS, transform, forwarding | Browser storage, editor state      |
+| F16 trust layer | Native-host manifest and X.509 CA trust lifecycle               | Request transformation             |
+| `cli`           | Offline verify/edit/test and explicit trust/install diagnostics | Ownership of live browser sessions |
+| `dry-run`       | Additive F12 selector extension                                 | F12 breaking change                |
 - No new product dependency. Use existing Node built-ins, browser APIs, and injected platform adapters only.
 
 ## Current Baseline Repairs (Prerequisite)
 
-| Area | Current gap | F17 repair |
-|---|---|---|
-| F14 lifecycle | `f14-lifecycle.ts` is injected capability seam only; no policy/session ownership | Add policy-aware shared provider/session seam |
-| F14 authority | `f14-revalidate.ts` accepts caller-selected IDs, lacks enabled groups/grants/digest/global arbitration | Add complete policy-bound authority validation |
-| F14 protocol | `f14-envelope.ts` is metadata-only; not F17 staged native protocol | Keep `f14-v1`; add separate `f17-v1` framing/staging |
-| F14 interception | `f14-interception.ts` has global provider state, no ownership rollback | Per-session ownership, actual provider state, PAC rollback, failure cleanup |
-| F15 provider | `f15-interception.ts` only wraps injected adapter calls | Reuse shared provider seam without changing F15 GET-only semantics |
-| F15 browser parity | `extension/browser-schema.ts` does not validate response-body payloads fully | Synchronize browser-safe F13/F15/F17 validation |
-| F15 editor parity | `editor.ts` `ACTION_FIELDS` omits `responseBody` | Repair action-field cleanup and stale payload removal |
-| F16 trust | `f16-trust.ts` stores SPKI/public-key, treats key existence as trust | Supply actual X.509 CA certificate/key, actual trust status, confinement, rollback |
-| F16 CLI | `runtime install` has no required explicit extension ID; manifest uses empty origins | Add exact `--extension-id` handling and identity-bound manifest |
-| Native host | No native-messaging executable or host entrypoint exists | Add explicit host entry/build/install contract |
-| CLI editor host | `commands/edit.ts` uses wrong `createEditor` call shape and async validator shape | Repair host wiring using browser-safe synchronous validation |
-| Runtime proxy | No HTTP/1.1 request-body proxy, TLS interception, marker verification, upstream forwarding | Add isolated F17 provider; do not modify F6 server behavior |
+| Area               | Current gap                                                                                            | F17 repair                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| F14 lifecycle      | `f14-lifecycle.ts` is injected capability seam only; no policy/session ownership                       | Add policy-aware shared provider/session seam                                      |
+| F14 authority      | `f14-revalidate.ts` accepts caller-selected IDs, lacks enabled groups/grants/digest/global arbitration | Add complete policy-bound authority validation                                     |
+| F14 protocol       | `f14-envelope.ts` is metadata-only; not F17 staged native protocol                                     | Keep `f14-v1`; add separate `f17-v1` framing/staging                               |
+| F14 interception   | `f14-interception.ts` has global provider state, no ownership rollback                                 | Per-session ownership, actual provider state, PAC rollback, failure cleanup        |
+| F15 provider       | `f15-interception.ts` only wraps injected adapter calls                                                | Reuse shared provider seam without changing F15 GET-only semantics                 |
+| F15 browser parity | `extension/browser-schema.ts` does not validate response-body payloads fully                           | Synchronize browser-safe F13/F15/F17 validation                                    |
+| F15 editor parity  | `editor.ts` `ACTION_FIELDS` omits `responseBody`                                                       | Repair action-field cleanup and stale payload removal                              |
+| F16 trust          | `f16-trust.ts` stores SPKI/public-key, treats key existence as trust                                   | Supply actual X.509 CA certificate/key, actual trust status, confinement, rollback |
+| F16 CLI            | `runtime install` has no required explicit extension ID; manifest uses empty origins                   | Add exact `--extension-id` handling and identity-bound manifest                    |
+| Native host        | No native-messaging executable or host entrypoint exists                                               | Add explicit host entry/build/install contract                                     |
+| CLI editor host    | `commands/edit.ts` uses wrong `createEditor` call shape and async validator shape                      | Repair host wiring using browser-safe synchronous validation                       |
+| Runtime proxy      | No HTTP/1.1 request-body proxy, TLS interception, marker verification, upstream forwarding             | Add isolated F17 provider; do not modify F6 server behavior                        |
 
 ## Tests First
 
 Author tests before production implementation. Add only test/configuration files in this phase. Run focused tests after authoring; expected result is red until corresponding production modules exist. Do not weaken assertions.
 
-| Test file or area | First contract | Acceptance criteria |
-|---|---|---|
-| `packages/schema/test/request-body.test.ts` | Strict action shape, Unicode, bounds, methods, resource type, local origins, hostile objects | AC-001, AC-002, AC-005 |
-| `packages/extension/test/browser-schema-request-body.test.ts` | Browser/Node valid-invalid parity and no Node/AJV imports | AC-003 |
-| `packages/compiler/test/request-body.test.ts` | Detached operation and source order | AC-001, AC-002 |
-| `packages/compiler/test/selector.test.ts` | Request/response phase, enabled groups, grants, target/initiator, priority, source-order tie, no composition | AC-004, AC-005 |
-| `packages/dry-run/test/request-body.test.ts` | F17 winner/preview behavior with additive F12 contract | AC-004, AC-026 |
-| `packages/runtime/test/f17-policy.test.ts` | Policy validation, detachment, canonical bytes, digest, limits, no sensitive payloads | AC-006, AC-008, AC-009 |
-| `packages/runtime/test/f17-native-protocol.test.ts` | Chrome framing, 64 KiB frames, policy staging, part order, duplicates, timeout, digest mismatch | AC-007, AC-008 |
-| `packages/runtime/test/f17-transform.test.ts` | Replace, strict UTF-8, MIME/encoding, regex `gu`, expansion, timeout, output bounds | AC-017, AC-018, AC-019 |
-| `packages/runtime/test/f17-wire.test.ts` | Raw HTTP/1.1 framing, headers, methods, signatures, mTLS rejection | AC-016, AC-020, AC-021 |
-| `packages/runtime/test/f17-proxy.test.ts` | Raw loopback proxy, marker handling, target policy, DNS pinning, zero upstream calls on failure | AC-014 through AC-023 |
-| `packages/runtime/test/f14-*.test.ts` | F14 compatibility and shared provider ownership regression | AC-005, AC-011, AC-012, AC-023 |
-| `packages/runtime/test/f15-interception.test.ts` and `response-body.test.ts` | F15 provider/status/credential/privacy regression | AC-005, AC-008, AC-020 |
-| `packages/runtime/test/f16-trust.test.ts` | X.509 material, actual trust adapter, identity, confinement, atomicity, rollback | AC-009, AC-024 |
-| `packages/extension/test/f17-policy.test.ts` | Policy construction and deterministic digest parity | AC-006, AC-008, AC-009 |
-| `packages/extension/test/f17-session.test.ts` | Explicit start, serialization, rollback, stop, policy replacement, collision | AC-010 through AC-012, AC-027, AC-028 |
-| `packages/extension/test/f17-metadata.test.ts` | Explicit metadata copy and no request-body/header/credential access | AC-013 |
-| `packages/extension/test/f17-status.test.ts` | Disabled, permission, proxy, unsupported, error, active states | AC-010, AC-027 |
-| `packages/editor/test/request-body.test.ts` | Mode controls, exact defaults, stale-field cleanup, constraints, diagnostics | AC-025 |
-| `packages/editor/test/editor.test.ts` | F15/F17 action-field replacement and detached drafts | AC-005, AC-025 |
-| `packages/cli/test/runtime-command.test.ts` | Explicit extension ID, trust/install status, offline runtime behavior | AC-024, AC-026 |
-| `packages/cli/test/verify.test.ts`, `test.test.ts`, `routes.test.ts` | F17 validation and preview without runtime/network access | AC-026 |
-| `test/browser/editor.spec.ts` | Browser artifact request-body controls and accessibility | AC-025 |
-| `test/browser/request-body-live.spec.ts` | Dedicated capable-platform live gate | AC-029 |
+| Test file or area                                                            | First contract                                                                                               | Acceptance criteria                   |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| `packages/schema/test/request-body.test.ts`                                  | Strict action shape, Unicode, bounds, methods, resource type, local origins, hostile objects                 | AC-001, AC-002, AC-005                |
+| `packages/extension/test/browser-schema-request-body.test.ts`                | Browser/Node valid-invalid parity and no Node/AJV imports                                                    | AC-003                                |
+| `packages/compiler/test/request-body.test.ts`                                | Detached operation and source order                                                                          | AC-001, AC-002                        |
+| `packages/compiler/test/selector.test.ts`                                    | Request/response phase, enabled groups, grants, target/initiator, priority, source-order tie, no composition | AC-004, AC-005                        |
+| `packages/dry-run/test/request-body.test.ts`                                 | F17 winner/preview behavior with additive F12 contract                                                       | AC-004, AC-026                        |
+| `packages/runtime/test/f17-policy.test.ts`                                   | Policy validation, detachment, canonical bytes, digest, limits, no sensitive payloads                        | AC-006, AC-008, AC-009                |
+| `packages/runtime/test/f17-native-protocol.test.ts`                          | Chrome framing, 64 KiB frames, policy staging, part order, duplicates, timeout, digest mismatch              | AC-007, AC-008                        |
+| `packages/runtime/test/f17-transform.test.ts`                                | Replace, strict UTF-8, MIME/encoding, regex `gu`, expansion, timeout, output bounds                          | AC-017, AC-018, AC-019                |
+| `packages/runtime/test/f17-wire.test.ts`                                     | Raw HTTP/1.1 framing, headers, methods, signatures, mTLS rejection                                           | AC-016, AC-020, AC-021                |
+| `packages/runtime/test/f17-proxy.test.ts`                                    | Raw loopback proxy, marker handling, target policy, DNS pinning, zero upstream calls on failure              | AC-014 through AC-023                 |
+| `packages/runtime/test/f14-*.test.ts`                                        | F14 compatibility and shared provider ownership regression                                                   | AC-005, AC-011, AC-012, AC-023        |
+| `packages/runtime/test/f15-interception.test.ts` and `response-body.test.ts` | F15 provider/status/credential/privacy regression                                                            | AC-005, AC-008, AC-020                |
+| `packages/runtime/test/f16-trust.test.ts`                                    | X.509 material, actual trust adapter, identity, confinement, atomicity, rollback                             | AC-009, AC-024                        |
+| `packages/extension/test/f17-policy.test.ts`                                 | Policy construction and deterministic digest parity                                                          | AC-006, AC-008, AC-009                |
+| `packages/extension/test/f17-session.test.ts`                                | Explicit start, serialization, rollback, stop, policy replacement, collision                                 | AC-010 through AC-012, AC-027, AC-028 |
+| `packages/extension/test/f17-metadata.test.ts`                               | Explicit metadata copy and no request-body/header/credential access                                          | AC-013                                |
+| `packages/extension/test/f17-status.test.ts`                                 | Disabled, permission, proxy, unsupported, error, active states                                               | AC-010, AC-027                        |
+| `packages/editor/test/request-body.test.ts`                                  | Mode controls, exact defaults, stale-field cleanup, constraints, diagnostics                                 | AC-025                                |
+| `packages/editor/test/editor.test.ts`                                        | F15/F17 action-field replacement and detached drafts                                                         | AC-005, AC-025                        |
+| `packages/cli/test/runtime-command.test.ts`                                  | Explicit extension ID, trust/install status, offline runtime behavior                                        | AC-024, AC-026                        |
+| `packages/cli/test/verify.test.ts`, `test.test.ts`, `routes.test.ts`         | F17 validation and preview without runtime/network access                                                    | AC-026                                |
+| `test/browser/editor.spec.ts`                                                | Browser artifact request-body controls and accessibility                                                     | AC-025                                |
+| `test/browser/request-body-live.spec.ts`                                     | Dedicated capable-platform live gate                                                                         | AC-029                                |
 
 ## Ordered Tasks
 
@@ -82,7 +81,7 @@ Author tests before production implementation. Add only test/configuration files
 
 **Depends on:** Tests first (author schema tests)
 
-**Files:** 
+**Files:**
 - `packages/schema/src/types.ts`
 - `packages/schema/src/limits.ts`
 - `packages/schema/src/schema.ts`
@@ -420,20 +419,20 @@ Author tests before production implementation. Add only test/configuration files
 
 ## Acceptance-Criterion Matrix
 
-| Acceptance criteria | Primary tasks |
-|---|---|
-| AC-001 through AC-003 | T1, T2, T9, T10 |
-| AC-004 | T2, T9, T10; requires dry-run contract decision |
-| AC-005 | T1, T2, T3, T4, T9, T10, T11 |
-| AC-006 through AC-009 | T5, T6, T9 |
-| AC-010 through AC-015 | T4, T6, T9 |
-| AC-016 through AC-023 | T7, T8 |
-| AC-024 | T5 |
-| AC-025 through AC-027 | T3, T9, T10 |
-| AC-028 | T1 through T11 |
-| AC-029 | T8, T9, T11 |
-| AC-030 | T11, T12 |
-| AC-031 | T9, T11 |
+| Acceptance criteria   | Primary tasks                                   |
+| --------------------- | ----------------------------------------------- |
+| AC-001 through AC-003 | T1, T2, T9, T10                                 |
+| AC-004                | T2, T9, T10; requires dry-run contract decision |
+| AC-005                | T1, T2, T3, T4, T9, T10, T11                    |
+| AC-006 through AC-009 | T5, T6, T9                                      |
+| AC-010 through AC-015 | T4, T6, T9                                      |
+| AC-016 through AC-023 | T7, T8                                          |
+| AC-024                | T5                                              |
+| AC-025 through AC-027 | T3, T9, T10                                     |
+| AC-028                | T1 through T11                                  |
+| AC-029                | T8, T9, T11                                     |
+| AC-030                | T11, T12                                        |
+| AC-031                | T9, T11                                         |
 
 ## Integration and E2E Gates
 

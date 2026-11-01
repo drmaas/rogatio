@@ -59,9 +59,9 @@ export interface TrustPlatformAdapter {
   readonly platform: TrustPlatform;
   readonly defaultManifestDir: () => string;
   readonly defaultCaInstallPath: () => string;
-  detect(): TrustCapabilities;           // pure: probe tooling + writability, return reasons
-  caTrustInstaller(certPem: string): Promise<void>;  // throws TrustError with reason on failure
-  caTrustRemover(): Promise<void>;        // idempotent; throws only on unexpected failure
+  detect(): TrustCapabilities; // pure: probe tooling + writability, return reasons
+  caTrustInstaller(certPem: string): Promise<void>; // throws TrustError with reason on failure
+  caTrustRemover(): Promise<void>; // idempotent; throws only on unexpected failure
 }
 ```
 
@@ -71,11 +71,11 @@ The `unsupported` adapter returns `{ manifest: false, caTrust: false, reasons: [
 
 Chrome scans per-user manifest directories on every OS:
 
-| OS | Manifest directory | CA install target (user-scope) |
-| --- | --- | --- |
-| darwin | `join(process.env.HOME ?? "", "Library/Application Support/Google/Chrome/NativeMessagingHosts")` | `join(process.env.HOME ?? "", "Library/Keychains/login.keychain-db")` (`security add-trusted-cert -d -r trustRoot -k …`) |
-| linux | `join(process.env.HOME ?? "", ".config/google-chrome/NativeMessagingHosts")` | `join(process.env.HOME ?? "", ".local/share/ca-certificates")` (directory; cert file is `rogatio-ca.crt` inside) + invoke `update-ca-certificates` if present |
-| win32 | `join(process.env.APPDATA ?? "", "Google", "Chrome", "NativeMessagingHosts")` | `Cert:\CurrentUser\Root` via `certutil -addstore -f "Root" "<cert>"` (no admin needed) |
+| OS     | Manifest directory                                                                               | CA install target (user-scope)                                                                                                                                |
+| ------ | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| darwin | `join(process.env.HOME ?? "", "Library/Application Support/Google/Chrome/NativeMessagingHosts")` | `join(process.env.HOME ?? "", "Library/Keychains/login.keychain-db")` (`security add-trusted-cert -d -r trustRoot -k …`)                                      |
+| linux  | `join(process.env.HOME ?? "", ".config/google-chrome/NativeMessagingHosts")`                     | `join(process.env.HOME ?? "", ".local/share/ca-certificates")` (directory; cert file is `rogatio-ca.crt` inside) + invoke `update-ca-certificates` if present |
+| win32  | `join(process.env.APPDATA ?? "", "Google", "Chrome", "NativeMessagingHosts")`                    | `Cert:\CurrentUser\Root` via `certutil -addstore -f "Root" "<cert>"` (no admin needed)                                                                        |
 
 Rationale (per RESEARCH open-question 1 + 3): the user-scope path is the minimum viable product for the extension's own Chrome profile, requires no elevation, and avoids `sudo` / `runas` complexity. The system-scope path (`/Library/Keychains/System.keychain`, `/usr/local/share/ca-certificates`, `Cert:\LocalMachine\Root`) is out of scope for this slice; if the user-scope path is unwritable the adapter reports `keychain-unwritable` (darwin) / `ca-store-unwritable` (linux) / `elevation-required` (win32 system store) and the user may re-run with elevation in a future slice. The manifest write is split from `installRoot`: the controller writes CA material under `installRoot` and the manifest under `defaultManifestDir()` (per RESEARCH open-question 1, option b).
 
@@ -240,7 +240,7 @@ The feature is done when **all** of the following hold:
 12. Frozen-doc footers are appended at the four locations enumerated in Phase 5 task 5.2. `docs/architecture.md` describes the per-OS adapter pattern in section `## Request-Body Trust Lifecycle` (lines 335–363). `rogatio-overview.md:61` clarifies the user-scope install path.
 13. **Vocabulary enforcement:** All adapter `detect()` return values use only the locked vocabulary `{ "no-capability-provider", "tooling-missing", "manifest-dir-unwritable", "ca-store-unwritable", "keychain-unwritable", "elevation-required" }`. Automated test in `detect.test.ts` asserts no other strings appear in `reasons`.
 14. **Error message hygiene:** All `TrustError` throws from adapters have messages containing only short vocabulary strings (no stderr, no cert paths, no `security:`/`certutil:` output). Automated test in each `*-install-remove.test.ts` asserts this.
-16. **CLI remediation hints:** When `runtime install` reports `trust unsupported`, the output appends a platform-specific hint line:
+15. **CLI remediation hints:** When `runtime install` reports `trust unsupported`, the output appends a platform-specific hint line:
     - `tooling-missing` → `Hint: install required tooling (macOS: security; Linux: update-ca-certificates; Windows: certutil is built-in)`
     - `manifest-dir-unwritable` → `Hint: check permissions on Chrome NativeMessagingHosts directory or run with appropriate access`
     - `keychain-unwritable` → `Hint: macOS login keychain not writable; try running with appropriate keychain access or use sudo for system keychain (future slice)`

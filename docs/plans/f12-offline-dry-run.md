@@ -25,6 +25,7 @@ packages/dry-run/
 ## Task list (ordered)
 
 ### T1 — `@rogatio/dry-run` package scaffold
+
 - `package.json` (name `@rogatio/dry-run`, `type: module`, ESM/NodeNext, deps on
   workspace `compiler` + `schema`, Biome/tsconfig aligned with repo). Add to pnpm
   workspace (`pnpm-workspace.yaml`) if not auto-globbed.
@@ -32,16 +33,19 @@ packages/dry-run/
 - Covers: REQ-001, REQ-007, REQ-008.
 
 ### T2 — Engine types (`types.ts`)
+
 - `DryRunTestCase`, `MatchState`, `MatchDimension`, `ActionPreview`, `RuleMatchResult`,
   `UrlDryRunResult`, `DryRunError`, `DryRunOptions`, `DryRunResult` exactly per spec §7.
 - Covers: REQ-002, REQ-003, REQ-004, REQ-008.
 
 ### T3 — Safe URL parse (`url.ts`)
+
 - `parseTestUrl(url): { ok: true; origin: string } | { ok: false }`.
 - Uses WHATWG `URL`; rejects non-string, empty, and non-absolute URLs; never fetches.
 - Covers: REQ-006, REQ-007 (origin dimension).
 
 ### T4 — Engine (`dryrun.ts`)
+
 - `dryRunProject(operations, cases, options?)`:
   1. Defensive snapshot of `cases` (reject proxies/accessors/cycles/symbols without
      invoking getters) → `dryrun.invalid-case` per bad entry.
@@ -57,6 +61,7 @@ packages/dry-run/
 - Covers: REQ-001, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008.
 
 ### T5 — Unit tests (`test/dryrun.test.ts`)
+
 - Map to AC-001..AC-008. Use compiled fixtures (call `compileProject` on small projects).
 - Include: resourceTypes-empty matches all; no-method matches all; batch limit boundary
   (maxCases vs maxCases+1); invalid URL; cyclic case rejected.
@@ -65,6 +70,7 @@ packages/dry-run/
   network calls by stubbing `globalThis.fetch` if present).
 
 ### T6 — CLI `test` command (`packages/cli`)
+
 - `commands/test.ts`: arg parse (positional path + urls, `--json`, `--method`,
   `--resource-type`, `--urls-file`, `--max-cases`, `--help`). Read project (file or `-`
   stdin). `validateProjectDetailed` + `compileProject`; invalid → diagnostics + exit 1.
@@ -75,11 +81,13 @@ packages/dry-run/
 - Covers: REQ-009, REQ-010, AC-009, AC-010.
 
 ### T7 — Editor server endpoint (`packages/cli/server/routes.ts`)
+
 - `POST /api/dry-run` (CSRF-protected): body `{ project, cases, options }`. Server-side
   compile; return `DryRunResult` JSON; invalid CSRF → 403; invalid JSON → 400.
 - Covers: REQ-011, AC-011.
 
 ### T8 — Editor "Test rules" route/panel (`packages/editor`)
+
 - Add host `dryRun` adapter type to `EditorOptions` (mirror `validate`):
   `(cases, options) => DryRunResult | Promise<DryRunResult>`; on error returns stable
   editor diagnostic.
@@ -90,25 +98,30 @@ packages/dry-run/
 - Covers: REQ-012, AC-012.
 
 ### T9 — Editor host wiring (`packages/cli/commands/edit.ts`)
+
 - Add `dryRun` adapter to `createEditor` options that POSTs to `/api/dry-run`.
 - Covers: REQ-012 end-to-end.
 
 ### T10 — Integration test (no-side-effects + endpoint)
+
 - `packages/cli/test`: start `edit` server, `POST /api/dry-run` happy + 403 + 400
   (AC-011). `test` command against a temp project file: valid run exit 0, invalid
   project exit 1, missing file exit 2, `--json` shape (AC-009/AC-011).
 
 ## Verification (Stage 8)
+
 - `pnpm -r --filter @rogatio/dry-run run test` (Vitest), plus cli integration tests.
 - Repo canonical validation: Biome format+lint, `tsc` strict, build (esbuild), full
   `pnpm test` for changed packages.
 - Assert AC-013 (no network/fs/permission/runtime calls) via the side-effect test + review.
 
 ## Rollback / flags
+
 - Additive package + new CLI subcommand + new editor route. No migration, no file-format
   change. If reverted, only the new package and the two new integration points change.
 
 ## Documentation (Stage 10)
+
 - `docs/architecture.md`: add F12 section (new package, boundary, no Node import in
   editor bundle). Update package-boundary diagram.
 - `README.md`: document `rogatio test` usage.

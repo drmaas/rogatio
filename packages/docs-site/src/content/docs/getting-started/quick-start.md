@@ -1,4 +1,5 @@
 ---
+
 title: Quick start
 description: Create your first Rogatio project and run a rule in the browser.
 ---

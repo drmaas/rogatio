@@ -13,19 +13,19 @@
 
 ## Stage status
 
-| Stage | Status | Notes |
-| --- | --- | --- |
-| 0 Worktree | done | `git worktree add -b feature/ai-provider-metadata ../rogatio-ai-provider-metadata main`, base `e8b1410`, `pnpm install` ok |
-| 1 Brainstorm | done | primary + adversarial passes; 4 decisions resolved with user (below) |
-| 2 Architecture | done | design captured in `spec.md` §Design; `docs/architecture.md` edits deferred to Stage 10 so living docs never describe unshipped behavior (repo rule) |
-| 3 Specification | done | `docs/decisions/ai-provider-metadata/spec.md` |
-| 4 Human gate | done | spec approved by user 2026-09-27 (D1–D4 all confirmed; cosmetic UI detail delegated) |
-| 5 Plan | done | `plan.md` (T1–T7) |
-| 6–7 Tests, impl | done | tests-first per plan T1–T4; red state recorded (21/21 new runtime tests failing before impl), green after |
-| 8 Verify | done | `pnpm validate` → "Validation completed successfully" (format, lint, typecheck, build, unit+integration vitest 331+324 green incl. 22+13 new, schema checks, browser 77 passed / 8 pre-existing skips) |
-| 9 Review | done | round 1 in-context over the full diff (fresh-context limitation below); findings fixed |
-| 10 Docs | blocked | architecture.md, docs-site, supersession footer on frozen `docs/specs/ai-integration.md` |
-| 11 Freeze + release | blocked | spec/plan/workflow → `docs/specs|plans|workflows/ai-provider-metadata*` |
+| Stage               | Status  | Notes                                                                                                                                                                                                  |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0 Worktree          | done    | `git worktree add -b feature/ai-provider-metadata ../rogatio-ai-provider-metadata main`, base `e8b1410`, `pnpm install` ok                                                                             |
+| 1 Brainstorm        | done    | primary + adversarial passes; 4 decisions resolved with user (below)                                                                                                                                   |
+| 2 Architecture      | done    | design captured in `spec.md` §Design; `docs/architecture.md` edits deferred to Stage 10 so living docs never describe unshipped behavior (repo rule)                                                   |
+| 3 Specification     | done    | `docs/decisions/ai-provider-metadata/spec.md`                                                                                                                                                          |
+| 4 Human gate        | done    | spec approved by user 2026-09-27 (D1–D4 all confirmed; cosmetic UI detail delegated)                                                                                                                   |
+| 5 Plan              | done    | `plan.md` (T1–T7)                                                                                                                                                                                      |
+| 6–7 Tests, impl     | done    | tests-first per plan T1–T4; red state recorded (21/21 new runtime tests failing before impl), green after                                                                                              |
+| 8 Verify            | done    | `pnpm validate` → "Validation completed successfully" (format, lint, typecheck, build, unit+integration vitest 331+324 green incl. 22+13 new, schema checks, browser 77 passed / 8 pre-existing skips) |
+| 9 Review            | done    | round 1 in-context over the full diff (fresh-context limitation below); findings fixed                                                                                                                 |
+| 10 Docs             | blocked | architecture.md, docs-site, supersession footer on frozen `docs/specs/ai-integration.md`                                                                                                               |
+| 11 Freeze + release | blocked | spec/plan/workflow → `docs/specs                                                                                                                                                                       | plans | workflows/ai-provider-metadata*` |
 
 ## Harness deviations (recorded, not silently skipped)
 
@@ -38,12 +38,12 @@
 
 ## Stage 1 decisions (user-approved 2026-09-27)
 
-| ID | Question | Decision |
-| --- | --- | --- |
-| D1 | Where provider metadata enters the architecture | New dedicated `ai.status` envelope (request/response), graceful "not reported" fallback on old hosts |
-| D2 | Launch-time staleness | Host re-reads `provider.json` on each status request and rebuilds the AI client when the config changed (config effective without host restart) |
-| D3 | Network-touching probe | Status check becomes metadata-only; wording shifts Ready → Configured (approved trade-off: a broken provider shows Configured until an actual call fails) |
-| D4 | Project-file `ai` field | Not added. Code truth: v2 schema root has no `ai` property (`additionalProperties: false`); the old `docs/specs/ai-integration.md` mention is aspiration. Host config is the single source of truth |
+| ID  | Question                                        | Decision                                                                                                                                                                                            |
+| --- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Where provider metadata enters the architecture | New dedicated `ai.status` envelope (request/response), graceful "not reported" fallback on old hosts                                                                                                |
+| D2  | Launch-time staleness                           | Host re-reads `provider.json` on each status request and rebuilds the AI client when the config changed (config effective without host restart)                                                     |
+| D3  | Network-touching probe                          | Status check becomes metadata-only; wording shifts Ready → Configured (approved trade-off: a broken provider shows Configured until an actual call fails)                                           |
+| D4  | Project-file `ai` field                         | Not added. Code truth: v2 schema root has no `ai` property (`additionalProperties: false`); the old `docs/specs/ai-integration.md` mention is aspiration. Host config is the single source of truth |
 
 ## Adversarial findings carried into the spec
 

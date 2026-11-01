@@ -10,15 +10,15 @@ Audience: agent
 
 ## Model selection
 
-| Role | Choice | Rationale |
-| --- | --- | --- |
-| reasoning | parent / inherit | claude-fable usage-capped; primary pass in-session |
-| adversarial | `cursor-grok-4.6-high-fast` | Different family; gpt/claude capped |
-| plan | inherit | Bounded host-only change |
-| coding | inherit | Same |
-| verify | inherit | Same |
-| review | `cursor-grok-4.6-high-fast` (locked) | Different family from coding |
-| docs | inherit | Same |
+| Role        | Choice                               | Rationale                                          |
+| ----------- | ------------------------------------ | -------------------------------------------------- |
+| reasoning   | parent / inherit                     | claude-fable usage-capped; primary pass in-session |
+| adversarial | `cursor-grok-4.6-high-fast`          | Different family; gpt/claude capped                |
+| plan        | inherit                              | Bounded host-only change                           |
+| coding      | inherit                              | Same                                               |
+| verify      | inherit                              | Same                                               |
+| review      | `cursor-grok-4.6-high-fast` (locked) | Different family from coding                       |
+| docs        | inherit                              | Same                                               |
 
 ## Stage checklist
 
@@ -35,11 +35,13 @@ Audience: agent
 ## Review rounds
 
 ### Round 1
+
 - Finding: `checkNativeAISupport` remounted during dirty soft-refresh → fixed (no `renderShell` in helper).
 - Finding: refresh failure ignored `remountEditor: false` → fixed.
 - Finding: dirty test missed started runtime → strengthened.
 
 ### Round 2
+
 - Finding: soft-patch across active-project change could save draft to wrong project → force `renderShell` when active id changes.
 
 ## Verification evidence

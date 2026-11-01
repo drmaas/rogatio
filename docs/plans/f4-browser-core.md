@@ -52,56 +52,67 @@ Borrowed from `rogatio-overview.md` and `sequence.md`, narrowed to what browser-
 ## Ordered Tasks
 
 ### T1 - Package boundary and plan artifact
+
 - **Files:** `docs/plans/f4-browser-core.md`, `packages/browser-core/package.json`, `packages/browser-core/tsconfig.json`, `packages/browser-core/vitest.config.ts`, root `pnpm-lock.yaml` (via `pnpm install`).
 - **Behavior:** Private ESM `@rogatio/browser-core` package; exports map to `src/index.ts` types and `dist/node/index.js`; dependencies exactly `@rogatio/schema` and `@rogatio/compiler` (`workspace:*`).
 - **Acceptance:** AC-001. **Verification:** `pnpm install --frozen-lockfile`, package metadata inspection.
 
 ### T2 - Tests first
+
 - **Files:** `packages/browser-core/test/migrate.test.ts`, `repository.test.ts`, `status.test.ts`, `install.test.ts`, `runtime.test.ts`, `test/fixtures/forbidden-direction.ts`.
 - **Behavior:** Contracts for envelope migration and corruption, repository lifecycle (create/import/save/switch/remove/enable/grant/export, CAS conflict, caps, auto-activation, fail-closed storage), status/badge computation, install orchestration with recovery and serialization, and runtime transitions — all before production source. Update the negative fixture to the still-absent `@rogatio/extension`.
 - **Acceptance:** AC-002 through AC-011. **Verification:** focused Vitest run records the expected missing-module red result.
 
 ### T3 - Diagnostics and shared types
+
 - **Files:** `packages/browser-core/src/diagnostics.ts`, `packages/browser-core/src/types.ts`.
 - **Behavior:** Stable `core.*` diagnostic codes (extending the compiler code union), safe-param copying, deterministic ordering; envelope/stored-project/status/badge/runtime/result types.
 - **Acceptance:** AC-002, AC-007 through AC-011. **Verification:** strict typecheck and contract tests.
 
 ### T4 - Envelope migration
+
 - **Files:** `packages/browser-core/src/migrate.ts`.
 - **Behavior:** `ENVELOPE_VERSION = 1`; `migrateEnvelope(value)` returns a fresh empty envelope for `undefined`, defensively snapshots own data (no cycles/symbols/getters/proxies/sparse arrays), validates version and structure (ids match keys, name/revision/timestamps, unique group ids and origins, active id exists), fails with `core.storage-corrupt` otherwise, never throws.
 - **Acceptance:** AC-002. **Verification:** migrate tests.
 
 ### T5 - Project repository
+
 - **Files:** `packages/browser-core/src/repository.ts`.
 - **Behavior:** `ProjectRepository` over `StorageAdapter` with injected id/time sources; all mutation ops validated, CAS-committed with bounded retry (strict conflict for explicit revisions), fail-closed on corrupt storage; data validated via `validateProjectDetailed` + `compileProject`; enablement reset and grant pruning on data commits; deterministic single-active invariant.
 - **Acceptance:** AC-003 through AC-006. **Verification:** repository tests.
 
 ### T6 - Desired rules, statuses, and badge
+
 - **Files:** `packages/browser-core/src/status.ts`.
 - **Behavior:** `computeDesiredRules`, `computeRuleStatuses` (stable per-rule statuses in source order, `core.rule-not-installed` diagnostics on error), `computeBadge` (active count + attention flag), `computeDeclaredOrigins` (union of normalized effective origins from compiled operations).
 - **Acceptance:** AC-007, AC-008. **Verification:** status tests.
 
 ### T7 - Install orchestration
+
 - **Files:** `packages/browser-core/src/install.ts`.
 - **Behavior:** `RuleInstallerAdapter` contract (`current`, `install`); `InstallService.apply` with no-op detection, atomic replace, rollback on failure, recovery diagnostics, and serialized concurrent calls.
 - **Acceptance:** AC-009. **Verification:** install tests.
 
 ### T8 - Runtime state model
+
 - **Files:** `packages/browser-core/src/runtime.ts`.
 - **Behavior:** Mock/native phase types, last-check record, guarded transition controller returning `core.runtime-transition` diagnostics, detached snapshots.
 - **Acceptance:** AC-010. **Verification:** runtime tests.
 
 ### T9 - Root build and validation integration
+
 - **Files:** `packages/browser-core/src/index.ts`, `scripts/build.ts`, `scripts/validate.ts`, `test/fixtures/forbidden-direction.ts`.
 - **Behavior:** Public exports; browser-core Node ESM artifact with schema/compiler externalized; emitted-module execution check; boundary checks (browser-core depends only on schema+compiler; schema/compiler must not depend on browser-core; negative fixture targets absent `@rogatio/extension`).
 - **Acceptance:** AC-001, AC-012. **Verification:** `pnpm validate` full sequence.
 
 ### T10 - Documentation synchronization
+
 - **Files:** `docs/architecture.md`, `README.md`, `docs/f4-workflow.md`.
 - **Behavior:** Record F4 as released, package layer status, storage/status/install/runtime decisions, verification evidence, and absence of F5+ behavior; keep durable docs consistent.
 - **Acceptance:** AC-013. **Verification:** documentation consistency review, `git diff --check`, generated-artifact/secret scan.
 
 ### T11 - Fresh-context review and release preparation
+
 - **Files:** Final diff and `docs/f4-workflow.md`; code changes only for approved in-scope defects.
 - **Behavior:** Self-review the final diff against the behavioral notes (fresh context, no implementer notes), rerun validation after any fix, then present summary and await explicit user authorization for commit/push/PR.
 - **Acceptance:** Full plan. **Verification:** review record, final `pnpm validate`.

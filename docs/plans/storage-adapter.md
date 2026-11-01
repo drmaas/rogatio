@@ -41,14 +41,14 @@ Groups and rules remain **nested arrays inside each `RogatioProject` document**.
 
 ## Today’s operations map (RESEARCH)
 
-| Lifecycle op | CLI today | Browser-core / extension today |
-| --- | --- | --- |
-| **get** (read document) | `readProject(path)` → `unknown` | `getProject` / `exportProject` (envelope-wrapped `RogatioProject`) |
-| **create** (empty / new) | `edit` bootstrap: missing file → `{ version: 1, name: "", groups: [] }` + write | `ProjectRepository.createProject` |
-| **update** (save document) | `writeProject` / `POST /api/save` | `ProjectRepository.saveProject` (revision + enablement reset) |
-| **import** | No CLI import command; stdin `-` is parse-only, not store import | `ProjectRepository.importProject` (file picker → message) |
-| **list** | None (single path per invocation) | `state()` → `envelope.projects` keys |
-| **delete** | None | `ProjectRepository.removeProject` |
+| Lifecycle op               | CLI today                                                                       | Browser-core / extension today                                     |
+| -------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **get** (read document)    | `readProject(path)` → `unknown`                                                 | `getProject` / `exportProject` (envelope-wrapped `RogatioProject`) |
+| **create** (empty / new)   | `edit` bootstrap: missing file → `{ version: 1, name: "", groups: [] }` + write | `ProjectRepository.createProject`                                  |
+| **update** (save document) | `writeProject` / `POST /api/save`                                               | `ProjectRepository.saveProject` (revision + enablement reset)      |
+| **import**                 | No CLI import command; stdin `-` is parse-only, not store import                | `ProjectRepository.importProject` (file picker → message)          |
+| **list**                   | None (single path per invocation)                                               | `state()` → `envelope.projects` keys                               |
+| **delete**                 | None                                                                            | `ProjectRepository.removeProject`                                  |
 
 This feature defines one application-facing port covering the left-hand ops. CLI wires **get / create / update** to existing commands. **import / list / delete** are implemented and unit-tested on the JSON-file adapter so future DB/API backends (and later CLI/extension consumers) share the contract—without adding new CLI product commands or touching browser-core in this slice.
 
@@ -58,19 +58,19 @@ This feature defines one application-facing port covering the left-hand ops. CLI
 
 ### Plan decisions (resolves RESEARCH open questions + revision)
 
-| # | Question | Decision |
-| --- | --- | --- |
-| 1 | First-cut surface | **CLI-owned port + JSON-file adapter**, shaped as full project lifecycle. Browser-core envelope/`StorageAdapter` / `ProjectRepository` stay untouched this slice. |
-| 2 | What “json file” means | Canonical VCS `.rogatio.json` (`RogatioProject`). Not Chrome `storage.local` JSON. |
-| 3 | Entity vs document API | **Whole-project document** ops only. Nested groups/rules unchanged. |
-| 4 | Future DB / remote vs local-first | **Not implemented.** Port is the plug-in seam; product/architecture docs stay local-first until an explicit amendment. |
-| 5 | Package home | **`packages/cli`** for interface + JSON adapter (Node `fs`). No new package. Do not put the Node adapter in browser-core. If a second in-tree host must share the interface later, relocate the **interface only** then—do not invent that package now. |
-| 6 | Atomicity | **Per-backend.** JSON-file keeps temp+rename. Do not invent shared CAS. Browser CAS remains separate. |
-| 7 | File-backed envelope store | **No.** |
-| 8 | Validation ownership | **Callers.** Store get/import/create accept or return unvalidated `unknown` / default empty document; schema/compile stay at save/verify/test/runtime boundaries. |
-| 9 | Error vocabulary | Introduce backend-neutral **`ProjectStorageError`** with `code` + `id` (opaque project key). JSON-file sets `id` to the filesystem path. Keep **`ProjectFileError` as a thin subclass or alias** so existing `instanceof` / HTTP mapping can migrate with minimal churn (prefer subclass with `path` getter ≡ `id`). Codes: `not-found`, `already-exists`, `invalid-id`, `invalid-json`, `invalid-format`, `read-failed`, `write-failed`, `delete-failed`, `is-directory`. |
-| 10 | Identity model | Opaque string **`id`**. JSON-file adapter: **path-as-id** (absolute or resolved filesystem path to the project file). Future DB/API: uuid/URI. |
-| 11 | Port breadth | **Full lifecycle** on the interface even where CLI has no command yet. |
+| #   | Question                          | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | First-cut surface                 | **CLI-owned port + JSON-file adapter**, shaped as full project lifecycle. Browser-core envelope/`StorageAdapter` / `ProjectRepository` stay untouched this slice.                                                                                                                                                                                                                                                                                                          |
+| 2   | What “json file” means            | Canonical VCS `.rogatio.json` (`RogatioProject`). Not Chrome `storage.local` JSON.                                                                                                                                                                                                                                                                                                                                                                                         |
+| 3   | Entity vs document API            | **Whole-project document** ops only. Nested groups/rules unchanged.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 4   | Future DB / remote vs local-first | **Not implemented.** Port is the plug-in seam; product/architecture docs stay local-first until an explicit amendment.                                                                                                                                                                                                                                                                                                                                                     |
+| 5   | Package home                      | **`packages/cli`** for interface + JSON adapter (Node `fs`). No new package. Do not put the Node adapter in browser-core. If a second in-tree host must share the interface later, relocate the **interface only** then—do not invent that package now.                                                                                                                                                                                                                    |
+| 6   | Atomicity                         | **Per-backend.** JSON-file keeps temp+rename. Do not invent shared CAS. Browser CAS remains separate.                                                                                                                                                                                                                                                                                                                                                                      |
+| 7   | File-backed envelope store        | **No.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 8   | Validation ownership              | **Callers.** Store get/import/create accept or return unvalidated `unknown` / default empty document; schema/compile stay at save/verify/test/runtime boundaries.                                                                                                                                                                                                                                                                                                          |
+| 9   | Error vocabulary                  | Introduce backend-neutral **`ProjectStorageError`** with `code` + `id` (opaque project key). JSON-file sets `id` to the filesystem path. Keep **`ProjectFileError` as a thin subclass or alias** so existing `instanceof` / HTTP mapping can migrate with minimal churn (prefer subclass with `path` getter ≡ `id`). Codes: `not-found`, `already-exists`, `invalid-id`, `invalid-json`, `invalid-format`, `read-failed`, `write-failed`, `delete-failed`, `is-directory`. |
+| 10  | Identity model                    | Opaque string **`id`**. JSON-file adapter: **path-as-id** (absolute or resolved filesystem path to the project file). Future DB/API: uuid/URI.                                                                                                                                                                                                                                                                                                                             |
+| 11  | Port breadth                      | **Full lifecycle** on the interface even where CLI has no command yet.                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### Port shape (locked — final after Phase 2)
 
@@ -99,14 +99,14 @@ export interface ProjectStorage {
 
 **Semantics (contract):**
 
-| Method | Behavior |
-| --- | --- |
-| `get` | Return unvalidated document; `not-found` / parse errors as today. |
+| Method   | Behavior                                                                                                                                                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get`    | Return unvalidated document; `not-found` / parse errors as today.                                                                                                                                                                          |
 | `create` | Persist a new project; default data `{ version: 1, name: "", groups: [] }` when `data` omitted. Fail `already-exists` if id already present. JSON-file **requires** `id` (path); omit → `invalid-id`. Future DB may mint ids when omitted. |
-| `import` | Persist caller-supplied document at `id` (create or replace at that id). JSON-file **requires** `id`. Does not fetch remote URLs—callers supply `data` (future API adapter may load remotely inside `import`). |
-| `update` | Replace document for existing id; `not-found` if missing. |
-| `delete` | Remove project; `not-found` if missing. JSON-file: unlink file (`delete-failed` on I/O). |
-| `list` | Return refs. JSON-file: `scope` = directory to scan **non-recursively** for `.rogatio.json` and `*.rogatio.json`; omit `scope` → empty list. Future DB may ignore `scope`. |
+| `import` | Persist caller-supplied document at `id` (create or replace at that id). JSON-file **requires** `id`. Does not fetch remote URLs—callers supply `data` (future API adapter may load remotely inside `import`).                             |
+| `update` | Replace document for existing id; `not-found` if missing.                                                                                                                                                                                  |
+| `delete` | Remove project; `not-found` if missing. JSON-file: unlink file (`delete-failed` on I/O).                                                                                                                                                   |
+| `list`   | Return refs. JSON-file: `scope` = directory to scan **non-recursively** for `.rogatio.json` and `*.rogatio.json`; omit `scope` → empty list. Future DB may ignore `scope`.                                                                 |
 
 Factory: `createJsonFileProjectStorage(): ProjectStorage` — **stateless, optionless**. Path/root concerns pass via `id` / `list(scope)`.
 
@@ -118,12 +118,12 @@ Factory: `createJsonFileProjectStorage(): ProjectStorage` — **stateless, optio
 
 ### Call-site injection (CLI)
 
-| Site | Change |
-| --- | --- |
-| `edit.ts` | `get(id)`; on `not-found` → `create({ id, data: empty })`; inject `storage.update` (or store) into route context for save. Keep directory `stat` UX outside the store. |
-| `RouteContext` | Injected write typed as `ProjectStorage["update"]` (or hold `ProjectStorage`). Save still validates/compiles then `update`. |
-| `verify.ts`, `test.ts`, `runtime.ts` | File-backed load via `get(id)`. Stdin (`-`) unchanged. |
-| Editor | Unchanged. |
+| Site                                 | Change                                                                                                                                                                 |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `edit.ts`                            | `get(id)`; on `not-found` → `create({ id, data: empty })`; inject `storage.update` (or store) into route context for save. Keep directory `stat` UX outside the store. |
+| `RouteContext`                       | Injected write typed as `ProjectStorage["update"]` (or hold `ProjectStorage`). Save still validates/compiles then `update`.                                            |
+| `verify.ts`, `test.ts`, `runtime.ts` | File-backed load via `get(id)`. Stdin (`-`) unchanged.                                                                                                                 |
+| Editor                               | Unchanged.                                                                                                                                                             |
 
 Do **not** add CLI commands that only exercise list/import/delete; adapter unit tests own that coverage.
 

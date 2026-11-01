@@ -4,15 +4,15 @@ Single active home for **all** feature workflows (`sdd`, `rpi`, `doit`). Each fe
 
 Typical files (write only what the workflow needs):
 
-| File | Used by | Durable? |
-| --- | --- | --- |
-| `research.md` | RPI | yes → `docs/research/` |
-| `spec.md` | SDD | yes → `docs/specs/` |
-| `plan.md` | SDD, RPI, doit | yes → `docs/plans/` |
-| `workflow.md` | SDD, optional elsewhere | yes → `docs/workflows/` |
-| `refactor.md` | RPI (opt-in) | yes → `docs/plans/<feature>-refactor.md` |
-| `checklist.md` | RPI implementer tracker | **no** — delete on release |
-| `notes.md` | doit (optional) | yes → fold into plan or delete if ephemeral |
+| File           | Used by                 | Durable?                                    |
+| -------------- | ----------------------- | ------------------------------------------- |
+| `research.md`  | RPI                     | yes → `docs/research/`                      |
+| `spec.md`      | SDD                     | yes → `docs/specs/`                         |
+| `plan.md`      | SDD, RPI, doit          | yes → `docs/plans/`                         |
+| `workflow.md`  | SDD, optional elsewhere | yes → `docs/workflows/`                     |
+| `refactor.md`  | RPI (opt-in)            | yes → `docs/plans/<feature>-refactor.md`    |
+| `checklist.md` | RPI implementer tracker | **no** — delete on release                  |
+| `notes.md`     | doit (optional)         | yes → fold into plan or delete if ephemeral |
 
 ## Lifecycle
 
@@ -22,14 +22,14 @@ Typical files (write only what the workflow needs):
 
 ### Freeze destinations
 
-| Active file | Frozen path |
-| --- | --- |
-| `research.md` | `docs/research/<feature>.md` |
-| `spec.md` | `docs/specs/<feature>.md` |
-| `plan.md` | `docs/plans/<feature>.md` |
-| `workflow.md` | `docs/workflows/<feature>-workflow.md` |
-| `refactor.md` | `docs/plans/<feature>-refactor.md` |
-| `checklist.md` | deleted |
+| Active file    | Frozen path                            |
+| -------------- | -------------------------------------- |
+| `research.md`  | `docs/research/<feature>.md`           |
+| `spec.md`      | `docs/specs/<feature>.md`              |
+| `plan.md`      | `docs/plans/<feature>.md`              |
+| `workflow.md`  | `docs/workflows/<feature>-workflow.md` |
+| `refactor.md`  | `docs/plans/<feature>-refactor.md`     |
+| `checklist.md` | deleted                                |
 
 Add a `> Status: frozen <YYYY-MM-DD>` header when moving.
 

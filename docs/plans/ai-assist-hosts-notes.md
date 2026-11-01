@@ -18,18 +18,18 @@ CLI `rogatio edit` and extension Workspace Assist produce a validated rule propo
 
 ## Acceptance checks
 
-| ID | Check |
-| --- | --- |
-| AC-001 | CLI Assist via `runAIAssist` returns validated proposal |
+| ID     | Check                                                                    |
+| ------ | ------------------------------------------------------------------------ |
+| AC-001 | CLI Assist via `runAIAssist` returns validated proposal                  |
 | AC-002 | CLI uses `provider.json` model (server-side), not hardcoded client model |
-| AC-003 | Response matches editor `AIAssistResponse` / final `proposal` |
-| AC-004 | CSRF required; unconfigured → 404 `ai-not-configured` |
-| AC-005 | Focused CLI route tests for assist contract |
-| AC-006 | Workspace `createEditor` gets `aiAssist` when AI available |
-| AC-007 | Create/fix Assist through SW → native `ai.complete` (unit-mockable) |
-| AC-008 | Extension never calls CLI loopback HTTP |
-| AC-009 | architecture / README / docs-site match shipped behavior |
-| AC-010 | `pnpm validate` passes |
+| AC-003 | Response matches editor `AIAssistResponse` / final `proposal`            |
+| AC-004 | CSRF required; unconfigured → 404 `ai-not-configured`                    |
+| AC-005 | Focused CLI route tests for assist contract                              |
+| AC-006 | Workspace `createEditor` gets `aiAssist` when AI available               |
+| AC-007 | Create/fix Assist through SW → native `ai.complete` (unit-mockable)      |
+| AC-008 | Extension never calls CLI loopback HTTP                                  |
+| AC-009 | architecture / README / docs-site match shipped behavior                 |
+| AC-010 | `pnpm validate` passes                                                   |
 
 ## Non-goals
 

@@ -30,20 +30,20 @@ session model served every role in a single-model environment.
 
 ## Stage status
 
-| Stage | Status | Notes |
-| --- | --- | --- |
-| 0 Worktree | done | `/home/drmaas/.local/share/opencode/worktree/rogatio/feature/design-system`, branch `feature/design-system` from `main` `b47f9f6` (clean). `pnpm install` completed. |
-| 1 Brainstorm | done (ephemeral) | User-supplied approved design + palette; standalone CSS per user instruction; adversarial self-pass recorded below. |
-| 2 Architecture | done | `docs/architecture.md` "Design System" section added. |
-| 3 Spec | done | `docs/specs/f22-design-system.md` approved at Stage 4. |
-| 4 Human review gate | done | User approved spec + architecture as written; also instructed to remove all "Requestify" traces and rename to "Rogatio" silently. |
-| 5 Plan | done | `docs/plans/f22-design-system.md`, tasks T1-T10 mapped to AC-001..AC-009. |
-| 6 Tests first | done | `test/browser/design-system.spec.ts`, fixture stylesheet link, CLI CSS/font route assertions. |
-| 7 Implementation | done | `editor.css`, `extension.css`, `popup.css`, editor `<style>` removal + top nav, shell rework (Dashboard + Workspace tabs, sidebar, project cards), popup restyle + Rogatio rename, build/validate pipeline, CLI CSS/font routes, font bundling, f21 doc brand rename. |
-| 8 Verification | done | `node scripts/validate.ts` green (format, lint 0 errors, tsc, build 18 artifacts, 561 unit tests, MV3 contract, forbidden-dep guard, 19 browser E2E incl. new design-system suite + real extension lifecycle). |
-| 9 Review | done | Fresh-context self-review round 1: restored popup deep-link `navigateToGroup` regression; no other actionable findings. |
-| 10 Docs | done | `docs/architecture.md` Design System section, README note, f22 workflow log, f21 spec/plan brand rename. |
-| 11 Release | pending | Awaiting user authorization. |
+| Stage               | Status           | Notes                                                                                                                                                                                                                                                                 |
+| ------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Worktree          | done             | `/home/drmaas/.local/share/opencode/worktree/rogatio/feature/design-system`, branch `feature/design-system` from `main` `b47f9f6` (clean). `pnpm install` completed.                                                                                                  |
+| 1 Brainstorm        | done (ephemeral) | User-supplied approved design + palette; standalone CSS per user instruction; adversarial self-pass recorded below.                                                                                                                                                   |
+| 2 Architecture      | done             | `docs/architecture.md` "Design System" section added.                                                                                                                                                                                                                 |
+| 3 Spec              | done             | `docs/specs/f22-design-system.md` approved at Stage 4.                                                                                                                                                                                                                |
+| 4 Human review gate | done             | User approved spec + architecture as written; also instructed to remove all "Requestify" traces and rename to "Rogatio" silently.                                                                                                                                     |
+| 5 Plan              | done             | `docs/plans/f22-design-system.md`, tasks T1-T10 mapped to AC-001..AC-009.                                                                                                                                                                                             |
+| 6 Tests first       | done             | `test/browser/design-system.spec.ts`, fixture stylesheet link, CLI CSS/font route assertions.                                                                                                                                                                         |
+| 7 Implementation    | done             | `editor.css`, `extension.css`, `popup.css`, editor `<style>` removal + top nav, shell rework (Dashboard + Workspace tabs, sidebar, project cards), popup restyle + Rogatio rename, build/validate pipeline, CLI CSS/font routes, font bundling, f21 doc brand rename. |
+| 8 Verification      | done             | `node scripts/validate.ts` green (format, lint 0 errors, tsc, build 18 artifacts, 561 unit tests, MV3 contract, forbidden-dep guard, 19 browser E2E incl. new design-system suite + real extension lifecycle).                                                        |
+| 9 Review            | done             | Fresh-context self-review round 1: restored popup deep-link `navigateToGroup` regression; no other actionable findings.                                                                                                                                               |
+| 10 Docs             | done             | `docs/architecture.md` Design System section, README note, f22 workflow log, f21 spec/plan brand rename.                                                                                                                                                              |
+| 11 Release          | pending          | Awaiting user authorization.                                                                                                                                                                                                                                          |
 
 ## Brainstorm synthesis (ephemeral, not retained as a file)
 
@@ -68,9 +68,9 @@ session model served every role in a single-model environment.
   darker `--rogatio-primary-strong` token while `#007AFF` remains the accent; no
   runtime network or CSP changes; data attributes, roles, labels, and commands asserted
   by browser tests must be preserved (identified: `data-desktop-route-rail`,
-`data-mobile-route-nav`, `data-rogatio-editor`, `#rogatio-title` heading, "Project to
-switch", "Switch project", group toggles, badge/status regions); all user-visible
-surfaces and the f21 popup documents use the "Rogatio" brand.
+  `data-mobile-route-nav`, `data-rogatio-editor`, `#rogatio-title` heading, "Project to
+  switch", "Switch project", group toggles, badge/status regions); all user-visible
+  surfaces and the f21 popup documents use the "Rogatio" brand.
 
 ## Verification evidence (Stage 8)
 

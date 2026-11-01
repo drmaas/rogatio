@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.3/schema.json",
   "files": {
     "includes": [
       "**",
@@ -10,7 +10,9 @@
       "!!**/.astro",
       "!!test/fixtures",
       "!!.opencode",
-      "!!graphify-out"
+      "!!graphify-out",
+      "!!docs/plans/dnr-install-reconcile.md",
+      "!!docs/plans/editor-rule-types-refactor.md"
     ]
   },
   "formatter": {

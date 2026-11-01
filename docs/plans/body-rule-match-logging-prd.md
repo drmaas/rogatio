@@ -45,16 +45,16 @@ Chrome users who activate Rogatio projects with body rules and debug matches in 
 
 ## Requirements
 
-| ID | Requirement | Outcome trace |
-| --- | --- | --- |
-| R1 | When a `request-body` or `response-body` rule’s URL matcher matches a live request under an active project with match logging on, emit one `[rogatio]` console line on the matched page’s DevTools Console. | O1 |
-| R2 | Body-kind lines use the same match signal, global Match logging toggle, fail-closed behavior, and field/style contract as shipped DNR match lines. Do not add a native-host match event for logging. | O3 |
-| R3 | Each line includes live URL, method, initiator, and resource type from the Chrome match event, plus intended body action from rule config (mode + bounded rewrite summary). No live body bytes. | O2 |
-| R4 | Apply `redactSensitiveInLogs` and existing hard bounds to sensitive fields on body-kind lines the same way as other logged kinds. | O2, O3 |
-| R5 | Request-body match signal reuses session DNR markers keyed to the URL matcher so existing match logging can emit the line. | O1, O3 |
-| R6 | Response-body match signal uses the same session-DNR URL-match pattern. Ship only after research proves the event fires and marker headers do not leak upstream. | O1, O3, O5 |
-| R7 | Before or with implement, record in research/ADR: body kinds use the DNR URL-match signal; native-host match logging is rejected; contract is URL match ⇒ attempt-to-rewrite. | O5 |
-| R8 | Match append path is usable as the single feed source for #204 (DNR + body kinds). This feature does not ship history UI. | O4 |
+| ID  | Requirement                                                                                                                                                                                                 | Outcome trace |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| R1  | When a `request-body` or `response-body` rule’s URL matcher matches a live request under an active project with match logging on, emit one `[rogatio]` console line on the matched page’s DevTools Console. | O1            |
+| R2  | Body-kind lines use the same match signal, global Match logging toggle, fail-closed behavior, and field/style contract as shipped DNR match lines. Do not add a native-host match event for logging.        | O3            |
+| R3  | Each line includes live URL, method, initiator, and resource type from the Chrome match event, plus intended body action from rule config (mode + bounded rewrite summary). No live body bytes.             | O2            |
+| R4  | Apply `redactSensitiveInLogs` and existing hard bounds to sensitive fields on body-kind lines the same way as other logged kinds.                                                                           | O2, O3        |
+| R5  | Request-body match signal reuses session DNR markers keyed to the URL matcher so existing match logging can emit the line.                                                                                  | O1, O3        |
+| R6  | Response-body match signal uses the same session-DNR URL-match pattern. Ship only after research proves the event fires and marker headers do not leak upstream.                                            | O1, O3, O5    |
+| R7  | Before or with implement, record in research/ADR: body kinds use the DNR URL-match signal; native-host match logging is rejected; contract is URL match ⇒ attempt-to-rewrite.                               | O5            |
+| R8  | Match append path is usable as the single feed source for #204 (DNR + body kinds). This feature does not ship history UI.                                                                                   | O4            |
 
 ## Metrics
 
@@ -62,12 +62,12 @@ None sourced.
 
 ## Open questions
 
-| ID | Question | Owner | Status |
-| --- | --- | --- | --- |
-| Q1 | Do request-body session DNR markers already exist in code, or does #170 still gate installability? | Research | Open — confirm against architecture + extension code. |
-| Q2 | What exact response-body session DNR action keeps `onRuleMatchedDebug` firing without leaking marker headers upstream? | Research | Open — probe required before shipping R6. |
-| Q3 | Should body-rule editor cards gain the `redactSensitiveInLogs` checkbox (console-match-logging excluded body kinds)? Issue requires reusing that flag for body lines. | Product | **Decided:** yes — same checkbox as other kinds. |
-| Q4 | Ship spike/ADR-only first, or implement console lines in the same RPI after research? Issue acceptance is spike-level; body allows validation “before or as part of” implement. | Product | **Decided:** same RPI — research gates, then implement console lines. |
+| ID  | Question                                                                                                                                                                        | Owner    | Status                                                                |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------- |
+| Q1  | Do request-body session DNR markers already exist in code, or does #170 still gate installability?                                                                              | Research | Open — confirm against architecture + extension code.                 |
+| Q2  | What exact response-body session DNR action keeps `onRuleMatchedDebug` firing without leaking marker headers upstream?                                                          | Research | Open — probe required before shipping R6.                             |
+| Q3  | Should body-rule editor cards gain the `redactSensitiveInLogs` checkbox (console-match-logging excluded body kinds)? Issue requires reusing that flag for body lines.           | Product  | **Decided:** yes — same checkbox as other kinds.                      |
+| Q4  | Ship spike/ADR-only first, or implement console lines in the same RPI after research? Issue acceptance is spike-level; body allows validation “before or as part of” implement. | Product  | **Decided:** same RPI — research gates, then implement console lines. |
 
 ## Source
 

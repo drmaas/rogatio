@@ -6,7 +6,7 @@ Depends on: F7 (Chrome MV3 extension shell), F5 (editor)
 
 ## 1. Problem statement and goals
 
-`rogatio-overview.md` lists **Query parameters** as a supported rule type: *"Add missing configured parameters and replace all existing values for configured names while preserving unrelated parameters, scheme, authority, path, and fragment."*
+`rogatio-overview.md` lists **Query parameters** as a supported rule type: _"Add missing configured parameters and replace all existing values for configured names while preserving unrelated parameters, scheme, authority, path, and fragment."_
 
 When F7 shipped the extension shell, the version-1 schema had no rule **action** field. Every compiled rule was treated as `unsupported` because no action slice had defined its effect (F7 deferral). F10 is the **first rule-action slice** and establishes the shared `action` discriminator that all later browser-only rule types (F9 redirect, F11 header, F13 mock) will extend.
 

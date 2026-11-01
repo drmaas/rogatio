@@ -10,11 +10,11 @@ One extension reconciler owns remove, install, and installed reporting for redir
 
 Keep existing bands. Do not redesign multi-project collision.
 
-| Kind | Numeric ids |
-| --- | --- |
-| redirect, query | 1–1_000_000 (dynamic store) |
-| header | 2_000_001 and up (`2_000_001 +` projection index, dynamic store) |
-| request-body, response-body | never installed via the **dynamic** reconciler |
+| Kind                        | Numeric ids                                                      |
+| --------------------------- | ---------------------------------------------------------------- |
+| redirect, query             | 1–1_000_000 (dynamic store)                                      |
+| header                      | 2_000_001 and up (`2_000_001 +` projection index, dynamic store) |
+| request-body, response-body | never installed via the **dynamic** reconciler                   |
 
 Remove set = live `getDynamicRules()` ∩ Rogatio-owned ids for the kinds in that replace. Never trust only in-memory `tracked`. If `getDynamicRules` throws, fail closed: do not treat the live set as empty and add. Drop Rogatio-owned orphans that are no longer desired. Leave ids outside owned bands untouched.
 

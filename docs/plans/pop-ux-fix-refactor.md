@@ -14,7 +14,7 @@ Self-review discarded: `sendOk`-style helpers for three identical `response?.ok 
 
 `test/browser/design-system.spec.ts` now defines module-level `MockProject` / `MockEnvelope` / `projectA`, but `installChromeMock` still embeds a near-identical default envelope (and a second inline `Envelope` shape) because the init-script body must be self-contained. One-project cases pass `projectA`; the default path duplicates it. Empty / empty-groups seeds are ad-hoc object literals.
 
-Collapse to: module-level fixture builders (`emptyEnvelope`, `oneProjectEnvelope`, `twoProjectEnvelope` / `defaultEnvelope`) always passed as the `addInitScript` argument; keep the default *inside* the serialized fn only as a last-resort fallback or remove it once every call site passes a seed. Reuse one project/group/rule factory for variants instead of copy-paste.
+Collapse to: module-level fixture builders (`emptyEnvelope`, `oneProjectEnvelope`, `twoProjectEnvelope` / `defaultEnvelope`) always passed as the `addInitScript` argument; keep the default _inside_ the serialized fn only as a last-resort fallback or remove it once every call site passes a seed. Reuse one project/group/rule factory for variants instead of copy-paste.
 
 ### Expected benefit
 
@@ -110,7 +110,7 @@ No new tests. Re-run `design-system` popup cases + any extension unit tests that
 
 ---
 
-## 5. Shared CSS class for toolbar action controls — *marginal*
+## 5. Shared CSS class for toolbar action controls — _marginal_
 
 ### Candidate
 
@@ -138,10 +138,10 @@ Toolbar membership + Open app href browser tests; forced-colors not re-proven be
 
 ## Skipped (self-review)
 
-| Idea | Why skip |
-| --- | --- |
-| Private `ok`-response helper in `popup-model` | Three one-liners; abstraction cost > savings |
-| `PopupModel.activeProjectLabel` | Single expression; public API churn for little gain |
-| Shared `:root` tokens / toolbar with `extension.css` | Plan non-goal; cross-surface risk |
-| Switch-failure status UX / deep-link | Behavior change, not refactor |
-| Parameterize 0/1 picker tests only | Tiny duplication; covered if #1–#2 land |
+| Idea                                                 | Why skip                                            |
+| ---------------------------------------------------- | --------------------------------------------------- |
+| Private `ok`-response helper in `popup-model`        | Three one-liners; abstraction cost > savings        |
+| `PopupModel.activeProjectLabel`                      | Single expression; public API churn for little gain |
+| Shared `:root` tokens / toolbar with `extension.css` | Plan non-goal; cross-surface risk                   |
+| Switch-failure status UX / deep-link                 | Behavior change, not refactor                       |
+| Parameterize 0/1 picker tests only                   | Tiny duplication; covered if #1–#2 land             |

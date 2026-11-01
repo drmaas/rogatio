@@ -1,4 +1,5 @@
 ---
+
 title: Security & privacy
 description: Rogatio's local-first, no-telemetry security and privacy model.
 ---

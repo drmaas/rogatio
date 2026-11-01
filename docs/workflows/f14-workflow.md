@@ -4,20 +4,20 @@ Status: **approved and implemented**; canonical validation passing.
 
 ## Stage trace
 
-| Stage | Result | Notes |
-| --- | --- | --- |
-| 0 — Worktree | Done | `feature/f14-macos-runtime` at `/home/drmaas/.local/share/opencode/worktree/rogatio/feature/f14-macos-runtime`, base `main` `b8c8ab6`. |
-| 1 — Brainstorm | Done (ephemeral) | Two-pass; the adversarial pass surfaced the macOS-only restriction as a false assumption. |
-| 2 — Architecture | Done | `docs/architecture.md` F14 section (capability-based activation). |
-| 3 — Specification | Done | `docs/specs/f14-macos-runtime.md` (REQ-001..REQ-031, AC-001..AC-016). |
-| 4 — Human review gate | **APPROVED** | User approved with "approved, proceed" (m0047) after the capability-based revision. |
-| 5 — Plan | Done | `docs/plans/f14-macos-runtime.md`. |
-| 6 — Tests first | Done | `packages/runtime/test/f14-{revalidate,envelope,pac,lifecycle}.test.ts`, `packages/cli/test/runtime-command.test.ts`. |
-| 7 — Implementation | Done | `packages/runtime/src/f14-{types,envelope,revalidate,pac,lifecycle,interception}.ts`; CLI `runtime` command real. |
-| 8 — Verification | Done | `pnpm install`, `format:check`, `lint`, `typecheck`, `build` (14 artifacts), `test` (314 unit), `validate` (314 unit + 14 browser E2E). All green. |
-| 9 — Review | Done (fresh-context self-review, single-model) | See Findings below. |
-| 10 — Documentation | Done | `README.md` runtime row updated; architecture F14 section kept in sync; this record created. |
-| 11 — Release | Blocked | No commit/push/PR without explicit user authorization. |
+| Stage                 | Result                                         | Notes                                                                                                                                              |
+| --------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 — Worktree          | Done                                           | `feature/f14-macos-runtime` at `/home/drmaas/.local/share/opencode/worktree/rogatio/feature/f14-macos-runtime`, base `main` `b8c8ab6`.             |
+| 1 — Brainstorm        | Done (ephemeral)                               | Two-pass; the adversarial pass surfaced the macOS-only restriction as a false assumption.                                                          |
+| 2 — Architecture      | Done                                           | `docs/architecture.md` F14 section (capability-based activation).                                                                                  |
+| 3 — Specification     | Done                                           | `docs/specs/f14-macos-runtime.md` (REQ-001..REQ-031, AC-001..AC-016).                                                                              |
+| 4 — Human review gate | **APPROVED**                                   | User approved with "approved, proceed" (m0047) after the capability-based revision.                                                                |
+| 5 — Plan              | Done                                           | `docs/plans/f14-macos-runtime.md`.                                                                                                                 |
+| 6 — Tests first       | Done                                           | `packages/runtime/test/f14-{revalidate,envelope,pac,lifecycle}.test.ts`, `packages/cli/test/runtime-command.test.ts`.                              |
+| 7 — Implementation    | Done                                           | `packages/runtime/src/f14-{types,envelope,revalidate,pac,lifecycle,interception}.ts`; CLI `runtime` command real.                                  |
+| 8 — Verification      | Done                                           | `pnpm install`, `format:check`, `lint`, `typecheck`, `build` (14 artifacts), `test` (314 unit), `validate` (314 unit + 14 browser E2E). All green. |
+| 9 — Review            | Done (fresh-context self-review, single-model) | See Findings below.                                                                                                                                |
+| 10 — Documentation    | Done                                           | `README.md` runtime row updated; architecture F14 section kept in sync; this record created.                                                       |
+| 11 — Release          | Blocked                                        | No commit/push/PR without explicit user authorization.                                                                                             |
 
 ## Tier / models
 

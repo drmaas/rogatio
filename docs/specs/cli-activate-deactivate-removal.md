@@ -18,7 +18,7 @@ that has nothing to do with the actual session the extension drives through
   carries no matchers, grants, or mocks.
 
 The real "start the host" path is the extension's Start/Stop buttons, which
-speak to the *installed* native-messaging host over stdio. Mocks and
+speak to the _installed_ native-messaging host over stdio. Mocks and
 response-body rules work as soon as Chrome can find the host. Request-body
 rules additionally require the device-local CA to be trusted, but that is a
 trust concern, not a lifecycle concern.
@@ -82,7 +82,7 @@ Make the lifecycle surface match reality:
 - When start fails with `extension.native-host-missing`, the message is:
   "The native-messaging host isn't registered with the browser. Run
   `rogatio runtime install --extension-id <id>` once in a terminal, then
-  click Start again." This is unchanged for the *host* case; the wording
+  click Start again." This is unchanged for the _host_ case; the wording
   already says it. We do not add "Start/Stop depends on trust" framing.
 - When start fails with the new `extension.request-body-needs-trust` reason
   (added by this change), the message is:

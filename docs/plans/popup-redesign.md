@@ -41,12 +41,12 @@ Replace the static "Active project: X" text with a `<select>` dropdown listing a
 
 ### Files changed
 
-| File | Change |
-|------|--------|
-| `packages/extension/src/popup.css` | Widen to 600px, bump fonts, adjust list max-height, add `<details>`/`<summary>` styles, add `<select>` picker styles |
-| `packages/extension/src/popup.ts` | Switch render from `rows()` to `groups()`, add expander DOM, add project picker `<select>`, filter rules inside details |
-| `packages/extension/src/popup-model.ts` | Add `PopupGroupRow` interface, add `groups()` method, add `projects` accessor for picker |
-| `packages/extension/test/popup-model.test.ts` | Add tests for `groups()` and `projects` accessor |
+| File                                          | Change                                                                                                                  |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `packages/extension/src/popup.css`            | Widen to 600px, bump fonts, adjust list max-height, add `<details>`/`<summary>` styles, add `<select>` picker styles    |
+| `packages/extension/src/popup.ts`             | Switch render from `rows()` to `groups()`, add expander DOM, add project picker `<select>`, filter rules inside details |
+| `packages/extension/src/popup-model.ts`       | Add `PopupGroupRow` interface, add `groups()` method, add `projects` accessor for picker                                |
+| `packages/extension/test/popup-model.test.ts` | Add tests for `groups()` and `projects` accessor                                                                        |
 
 ### Public API / wire format changes
 

@@ -43,13 +43,13 @@ Authors state host scope twice: once in `urlRegex`, once in group/rule `origins`
 
 ## 3. Actors, entry points, environments
 
-| Actor | Entry |
-| --- | --- |
-| Project author | Editor, `.rogatio.json`, `rogatio edit` / `verify` / `test` / `ai` |
-| Extension user | Install, management page, popup, Start/Stop runtime |
-| Chrome | DNR, `chrome.proxy` PAC, scripting inject, native messaging |
-| Native host | PAC install, loopback proxy, `revalidateAuthority`, authorization |
-| Stored projects | browser-core envelope + on-disk `.rogatio.json` |
+| Actor           | Entry                                                              |
+| --------------- | ------------------------------------------------------------------ |
+| Project author  | Editor, `.rogatio.json`, `rogatio edit` / `verify` / `test` / `ai` |
+| Extension user  | Install, management page, popup, Start/Stop runtime                |
+| Chrome          | DNR, `chrome.proxy` PAC, scripting inject, native messaging        |
+| Native host     | PAC install, loopback proxy, `revalidateAuthority`, authorization  |
+| Stored projects | browser-core envelope + on-disk `.rogatio.json`                    |
 
 Supported environment: Chrome MV3 + Rogatio native host (existing platforms). PAC spike must run on the repo's Chrome for Testing before RegExp-in-PAC is treated as approved behavior.
 
@@ -143,7 +143,7 @@ Supported environment: Chrome MV3 + Rogatio native host (existing platforms). PA
   5. Non-terminating / statically unsafe pattern → refused at install; no PAC entry; stable diagnostic.
   6. Marker missing → pass through / existing deny untouched.
   7. Marker valid but URL no longer matches source → `url-mismatch`.
-  (REQ-022–029, REQ-035)
+     (REQ-022–029, REQ-035)
 - **AC-009** Unsafe PAC pattern fails closed; no wildcard/broad fallback route. (REQ-025)
 - **AC-010** Docs (`architecture.md`, README, package READMEs, docs site) state the broad-grant model and install-time warning plainly. Line that promised no broad host patterns is rewritten, not softened. Native re-check wording strengthened. (Stage 10)
 - **AC-011** `pnpm validate` green. Decision docs frozen per `AGENTS.md` on release. (Stage 8/11)
@@ -153,15 +153,15 @@ Supported environment: Chrome MV3 + Rogatio native host (existing platforms). PA
 
 ## 6. Compatibility and surfaces
 
-| Surface | Change |
-| --- | --- |
-| `.rogatio.json` | Breaking v2 shape; migration from v1 |
-| Compiler operations | `matcher.source` replaces `urlRegex`+`origins` |
-| Extension UI | No grant buttons; source editor replaces origins editors |
-| Status model | Drop `needs permission` |
-| Manifest / store listing | "Read and change all your data on all websites" |
-| AI prompts | Source condition instead of origins |
-| Preset digests | All change once |
+| Surface                  | Change                                                   |
+| ------------------------ | -------------------------------------------------------- |
+| `.rogatio.json`          | Breaking v2 shape; migration from v1                     |
+| Compiler operations      | `matcher.source` replaces `urlRegex`+`origins`           |
+| Extension UI             | No grant buttons; source editor replaces origins editors |
+| Status model             | Drop `needs permission`                                  |
+| Manifest / store listing | "Read and change all your data on all websites"          |
+| AI prompts               | Source condition instead of origins                      |
+| Preset digests           | All change once                                          |
 
 ## 7. Security, privacy, performance, ops
 
@@ -219,30 +219,30 @@ Alternatives: require target URL to also satisfy the source condition; keep a se
 
 ## 10. Architecture decisions appendix
 
-*(Apply to `docs/architecture.md` after approval / Stage 10. Do not treat this appendix as the living doc.)*
+_(Apply to `docs/architecture.md` after approval / Stage 10. Do not treat this appendix as the living doc.)_
 
 ### Package ownership
 
-| Package | Responsibility |
-| --- | --- |
-| `schema` | v2 shape, source validation, migration pure function + notices, drop origin checks |
-| `compiler` | `MatcherOperation.source`; delete `normalizeOrigins` |
-| `dry-run` | `source` dimension |
-| `browser-core` | Drop grants / `needs permission`; storage migration hooks; notice side-channel |
-| `editor` | Source controls; drop origins UI; show notices once |
-| `extension` | Manifest, DNR/markers, delete permissions adapters, PAC inputs from source, browser-schema mirror |
-| `runtime` | PAC from source conditions, revalidate/authorize target+initiator+source, canonical bytes, bounds |
-| `cli` | AI prompt + load-time migration notices |
+| Package        | Responsibility                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------- |
+| `schema`       | v2 shape, source validation, migration pure function + notices, drop origin checks                |
+| `compiler`     | `MatcherOperation.source`; delete `normalizeOrigins`                                              |
+| `dry-run`      | `source` dimension                                                                                |
+| `browser-core` | Drop grants / `needs permission`; storage migration hooks; notice side-channel                    |
+| `editor`       | Source controls; drop origins UI; show notices once                                               |
+| `extension`    | Manifest, DNR/markers, delete permissions adapters, PAC inputs from source, browser-schema mirror |
+| `runtime`      | PAC from source conditions, revalidate/authorize target+initiator+source, canonical bytes, bounds |
+| `cli`          | AI prompt + load-time migration notices                                                           |
 
 ### Chosen approaches
 
-| Seam | Choice | Rejected |
-| --- | --- | --- |
-| PAC | Spike-gated RegExp + literal host fast path; fail closed | Host-extract from URL regex; wildcard PAC |
-| Migration | Byte-preserve URL regex; warn inconclusive; side-channel notices | Synthesize `key:host`; warnings inside document |
-| DNR | `regexFilter` authoritative; `requestDomains` AND only for literal host | `requestDomains` alone; DNR `urlFilter` for regex |
-| Target auth | Same-origin with matched request URL | Any target after URL match; new origins-like allowlist |
-| Permissions | `host_permissions: ["*://*/*"]` + keep `declarativeNetRequest` | Per-origin optional grants; switch to `declarativeNetRequestWithHostAccess` without need |
+| Seam        | Choice                                                                  | Rejected                                                                                 |
+| ----------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| PAC         | Spike-gated RegExp + literal host fast path; fail closed                | Host-extract from URL regex; wildcard PAC                                                |
+| Migration   | Byte-preserve URL regex; warn inconclusive; side-channel notices        | Synthesize `key:host`; warnings inside document                                          |
+| DNR         | `regexFilter` authoritative; `requestDomains` AND only for literal host | `requestDomains` alone; DNR `urlFilter` for regex                                        |
+| Target auth | Same-origin with matched request URL                                    | Any target after URL match; new origins-like allowlist                                   |
+| Permissions | `host_permissions: ["*://*/*"]` + keep `declarativeNetRequest`          | Per-origin optional grants; switch to `declarativeNetRequestWithHostAccess` without need |
 
 ### Living architecture paragraphs to rewrite after approval
 

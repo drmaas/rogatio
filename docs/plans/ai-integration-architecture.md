@@ -58,15 +58,15 @@
 
 ### Key Design Decisions (Revised)
 
-| Decision | Rationale |
-|----------|-----------|
-| **Self-contained `rogatio edit`** | No proxy, no native host dependency for AI; works everywhere CLI runs |
-| **Cross-platform config file** | `~/.config/rogatio/provider.json` (Linux), `%LOCALAPPDATA%\rogatio\provider.json` (Windows), `~/Library/Application Support/rogatio/provider.json` (macOS) |
-| **Shared AI module** | `@rogatio/runtime` exports AI completion engine; both CLI server and native host import it |
-| **CLI `ai` subcommands** | User-friendly provider management: `setup`, `ls`, `show`, `delete`, `test` |
-| **Native host unchanged role** | Still `rogatio runtime host` for extension debugging; just also uses shared AI module |
-| **Streaming via SSE from CLI server** | Editor receives SSE; native host uses native messaging chunks for extension |
-| **No fallback routing needed** | Edit process always has AI engine; native host always has AI engine |
+| Decision                              | Rationale                                                                                                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Self-contained `rogatio edit`**     | No proxy, no native host dependency for AI; works everywhere CLI runs                                                                                      |
+| **Cross-platform config file**        | `~/.config/rogatio/provider.json` (Linux), `%LOCALAPPDATA%\rogatio\provider.json` (Windows), `~/Library/Application Support/rogatio/provider.json` (macOS) |
+| **Shared AI module**                  | `@rogatio/runtime` exports AI completion engine; both CLI server and native host import it                                                                 |
+| **CLI `ai` subcommands**              | User-friendly provider management: `setup`, `ls`, `show`, `delete`, `test`                                                                                 |
+| **Native host unchanged role**        | Still `rogatio runtime host` for extension debugging; just also uses shared AI module                                                                      |
+| **Streaming via SSE from CLI server** | Editor receives SSE; native host uses native messaging chunks for extension                                                                                |
+| **No fallback routing needed**        | Edit process always has AI engine; native host always has AI engine                                                                                        |
 
 ## Component Responsibilities (Revised)
 
@@ -79,12 +79,12 @@ export interface RogatioProject {
   name: string;
   description?: string;
   groups: RogatioGroup[];
-  ai?: AIProjectConfig;        // Optional metadata only (no credentials)
+  ai?: AIProjectConfig; // Optional metadata only (no credentials)
 }
 
 export interface AIProjectConfig {
-  providerUrl: string;          // For reference/display only
-  model: string;                // For reference/display only
+  providerUrl: string; // For reference/display only
+  model: string; // For reference/display only
 }
 ```
 
@@ -229,7 +229,7 @@ interface AICompleteRequest {
   type: "ai.complete";
   requestId: string;
   timestamp: number;
-  metadata: AICompletionOptions;  // Reuses shared types
+  metadata: AICompletionOptions; // Reuses shared types
 }
 
 // Response: native host → extension
@@ -299,48 +299,48 @@ AI calls editor's `dryRun` handler via `/api/dry-run` to validate proposals.
 
 ## Security Boundaries (Revised)
 
-| Boundary | Protection |
-|----------|------------|
-| **API Key** | Only in `~/.config/rogatio/provider.json` (600 perms) or OS keychain; read by CLI server and native host processes only |
-| **Project Data** | Sent to user's AI endpoint only; no Rogatio infrastructure |
-| **AI Output** | Sanitized → validated by schema/compiler → editor draft |
-| **Native Messaging** | Frames carry AI request/response metadata only |
-| **Config File** | Created by `rogatio ai setup` with 600 permissions; never written by editor |
+| Boundary             | Protection                                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **API Key**          | Only in `~/.config/rogatio/provider.json` (600 perms) or OS keychain; read by CLI server and native host processes only |
+| **Project Data**     | Sent to user's AI endpoint only; no Rogatio infrastructure                                                              |
+| **AI Output**        | Sanitized → validated by schema/compiler → editor draft                                                                 |
+| **Native Messaging** | Frames carry AI request/response metadata only                                                                          |
+| **Config File**      | Created by `rogatio ai setup` with 600 permissions; never written by editor                                             |
 
 ## Platform Support Matrix (Revised)
 
-| Feature | macOS | Linux | Windows |
-|---------|-------|-------|---------|
-| `rogatio edit` + AI | ✅ | ✅ | ✅ |
-| `rogatio ai` config commands | ✅ | ✅ | ✅ |
-| Extension AI (native host) | ✅ | Capability-gated | Capability-gated |
-| Shared AI module | ✅ | ✅ | ✅ |
+| Feature                      | macOS | Linux            | Windows          |
+| ---------------------------- | ----- | ---------------- | ---------------- |
+| `rogatio edit` + AI          | ✅    | ✅               | ✅               |
+| `rogatio ai` config commands | ✅    | ✅               | ✅               |
+| Extension AI (native host)   | ✅    | Capability-gated | Capability-gated |
+| Shared AI module             | ✅    | ✅               | ✅               |
 
 ## Rejected Alternatives (Revised)
 
-| Alternative | Reason |
-|-------------|--------|
-| Project-local `.rogatio.ai.json` | User wants cross-platform config directory |
-| CLI server proxying to native host | User wants self-contained edit process |
-| Browser-direct AI calls | Security boundary violation |
-| Separate AI daemon | Unnecessary; in-process is simpler |
+| Alternative                        | Reason                                     |
+| ---------------------------------- | ------------------------------------------ |
+| Project-local `.rogatio.ai.json`   | User wants cross-platform config directory |
+| CLI server proxying to native host | User wants self-contained edit process     |
+| Browser-direct AI calls            | Security boundary violation                |
+| Separate AI daemon                 | Unnecessary; in-process is simpler         |
 
 ## Testing Seams (Revised)
 
-| Seam | Test Type |
-|------|-----------|
-| Config file path resolution | Unit (runtime) |
-| Config read/write/delete | Unit (runtime) |
-| AI client (complete/stream) | Unit (runtime, with mock fetch) |
-| System prompt generation | Unit (runtime) |
-| Validation loop (3 iterations) | Unit (runtime) |
-| CLI `ai` subcommands | Unit (cli) |
-| Edit server AI routes | Unit (cli server) |
-| Editor aiAssist integration | Unit (editor) |
-| Native host AI envelopes | Integration (extension ↔ runtime) |
-| Full generation flow | E2E (Playwright) |
-| Full fix flow | E2E (Playwright) |
-| Config file permissions | Unit (runtime) |
+| Seam                           | Test Type                         |
+| ------------------------------ | --------------------------------- |
+| Config file path resolution    | Unit (runtime)                    |
+| Config read/write/delete       | Unit (runtime)                    |
+| AI client (complete/stream)    | Unit (runtime, with mock fetch)   |
+| System prompt generation       | Unit (runtime)                    |
+| Validation loop (3 iterations) | Unit (runtime)                    |
+| CLI `ai` subcommands           | Unit (cli)                        |
+| Edit server AI routes          | Unit (cli server)                 |
+| Editor aiAssist integration    | Unit (editor)                     |
+| Native host AI envelopes       | Integration (extension ↔ runtime) |
+| Full generation flow           | E2E (Playwright)                  |
+| Full fix flow                  | E2E (Playwright)                  |
+| Config file permissions        | Unit (runtime)                    |
 
 ## Migration & Rollout (Revised)
 
@@ -356,10 +356,10 @@ Each phase independently testable.
 
 ## Open Questions Resolved
 
-| Question | Resolution |
-|----------|------------|
-| Config storage | Cross-platform config directory (not project-local) |
-| Self-contained edit | Yes - AI engine in-process in CLI server |
-| Native host AI | Shared module; reads same config file |
-| CLI subcommands | `setup`, `ls`, `show`, `delete`, `test` |
-| Multiple providers | Start with single provider; extensible to named profiles later |
+| Question            | Resolution                                                     |
+| ------------------- | -------------------------------------------------------------- |
+| Config storage      | Cross-platform config directory (not project-local)            |
+| Self-contained edit | Yes - AI engine in-process in CLI server                       |
+| Native host AI      | Shared module; reads same config file                          |
+| CLI subcommands     | `setup`, `ls`, `show`, `delete`, `test`                        |
+| Multiple providers  | Start with single provider; extensible to named profiles later |

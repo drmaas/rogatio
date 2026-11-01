@@ -6,17 +6,17 @@ Base: `850e5f4`
 
 ## Stage status
 
-| Stage | Status | Evidence |
-| --- | --- | --- |
-| 0 Worktree | done | Worktree created from `main` at `850e5f4`, `pnpm install` run, shell confirmed inside it. |
-| 1 Brainstorm | done | Primary pass inline. Adversarial pass by a fresh-context subagent with no access to prior reasoning; 18 findings, 3 blockers. |
-| 2 Plan | done | `plan.md` recorded, append-only. |
-| 3 Tests first | done | Red state recorded before implementation: 12 failures, all `ruleAnchorId is not a function`. |
-| 4 Implementation | done | Editor anchor contract, one deep-link resolver, three cards, inert project card, focus retention, stylesheet. |
-| 5 Verification | done | `pnpm validate` passes: 1064 unit, 70 browser, 8 skipped (LIVE_E2E gated), format and lint clean. |
-| 6 Review | done | Round 1 returned 18 findings, 2 blockers. All accepted findings fixed and re-verified; see the review section. |
-| 7 Docs | done | `docs/architecture.md`, the docs-site extension guide, and the F22 supersession footer were updated after round 1 caught them being falsely reported as done. |
-| 8 Freeze + release | pending | Awaiting release authorization. |
+| Stage              | Status  | Evidence                                                                                                                                                      |
+| ------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 Worktree         | done    | Worktree created from `main` at `850e5f4`, `pnpm install` run, shell confirmed inside it.                                                                     |
+| 1 Brainstorm       | done    | Primary pass inline. Adversarial pass by a fresh-context subagent with no access to prior reasoning; 18 findings, 3 blockers.                                 |
+| 2 Plan             | done    | `plan.md` recorded, append-only.                                                                                                                              |
+| 3 Tests first      | done    | Red state recorded before implementation: 12 failures, all `ruleAnchorId is not a function`.                                                                  |
+| 4 Implementation   | done    | Editor anchor contract, one deep-link resolver, three cards, inert project card, focus retention, stylesheet.                                                 |
+| 5 Verification     | done    | `pnpm validate` passes: 1064 unit, 70 browser, 8 skipped (LIVE_E2E gated), format and lint clean.                                                             |
+| 6 Review           | done    | Round 1 returned 18 findings, 2 blockers. All accepted findings fixed and re-verified; see the review section.                                                |
+| 7 Docs             | done    | `docs/architecture.md`, the docs-site extension guide, and the F22 supersession footer were updated after round 1 caught them being falsely reported as done. |
+| 8 Freeze + release | pending | Awaiting release authorization.                                                                                                                               |
 
 ## Adversarial pass outcomes (Stage 1)
 

@@ -1,13 +1,14 @@
 ---
+
 name: docs-accuracy-sync
 description: >-
-  Sync Rogatio orientation docs and the Starlight docs-site with shipped code.
-  Use when updating README, AGENTS.md, docs/architecture.md, rogatio-overview.md,
-  packages/docs-site content, package READMEs, or when docs drift from CLI/runtime/
-  extension behavior (pnpm pin, package DAG, install commands, host vs CA).
-  Queries the main checkout's graphify graph (packages/ only, built once in the
-  main checkout) before editing. Lives at .agents/skills/ for multi-agent discovery
-  (Cursor, Claude Code, etc.).
+Sync Rogatio orientation docs and the Starlight docs-site with shipped code.
+Use when updating README, AGENTS.md, docs/architecture.md, rogatio-overview.md,
+packages/docs-site content, package READMEs, or when docs drift from CLI/runtime/
+extension behavior (pnpm pin, package DAG, install commands, host vs CA).
+Queries the main checkout's graphify graph (packages/ only, built once in the
+main checkout) before editing. Lives at .agents/skills/ for multi-agent discovery
+(Cursor, Claude Code, etc.).
 ---
 
 # Rogatio docs accuracy sync
@@ -41,15 +42,15 @@ Graphify answers are **orientation aids**. If graphify and code disagree, **code
 
 Live current-behavior surfaces that **must** stay synced with code:
 
-| Surface | Role |
-|---------|------|
-| `README.md` | User overview + CLI |
-| `AGENTS.md` | Agent orientation + pins + DAG |
-| `rogatio-overview.md` | Product scope |
-| `docs/architecture.md` | Package boundaries / seams |
-| `packages/docs-site/src/content/docs/**` | Published user docs |
-| `CONTRIBUTING.md` / `samples/*/README.md` | Toolchain pins when mentioned |
-| `packages/cli/README.md` | Published CLI package readme |
+| Surface                                   | Role                           |
+| ----------------------------------------- | ------------------------------ |
+| `README.md`                               | User overview + CLI            |
+| `AGENTS.md`                               | Agent orientation + pins + DAG |
+| `rogatio-overview.md`                     | Product scope                  |
+| `docs/architecture.md`                    | Package boundaries / seams     |
+| `packages/docs-site/src/content/docs/**`  | Published user docs            |
+| `CONTRIBUTING.md` / `samples/*/README.md` | Toolchain pins when mentioned  |
+| `packages/cli/README.md`                  | Published CLI package readme   |
 
 ## Worktree first
 

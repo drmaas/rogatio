@@ -70,15 +70,15 @@ Goals:
 
 ## Actors and supported environments
 
-| Actor | Responsibility |
-| --- | --- |
-| CLI operator | Verifies, edits, dry-runs, installs trust, and inspects safe status. |
-| Editor | Edits project and request-body configuration without runtime access. |
-| Chrome extension | Owns permissions, committed project state, live policy, native session, PAC, and markers. |
-| Native runtime | Validates policy, selects authority, transforms bodies, and forwards or blocks traffic. |
-| Platform CA adapter | Detects capability and manages device-local X.509 trust through reviewed tooling. |
-| Upstream server | Receives only an authorized, successfully transformed request. |
-| Browser request | Untrusted input for metadata, framing, headers, target, and body validation. |
+| Actor               | Responsibility                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------- |
+| CLI operator        | Verifies, edits, dry-runs, installs trust, and inspects safe status.                      |
+| Editor              | Edits project and request-body configuration without runtime access.                      |
+| Chrome extension    | Owns permissions, committed project state, live policy, native session, PAC, and markers. |
+| Native runtime      | Validates policy, selects authority, transforms bodies, and forwards or blocks traffic.   |
+| Platform CA adapter | Detects capability and manages device-local X.509 trust through reviewed tooling.         |
+| Upstream server     | Receives only an authorized, successfully transformed request.                            |
+| Browser request     | Untrusted input for metadata, framing, headers, target, and body validation.              |
 
 Offline support is required on Node.js `>=24`, TypeScript 7, ESM/NodeNext, Linux,
 macOS, and Windows. Chrome MV3 is the browser target. macOS is the reference live
@@ -607,22 +607,22 @@ serialized.
 
 ## Limits
 
-| Resource | F17 limit |
-| --- | ---: |
-| Observed request body | 4 MiB |
-| Transformed output body | 4 MiB |
-| Canonical live policy | 256 KiB |
-| Serialized native frame | 64 KiB |
-| Request-body operations in one policy | 32 |
-| Concurrent request-body transforms | 32 |
-| Regex pattern | 2,048 UTF-16 code units and policy byte bound |
-| Regex replacement | 4,096 UTF-16 code units and policy byte bound |
-| Local origins | 32 |
-| Regex deadline | 250 ms |
-| Complete operation | Existing F14 operation timeout |
-| Redirects | 0 |
-| Protocol | HTTP/1.1 |
-| Content encoding | Absent or `identity` |
+| Resource                              |                                     F17 limit |
+| ------------------------------------- | --------------------------------------------: |
+| Observed request body                 |                                         4 MiB |
+| Transformed output body               |                                         4 MiB |
+| Canonical live policy                 |                                       256 KiB |
+| Serialized native frame               |                                        64 KiB |
+| Request-body operations in one policy |                                            32 |
+| Concurrent request-body transforms    |                                            32 |
+| Regex pattern                         | 2,048 UTF-16 code units and policy byte bound |
+| Regex replacement                     | 4,096 UTF-16 code units and policy byte bound |
+| Local origins                         |                                            32 |
+| Regex deadline                        |                                        250 ms |
+| Complete operation                    |                Existing F14 operation timeout |
+| Redirects                             |                                             0 |
+| Protocol                              |                                      HTTP/1.1 |
+| Content encoding                      |                          Absent or `identity` |
 
 The 4 MiB limit applies independently to observed and transformed wire bodies. The
 256 KiB limit applies to complete canonical policy, including configured replacement
@@ -690,14 +690,14 @@ prepared -> wire-validated -> buffered -> transformed
 
 Any pre-upstream failure becomes `blocked`. Runtime stop aborts all active states.
 
-| Condition | Rule status |
-| --- | --- |
-| Group disabled | `disabled` |
-| Required permission missing | `needs permission` |
-| No active extension-owned native session | `needs proxy` |
-| Missing trust, identity, capability, arbitration, TLS, or PAC support | `unsupported` |
-| Valid session/provider installation failure | `error` |
-| Validated policy, provider, PAC, and marker installation | `active` |
+| Condition                                                             | Rule status        |
+| --------------------------------------------------------------------- | ------------------ |
+| Group disabled                                                        | `disabled`         |
+| Required permission missing                                           | `needs permission` |
+| No active extension-owned native session                              | `needs proxy`      |
+| Missing trust, identity, capability, arbitration, TLS, or PAC support | `unsupported`      |
+| Valid session/provider installation failure                           | `error`            |
+| Validated policy, provider, PAC, and marker installation              | `active`           |
 
 Per-request failure does not turn an otherwise installed rule into `active` or
 `disabled`; it emits stable redacted diagnostics and blocks the affected operation.
@@ -806,19 +806,19 @@ Per-request failure does not turn an otherwise installed rule into `active` or
 
 ## Required test mapping
 
-| Test level | Coverage |
-| --- | --- |
-| Schema | AC-001, AC-002, AC-003, AC-005 |
-| Compiler/selector | AC-001, AC-004, AC-006 |
-| Editor | AC-025 |
-| Runtime transform | AC-017, AC-018, AC-019, AC-020, AC-021 |
-| Native protocol/policy | AC-006, AC-007, AC-008, AC-009 |
-| Proxy integration | AC-014 through AC-023 |
-| F16 regression | AC-024 |
-| Extension integration | AC-010 through AC-015, AC-027 |
-| CLI integration | AC-026 |
-| Browser E2E | AC-029 |
-| Package validation | AC-005, AC-030 |
+| Test level             | Coverage                               |
+| ---------------------- | -------------------------------------- |
+| Schema                 | AC-001, AC-002, AC-003, AC-005         |
+| Compiler/selector      | AC-001, AC-004, AC-006                 |
+| Editor                 | AC-025                                 |
+| Runtime transform      | AC-017, AC-018, AC-019, AC-020, AC-021 |
+| Native protocol/policy | AC-006, AC-007, AC-008, AC-009         |
+| Proxy integration      | AC-014 through AC-023                  |
+| F16 regression         | AC-024                                 |
+| Extension integration  | AC-010 through AC-015, AC-027          |
+| CLI integration        | AC-026                                 |
+| Browser E2E            | AC-029                                 |
+| Package validation     | AC-005, AC-030                         |
 
 ## Approval record
 

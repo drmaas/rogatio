@@ -25,34 +25,34 @@ Feature tree: `docs/decisions/issue-170-f23-pac-proxy/` (freeze: `plan.md` → `
 
 ## Stage 1 adversarial findings (takeover review)
 
-| Severity | Finding | Disposition |
-| --- | --- | --- |
-| important | Stop order should remove PAC before stopping proxy | Applied in tests + interception.ts |
-| important | lifecycle local `getCurrentSession` stub always null | Fixed in Stage 4 (import real) |
-| important | InterceptionProvider does not take origins | Host sets `pendingOrigins` from `runtime.start` metadata |
-| nit | BN-7 reason code naming | Fixed in notes |
-| go | No sdd escalate | Proceeded |
+| Severity  | Finding                                              | Disposition                                              |
+| --------- | ---------------------------------------------------- | -------------------------------------------------------- |
+| important | Stop order should remove PAC before stopping proxy   | Applied in tests + interception.ts                       |
+| important | lifecycle local `getCurrentSession` stub always null | Fixed in Stage 4 (import real)                           |
+| important | InterceptionProvider does not take origins           | Host sets `pendingOrigins` from `runtime.start` metadata |
+| nit       | BN-7 reason code naming                              | Fixed in notes                                           |
+| go        | No sdd escalate                                      | Proceeded                                                |
 
 ## Stage 6 review findings (2026-09-24)
 
-| Severity | Finding | Disposition |
-| --- | --- | --- |
-| important | LIVE_E2E body journey not executed (`sudo -n` fails) | Recorded; AC-002/003/004 proven at unit level; live remains operator gate |
-| nit | `host.ts` detect hardcodes `controlling* = false` | Acceptable: collision enforced at extension `chrome.proxy` install (`controlled_by_other`) |
-| nit | Verbose obsolete comments in host wrapper | Non-blocking; optional cleanup later |
-| go | Compile fills group origins into empty rule origins → pacOrigins derivation works | Confirmed with compiler probe |
+| Severity  | Finding                                                                           | Disposition                                                                                |
+| --------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| important | LIVE_E2E body journey not executed (`sudo -n` fails)                              | Recorded; AC-002/003/004 proven at unit level; live remains operator gate                  |
+| nit       | `host.ts` detect hardcodes `controlling* = false`                                 | Acceptable: collision enforced at extension `chrome.proxy` install (`controlled_by_other`) |
+| nit       | Verbose obsolete comments in host wrapper                                         | Non-blocking; optional cleanup later                                                       |
+| go        | Compile fills group origins into empty rule origins → pacOrigins derivation works | Confirmed with compiler probe                                                              |
 
 **Review verdict: pass** (no sdd escalate).
 
 ## Model / role selection
 
-| Role | Model | Rationale |
-| --- | --- | --- |
-| reasoning / plan | prior OpenCode + Cursor inherit | Stage 1–2 recorded |
-| adversarial / Stage 6 review | Cursor inherit | Opus/GPT Task blocked by usage limit |
-| coding | inherit (Task) | Stages 3–4 |
-| verify | inherit | Real `pnpm validate` |
-| docs | inherit | Stage 7 |
+| Role                         | Model                           | Rationale                            |
+| ---------------------------- | ------------------------------- | ------------------------------------ |
+| reasoning / plan             | prior OpenCode + Cursor inherit | Stage 1–2 recorded                   |
+| adversarial / Stage 6 review | Cursor inherit                  | Opus/GPT Task blocked by usage limit |
+| coding                       | inherit (Task)                  | Stages 3–4                           |
+| verify                       | inherit                         | Real `pnpm validate`                 |
+| docs                         | inherit                         | Stage 7                              |
 
 ## Verification record
 

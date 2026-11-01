@@ -6,14 +6,14 @@ Workflow: `doit`. Worktree: `/home/drmaas/.local/share/opencode/worktree/rogatio
 
 Tier: `cursor-models` (user request; not the free/normal OpenCode chains).
 
-| Phase | Model |
-| --- | --- |
-| Brainstorm | gpt-5.6-sol-medium |
-| Adversarial | cursor-grok-4.6-high-fast |
-| Architecture + plan | claude-fable-5-1-thinking-high |
-| Tests + implementation | composer-2.5-fast |
-| Verification | muse-spark-1.3-high |
-| Independent review | claude-opus-5-thinking-high (PASS, round 1) |
+| Phase                  | Model                                       |
+| ---------------------- | ------------------------------------------- |
+| Brainstorm             | gpt-5.6-sol-medium                          |
+| Adversarial            | cursor-grok-4.6-high-fast                   |
+| Architecture + plan    | claude-fable-5-1-thinking-high              |
+| Tests + implementation | composer-2.5-fast                           |
+| Verification           | muse-spark-1.3-high                         |
+| Independent review     | claude-opus-5-thinking-high (PASS, round 1) |
 
 ## Locked decisions
 
@@ -26,16 +26,16 @@ Tier: `cursor-models` (user request; not the free/normal OpenCode chains).
 
 ## Acceptance criteria
 
-| ID | Criterion | Evidence |
-| --- | --- | --- |
-| AC-001 | Failed runtime guidance shows install command and icon button inline, icon immediately right of command | `.rogatio-install-command` flex nowrap row wraps `code` + `.rogatio-copy-icon`; browser test same-row assertion passes |
-| AC-002 | Button visible content is `⧉`, not "Copy install command" | `toHaveText("⧉")` in extension.spec.ts; `button("⧉", …)` in extension-page-entry.ts |
-| AC-003 | Accessible name remains "Copy install command" (+ `title`) | `aria-label` + `title` set; `toHaveAttribute("title", …)`; `getByRole("button", { name: "Copy install command" })` still resolves |
-| AC-004 | Click copies exact install command (existing behavior) | Clipboard + status assertions unchanged and pass |
-| AC-005 | Long command wraps/shrinks without overlapping icon | CSS: `.rogatio-install-command code { flex: 1 1 auto; min-width: 0; display: inline-block; overflow-wrap/word-break }`; `.rogatio-copy-icon { flex: none }` |
-| AC-006 | Extension-ID copy control unchanged | No edits to extension-ID row (~L361–371); copy-extension-ID assertions still pass |
-| AC-007 | Browser test passes with accessible role/name | `pnpm exec playwright test test/browser/extension.spec.ts` — 6 passed |
-| AC-008 | `pnpm validate` passes | `pnpm validate` — format, lint, typecheck, build, vitest (725), playwright (25 passed, 3 skipped) |
+| ID     | Criterion                                                                                               | Evidence                                                                                                                                                    |
+| ------ | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC-001 | Failed runtime guidance shows install command and icon button inline, icon immediately right of command | `.rogatio-install-command` flex nowrap row wraps `code` + `.rogatio-copy-icon`; browser test same-row assertion passes                                      |
+| AC-002 | Button visible content is `⧉`, not "Copy install command"                                               | `toHaveText("⧉")` in extension.spec.ts; `button("⧉", …)` in extension-page-entry.ts                                                                         |
+| AC-003 | Accessible name remains "Copy install command" (+ `title`)                                              | `aria-label` + `title` set; `toHaveAttribute("title", …)`; `getByRole("button", { name: "Copy install command" })` still resolves                           |
+| AC-004 | Click copies exact install command (existing behavior)                                                  | Clipboard + status assertions unchanged and pass                                                                                                            |
+| AC-005 | Long command wraps/shrinks without overlapping icon                                                     | CSS: `.rogatio-install-command code { flex: 1 1 auto; min-width: 0; display: inline-block; overflow-wrap/word-break }`; `.rogatio-copy-icon { flex: none }` |
+| AC-006 | Extension-ID copy control unchanged                                                                     | No edits to extension-ID row (~L361–371); copy-extension-ID assertions still pass                                                                           |
+| AC-007 | Browser test passes with accessible role/name                                                           | `pnpm exec playwright test test/browser/extension.spec.ts` — 6 passed                                                                                       |
+| AC-008 | `pnpm validate` passes                                                                                  | `pnpm validate` — format, lint, typecheck, build, vitest (725), playwright (25 passed, 3 skipped)                                                           |
 
 ## Log
 
