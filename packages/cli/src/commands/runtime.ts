@@ -55,6 +55,17 @@ exec "${nodeBin}" "${cliScript}" runtime host 2>>"${logPath}"
 `;
 }
 
+function formatHostWrapperError(error: unknown): string {
+  if (error instanceof Error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (typeof code === "string" && code.length > 0) {
+      return `${error.message} (${code})`;
+    }
+    return error.message;
+  }
+  return String(error);
+}
+
 async function writeHostWrapper(
   hostPath: string,
   installRoot: string,
@@ -66,7 +77,26 @@ async function writeHostWrapper(
     logPath,
   );
   await writeFile(hostPath, script, "utf8");
-  await chmod(hostPath, 0o755);
+  try {
+    await chmod(hostPath, 0o755);
+  } catch (error) {
+    try {
+      await rm(hostPath, { force: true });
+    } catch {
+      // best-effort cleanup of a non-executable partial wrapper
+    }
+    throw error;
+  }
+}
+
+function reportHostWrapperFailure(error: unknown): number {
+  console.error(
+    `runtime install failed: manifest and device-local CA were trusted, but the runtime-host wrapper was not created: ${formatHostWrapperError(error)}`,
+  );
+  console.error(
+    "Fix the error above, then re-run `rogatio runtime install` and `rogatio runtime verify`.",
+  );
+  return 1;
 }
 
 function makeTrustController() {
@@ -167,9 +197,7 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
         try {
           await writeHostWrapper(hostPath, installRoot);
         } catch (error) {
-          console.error(
-            `Warning: manifest and CA trusted, but failed to create runtime-host wrapper: ${error instanceof Error ? error.message : String(error)}`,
-          );
+          return reportHostWrapperFailure(error);
         }
       }
       return reportTrust(
