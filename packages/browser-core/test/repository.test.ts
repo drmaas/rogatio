@@ -477,6 +477,48 @@ describe("ProjectRepository", () => {
     if (result.ok) expect(result.value.activeProjectId).toBe("alpha");
   });
 
+  it("activates the newer remaining project when its id sorts first", async () => {
+    const storage = new MemoryStorage();
+    const { repo, clock } = makeRepository(storage);
+
+    await repo.createProject(makeProject("Older"), { id: "bravo" });
+    await repo.createProject(makeProject("Middle"), { id: "alpha" });
+    clock.advance();
+    await repo.saveProject(
+      "alpha",
+      makeProject("Middle", { description: "bumped" }),
+      1,
+    );
+    await repo.createProject(makeProject("Active"), { id: "charlie" });
+    await repo.switchProject("charlie");
+
+    const result = await repo.removeProject("charlie");
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.activeProjectId).toBe("alpha");
+    expect(Object.keys(result.ok ? result.value.projects : {})).toEqual(
+      expect.arrayContaining(["alpha", "bravo"]),
+    );
+  });
+
+  it("activates the lexicographically smallest id when updatedAt ties", async () => {
+    const storage = new MemoryStorage();
+    const { repo } = makeRepository(storage);
+
+    await repo.createProject(makeProject("A"), { id: "beta" });
+    await repo.createProject(makeProject("B"), { id: "alpha" });
+    await repo.createProject(makeProject("C"), { id: "gamma" });
+    await repo.switchProject("gamma");
+
+    const result = await repo.removeProject("gamma");
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.activeProjectId).toBe("alpha");
+    expect(Object.keys(result.ok ? result.value.projects : {})).toEqual(
+      expect.arrayContaining(["alpha", "beta"]),
+    );
+  });
+
   it("toggles saved group enablement and rejects unknown groups", async () => {
     const storage = new MemoryStorage();
     const { repo } = makeRepository(storage);

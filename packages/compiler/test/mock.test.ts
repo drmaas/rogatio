@@ -350,7 +350,8 @@ describe("@rogatio/compiler mock follow-ups", () => {
       }),
     );
     expectFailure(result);
-    expect(result.diagnostics[0]?.code).toBe("schema.invalid-value");
+    expect(result.diagnostics[0]?.code).toBe("compiler.forbidden-header");
+    expect(result.diagnostics[0]?.path).toBe("/groups/0/rules/0/headerName");
   });
 
   it("selects an enabled mock operation in the request phase", () => {

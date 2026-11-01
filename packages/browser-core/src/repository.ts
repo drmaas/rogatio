@@ -181,11 +181,11 @@ export class ProjectRepository {
           } else {
             const sorted = [...remaining].sort((left, right) => {
               if (left.updatedAt !== right.updatedAt) {
-                return left.updatedAt - right.updatedAt;
+                return right.updatedAt - left.updatedAt;
               }
               return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
             });
-            activeProjectId = sorted[sorted.length - 1]?.id ?? null;
+            activeProjectId = sorted[0]?.id ?? null;
           }
         }
         const next: StoredEnvelope = {
