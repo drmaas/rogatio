@@ -1,25 +1,16 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { RELEASE_EXTENSION_ID } from "@rogatio/runtime";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const recorded = vi.hoisted(() => ({
   extensionIds: [] as string[],
 }));
 
-// Never touch the real install root (~/.local/share/rogatio): the CLI writes
-// the runtime-host wrapper outside the mocked trust controller.
-vi.mock("node:fs/promises", async () => {
-  const actual =
-    await vi.importActual<typeof import("node:fs/promises")>(
-      "node:fs/promises",
-    );
-  return {
-    ...actual,
-    mkdir: async () => undefined,
-    writeFile: async () => undefined,
-    chmod: async () => undefined,
-    rm: async () => undefined,
-  };
-});
+const installRootOverride = vi.hoisted(() => ({
+  value: null as string | null,
+}));
 
 vi.mock("@rogatio/runtime", async () => {
   const actual =
@@ -28,6 +19,9 @@ vi.mock("@rogatio/runtime", async () => {
     );
   return {
     ...actual,
+    defaultTrustInstallRoot: () =>
+      installRootOverride.value ??
+      actual.defaultTrustInstallRoot(process.platform),
     createInstalledTrustController: () => ({
       install: async (extensionId: string) => {
         recorded.extensionIds.push(extensionId);
@@ -46,7 +40,17 @@ vi.mock("@rogatio/runtime", async () => {
 
 import { runtimeCommand } from "../src/commands/runtime.js";
 
-afterEach(() => {
+beforeEach(async () => {
+  installRootOverride.value = await mkdtemp(
+    join(tmpdir(), "rogatio-runtime-gating-"),
+  );
+});
+
+afterEach(async () => {
+  if (installRootOverride.value) {
+    await rm(installRootOverride.value, { recursive: true, force: true });
+    installRootOverride.value = null;
+  }
   vi.restoreAllMocks();
 });
 

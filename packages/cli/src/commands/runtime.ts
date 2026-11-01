@@ -1,5 +1,6 @@
-import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { constants as fsConstants } from "node:fs";
+import { mkdir, open, rename, rm } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { compileProject } from "@rogatio/compiler";
 import {
   createInstalledTrustController,
@@ -66,6 +67,11 @@ function formatHostWrapperError(error: unknown): string {
   return String(error);
 }
 
+function noFollowFlag(): number {
+  const flag = fsConstants.O_NOFOLLOW;
+  return typeof flag === "number" ? flag : 0;
+}
+
 async function writeHostWrapper(
   hostPath: string,
   installRoot: string,
@@ -76,14 +82,31 @@ async function writeHostWrapper(
     `${process.execPath} ${process.argv[1] ?? "rogatio"}`,
     logPath,
   );
-  await writeFile(hostPath, script, "utf8");
+  const dir = dirname(hostPath);
+  const tmp = join(dir, `.${basename(hostPath)}.${process.pid}.tmp`);
+  const flags =
+    fsConstants.O_WRONLY |
+    fsConstants.O_CREAT |
+    fsConstants.O_EXCL |
+    noFollowFlag();
+  let created = false;
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
   try {
-    await chmod(hostPath, 0o755);
+    handle = await open(tmp, flags, 0o600);
+    created = true;
+    await handle.writeFile(script, "utf8");
+    await handle.chmod(0o755);
+    await handle.close();
+    handle = undefined;
+    await rename(tmp, hostPath);
   } catch (error) {
-    try {
-      await rm(hostPath, { force: true });
-    } catch {
-      // best-effort cleanup of a non-executable partial wrapper
+    await handle?.close().catch(() => undefined);
+    if (created) {
+      try {
+        await rm(tmp, { force: true });
+      } catch {
+        // best-effort cleanup of the temp wrapper
+      }
     }
     throw error;
   }
@@ -91,7 +114,7 @@ async function writeHostWrapper(
 
 function reportHostWrapperFailure(error: unknown): number {
   console.error(
-    `runtime install failed: manifest and device-local CA were trusted, but the runtime-host wrapper was not created: ${formatHostWrapperError(error)}`,
+    `runtime install failed: the runtime-host wrapper was not created: ${formatHostWrapperError(error)}. Manifest and CA trust were rolled back.`,
   );
   console.error(
     "Fix the error above, then re-run `rogatio runtime install` and `rogatio runtime verify`.",
@@ -197,6 +220,11 @@ async function trustRuntimeCommand(args: string[]): Promise<number> {
         try {
           await writeHostWrapper(hostPath, installRoot);
         } catch (error) {
+          try {
+            await controller.uninstall();
+          } catch {
+            // best-effort rollback after wrapper failure
+          }
           return reportHostWrapperFailure(error);
         }
       }

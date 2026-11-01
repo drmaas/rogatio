@@ -1,17 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("node:fs/promises", async () => {
-  const actual =
-    await vi.importActual<typeof import("node:fs/promises")>(
-      "node:fs/promises",
-    );
-  return {
-    ...actual,
-    mkdir: async () => undefined,
-    writeFile: async () => undefined,
-    chmod: async () => undefined,
-  };
-});
+const installRootOverride = vi.hoisted(() => ({
+  value: null as string | null,
+}));
 
 vi.mock("@rogatio/runtime", async () => {
   const actual =
@@ -20,6 +14,9 @@ vi.mock("@rogatio/runtime", async () => {
     );
   return {
     ...actual,
+    defaultTrustInstallRoot: () =>
+      installRootOverride.value ??
+      actual.defaultTrustInstallRoot(process.platform),
     createInstalledTrustController: () => ({
       install: async () => ({ ok: true, state: "installed" as const }),
       uninstall: async () => ({ ok: true, state: "uninstalled" as const }),
@@ -33,8 +30,19 @@ vi.mock("@rogatio/runtime", async () => {
   };
 });
 
+afterEach(async () => {
+  if (installRootOverride.value) {
+    await rm(installRootOverride.value, { recursive: true, force: true });
+    installRootOverride.value = null;
+  }
+  vi.restoreAllMocks();
+});
+
 describe("rogatio runtime install (unified success)", () => {
   it("prints the unified install success message when install succeeds", async () => {
+    installRootOverride.value = await mkdtemp(
+      join(tmpdir(), "rogatio-wrapper-success-"),
+    );
     const { runtimeCommand } = await import("../src/commands/runtime.js");
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
