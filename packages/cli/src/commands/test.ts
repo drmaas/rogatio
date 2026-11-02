@@ -8,11 +8,11 @@ import {
 } from "@rogatio/dry-run";
 import {
   createJsonFileProjectStorage,
-  type ProjectStorage,
+  type ProjectReader,
 } from "../utils/file.js";
 import { diagnoseProject } from "./diagnose.js";
 export interface TestCommandOptions {
-  storage?: ProjectStorage;
+  storage?: ProjectReader;
 }
 
 interface TestCaseInput {

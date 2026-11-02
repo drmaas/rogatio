@@ -9,13 +9,16 @@ import {
   generateCsrfToken,
   type RouteContext,
 } from "../src/server/routes.js";
-import type { ProjectStorage } from "../src/utils/file.js";
+import type {
+  ProjectDocumentWriter,
+  ProjectReader,
+} from "../src/utils/file.js";
 
 describe("API routes", () => {
   let context: RouteContext;
   let handler: ReturnType<typeof createRoutes>;
-  let updateMock: ReturnType<typeof vi.fn<ProjectStorage["update"]>>;
-  let storage: ProjectStorage;
+  let updateMock: ReturnType<typeof vi.fn<ProjectDocumentWriter["update"]>>;
+  let storage: ProjectReader & Pick<ProjectDocumentWriter, "update">;
   const boundPort = 34567;
   const allowedHost = `127.0.0.1:${boundPort}`;
   const sessionToken = "test-csrf-token";
@@ -50,14 +53,12 @@ describe("API routes", () => {
 
   beforeEach(() => {
     const csrfToken = sessionToken;
-    updateMock = vi.fn<ProjectStorage["update"]>().mockResolvedValue(undefined);
+    updateMock = vi
+      .fn<ProjectDocumentWriter["update"]>()
+      .mockResolvedValue(undefined);
     storage = {
-      list: vi.fn(),
       get: vi.fn(),
-      create: vi.fn(),
-      import: vi.fn(),
       update: updateMock,
-      delete: vi.fn(),
     };
     context = {
       project: { ...validProject },
@@ -564,7 +565,6 @@ describe("API routes", () => {
         validProject,
       );
       expect(storage.get).not.toHaveBeenCalled();
-      expect(storage.create).not.toHaveBeenCalled();
       const endCall = vi.mocked(res.end).mock.calls[0][0];
       const data = JSON.parse(endCall);
       expect(data.ok).toBe(true);

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { verifyCommand } from "../src/commands/verify.js";
 import {
   createJsonFileProjectStorage,
-  type ProjectStorage,
+  type ProjectReader,
   writeProject,
 } from "../src/utils/file.js";
 
@@ -89,14 +89,7 @@ describe("verify command", () => {
     const real = createJsonFileProjectStorage();
     await real.create({ id: testFile, data: validProject });
     const get = vi.fn(real.get.bind(real));
-    const storage: ProjectStorage = {
-      list: vi.fn(real.list.bind(real)),
-      get,
-      create: vi.fn(real.create.bind(real)),
-      import: vi.fn(real.import.bind(real)),
-      update: vi.fn(real.update.bind(real)),
-      delete: vi.fn(real.delete.bind(real)),
-    };
+    const storage: ProjectReader = { get };
 
     const fileCode = await verifyCommand([testFile], undefined, false, {
       storage,
@@ -113,11 +106,6 @@ describe("verify command", () => {
     );
     expect(stdinOutput).toBe("Valid\n");
     expect(get).not.toHaveBeenCalled();
-    expect(storage.create).not.toHaveBeenCalled();
-    expect(storage.update).not.toHaveBeenCalled();
-    expect(storage.list).not.toHaveBeenCalled();
-    expect(storage.delete).not.toHaveBeenCalled();
-    expect(storage.import).not.toHaveBeenCalled();
   });
 
   it("outputs JSON with --json flag", async () => {

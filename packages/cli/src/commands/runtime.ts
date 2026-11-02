@@ -21,13 +21,13 @@ import { showRuntimeHelp } from "../help.js";
 import { readSavedMockRoot } from "../mock-root-config.js";
 import {
   createJsonFileProjectStorage,
-  type ProjectStorage,
+  type ProjectReader,
 } from "../utils/file.js";
 import { readCliVersion } from "../version.js";
 
 export interface RuntimeCommandOptions {
   stdinInput?: string;
-  storage?: ProjectStorage;
+  storage?: ProjectReader;
 }
 
 export interface RuntimeCommandResult {
