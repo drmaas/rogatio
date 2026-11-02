@@ -13,11 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createJsonFileProjectStorage,
   ProjectFileError,
-  type ProjectStorage,
   ProjectStorageError,
   readProject,
   writeProject,
 } from "../src/utils/file.js";
+import type { ProjectStorage } from "../src/utils/project-storage.js";
 
 describe("ProjectStorage (JSON-file)", () => {
   let testDir: string;
