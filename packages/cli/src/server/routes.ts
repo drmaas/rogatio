@@ -18,13 +18,13 @@ import {
   serializeEditorDiagnostics,
 } from "../editor-doctor.js";
 import { readSavedMockRoot, writeSavedMockRoot } from "../mock-root-config.js";
-import type { ProjectStorage } from "../utils/file.js";
+import type { ProjectDocumentWriter, ProjectReader } from "../utils/file.js";
 import { readCliVersion } from "../version.js";
 export interface RouteContext {
   project: unknown;
   filePath: string;
   csrfToken: string;
-  storage: ProjectStorage;
+  storage: ProjectReader & Pick<ProjectDocumentWriter, "update">;
   shutdown: () => void;
   /** Bound loopback port after `server.start()`; used for Host/Origin checks. */
   boundPort: number;

@@ -1,6 +1,8 @@
 export {
   createJsonFileProjectStorage,
+  type ProjectDocumentWriter,
   ProjectFileError,
+  type ProjectReader,
   type ProjectStorage,
   ProjectStorageError,
 } from "./project-storage.js";

@@ -1,12 +1,12 @@
 import { resolve } from "node:path";
 import {
   createJsonFileProjectStorage,
-  type ProjectStorage,
+  type ProjectReader,
 } from "../utils/file.js";
 import { diagnoseProject } from "./diagnose.js";
 
 export interface VerifyCommandOptions {
-  storage?: ProjectStorage;
+  storage?: ProjectReader;
 }
 
 async function verifyCommandImpl(

@@ -13,14 +13,14 @@ import {
 import { showDoctorHelp } from "../help.js";
 import {
   createJsonFileProjectStorage,
-  type ProjectStorage,
+  type ProjectReader,
   ProjectStorageError,
 } from "../utils/file.js";
 import { readCliVersion } from "../version.js";
 
 export interface DoctorCommandOptions {
   readonly cwd?: string;
-  readonly storage?: ProjectStorage;
+  readonly storage?: ProjectReader;
   readonly nodeVersion?: string;
   readonly cliVersion?: string;
   readonly fetchLatestVersion?: InstalledDoctorOptions["fetchLatestVersion"];

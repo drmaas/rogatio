@@ -64,18 +64,34 @@ interface ProjectRef {
 }
 
 /**
- * Application-facing project lifecycle persistence.
+ * Read a project document by backend-defined `id`.
  * Groups/rules are nested inside each project document — not separate resources.
- * `id` is backend-defined (filesystem path for JSON-file; uuid/URI for future backends).
  */
-export interface ProjectStorage {
-  list(scope?: string): Promise<readonly ProjectRef[]>;
+export interface ProjectReader {
   get(id: string): Promise<unknown>;
+}
+
+/** Create or replace project documents. */
+export interface ProjectDocumentWriter {
   create(options?: { id?: string; data?: unknown }): Promise<ProjectRef>;
-  import(data: unknown, options?: { id?: string }): Promise<ProjectRef>;
   update(id: string, data: unknown): Promise<void>;
+}
+
+/** Catalog and lifecycle operations not required by read-only CLI paths. */
+interface ProjectCatalog {
+  list(scope?: string): Promise<readonly ProjectRef[]>;
+  import(data: unknown, options?: { id?: string }): Promise<ProjectRef>;
   delete(id: string): Promise<void>;
 }
+
+/**
+ * Full application-facing project lifecycle persistence.
+ * `id` is backend-defined (filesystem path for JSON-file; uuid/URI for future backends).
+ */
+export interface ProjectStorage
+  extends ProjectReader,
+    ProjectDocumentWriter,
+    ProjectCatalog {}
 
 /**
  * Fresh empty project document for create-without-data and edit bootstrap.

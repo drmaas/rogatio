@@ -20,7 +20,8 @@ import { editorAssetPaths } from "../utils/asset-paths.js";
 import { launchBrowser } from "../utils/browser.js";
 import {
   createJsonFileProjectStorage,
-  type ProjectStorage,
+  type ProjectDocumentWriter,
+  type ProjectReader,
   ProjectStorageError,
 } from "../utils/file.js";
 import { randomCivilizationProjectName } from "../utils/project-storage.js";
@@ -28,7 +29,7 @@ import { randomCivilizationProjectName } from "../utils/project-storage.js";
 export interface EditCommandOptions {
   launchBrowser?: (url: string) => Promise<boolean>;
   port?: number;
-  storage?: ProjectStorage;
+  storage?: ProjectReader & ProjectDocumentWriter;
 }
 
 export interface EditCommandResult {
@@ -253,7 +254,7 @@ function needsCivilizationProjectName(data: unknown): boolean {
  * Covers legacy empty-name files created before default naming existed.
  */
 async function ensureCivilizationProjectName(
-  storage: ProjectStorage,
+  storage: ProjectReader & ProjectDocumentWriter,
   filePath: string,
   data: unknown,
 ): Promise<unknown> {
