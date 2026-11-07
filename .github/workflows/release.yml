@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: 26.11.1
+  NODE_VERSION: 26.12.1
   # Trusted publishing needs npm CLI >= 11.5.1. Pin the newest 11.x so the job
   # does not follow whatever npm ships inside the Node 26 image.
   NPM_VERSION: "11.21.0"
