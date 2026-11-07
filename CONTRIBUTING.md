@@ -12,7 +12,7 @@ experienced contributors alike.
 
 Rogatio is a pnpm monorepo. You need:
 
-- **Node.js 26.11.1** (CI baseline; Node 26 or newer)
+- **Node.js 26.12.1** (CI baseline; Node >=26.12.1 per `engines.node`)
 - **pnpm 12.10.1**
 - **Chrome for Testing** for browser e2e (`pnpm browser:install`)
 

@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = resolve(import.meta.dirname, "../..");
-const nodePin = "26.11.1";
+const nodePin = "26.12.1";
 
 describe("toolchain pins", () => {
   it("uses the same Node pin in nvm and every workflow", async () => {
@@ -34,6 +34,6 @@ describe("toolchain pins", () => {
       engines: { node: string };
     };
     expect(manifest.packageManager).toBe("pnpm@12.10.1");
-    expect(manifest.engines.node).toBe(">=26");
+    expect(manifest.engines.node).toBe(">=26.12.1");
   });
 });
