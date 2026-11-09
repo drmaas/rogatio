@@ -47,7 +47,7 @@ function hostReport(): DoctorReport {
     ok: true,
     exitCode: 0,
     checks: [
-      row("node", "pass", false, "Node 26.11.1, CLI 6.15.0.", null),
+      row("node", "pass", false, "Node 26.12.1, CLI 6.15.0.", null),
       row("project", "pass", false, "Active project is valid.", null),
       row(
         "host",

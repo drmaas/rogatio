@@ -29,7 +29,7 @@ const report: DoctorReport = {
       id: "node",
       status: "pass",
       optional: false,
-      summary: "Node 26.11.1, CLI 1.2.3.",
+      summary: "Node 26.12.1, CLI 1.2.3.",
       fix: null,
     },
     {

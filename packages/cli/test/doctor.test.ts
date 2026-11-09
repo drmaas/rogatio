@@ -30,7 +30,7 @@ const validProject = {
 
 function ports() {
   return {
-    nodeVersion: "26.11.1",
+    nodeVersion: "26.12.1",
     cliVersion: "1.2.3",
     verifyInstall: async () => passingVerify,
     probePac: async () => ({ ok: true as const }),
