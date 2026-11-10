@@ -35,7 +35,7 @@ Checks the local stack and prints `pass`, `warn`, or `fail` with one copy-paste 
 
 Checks, in order:
 
-1. Node.js 26 or newer, and this CLI version.
+1. Node.js 26.12.1 or newer (>=26.12.1 per `engines.node`), and this CLI version.
 2. The project file, using the same schema and compiler checks as `verify`.
 3. The native-host manifest, including whether `allowed_origins` matches the extension ID.
 4. The device CA, using the same signal as `rogatio runtime verify`.
@@ -120,4 +120,4 @@ OpenAI-compatible providers.
 ## Notes
 
 - The CLI is distributed as `@rogatio/cli` from the public npm registry.
-- Requires **Node.js 26** or newer.
+- Requires **Node.js 26.12.1** or newer (>=26.12.1 per `engines.node`).

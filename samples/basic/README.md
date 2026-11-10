@@ -229,7 +229,7 @@ rules match and preview their rewrites offline.
 
 #### Local validation server
 
-Save this as `samples/basic/validate-server.mjs` (Node 26+, no dependencies) and run it with
+Save this as `samples/basic/validate-server.mjs` (Node 26.12.1+, no dependencies) and run it with
 `node samples/basic/validate-server.mjs`. It serves endpoints that expose the headers,
 body, and content the Rogatio rules act on:
 

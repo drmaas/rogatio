@@ -6,7 +6,7 @@ description: Install the Rogatio CLI from npm and manually load the Chrome exten
 ## CLI
 
 The CLI is distributed as an npm package from the public npm registry. It requires
-**Node.js 26 or newer**. Install the CLI globally with your preferred package manager:
+**Node.js 26.12.1** or newer (>=26.12.1 per `engines.node`). Install the CLI globally with your preferred package manager:
 
 ```sh
 npm install -g @rogatio/cli
