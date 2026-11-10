@@ -21,8 +21,10 @@ export const DOCTOR_PAC_TIMEOUT_MS = 10_000;
 /** How long doctor waits for the configured AI provider. */
 export const DOCTOR_AI_TIMEOUT_MS = 10_000;
 
-export const DOCTOR_FIX_NODE =
-  "Install Node.js 26 or newer, then run: npm install -g @rogatio/cli";
+/** Matches root `engines.node` and the CI Node pin. */
+export const MINIMUM_NODE_VERSION = "26.12.1";
+
+export const DOCTOR_FIX_NODE = `Install Node.js ${MINIMUM_NODE_VERSION} or newer, then run: npm install -g @rogatio/cli`;
 export const DOCTOR_FIX_CLI = "npm install -g @rogatio/cli";
 export const DOCTOR_FIX_HOST = "rogatio runtime install";
 export const DOCTOR_FIX_CA = "rogatio runtime install";
@@ -58,7 +60,6 @@ export const DOCTOR_CHECK_TITLES: Record<DoctorCheckId, string> = {
   ai: "AI Assist",
 };
 
-const MINIMUM_NODE_MAJOR = 26;
 const EXTENSION_ID_RE = /^[a-p]{32}$/;
 /** Local Node and CLI versions may carry a suffix after major.minor.patch. */
 const NODE_VERSION_RE = /^(\d+)\.(\d+)\.(\d+)/;
@@ -191,20 +192,18 @@ function compareVersions(left: string, right: string): number | null {
   return 0;
 }
 
-function nodeMajor(version: string): number | null {
-  const match = NODE_VERSION_RE.exec(version);
-  if (match === null) return null;
-  return Number(match[1]);
+function nodeMeetsMinimum(version: string): boolean {
+  const compared = compareVersions(version, MINIMUM_NODE_VERSION);
+  return compared !== null && compared >= 0;
 }
 
 async function nodeCheck(input: DoctorInput): Promise<DoctorCheck> {
-  const major = nodeMajor(input.nodeVersion);
   const cli = input.cliVersion.trim();
-  if (major === null || major < MINIMUM_NODE_MAJOR) {
+  if (!nodeMeetsMinimum(input.nodeVersion)) {
     return check(
       "node",
       "fail",
-      `Node ${input.nodeVersion || "unknown"} is older than Node ${MINIMUM_NODE_MAJOR}.`,
+      `Node ${input.nodeVersion || "unknown"} is older than Node ${MINIMUM_NODE_VERSION}.`,
       DOCTOR_FIX_NODE,
     );
   }
