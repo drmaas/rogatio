@@ -906,21 +906,33 @@ when neither matches. Response-body rules are not PAC routes. The extension does
 not use `webRequestBlocking`. The proxy does not authorize a rewrite from a per-request
 capability marker or a pending-auth map.
 
-An absolute-form `http:` request is accepted only for port 80. The listener matches the
-URL and method against the session policy's compiled `request-body` and `response-body`
-operations and keeps the highest-priority winner (`pickHighest`, ties broken by rule
-id). A winner is authorized with `revalidateAuthority`. The initiator is the `Origin`
-header when it is an `http:` or `https:` origin, otherwise the `Referer` origin,
-otherwise the target origin. An authorized request-body winner is rewritten with
+Origin-form requests are answered by this listener and are not forwarded. That
+includes `/.rogatio/mock/` and `/.rogatio/body/`. Their Host must be
+`127.0.0.1:<port>`, `localhost:<port>`, or `[::1]:<port>`, where `<port>` is this
+listener's bound port. The comparison is `isAllowedLoopbackHost`. The editor server
+uses the same helper with `127.0.0.1` and `localhost` only.
+
+An absolute-form `http:` request to any other authority is accepted only for port 80.
+`CONNECT` to any other authority is accepted only for port 443 and stays a blind
+tunnel. An absolute-form or `CONNECT` authority that is this listener is not
+forwarded. An absolute-form mock or response-body path on this listener is served
+only when its Host is on the same allowlist.
+
+The listener matches an upstream URL and method against the session policy's compiled
+`request-body` and `response-body` operations and keeps the highest-priority winner
+(`pickHighest`, ties broken by rule id). A winner is authorized with
+`revalidateAuthority`. The initiator is the request target origin. This listener has
+no registered page context, and `Origin` and `Referer` are not the initiator. An
+authorized request-body winner is rewritten with
 `rewriteRequestBody`. A denied authorization or a failed transform forwards the
 original body. `forwardRequestHeaders` rebuilds the upstream request: it sets `Host`
 and `Content-Length`, sends `Connection: close`, drops hop-by-hop and `proxy-*`
 headers, and drops any header whose name starts with `x-rogatio-dispatch-`. DNS
 pinning uses `address-policy.ts` (`classifyAddress` and `validateResolvedAddresses`).
 Public addresses are the default pin. A non-public pin is allowed only for an exact
-normalized origin listed in the policy's local origins. `CONNECT` is accepted only for
-port 443 and is a blind tunnel to that pinned address: the bytes are spliced, and TLS
-is not decrypted.
+normalized origin listed in the policy's local origins. `CONNECT` to another
+authority is accepted only for port 443 and is a blind tunnel to that pinned address:
+the bytes are spliced, and TLS is not decrypted.
 
 Response-body rules that the browser redirects to
 `/.rogatio/body/<token>/<ruleId>/<digest>/<originalUrl>` are a separate

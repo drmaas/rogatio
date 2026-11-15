@@ -1013,3 +1013,440 @@ describe("intercept-proxy upstream targets", () => {
     expect(dialed).toEqual([]);
   });
 });
+
+const MOCK_DIGEST = "sha256:abc";
+
+function mockListenerPath(): string {
+  return `/.rogatio/mock/tok/${encodeURIComponent(MOCK_DIGEST)}`;
+}
+
+function rawStatus(port: number, raw: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const socket = connect(port, "127.0.0.1");
+    let buf = "";
+    const timer = setTimeout(() => {
+      socket.destroy();
+      reject(new Error(`timeout: ${buf.slice(0, 60)}`));
+    }, 2000);
+    socket.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    socket.on("data", (chunk) => {
+      buf += chunk.toString("latin1");
+      const match = /^HTTP\/1\.[01] (\d+)/.exec(buf);
+      if (match === null) return;
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(Number(match[1]));
+    });
+    socket.on("connect", () => {
+      socket.write(raw);
+    });
+  });
+}
+
+function rawFetch(
+  port: number,
+  raw: string,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const socket = connect(port, "127.0.0.1");
+    let buf = Buffer.alloc(0);
+    const timer = setTimeout(() => {
+      socket.destroy();
+      reject(new Error("timeout"));
+    }, 2000);
+    socket.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    socket.on("connect", () => {
+      socket.write(raw);
+    });
+    socket.on("data", (chunk) => {
+      const piece = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      buf = Buffer.concat([buf, piece]);
+    });
+    socket.on("end", () => {
+      clearTimeout(timer);
+      const sep = buf.indexOf("\r\n\r\n");
+      if (sep < 0) {
+        reject(new Error("no headers"));
+        return;
+      }
+      const head = buf.subarray(0, sep).toString("latin1");
+      const statusMatch = /^HTTP\/1\.[01] (\d+)/.exec(head);
+      if (!statusMatch) {
+        reject(new Error(`bad status line: ${head.slice(0, 40)}`));
+        return;
+      }
+      const headerMap: Record<string, string> = {};
+      for (const line of head.split("\r\n").slice(1)) {
+        const index = line.indexOf(":");
+        if (index > 0) {
+          headerMap[line.slice(0, index).trim().toLowerCase()] = line
+            .slice(index + 1)
+            .trim();
+        }
+      }
+      let body = Buffer.from(buf.subarray(sep + 4));
+      const encoding = headerMap["transfer-encoding"]?.toLowerCase();
+      if (encoding?.includes("chunked")) {
+        body = Buffer.from(decodeChunked(body));
+      } else if (headerMap["content-length"]) {
+        body = body.subarray(0, Number(headerMap["content-length"]));
+      }
+      resolve({ status: Number(statusMatch[1]), body: body.toString("utf8") });
+    });
+  });
+}
+
+function httpRequestText(startLine: string, host: string): string {
+  return `${startLine}\r\nHost: ${host}\r\nConnection: close\r\n\r\n`;
+}
+
+describe("intercept proxy loopback host", () => {
+  let upstream: Server | undefined;
+  let proxy: InterceptProxyHandle | undefined;
+
+  afterEach(async () => {
+    if (proxy) {
+      await proxy.stop();
+      proxy = undefined;
+    }
+    if (upstream) {
+      await closeServer(upstream);
+      upstream = undefined;
+    }
+  });
+
+  async function startMockProxy(dialed: string[] = []): Promise<string[]> {
+    const served: string[] = [];
+    proxy = await startInterceptProxy({
+      policy: {
+        project: { version: 2, name: "host", groups: [] },
+        operations: [],
+        presetDigest: MOCK_DIGEST,
+      },
+      serveMock: async (request) => {
+        served.push(request.token);
+        return {
+          ok: true,
+          value: {
+            status: 200,
+            headers: [["content-type", "text/plain"]],
+            bodyBytes: Buffer.from("mock-ok"),
+          },
+        };
+      },
+      dial: (port, address) => {
+        dialed.push(`${address}:${port}`);
+        throw new Error("dialed");
+      },
+    });
+    return served;
+  }
+
+  it("rejects a rebound Host on mock, body, and other origin-form paths", async () => {
+    const served = await startMockProxy();
+    const port = proxy?.endpoint.port;
+    if (port === undefined) throw new Error("proxy missing");
+    const host = `evil.example:${port}`;
+    const paths = [
+      mockListenerPath(),
+      "/.rogatio/body/tok/rule/sha256%3Aabc/http://fixture.example/page",
+      "/",
+    ];
+    for (const path of paths) {
+      const status = await rawStatus(
+        port,
+        httpRequestText(`GET ${path} HTTP/1.1`, host),
+      );
+      expect(status).toBe(403);
+    }
+    expect(served).toEqual([]);
+  });
+
+  it("allows loopback Host values on the mock listener", async () => {
+    const served = await startMockProxy();
+    const port = proxy?.endpoint.port;
+    if (port === undefined) throw new Error("proxy missing");
+    for (const host of [
+      `127.0.0.1:${port}`,
+      `localhost:${port}`,
+      `[::1]:${port}`,
+    ]) {
+      const result = await rawFetch(
+        port,
+        httpRequestText(`GET ${mockListenerPath()} HTTP/1.1`, host),
+      );
+      expect(result.status).toBe(200);
+      expect(result.body).toBe("mock-ok");
+    }
+    expect(served).toEqual(["tok", "tok", "tok"]);
+  });
+
+  it("rejects a rebound Host on the response-body listener and allows loopback Hosts", async () => {
+    const up = await listen((_req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end("oldValue");
+    });
+    upstream = up.server;
+    const project = buildProject(up.origin, [
+      {
+        id: "r-resp",
+        name: "resp",
+        urlRegex: "^http://fixture\\.example/page$",
+        origins: [],
+        resourceTypes: ["main_frame"],
+        priority: 10,
+        type: "response-body",
+        responseBody: {
+          replacements: [{ pattern: "oldValue", replacement: "newValue" }],
+        },
+      },
+    ]);
+    const fetches: string[] = [];
+    proxy = await startInterceptProxy({
+      policy: {
+        project,
+        operations: compileOps(project),
+        presetDigest: MOCK_DIGEST,
+      },
+      resolver: publicResolver(),
+      dial: dialFixture(up.port),
+      outbound: {
+        resolver: publicResolver(),
+        transport: recordingTransport(up.port, () => {
+          fetches.push("fetched");
+        }),
+      },
+    });
+    const port = proxy.endpoint.port;
+    const path = listenerPath(
+      proxy.responseBodyToken,
+      "r-resp",
+      MOCK_DIGEST,
+      `${FIXTURE_ORIGIN}/page`,
+    );
+    const rebound = await originGet(port, path, {
+      host: `evil.example:${port}`,
+    });
+    expect(rebound.status).toBe(403);
+    expect(rebound.body).toBe("");
+    expect(fetches).toEqual([]);
+
+    for (const host of [
+      `127.0.0.1:${port}`,
+      `localhost:${port}`,
+      `[::1]:${port}`,
+    ]) {
+      const allowed = await originGet(port, path, { host });
+      expect(allowed.status).toBe(200);
+      expect(allowed.body).toContain("newValue");
+    }
+    expect(fetches).toEqual(["fetched", "fetched", "fetched"]);
+  });
+
+  it("does not serve internal paths for a rebound absolute-form authority", async () => {
+    const dialed: string[] = [];
+    const served = await startMockProxy(dialed);
+    const port = proxy?.endpoint.port;
+    if (port === undefined) throw new Error("proxy missing");
+    const target = `http://evil.example:${port}${mockListenerPath()}`;
+    const status = await rawStatus(
+      port,
+      httpRequestText(`GET ${target} HTTP/1.1`, `evil.example:${port}`),
+    );
+    expect(status).toBe(403);
+    expect(served).toEqual([]);
+    expect(dialed).toEqual([]);
+  });
+
+  it("does not serve this listener when the absolute-form Host is rebound", async () => {
+    const dialed: string[] = [];
+    const served = await startMockProxy(dialed);
+    const port = proxy?.endpoint.port;
+    if (port === undefined) throw new Error("proxy missing");
+    const target = `http://127.0.0.1:${port}${mockListenerPath()}`;
+    const status = await rawStatus(
+      port,
+      httpRequestText(`GET ${target} HTTP/1.1`, `evil.example:${port}`),
+    );
+    expect(status).toBe(403);
+    expect(served).toEqual([]);
+    expect(dialed).toEqual([]);
+  });
+
+  it("serves an absolute-form mock path when the Host is loopback", async () => {
+    const dialed: string[] = [];
+    const served = await startMockProxy(dialed);
+    const port = proxy?.endpoint.port;
+    if (port === undefined) throw new Error("proxy missing");
+    const target = `http://127.0.0.1:${port}${mockListenerPath()}`;
+    const result = await rawFetch(
+      port,
+      httpRequestText(`GET ${target} HTTP/1.1`, `localhost:${port}`),
+    );
+    expect(result.status).toBe(200);
+    expect(result.body).toBe("mock-ok");
+    expect(served).toEqual(["tok"]);
+    expect(dialed).toEqual([]);
+  });
+
+  it("does not tunnel CONNECT to this listener", async () => {
+    const dialed: string[] = [];
+    await startMockProxy(dialed);
+    const port = proxy?.endpoint.port;
+    if (port === undefined) throw new Error("proxy missing");
+    for (const authority of [
+      `127.0.0.1:${port}`,
+      `localhost:${port}`,
+      `[::1]:${port}`,
+    ]) {
+      const status = await rawStatus(
+        port,
+        `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\n\r\n`,
+      );
+      expect(status).toBe(403);
+    }
+    expect(dialed).toEqual([]);
+  });
+
+  it("still proxies absolute-form HTTP and CONNECT to another authority", async () => {
+    const up = await listen((req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end(req.url === "/" ? "tunneled" : "proxied");
+    });
+    upstream = up.server;
+    const dialed: Array<{ port: number; address: string }> = [];
+    proxy = await startInterceptProxy({
+      resolver: publicResolver(),
+      dial: (port, address) => {
+        dialed.push({ port, address });
+        return connect(up.port, "127.0.0.1");
+      },
+    });
+    const port = proxy.endpoint.port;
+    const http = await rawFetch(
+      port,
+      httpRequestText(`GET ${FIXTURE_ORIGIN}/data HTTP/1.1`, "fixture.example"),
+    );
+    expect(http.status).toBe(200);
+    expect(http.body).toBe("proxied");
+    const connectStatus = await rawStatus(
+      port,
+      "CONNECT fixture.example:443 HTTP/1.1\r\nHost: fixture.example:443\r\n\r\n",
+    );
+    expect(connectStatus).toBe(200);
+    expect(dialed).toEqual([
+      { port: 80, address: PUBLIC_ADDRESS },
+      { port: 443, address: PUBLIC_ADDRESS },
+    ]);
+  });
+
+  it("does not use Origin or Referer as the request-body initiator", async () => {
+    let seen = "";
+    const up = await listen((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => {
+        seen = Buffer.concat(chunks).toString("utf8");
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end('{"ok":true}');
+      });
+    });
+    upstream = up.server;
+    const project = buildProject(up.origin, [
+      {
+        id: "r-req",
+        name: "req",
+        urlRegex: "^http://fixture\\.example/submit$",
+        origins: [],
+        resourceTypes: ["xmlhttprequest"],
+        priority: 10,
+        method: "POST",
+        type: "request-body",
+        requestBody: { mode: "replace", body: '{"replaced":true}' },
+      },
+    ]);
+    proxy = await startDataProxy(up.port, project);
+    const spy = vi.spyOn(revalidateMod, "revalidateAuthority");
+    const result = await proxyFetch(
+      proxy.endpoint,
+      `${FIXTURE_ORIGIN}/submit`,
+      {
+        method: "POST",
+        body: '{"original":true}',
+        headers: {
+          origin: "https://evil.example",
+          referer: "https://evil.example/page",
+        },
+      },
+    );
+    expect(result.status).toBe(200);
+    expect(seen).toBe('{"replaced":true}');
+    expect(spy.mock.calls[0]?.[2]).toMatchObject({
+      initiator: FIXTURE_ORIGIN,
+      url: `${FIXTURE_ORIGIN}/submit`,
+    });
+    spy.mockRestore();
+  });
+
+  it("does not use Origin or Referer as the response-body initiator", async () => {
+    const up = await listen((_req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end("oldValue");
+    });
+    upstream = up.server;
+    const project = buildProject(up.origin, [
+      {
+        id: "r-resp",
+        name: "resp",
+        urlRegex: "^http://fixture\\.example/page$",
+        origins: [],
+        resourceTypes: ["main_frame"],
+        priority: 10,
+        type: "response-body",
+        responseBody: {
+          replacements: [{ pattern: "oldValue", replacement: "newValue" }],
+        },
+      },
+    ]);
+    proxy = await startInterceptProxy({
+      policy: {
+        project,
+        operations: compileOps(project),
+        presetDigest: MOCK_DIGEST,
+      },
+      resolver: publicResolver(),
+      dial: dialFixture(up.port),
+      outbound: {
+        resolver: publicResolver(),
+        transport: recordingTransport(up.port),
+      },
+    });
+    const spy = vi.spyOn(revalidateMod, "revalidateAuthority");
+    const result = await originGet(
+      proxy.endpoint.port,
+      listenerPath(
+        proxy.responseBodyToken,
+        "r-resp",
+        MOCK_DIGEST,
+        `${FIXTURE_ORIGIN}/page`,
+      ),
+      {
+        origin: "https://evil.example",
+        referer: "https://evil.example/page",
+      },
+    );
+    expect(result.status).toBe(200);
+    expect(result.body).toContain("newValue");
+    expect(spy.mock.calls[0]?.[2]).toMatchObject({
+      initiator: FIXTURE_ORIGIN,
+      url: `${FIXTURE_ORIGIN}/page`,
+    });
+    spy.mockRestore();
+  });
+});

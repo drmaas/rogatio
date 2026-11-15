@@ -18,6 +18,10 @@ import {
 } from "./address-policy.js";
 import { sourceMatchesWithinDeadline } from "./deadline-match.js";
 import { RUNTIME_LIMITS } from "./limits.js";
+import {
+  INTERCEPT_PROXY_LOOPBACK_NAMES,
+  isAllowedLoopbackHost,
+} from "./loopback-host.js";
 import { mintToken, type RenderedMock } from "./mock.js";
 import { MOCK_LISTENER_PREFIX, parseMockRedirect } from "./mock-listener.js";
 import { rewriteRequestBody } from "./request-body.js";
@@ -596,27 +600,47 @@ function asPresetDigest(value: string): PresetDigest | null {
   return value.startsWith("sha256:") ? (value as PresetDigest) : null;
 }
 
-function initiatorFromHeaders(
-  headers: IncomingMessage["headers"],
-  targetUrl: string,
-): string | undefined {
-  const origin = headerValue(headers, "origin");
-  if (typeof origin === "string" && /^https?:\/\//i.test(origin)) {
-    return origin.endsWith("/") ? origin.slice(0, -1) : origin;
-  }
-  const referer = headerValue(headers, "referer");
-  if (typeof referer === "string") {
-    try {
-      return new URL(referer).origin;
-    } catch {
-      // ignore malformed referer
-    }
-  }
+/**
+ * Initiator for authorization. This listener has no registered page
+ * context. The value is the request target origin. `Origin` and `Referer`
+ * are not authorization inputs.
+ */
+function targetOrigin(targetUrl: string): string | undefined {
   try {
-    return new URL(targetUrl).origin;
+    const origin = new URL(targetUrl).origin;
+    if (!/^https?:\/\//i.test(origin)) return undefined;
+    return origin;
   } catch {
     return undefined;
   }
+}
+
+function bareHostname(hostname: string): string {
+  if (
+    hostname.startsWith("[") &&
+    hostname.endsWith("]") &&
+    hostname.length > 2
+  ) {
+    return hostname.slice(1, -1);
+  }
+  return hostname;
+}
+
+function isProxyLoopbackHostname(hostname: string): boolean {
+  const bare = bareHostname(hostname);
+  for (const name of INTERCEPT_PROXY_LOOPBACK_NAMES) {
+    if (name === bare) return true;
+  }
+  return false;
+}
+
+function httpUrlPort(target: URL): number | null {
+  if (target.protocol !== "http:") return null;
+  if (target.port.length === 0) return 80;
+  if (!/^\d+$/.test(target.port)) return null;
+  const port = Number(target.port);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) return null;
+  return port;
 }
 
 async function authorizeOp(
@@ -624,10 +648,9 @@ async function authorizeOp(
   op: BodyOperation,
   url: string,
   method: string,
-  headers: IncomingMessage["headers"],
 ): Promise<boolean> {
   const resourceType = op.matcher.resourceTypes[0];
-  const initiator = initiatorFromHeaders(headers, url);
+  const initiator = targetOrigin(url);
   const decision = await revalidateAuthority(
     policy.project,
     policy.operations,
@@ -648,8 +671,13 @@ async function authorizeOp(
  * Response-body redirects arrive as origin-form
  * `/.rogatio/body/<token>/<ruleId>/<digest>/<originalUrl>` and are
  * revalidated, then fetched with a credential-free GET.
- * Absolute-form HTTP is port 80 only. CONNECT is port 443 only and stays a
- * blind tunnel: bytes are spliced with no TLS decryption, to the pinned address.
+ * Origin-form requests are answered here and are not forwarded. Their Host
+ * must be `127.0.0.1`, `localhost`, or `[::1]` with this listener's port.
+ * Absolute-form HTTP to any other authority is port 80 only. CONNECT to any
+ * other authority is port 443 only and stays a blind tunnel: bytes are
+ * spliced with no TLS decryption, to the pinned address. An absolute-form
+ * or CONNECT authority that is this listener is not forwarded.
+ * The authorization initiator is the request target origin.
  */
 export async function startInterceptProxy(
   options: InterceptProxyOptions = {},
@@ -663,6 +691,21 @@ export async function startInterceptProxy(
   let activeMocks = 0;
   const mockAborts = new Set<AbortController>();
   let stopped = false;
+  let boundPort = 0;
+
+  function allowsListenerHost(req: IncomingMessage): boolean {
+    const raw = req.headers.host;
+    const host = typeof raw === "string" ? raw : undefined;
+    return isAllowedLoopbackHost(
+      host,
+      boundPort,
+      INTERCEPT_PROXY_LOOPBACK_NAMES,
+    );
+  }
+
+  function isOwnListener(hostname: string, port: number): boolean {
+    return port === boundPort && isProxyLoopbackHostname(hostname);
+  }
 
   const server = createServer((req, res) => {
     void handleHttp(req, res);
@@ -678,15 +721,13 @@ export async function startInterceptProxy(
   ): Promise<void> {
     try {
       const targetUrl = req.url ?? "";
-      if (targetUrl.startsWith("/.rogatio/body/")) {
-        await handleResponseBodyRedirect(req, res, targetUrl);
-        return;
-      }
-      if (targetUrl.startsWith(MOCK_LISTENER_PREFIX.slice(0, -1))) {
-        await handleMockRedirect(req, res, targetUrl);
-        return;
-      }
       if (!/^https?:\/\//i.test(targetUrl)) {
+        if (!allowsListenerHost(req)) {
+          discardRequestBody(req);
+          endEmpty(res, 403);
+          return;
+        }
+        if (await dispatchInternal(req, res, targetUrl)) return;
         res.writeHead(400);
         res.end();
         return;
@@ -702,6 +743,22 @@ export async function startInterceptProxy(
       if (target.protocol !== "http:") {
         res.writeHead(501);
         res.end();
+        return;
+      }
+      const ownPort = httpUrlPort(target);
+      if (ownPort !== null && isOwnListener(target.hostname, ownPort)) {
+        if (
+          target.username.length > 0 ||
+          target.password.length > 0 ||
+          !allowsListenerHost(req)
+        ) {
+          discardRequestBody(req);
+          endEmpty(res, 403);
+          return;
+        }
+        const path = `${target.pathname}${target.search}`;
+        if (await dispatchInternal(req, res, path)) return;
+        endEmpty(res, 403);
         return;
       }
 
@@ -742,15 +799,7 @@ export async function startInterceptProxy(
       let requestBody = bodyResult.body;
 
       if (needsRequestBody && requestOp !== null && active !== null) {
-        if (
-          !(await authorizeOp(
-            active,
-            requestOp,
-            targetUrl,
-            method,
-            req.headers,
-          ))
-        ) {
+        if (!(await authorizeOp(active, requestOp, targetUrl, method))) {
           // Denied: pass through original body.
         } else {
           const rewritten = await rewriteRequestBody(
@@ -806,13 +855,7 @@ export async function startInterceptProxy(
         if (responseBody.byteLength > RUNTIME_LIMITS.maxResponseBodyBytes) {
           // Oversized: pass through untouched.
         } else if (
-          !(await authorizeOp(
-            active,
-            responseOp,
-            targetUrl,
-            method,
-            req.headers,
-          ))
+          !(await authorizeOp(active, responseOp, targetUrl, method))
         ) {
           // Denied: pass through.
         } else {
@@ -874,6 +917,22 @@ export async function startInterceptProxy(
   function discardRequestBody(req: IncomingMessage): void {
     req.on("data", () => {});
     req.resume();
+  }
+
+  async function dispatchInternal(
+    req: IncomingMessage,
+    res: ServerResponse,
+    path: string,
+  ): Promise<boolean> {
+    if (path.startsWith("/.rogatio/body/")) {
+      await handleResponseBodyRedirect(req, res, path);
+      return true;
+    }
+    if (path.startsWith(MOCK_LISTENER_PREFIX.slice(0, -1))) {
+      await handleMockRedirect(req, res, path);
+      return true;
+    }
+    return false;
   }
 
   async function handleMockRedirect(
@@ -1018,9 +1077,7 @@ export async function startInterceptProxy(
         url: parsed.originalUrl,
         target,
         method: "GET",
-        initiator:
-          initiatorFromHeaders(req.headers, parsed.originalUrl) ??
-          new URL(target).origin,
+        initiator: targetOrigin(parsed.originalUrl) ?? new URL(target).origin,
       },
     );
     if (!allowed.allowed) {
@@ -1096,6 +1153,10 @@ export async function startInterceptProxy(
       endConnect(clientSocket, 400, "Bad Request");
       return;
     }
+    if (isOwnListener(parsed.host, parsed.port)) {
+      endConnect(clientSocket, 403, "Forbidden");
+      return;
+    }
     if (parsed.port !== 443) {
       endConnect(clientSocket, 403, "Forbidden");
       return;
@@ -1142,6 +1203,7 @@ export async function startInterceptProxy(
         reject(new Error("intercept-proxy bind failed"));
         return;
       }
+      boundPort = addr.port;
       resolve({ host: "127.0.0.1", port: addr.port });
     });
   });

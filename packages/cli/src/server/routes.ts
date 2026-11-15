@@ -10,7 +10,11 @@ import type {
   AIProviderConfig,
   DoctorReport,
 } from "@rogatio/runtime";
-import { doctorInterruptedReport, runAIAssist } from "@rogatio/runtime";
+import {
+  doctorInterruptedReport,
+  isAllowedLoopbackHost,
+  runAIAssist,
+} from "@rogatio/runtime";
 import { diagnoseProject } from "../commands/diagnose.js";
 import {
   buildEditorDoctor,
@@ -62,16 +66,12 @@ function headerValue(value: string | string[] | undefined): string | undefined {
   return undefined;
 }
 
-/** Exact Host allowlist for the loopback editor server. */
+/** Editor Host allowlist: `127.0.0.1` and `localhost` with the bound port. */
 function isAllowedEditorHost(
   host: string | undefined,
   boundPort: number,
 ): boolean {
-  if (host === undefined || !Number.isInteger(boundPort) || boundPort <= 0) {
-    return false;
-  }
-  const expected = String(boundPort);
-  return host === `127.0.0.1:${expected}` || host === `localhost:${expected}`;
+  return isAllowedLoopbackHost(host, boundPort, ["127.0.0.1", "localhost"]);
 }
 
 /** Exact Origin allowlist for POST. A missing Origin is rejected. */
