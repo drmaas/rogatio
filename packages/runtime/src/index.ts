@@ -20,6 +20,7 @@ export {
 export * from "./interception.js";
 export * from "./lifecycle.js";
 export { RUNTIME_LIMITS } from "./limits.js";
+export { isAllowedLoopbackHost } from "./loopback-host.js";
 export * from "./native-framing.js";
 export { fetchAuthorized } from "./outbound.js";
 export * from "./pac.js";
