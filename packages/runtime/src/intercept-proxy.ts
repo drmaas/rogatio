@@ -169,16 +169,20 @@ function headerValue(
   return raw;
 }
 
-function readBoundedBody(
+export function readBoundedBody(
   req: IncomingMessage,
   maxBytes: number,
-): Promise<{ ok: true; body: Buffer } | { ok: false; reason: "oversized" }> {
+): Promise<
+  { ok: true; body: Buffer } | { ok: false; reason: "oversized" | "error" }
+> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let total = 0;
     let settled = false;
     const finish = (
-      result: { ok: true; body: Buffer } | { ok: false; reason: "oversized" },
+      result:
+        | { ok: true; body: Buffer }
+        | { ok: false; reason: "oversized" | "error" },
     ) => {
       if (settled) return;
       settled = true;
@@ -197,7 +201,7 @@ function readBoundedBody(
       finish({ ok: true, body: Buffer.concat(chunks) });
     });
     req.on("error", () => {
-      finish({ ok: true, body: Buffer.concat(chunks) });
+      finish({ ok: false, reason: "error" });
     });
   });
 }
@@ -789,9 +793,14 @@ export async function startInterceptProxy(
         RUNTIME_LIMITS.maxRequestBodyBytes,
       );
       if (!bodyResult.ok) {
-        // Oversized: pass through is impossible once destroyed; fail closed.
+        // Oversized or truncated stream: no forward or rewrite.
         if (!res.headersSent) {
-          res.writeHead(413);
+          const status = bodyResult.reason === "oversized" ? 413 : 400;
+          res.writeHead(status, {
+            "cache-control": "no-store",
+            "content-length": "0",
+            connection: "close",
+          });
           res.end();
         }
         return;

@@ -6,12 +6,14 @@ import {
   type Server,
 } from "node:http";
 import { connect, type Socket } from "node:net";
+import { PassThrough } from "node:stream";
 import { compileProject, type RogatioOperation } from "@rogatio/compiler";
 import type { RogatioProject } from "@rogatio/schema";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sourceMatchesWithinDeadline } from "../src/deadline-match.js";
 import {
   type InterceptProxyHandle,
+  readBoundedBody,
   startInterceptProxy,
   upstreamHttp,
 } from "../src/intercept-proxy.js";
@@ -1448,5 +1450,80 @@ describe("intercept proxy loopback host", () => {
       url: `${FIXTURE_ORIGIN}/page`,
     });
     spy.mockRestore();
+  });
+});
+
+describe("readBoundedBody", () => {
+  it("resolves with error when the request stream errors mid-read", async () => {
+    const req = new PassThrough() as unknown as IncomingMessage;
+    const pending = readBoundedBody(req, RUNTIME_LIMITS.maxRequestBodyBytes);
+    req.emit("data", Buffer.from('{"partial":'));
+    req.emit("error", new Error("ECONNRESET"));
+    await expect(pending).resolves.toEqual({ ok: false, reason: "error" });
+  });
+
+  it("does not dial upstream when the client resets a body mid-read", async () => {
+    const dialed: Array<{ port: number; address: string }> = [];
+    let upstreamHit = false;
+    const up = await listen((req, res) => {
+      upstreamHit = true;
+      const chunks: Buffer[] = [];
+      req.on("data", (c) => chunks.push(c));
+      req.on("end", () => {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(Buffer.concat(chunks));
+      });
+    });
+    const project = buildProject(up.origin, [
+      {
+        id: "r-req",
+        name: "req",
+        urlRegex: `^http://fixture\\.example/submit$`,
+        origins: [],
+        resourceTypes: ["xmlhttprequest"],
+        priority: 10,
+        method: "POST",
+        type: "request-body",
+        requestBody: { mode: "replace", body: '{"replaced":true}' },
+      },
+    ]);
+    const proxy = await startInterceptProxy({
+      policy: { project, operations: compileOps(project) },
+      resolver: publicResolver(),
+      dial: (port, address) => {
+        dialed.push({ port, address });
+        return connect(up.port, "127.0.0.1");
+      },
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const socket = connect(proxy.endpoint.port, proxy.endpoint.host);
+        socket.on("error", () => resolve());
+        socket.on("connect", () => {
+          socket.write(
+            `POST ${FIXTURE_ORIGIN}/submit HTTP/1.1\r\n` +
+              `Host: ${new URL(FIXTURE_ORIGIN).host}\r\n` +
+              "Connection: close\r\n" +
+              "Content-Type: application/json\r\n" +
+              "Content-Length: 1000\r\n\r\n",
+          );
+          socket.write('{"partial":');
+          setTimeout(() => {
+            socket.resetAndDestroy();
+            resolve();
+          }, 50);
+        });
+        socket.setTimeout(5_000, () => {
+          socket.destroy();
+          reject(new Error("timed out resetting client"));
+        });
+      });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(dialed).toEqual([]);
+      expect(upstreamHit).toBe(false);
+    } finally {
+      await proxy.stop();
+      await closeServer(up.server);
+    }
   });
 });
