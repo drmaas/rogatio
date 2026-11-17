@@ -4,6 +4,7 @@ import {
   type IncomingHttpHeaders,
   type IncomingMessage,
   type Server,
+  ServerResponse,
 } from "node:http";
 import { connect, type Socket } from "node:net";
 import { PassThrough } from "node:stream";
@@ -119,6 +120,44 @@ function startDataProxy(
   });
 }
 
+function parseHttpResponse(buf: Buffer): {
+  status: number;
+  body: string;
+  headers: Record<string, string>;
+} {
+  const sep = buf.indexOf("\r\n\r\n");
+  if (sep < 0) {
+    throw new Error("no headers");
+  }
+  const head = buf.subarray(0, sep).toString("latin1");
+  const statusMatch = /^HTTP\/1\.[01] (\d+)/.exec(head);
+  if (!statusMatch) {
+    throw new Error(`bad status line: ${head.slice(0, 40)}`);
+  }
+  const status = Number(statusMatch[1]);
+  const headerMap: Record<string, string> = {};
+  for (const line of head.split("\r\n").slice(1)) {
+    const i = line.indexOf(":");
+    if (i > 0)
+      headerMap[line.slice(0, i).trim().toLowerCase()] = line
+        .slice(i + 1)
+        .trim();
+  }
+  let body: Buffer = Buffer.from(buf.subarray(sep + 4));
+  const te = headerMap["transfer-encoding"]?.toLowerCase();
+  if (te?.includes("chunked")) {
+    body = Buffer.from(decodeChunked(body));
+  } else if (headerMap["content-length"]) {
+    const cl = Number(headerMap["content-length"]);
+    body = body.subarray(0, cl);
+  }
+  return {
+    status,
+    body: body.toString("utf8"),
+    headers: headerMap,
+  };
+}
+
 async function proxyFetch(
   proxy: { host: string; port: number },
   absoluteUrl: string,
@@ -153,39 +192,11 @@ async function proxyFetch(
       buf = Buffer.concat([buf, piece]);
     });
     socket.on("end", () => {
-      const sep = buf.indexOf("\r\n\r\n");
-      if (sep < 0) {
-        reject(new Error("no headers"));
-        return;
+      try {
+        resolve(parseHttpResponse(buf));
+      } catch (err) {
+        reject(err);
       }
-      const head = buf.subarray(0, sep).toString("latin1");
-      const statusMatch = /^HTTP\/1\.[01] (\d+)/.exec(head);
-      if (!statusMatch) {
-        reject(new Error(`bad status line: ${head.slice(0, 40)}`));
-        return;
-      }
-      const status = Number(statusMatch[1]);
-      const headerMap: Record<string, string> = {};
-      for (const line of head.split("\r\n").slice(1)) {
-        const i = line.indexOf(":");
-        if (i > 0)
-          headerMap[line.slice(0, i).trim().toLowerCase()] = line
-            .slice(i + 1)
-            .trim();
-      }
-      let body: Buffer = Buffer.from(buf.subarray(sep + 4));
-      const te = headerMap["transfer-encoding"]?.toLowerCase();
-      if (te?.includes("chunked")) {
-        body = Buffer.from(decodeChunked(body));
-      } else if (headerMap["content-length"]) {
-        const cl = Number(headerMap["content-length"]);
-        body = body.subarray(0, cl);
-      }
-      resolve({
-        status,
-        body: body.toString("utf8"),
-        headers: headerMap,
-      });
     });
   });
 }
@@ -1462,6 +1473,19 @@ describe("readBoundedBody", () => {
     await expect(pending).resolves.toEqual({ ok: false, reason: "error" });
   });
 
+  it("resolves oversized without destroying the request socket", async () => {
+    const req = new PassThrough() as unknown as IncomingMessage;
+    let destroyed = false;
+    req.destroy = (() => {
+      destroyed = true;
+      return req;
+    }) as IncomingMessage["destroy"];
+    const pending = readBoundedBody(req, 10);
+    req.emit("data", Buffer.alloc(11));
+    await expect(pending).resolves.toEqual({ ok: false, reason: "oversized" });
+    expect(destroyed).toBe(false);
+  });
+
   it("does not dial upstream when the client resets a body mid-read", async () => {
     const dialed: Array<{ port: number; address: string }> = [];
     let upstreamHit = false;
@@ -1495,6 +1519,7 @@ describe("readBoundedBody", () => {
         return connect(up.port, "127.0.0.1");
       },
     });
+    const writeHead = vi.spyOn(ServerResponse.prototype, "writeHead");
     try {
       await new Promise<void>((resolve, reject) => {
         const socket = connect(proxy.endpoint.port, proxy.endpoint.host);
@@ -1519,6 +1544,72 @@ describe("readBoundedBody", () => {
         });
       });
       await new Promise((resolve) => setTimeout(resolve, 100));
+      const failClosed = writeHead.mock.calls.find((args) => args[0] === 400);
+      expect(failClosed).toEqual([
+        400,
+        {
+          "cache-control": "no-store",
+          "content-length": "0",
+          connection: "close",
+        },
+      ]);
+      expect(dialed).toEqual([]);
+      expect(upstreamHit).toBe(false);
+    } finally {
+      writeHead.mockRestore();
+      await proxy.stop();
+      await closeServer(up.server);
+    }
+  });
+
+  it("does not dial upstream when the request body exceeds the byte limit", async () => {
+    const dialed: Array<{ port: number; address: string }> = [];
+    let upstreamHit = false;
+    const up = await listen((req, res) => {
+      upstreamHit = true;
+      const chunks: Buffer[] = [];
+      req.on("data", (c) => chunks.push(c));
+      req.on("end", () => {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(Buffer.concat(chunks));
+      });
+    });
+    const project = buildProject(up.origin, [
+      {
+        id: "r-req",
+        name: "req",
+        urlRegex: `^http://fixture\\.example/submit$`,
+        origins: [],
+        resourceTypes: ["xmlhttprequest"],
+        priority: 10,
+        method: "POST",
+        type: "request-body",
+        requestBody: { mode: "replace", body: '{"replaced":true}' },
+      },
+    ]);
+    const proxy = await startInterceptProxy({
+      policy: { project, operations: compileOps(project) },
+      resolver: publicResolver(),
+      dial: (port, address) => {
+        dialed.push({ port, address });
+        return connect(up.port, "127.0.0.1");
+      },
+    });
+    try {
+      const oversizedBody = "x".repeat(RUNTIME_LIMITS.maxRequestBodyBytes + 1);
+      const result = await proxyFetch(
+        proxy.endpoint,
+        `${FIXTURE_ORIGIN}/submit`,
+        {
+          method: "POST",
+          body: oversizedBody,
+        },
+      );
+      expect(result.status).toBe(413);
+      expect(result.headers["cache-control"]).toBe("no-store");
+      expect(result.headers["content-length"]).toBe("0");
+      expect(result.headers.connection).toBe("close");
+      expect(result.body).toBe("");
       expect(dialed).toEqual([]);
       expect(upstreamHit).toBe(false);
     } finally {

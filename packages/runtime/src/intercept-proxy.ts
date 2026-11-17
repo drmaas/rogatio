@@ -191,8 +191,9 @@ export function readBoundedBody(
     req.on("data", (chunk: Buffer) => {
       total += chunk.byteLength;
       if (total > maxBytes) {
-        req.destroy();
         finish({ ok: false, reason: "oversized" });
+        req.resume();
+        req.on("data", () => {});
         return;
       }
       chunks.push(chunk);
