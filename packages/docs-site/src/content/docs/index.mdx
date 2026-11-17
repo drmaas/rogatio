@@ -69,6 +69,10 @@ or export.
     Because rules live in your repo, every change ships through the same pull request and
     review flow as the rest of your code.
   </Card>
+  <Card title="Migrating from Requestly" icon="download">
+    Import a Requestly export with `rogatio import requestly &lt;export.json&gt;`. Use
+    `--merge` to append onto an existing `.rogatio.json` project.
+  </Card>
 </CardGrid>
 
 ## See it in action
@@ -101,6 +105,11 @@ rogatio runtime install
     title="Quick start"
     description="Create your first project, write a rule, and dry-run it offline."
     href="/rogatio/getting-started/quick-start/"
+  />
+  <LinkCard
+    title="Migrating from Requestly"
+    description="Turn a Requestly export into a Rogatio project with rogatio import requestly."
+    href="/rogatio/guides/migrating-from-requestly/"
   />
   <LinkCard
     title="Projects & rules"

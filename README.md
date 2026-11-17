@@ -8,6 +8,11 @@
 
 📖 **[Live docs site → https://drmaas.github.io/rogatio/](https://drmaas.github.io/rogatio/)**
 
+**Coming from Requestly?** Run `rogatio import requestly <export.json>` (`--merge` appends
+onto an existing project). See the
+[migration guide](https://drmaas.github.io/rogatio/guides/migrating-from-requestly/) on
+the docs site.
+
 <img src="packages/docs-site/src/assets/logo.svg" alt="Rogatio logo" width="64" align="right" style="margin-left: 1rem; float: right;" />
 
 Rogatio is a local-first tool for creating, reviewing, and running browser request and
@@ -44,6 +49,10 @@ supported) an HTTP method.
 - **Request-body modification** — replace or apply bounded regex replacement to eligible
   POST/PUT/PATCH XHR bodies, via native messaging to a local runtime. Replace bodies can
   use `$1`–`$9` URL captures; regex-mode `$1`–`$9` remain body captures.
+- **Requestly migration** — turn a Requestly export into `.rogatio.json` with
+  `rogatio import requestly <export.json>`. Pass `--merge` to append imported groups onto an
+  existing project. See the
+  [migration guide](https://drmaas.github.io/rogatio/guides/migrating-from-requestly/).
 
 Every rule can be dry-run against a bounded batch of URLs before saving. `rogatio test`
 reports the URL pattern, method, and resource type, plus substituted action previews.
@@ -78,8 +87,8 @@ Verify the install:
 rogatio --help
 ```
 
-The public CLI consists of `edit`, `verify`, `test`, `runtime` (with
-`install`, `uninstall`, `verify`, and `host` subcommands), and `ai`.
+The public CLI consists of `edit`, `verify`, `test`, `doctor`, `runtime` (with
+`install`, `uninstall`, `verify`, and `host` subcommands), `import`, and `ai`.
 
 ## Chrome extension
 
