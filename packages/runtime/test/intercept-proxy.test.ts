@@ -1486,6 +1486,18 @@ describe("readBoundedBody", () => {
     expect(destroyed).toBe(false);
   });
 
+  it("keeps a single data listener when many chunks arrive after the limit", async () => {
+    const req = new PassThrough() as unknown as IncomingMessage;
+    const pending = readBoundedBody(req, 10);
+    req.emit("data", Buffer.alloc(11));
+    await expect(pending).resolves.toEqual({ ok: false, reason: "oversized" });
+    expect(req.listenerCount("data")).toBe(1);
+    for (let i = 0; i < 50; i++) {
+      req.emit("data", Buffer.alloc(64));
+    }
+    expect(req.listenerCount("data")).toBe(1);
+  });
+
   it("does not dial upstream when the client resets a body mid-read", async () => {
     const dialed: Array<{ port: number; address: string }> = [];
     let upstreamHit = false;
@@ -1532,18 +1544,26 @@ describe("readBoundedBody", () => {
               "Content-Type: application/json\r\n" +
               "Content-Length: 1000\r\n\r\n",
           );
-          socket.write('{"partial":');
-          setTimeout(() => {
-            socket.resetAndDestroy();
-            resolve();
-          }, 50);
+          socket.write('{"partial":', () => {
+            setTimeout(() => {
+              socket.resetAndDestroy();
+              resolve();
+            }, 50);
+          });
         });
         socket.setTimeout(5_000, () => {
           socket.destroy();
           reject(new Error("timed out resetting client"));
         });
       });
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await vi.waitFor(
+        () => {
+          expect(writeHead.mock.calls.some((args) => args[0] === 400)).toBe(
+            true,
+          );
+        },
+        { timeout: 5_000, interval: 20 },
+      );
       const failClosed = writeHead.mock.calls.find((args) => args[0] === 400);
       expect(failClosed).toEqual([
         400,
@@ -1560,7 +1580,7 @@ describe("readBoundedBody", () => {
       await proxy.stop();
       await closeServer(up.server);
     }
-  });
+  }, 10_000);
 
   it("does not dial upstream when the request body exceeds the byte limit", async () => {
     const dialed: Array<{ port: number; address: string }> = [];
@@ -1612,6 +1632,78 @@ describe("readBoundedBody", () => {
       expect(result.body).toBe("");
       expect(dialed).toEqual([]);
       expect(upstreamHit).toBe(false);
+    } finally {
+      await proxy.stop();
+      await closeServer(up.server);
+    }
+  });
+
+  it("closes the client connection after a 413 even when the body keeps arriving", async () => {
+    const dialed: Array<{ port: number; address: string }> = [];
+    const up = await listen(() => {});
+    const project = buildProject(up.origin, [
+      {
+        id: "r-req",
+        name: "req",
+        urlRegex: `^http://fixture\\.example/submit$`,
+        origins: [],
+        resourceTypes: ["xmlhttprequest"],
+        priority: 10,
+        method: "POST",
+        type: "request-body",
+        requestBody: { mode: "replace", body: '{"replaced":true}' },
+      },
+    ]);
+    const proxy = await startInterceptProxy({
+      policy: { project, operations: compileOps(project) },
+      resolver: publicResolver(),
+      dial: (port, address) => {
+        dialed.push({ port, address });
+        return connect(up.port, "127.0.0.1");
+      },
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const socket = connect(proxy.endpoint.port, proxy.endpoint.host);
+        let saw413 = false;
+        let buf = "";
+        const failTimer = setTimeout(() => {
+          socket.destroy();
+          reject(new Error("timed out waiting for connection close after 413"));
+        }, 5_000);
+        socket.on("data", (chunk) => {
+          buf += chunk.toString("utf8");
+          if (!saw413 && buf.includes("413")) {
+            saw413 = true;
+            const keepSending = () => {
+              if (socket.destroyed) return;
+              socket.write("x".repeat(16_384));
+              setImmediate(keepSending);
+            };
+            keepSending();
+          }
+        });
+        socket.once("close", () => {
+          clearTimeout(failTimer);
+          resolve();
+        });
+        socket.once("error", () => {
+          clearTimeout(failTimer);
+          resolve();
+        });
+        socket.once("connect", () => {
+          const declared = RUNTIME_LIMITS.maxRequestBodyBytes + 50_000;
+          socket.write(
+            `POST ${FIXTURE_ORIGIN}/submit HTTP/1.1\r\n` +
+              `Host: ${new URL(FIXTURE_ORIGIN).host}\r\n` +
+              "Connection: close\r\n" +
+              "Content-Type: text/plain\r\n" +
+              `Content-Length: ${declared}\r\n\r\n`,
+          );
+          socket.write("x".repeat(RUNTIME_LIMITS.maxRequestBodyBytes + 1));
+        });
+      });
+      expect(dialed).toEqual([]);
     } finally {
       await proxy.stop();
       await closeServer(up.server);
