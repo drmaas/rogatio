@@ -179,6 +179,61 @@ export function readBoundedBody(
     const chunks: Buffer[] = [];
     let total = 0;
     let settled = false;
+    let oversizeDraining = false;
+    let drainedAfterOversize = 0;
+    let drainTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const clearDrainTimer = (): void => {
+      if (drainTimer !== undefined) {
+        clearTimeout(drainTimer);
+        drainTimer = undefined;
+      }
+    };
+
+    const teardownOversizeDrain = (): void => {
+      clearDrainTimer();
+      req.removeListener("data", onOversizeDrain);
+      req.removeListener("end", onOversizeDrainEnd);
+      req.removeListener("close", onOversizeDrainEnd);
+    };
+
+    const destroyAfterOversizeDrain = (): void => {
+      teardownOversizeDrain();
+      req.destroy();
+    };
+
+    const armOversizeIdleTimer = (): void => {
+      clearDrainTimer();
+      drainTimer = setTimeout(
+        destroyAfterOversizeDrain,
+        RUNTIME_LIMITS.bodyIdleTimeoutMs,
+      );
+    };
+
+    const onOversizeDrain = (chunk: Buffer): void => {
+      drainedAfterOversize += chunk.byteLength;
+      if (drainedAfterOversize > RUNTIME_LIMITS.maxControlBodyBytes) {
+        destroyAfterOversizeDrain();
+        return;
+      }
+      armOversizeIdleTimer();
+    };
+
+    const onOversizeDrainEnd = (): void => {
+      teardownOversizeDrain();
+    };
+
+    const startOversizeDrain = (): void => {
+      if (oversizeDraining) return;
+      oversizeDraining = true;
+      req.removeListener("data", onData);
+      req.resume();
+      req.on("data", onOversizeDrain);
+      req.once("end", onOversizeDrainEnd);
+      req.once("close", onOversizeDrainEnd);
+      armOversizeIdleTimer();
+    };
+
     const finish = (
       result:
         | { ok: true; body: Buffer }
@@ -188,20 +243,29 @@ export function readBoundedBody(
       settled = true;
       resolve(result);
     };
-    req.on("data", (chunk: Buffer) => {
+
+    const onData = (chunk: Buffer): void => {
       total += chunk.byteLength;
       if (total > maxBytes) {
-        req.destroy();
         finish({ ok: false, reason: "oversized" });
+        startOversizeDrain();
         return;
       }
       chunks.push(chunk);
-    });
+    };
+
+    req.on("data", onData);
     req.on("end", () => {
+      if (oversizeDraining) return;
       finish({ ok: true, body: Buffer.concat(chunks) });
     });
     req.on("error", () => {
-      finish({ ok: false, reason: "error" });
+      if (!settled) {
+        finish({ ok: false, reason: "error" });
+      }
+      if (oversizeDraining) {
+        teardownOversizeDrain();
+      }
     });
   });
 }
@@ -794,14 +858,23 @@ export async function startInterceptProxy(
       );
       if (!bodyResult.ok) {
         // Oversized or truncated stream: no forward or rewrite.
+        const status = bodyResult.reason === "oversized" ? 413 : 400;
         if (!res.headersSent) {
-          const status = bodyResult.reason === "oversized" ? 413 : 400;
           res.writeHead(status, {
             "cache-control": "no-store",
             "content-length": "0",
             connection: "close",
           });
-          res.end();
+          const destroySocket = (): void => {
+            req.socket?.destroy();
+          };
+          if (status === 413) {
+            res.end(destroySocket);
+          } else {
+            res.end();
+          }
+        } else if (status === 413) {
+          req.socket?.destroy();
         }
         return;
       }
