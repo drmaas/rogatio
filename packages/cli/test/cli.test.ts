@@ -68,6 +68,8 @@ describe("CLI entry point", () => {
       expect(output).toMatch(new RegExp(`^ {2}${command}\\b`, "m"));
     }
     expect(output).toContain("install|uninstall|verify|host");
+    expect(output).toContain("import requestly");
+    expect(output).toContain("Requestly");
     consoleSpy.mockRestore();
   });
 
