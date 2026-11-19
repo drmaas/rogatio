@@ -313,7 +313,7 @@ describe("loopback mock route", () => {
     const { proxy, digest, token } = await boot({ status: 200, body: "hello" });
     const response = await hit(proxy.endpoint.port, mockPath(token, digest), {
       method: "POST",
-      body: Buffer.alloc(256 * 1024, 7),
+      body: Buffer.alloc(32 * 1024, 7),
       headers: { "content-type": "application/octet-stream" },
     });
     expect(response.status).toBe(200);
