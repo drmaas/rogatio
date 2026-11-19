@@ -15,6 +15,7 @@ import { sourceMatchesWithinDeadline } from "../src/deadline-match.js";
 import {
   type InterceptProxyHandle,
   readBoundedBody,
+  startBoundedBodyDrain,
   startInterceptProxy,
   upstreamHttp,
 } from "../src/intercept-proxy.js";
@@ -1292,6 +1293,105 @@ describe("intercept proxy loopback host", () => {
     expect(dialed).toEqual([]);
   });
 
+  it("tears down a 403 discard path when the request body goes idle", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const dialed: string[] = [];
+    await startMockProxy(dialed);
+    const port = proxy?.endpoint.port;
+    if (port === undefined) throw new Error("proxy missing");
+    const target = `http://127.0.0.1:${port}${mockListenerPath()}`;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const socket = connect(port, "127.0.0.1");
+        let saw403 = false;
+        let buf = "";
+        const failTimer = setTimeout(() => {
+          socket.destroy();
+          reject(new Error("timed out waiting for idle teardown on 403 path"));
+        }, 30_000);
+        socket.on("data", (chunk) => {
+          buf += chunk.toString("utf8");
+          if (!saw403 && buf.includes("403")) {
+            saw403 = true;
+            void vi.advanceTimersByTimeAsync(RUNTIME_LIMITS.bodyIdleTimeoutMs);
+          }
+        });
+        socket.once("close", () => {
+          clearTimeout(failTimer);
+          resolve();
+        });
+        socket.once("error", () => {
+          clearTimeout(failTimer);
+          resolve();
+        });
+        socket.once("connect", () => {
+          const bodyBytes = RUNTIME_LIMITS.maxControlBodyBytes + 4096;
+          socket.write(
+            `POST ${target} HTTP/1.1\r\n` +
+              `Host: evil.example:${port}\r\n` +
+              "Connection: close\r\n" +
+              "Content-Type: text/plain\r\n" +
+              `Content-Length: ${bodyBytes}\r\n\r\n`,
+          );
+          socket.write("x".repeat(64));
+        });
+      });
+      expect(dialed).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 15_000);
+
+  it("closes the client connection after 403 when the body exceeds the drain byte cap", async () => {
+    const dialed: string[] = [];
+    await startMockProxy(dialed);
+    const port = proxy?.endpoint.port;
+    if (port === undefined) throw new Error("proxy missing");
+    const target = `http://127.0.0.1:${port}${mockListenerPath()}`;
+    await new Promise<void>((resolve, reject) => {
+      const socket = connect(port, "127.0.0.1");
+      let saw403 = false;
+      let buf = "";
+      const failTimer = setTimeout(() => {
+        socket.destroy();
+        reject(new Error("timed out waiting for connection close after 403"));
+      }, 5_000);
+      socket.on("data", (chunk) => {
+        buf += chunk.toString("utf8");
+        if (!saw403 && buf.includes("403")) {
+          saw403 = true;
+          expect(buf.toLowerCase()).toContain("connection: close");
+          const keepSending = () => {
+            if (socket.destroyed) return;
+            socket.write("x".repeat(16_384));
+            setImmediate(keepSending);
+          };
+          keepSending();
+        }
+      });
+      socket.once("close", () => {
+        clearTimeout(failTimer);
+        resolve();
+      });
+      socket.once("error", () => {
+        clearTimeout(failTimer);
+        resolve();
+      });
+      socket.once("connect", () => {
+        const bodyBytes = RUNTIME_LIMITS.maxControlBodyBytes + 50_000;
+        socket.write(
+          `POST ${target} HTTP/1.1\r\n` +
+            `Host: evil.example:${port}\r\n` +
+            "Connection: close\r\n" +
+            "Content-Type: text/plain\r\n" +
+            `Content-Length: ${bodyBytes}\r\n\r\n`,
+        );
+        socket.write("x".repeat(64));
+      });
+    });
+    expect(dialed).toEqual([]);
+  }, 10_000);
+
   it("serves an absolute-form mock path when the Host is loopback", async () => {
     const dialed: string[] = [];
     const served = await startMockProxy(dialed);
@@ -1496,6 +1596,39 @@ describe("readBoundedBody", () => {
       req.emit("data", Buffer.alloc(64));
     }
     expect(req.listenerCount("data")).toBe(1);
+  });
+
+  it("destroys a discarded body after the idle cap elapses", async () => {
+    vi.useFakeTimers();
+    const req = new PassThrough() as unknown as IncomingMessage;
+    let destroyed = false;
+    req.destroy = (() => {
+      destroyed = true;
+      return req;
+    }) as IncomingMessage["destroy"];
+    try {
+      startBoundedBodyDrain(req);
+      req.emit("data", Buffer.alloc(8));
+      expect(destroyed).toBe(false);
+      await vi.advanceTimersByTimeAsync(RUNTIME_LIMITS.bodyIdleTimeoutMs);
+      expect(destroyed).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("destroys a discarded body when the drain byte cap is exceeded", async () => {
+    const req = new PassThrough() as unknown as IncomingMessage;
+    let destroyed = false;
+    req.destroy = (() => {
+      destroyed = true;
+      return req;
+    }) as IncomingMessage["destroy"];
+    startBoundedBodyDrain(req);
+    req.emit("data", Buffer.alloc(RUNTIME_LIMITS.maxControlBodyBytes));
+    expect(destroyed).toBe(false);
+    req.emit("data", Buffer.alloc(1));
+    expect(destroyed).toBe(true);
   });
 
   it("does not dial upstream when the client resets a body mid-read", async () => {
