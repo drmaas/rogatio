@@ -169,6 +169,68 @@ function headerValue(
   return raw;
 }
 
+const boundedBodyDrainActive = new WeakSet<IncomingMessage>();
+
+export function startBoundedBodyDrain(req: IncomingMessage): () => void {
+  if (boundedBodyDrainActive.has(req)) {
+    return () => {};
+  }
+  boundedBodyDrainActive.add(req);
+
+  let drained = 0;
+  let drainTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const clearDrainTimer = (): void => {
+    if (drainTimer !== undefined) {
+      clearTimeout(drainTimer);
+      drainTimer = undefined;
+    }
+  };
+
+  const onDrain = (chunk: Buffer): void => {
+    drained += chunk.byteLength;
+    if (drained > RUNTIME_LIMITS.maxControlBodyBytes) {
+      destroyAfterDrain();
+      return;
+    }
+    armIdleTimer();
+  };
+
+  const teardown = (): void => {
+    if (!boundedBodyDrainActive.has(req)) return;
+    boundedBodyDrainActive.delete(req);
+    clearDrainTimer();
+    req.removeListener("data", onDrain);
+    req.removeListener("end", onDrainEnd);
+    req.removeListener("close", onDrainEnd);
+  };
+
+  const destroyAfterDrain = (): void => {
+    teardown();
+    req.destroy();
+  };
+
+  const armIdleTimer = (): void => {
+    clearDrainTimer();
+    drainTimer = setTimeout(
+      destroyAfterDrain,
+      RUNTIME_LIMITS.bodyIdleTimeoutMs,
+    );
+  };
+
+  const onDrainEnd = (): void => {
+    teardown();
+  };
+
+  req.resume();
+  req.on("data", onDrain);
+  req.once("end", onDrainEnd);
+  req.once("close", onDrainEnd);
+  armIdleTimer();
+
+  return teardown;
+}
+
 export function readBoundedBody(
   req: IncomingMessage,
   maxBytes: number,
@@ -180,58 +242,13 @@ export function readBoundedBody(
     let total = 0;
     let settled = false;
     let oversizeDraining = false;
-    let drainedAfterOversize = 0;
-    let drainTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const clearDrainTimer = (): void => {
-      if (drainTimer !== undefined) {
-        clearTimeout(drainTimer);
-        drainTimer = undefined;
-      }
-    };
-
-    const teardownOversizeDrain = (): void => {
-      clearDrainTimer();
-      req.removeListener("data", onOversizeDrain);
-      req.removeListener("end", onOversizeDrainEnd);
-      req.removeListener("close", onOversizeDrainEnd);
-    };
-
-    const destroyAfterOversizeDrain = (): void => {
-      teardownOversizeDrain();
-      req.destroy();
-    };
-
-    const armOversizeIdleTimer = (): void => {
-      clearDrainTimer();
-      drainTimer = setTimeout(
-        destroyAfterOversizeDrain,
-        RUNTIME_LIMITS.bodyIdleTimeoutMs,
-      );
-    };
-
-    const onOversizeDrain = (chunk: Buffer): void => {
-      drainedAfterOversize += chunk.byteLength;
-      if (drainedAfterOversize > RUNTIME_LIMITS.maxControlBodyBytes) {
-        destroyAfterOversizeDrain();
-        return;
-      }
-      armOversizeIdleTimer();
-    };
-
-    const onOversizeDrainEnd = (): void => {
-      teardownOversizeDrain();
-    };
+    let stopOversizeDrain: (() => void) | undefined;
 
     const startOversizeDrain = (): void => {
       if (oversizeDraining) return;
       oversizeDraining = true;
       req.removeListener("data", onData);
-      req.resume();
-      req.on("data", onOversizeDrain);
-      req.once("end", onOversizeDrainEnd);
-      req.once("close", onOversizeDrainEnd);
-      armOversizeIdleTimer();
+      stopOversizeDrain = startBoundedBodyDrain(req);
     };
 
     const finish = (
@@ -264,7 +281,7 @@ export function readBoundedBody(
         finish({ ok: false, reason: "error" });
       }
       if (oversizeDraining) {
-        teardownOversizeDrain();
+        stopOversizeDrain?.();
       }
     });
   });
@@ -792,7 +809,7 @@ export async function startInterceptProxy(
       if (!/^https?:\/\//i.test(targetUrl)) {
         if (!allowsListenerHost(req)) {
           discardRequestBody(req);
-          endEmpty(res, 403);
+          endEmpty(res, 403, { connectionClose: true });
           return;
         }
         if (await dispatchInternal(req, res, targetUrl)) return;
@@ -821,7 +838,7 @@ export async function startInterceptProxy(
           !allowsListenerHost(req)
         ) {
           discardRequestBody(req);
-          endEmpty(res, 403);
+          endEmpty(res, 403, { connectionClose: true });
           return;
         }
         const path = `${target.pathname}${target.search}`;
@@ -987,18 +1004,25 @@ export async function startInterceptProxy(
     }
   }
 
-  function endEmpty(res: ServerResponse, status: number): void {
+  function endEmpty(
+    res: ServerResponse,
+    status: number,
+    opts?: { readonly connectionClose?: boolean },
+  ): void {
     if (res.writableEnded) return;
-    res.writeHead(status, {
+    const headers: Record<string, string | number> = {
       "cache-control": "no-store",
       "content-length": "0",
-    });
+    };
+    if (opts?.connectionClose) {
+      headers.connection = "close";
+    }
+    res.writeHead(status, headers);
     res.end();
   }
 
   function discardRequestBody(req: IncomingMessage): void {
-    req.on("data", () => {});
-    req.resume();
+    startBoundedBodyDrain(req);
   }
 
   async function dispatchInternal(
@@ -1035,11 +1059,11 @@ export async function startInterceptProxy(
       active.presetDigest === undefined ||
       active.presetDigest.length === 0
     ) {
-      endEmpty(res, 403);
+      endEmpty(res, 403, { connectionClose: true });
       return;
     }
     if (parsed.digest !== active.presetDigest) {
-      endEmpty(res, 403);
+      endEmpty(res, 403, { connectionClose: true });
       return;
     }
     if (activeMocks >= RUNTIME_LIMITS.maxConcurrentOperations) {
