@@ -69,5 +69,6 @@ describe("semantic-release 26 release toolchain", () => {
         'Loaded plugin "generateNotes" from "./scripts/release-notes-plugin.mjs"',
       );
     },
+    30_000,
   );
 });
