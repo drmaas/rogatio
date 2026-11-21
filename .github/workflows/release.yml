@@ -72,6 +72,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # @semantic-release/npm 14 (semantic-release 26) publishes with npm 12
+      # (preferLocal). Trusted publishing still needs npm >= 11.5.1; the assert
+      # script verifies the bundled CLI version, not a global npm install.
       - name: Assert release toolchain (Node and @semantic-release/npm npm)
         run: node scripts/assert-release-toolchain.mjs
 
