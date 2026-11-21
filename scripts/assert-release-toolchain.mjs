@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,17 +26,20 @@ if (!nodeOk) {
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const semanticReleaseEntry = require.resolve("semantic-release", {
-  paths: [repoRoot],
-});
-const semanticReleaseRoot = path.dirname(semanticReleaseEntry);
+const semanticReleaseRoot = path.dirname(
+  require.resolve("semantic-release", { paths: [repoRoot] }),
+);
 const npmPluginRoot = path.dirname(
   require.resolve("@semantic-release/npm", { paths: [semanticReleaseRoot] }),
 );
-const npmEntry = require.resolve("npm", { paths: [npmPluginRoot] });
-const npm = JSON.parse(
-  readFileSync(path.join(path.dirname(npmEntry), "package.json"), "utf8"),
-).version;
+const execaPath = require.resolve("execa", { paths: [npmPluginRoot] });
+const { execaSync } = await import(execaPath);
+
+const { stdout } = execaSync("npm", ["--version"], {
+  cwd: repoRoot,
+  preferLocal: true,
+});
+const npm = stdout.trim();
 
 const [npmMajor, npmMinor, npmPatch] = npm.split(".").map(Number);
 const npmOk =
@@ -47,9 +49,11 @@ const npmOk =
       (npmMinor === MIN_NPM_MINOR && npmPatch >= MIN_NPM_PATCH)));
 if (!npmOk) {
   console.error(
-    `@semantic-release/npm bundled npm ${npm} is below ${MIN_NPM_MAJOR}.${MIN_NPM_MINOR}.${MIN_NPM_PATCH}`,
+    `npm publish CLI ${npm} is below ${MIN_NPM_MAJOR}.${MIN_NPM_MINOR}.${MIN_NPM_PATCH}`,
   );
   process.exit(1);
 }
 
-console.log(`node ${process.version} @semantic-release/npm npm ${npm}`);
+console.log(
+  `node ${process.version} publish npm ${npm} (preferLocal from repo root)`,
+);

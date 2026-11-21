@@ -5,6 +5,21 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MINIMUM_NODE_VERSION } from "../../packages/runtime/src/doctor.js";
 
+async function publishNpmVersion(repoRoot: string): Promise<string> {
+  const require = createRequire(join(repoRoot, "package.json"));
+  const semanticReleaseRoot = join(require.resolve("semantic-release"), "..");
+  const npmPluginRoot = join(
+    require.resolve("@semantic-release/npm", { paths: [semanticReleaseRoot] }),
+    "..",
+  );
+  const execaPath = require.resolve("execa", { paths: [npmPluginRoot] });
+  const { execaSync } = await import(execaPath);
+  return execaSync("npm", ["--version"], {
+    cwd: repoRoot,
+    preferLocal: true,
+  }).stdout.trim();
+}
+
 const root = resolve(import.meta.dirname, "../..");
 const require = createRequire(join(root, "package.json"));
 const semanticReleaseCli = require.resolve(
@@ -37,15 +52,16 @@ describe("semantic-release 26 release toolchain", () => {
   });
 
   it.skipIf(!nodeOk)(
-    "assert-release-toolchain accepts Node and bundled npm 12 from @semantic-release/npm",
-    () => {
+    "assert-release-toolchain checks the npm CLI that npm publish would run",
+    async () => {
+      const publishNpm = await publishNpmVersion(root);
       const result = spawnSync(
         process.execPath,
         ["scripts/assert-release-toolchain.mjs"],
         { cwd: root, encoding: "utf8" },
       );
       expect(result.status, result.stderr || result.stdout).toBe(0);
-      expect(result.stdout).toMatch(/@semantic-release\/npm npm 12\./);
+      expect(result.stdout).toContain(`publish npm ${publishNpm}`);
     },
   );
 
