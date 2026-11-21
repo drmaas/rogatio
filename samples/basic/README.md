@@ -24,7 +24,7 @@ deterministically offline with `rogatio test`.
 
 ## Prerequisites
 
-- **Node.js 26.12.1** and **pnpm 12.10.1** (see the repository `README.md` for the exact
+- **Node.js 26.13.0** and **pnpm 12.10.1** (see the repository `README.md` for the exact
   toolchain; `node -v` and `pnpm -v` should report compatible versions).
 - **Google Chrome** (the only supported browser).
 - The Chrome extension is built locally from source in this repository — there is no
@@ -229,7 +229,7 @@ rules match and preview their rewrites offline.
 
 #### Local validation server
 
-Save this as `samples/basic/validate-server.mjs` (Node 26.12.1+, no dependencies) and run it with
+Save this as `samples/basic/validate-server.mjs` (Node 26.13.0+, no dependencies) and run it with
 `node samples/basic/validate-server.mjs`. It serves endpoints that expose the headers,
 body, and content the Rogatio rules act on:
 

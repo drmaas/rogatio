@@ -9,7 +9,7 @@ optional local runtime used for response/request body rewriting.
 
 ## Install
 
-Requires Node.js 26.12.1 or newer (>=26.12.1 per `engines.node`). Install the CLI globally with your preferred
+Requires Node.js 26.13.0 or newer (>=26.13.0 per `engines.node`). Install the CLI globally with your preferred
 package manager:
 
 ```sh
