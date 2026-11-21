@@ -22,7 +22,7 @@ export const DOCTOR_PAC_TIMEOUT_MS = 10_000;
 export const DOCTOR_AI_TIMEOUT_MS = 10_000;
 
 /** Matches root `engines.node` and the CI Node pin. */
-export const MINIMUM_NODE_VERSION = "26.12.1";
+export const MINIMUM_NODE_VERSION = "26.13.0";
 
 export const DOCTOR_FIX_NODE = `Install Node.js ${MINIMUM_NODE_VERSION} or newer, then run: npm install -g @rogatio/cli`;
 export const DOCTOR_FIX_CLI = "npm install -g @rogatio/cli";

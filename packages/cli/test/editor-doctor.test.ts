@@ -27,7 +27,7 @@ const host = {
       id: "node" as const,
       status: "pass" as const,
       optional: false,
-      summary: "Node 26.12.1, CLI 1.2.3.",
+      summary: "Node 26.13.0, CLI 1.2.3.",
       fix: null,
     },
     {

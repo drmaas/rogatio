@@ -76,7 +76,7 @@ function input(overrides: Partial<DoctorInput> = {}): DoctorInput {
     read: async () => ({ ok: true, data: validProject }),
   };
   return {
-    nodeVersion: "26.12.1",
+    nodeVersion: "26.13.0",
     cliVersion: "1.2.3",
     checkUpdates: false,
     fetchLatestVersion: async () => {
@@ -144,7 +144,7 @@ describe("rogatio doctor", () => {
     ]);
     expect(json).toContain('"status": "pass"');
     expect(formatDoctorReport(report)).toContain(
-      "pass  Node and CLI  Node 26.12.1, CLI 1.2.3.",
+      "pass  Node and CLI  Node 26.13.0, CLI 1.2.3.",
     );
   });
 
@@ -201,19 +201,19 @@ describe("rogatio doctor", () => {
     expect(formatDoctorReport(report)).toContain(`Fix: ${DOCTOR_FIX_NODE}`);
   });
 
-  it("fails Node below the engines.node patch floor with the 26.12.1 fix text", async () => {
-    const report = await runDoctor(input({ nodeVersion: "26.11.1" }));
+  it("fails Node below the engines.node patch floor with the 26.13.0 fix text", async () => {
+    const report = await runDoctor(input({ nodeVersion: "26.12.1" }));
     const node = report.checks[0];
     expect(node?.status).toBe("fail");
-    expect(node?.summary).toContain("26.12.1");
+    expect(node?.summary).toContain("26.13.0");
     expect(node?.fix).toBe(DOCTOR_FIX_NODE);
-    expect(node?.fix).toContain("26.12.1");
+    expect(node?.fix).toContain("26.13.0");
     expect(report.exitCode).toBe(1);
     expect(report.ok).toBe(false);
   });
 
   it("passes the Node check at the supported baseline patch", async () => {
-    const report = await runDoctor(input({ nodeVersion: "26.12.1" }));
+    const report = await runDoctor(input({ nodeVersion: "26.13.0" }));
     expect(report.checks[0]?.status).toBe("pass");
     expect(report.exitCode).toBe(0);
   });
@@ -564,7 +564,7 @@ describe("rogatio doctor", () => {
       },
       {
         cliVersion: "1.2.3",
-        nodeVersion: "26.12.1",
+        nodeVersion: "26.13.0",
         fetchLatestVersion: async () => {
           throw new Error("no registry");
         },
@@ -586,7 +586,7 @@ describe("rogatio doctor", () => {
       { projectOmitted: "too-large", extensionId: RELEASE_EXTENSION_ID },
       {
         cliVersion: "1.2.3",
-        nodeVersion: "26.12.1",
+        nodeVersion: "26.13.0",
         verifyInstall: async () => verifyResult(),
         probePac: async () => ({ ok: true }),
         testAi: async () => ({ configured: true, ok: true }),

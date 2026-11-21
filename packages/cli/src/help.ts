@@ -34,7 +34,7 @@ Options:
   --help, -h        Show this help
 
 Checks, in order:
-  node      Node.js 26 or newer, and this CLI version
+  node      Node.js 26.13.0 or newer, and this CLI version
   project   Project file found and valid (same schema and compiler checks as verify)
   host      Native host manifest present and allowed_origins matches the extension ID
   ca        Device CA present and trusted (same signal as rogatio runtime verify)

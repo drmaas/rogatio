@@ -30,6 +30,9 @@ const config: KnipConfig = {
     // test/integration/packaged-cli.test.ts resolves this dynamically while
     // packing the published CLI. Nothing imports it from TypeScript.
     "@peculiar/x509",
+    // scripts/assert-release-toolchain.mjs resolves execa like @semantic-release/npm.
+    "@semantic-release/npm",
+    "execa",
   ],
   ignoreIssues: {
     // MOCK_GUARD_ID is the top of the mock-redirect id band, so it aliases
