@@ -14,7 +14,7 @@ async function publishNpmVersion(repoRoot: string): Promise<string> {
     "..",
   );
   const execaPath = require.resolve("execa", { paths: [npmPluginRoot] });
-  const { execaSync } = await import(execaPath);
+  const { execaSync } = await import(pathToFileURL(execaPath).href);
   return execaSync("npm", ["--version"], {
     cwd: repoRoot,
     preferLocal: true,
