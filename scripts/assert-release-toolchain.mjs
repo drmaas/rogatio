@@ -33,7 +33,7 @@ const npmPluginRoot = path.dirname(
   require.resolve("@semantic-release/npm", { paths: [semanticReleaseRoot] }),
 );
 const execaPath = require.resolve("execa", { paths: [npmPluginRoot] });
-const { execaSync } = await import(execaPath);
+const { execaSync } = await import(pathToFileURL(execaPath).href);
 
 const { stdout } = execaSync("npm", ["--version"], {
   cwd: repoRoot,
