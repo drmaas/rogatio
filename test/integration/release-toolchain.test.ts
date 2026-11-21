@@ -1,10 +1,15 @@
 import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MINIMUM_NODE_VERSION } from "../../packages/runtime/src/doctor.js";
 
 const root = resolve(import.meta.dirname, "../..");
+const require = createRequire(join(root, "package.json"));
+const semanticReleaseCli = require.resolve(
+  "semantic-release/bin/semantic-release.js",
+);
 
 function compareVersions(version: string, minimum: string): number {
   const left = version.split(".").map(Number);
@@ -51,9 +56,9 @@ describe("semantic-release 26 release toolchain", () => {
       delete env.GITHUB_TOKEN;
       delete env.GH_TOKEN;
       const result = spawnSync(
-        "pnpm",
-        ["exec", "semantic-release", "--dry-run", "--no-ci"],
-        { cwd: root, encoding: "utf8", env, shell: false },
+        process.execPath,
+        [semanticReleaseCli, "--dry-run", "--no-ci"],
+        { cwd: root, encoding: "utf8", env },
       );
       const combined = `${result.stdout}\n${result.stderr}`;
       expect(result.status, combined).toBe(0);
